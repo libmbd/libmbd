@@ -52,7 +52,7 @@ function get_ts_energy( &
     implicit none
 
     real*8, intent(in) :: C6(:), alpha_0(size(C6))
-    character(len=100), intent(in) :: version
+    character(len=*), intent(in) :: version
     real*8, intent(in), optional :: R_vdw(size(C6))
     real*8, intent(in), optional :: s_R, d
     real*8, intent(in), optional :: &

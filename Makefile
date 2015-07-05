@@ -6,15 +6,13 @@ F90FLAGS ?= $(addprefix -Wno-,${f_warnings_off})
 LDFLAGS ?= -lscalapack
 FC ?= gfortran
 MPIFC ?= mpifort
-FC := $(shell which ${FC})
-MPIFC := $(shell which ${MPIFC})
 
 all: mbd.so
 	mpiexec -n 2 python pymbd.py
 
 mbd.so: mbd.f90 ${blddir}/mbd_interface.o
 	mkdir -p ${blddir}
-	CFLAGS="${CFLAGS}" f2py -c --build-dir ${blddir} --f90exec=${FC} --f90flags="${F90FLAGS}" -m $(basename $@) ${LDFLAGS} $^
+	CFLAGS="${CFLAGS}" f2py -c --build-dir ${blddir} --f90exec=$(shell which ${FC}) --f90flags="${F90FLAGS}" -m $(basename $@) ${LDFLAGS} $^
 	rsync -a ${blddir}/*.mod .
 
 ${blddir}/%.o: %.f90

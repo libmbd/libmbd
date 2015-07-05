@@ -1,10 +1,10 @@
 c_warnings_off = incompatible-pointer-types parentheses-equality shorten-64-to-32 \#warnings
 f_warnings_off = maybe-uninitialized
-CFLAGS = $(addprefix -Wno-,${c_warnings_off})
-F90FLAGS = $(addprefix -Wno-,${f_warnings_off})
+blddir = build
+CFLAGS ?= $(addprefix -Wno-,${c_warnings_off})
+F90FLAGS ?= $(addprefix -Wno-,${f_warnings_off})
 LDFLAGS ?= -lscalapack
 MPIFC ?= mpifort
-blddir = build
 
 all: mbd.so
 	mpiexec -n 2 python pymbd.py

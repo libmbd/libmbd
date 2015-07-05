@@ -13,6 +13,8 @@ mbd.so: mbd_interface.f90 mbd.f90
 	rsync -a ${blddir}/*.mod .
 	rm -r ${blddir}
 
-distclean:
-	-rm mbd.so
+clean:
 	-rm *.mod
+
+distclean: clean
+	-rm mbd.so

@@ -3,7 +3,6 @@ include system.mk
 blddir = build
 
 all: mbd.so
-	mpiexec -n 2 python pymbd.py
 
 mbd.so: mbd_interface.f90 mbd.f90
 	mkdir -p ${blddir}
@@ -12,6 +11,9 @@ mbd.so: mbd_interface.f90 mbd.f90
 		   -m $(basename $@) ${LDFLAGS} $^
 	rsync -a ${blddir}/*.mod .
 	rm -r ${blddir}
+
+test:
+	mpiexec -n 2 python pymbd.py
 
 clean:
 	-rm *.mod

@@ -13,7 +13,7 @@ mbd.so: mbd_interface.f90 mbd.f90
 	rm -r ${blddir}
 
 test:
-	mpiexec -n 2 python pymbd.py
+	python test.py
 
 clean:
 	-rm *.mod

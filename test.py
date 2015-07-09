@@ -2,8 +2,8 @@ import pymbd
 import json
 import numpy as np
 
-data = json.load(open('results.json'))
-energy = pymbd.main('results.json')
+energy = pymbd.main('mbddata.json')
+data = json.load(open('mbddata.json'))
 for key in energy:
     my = energy[key]
     ref = [e['value'] for e in data['energy'] if e['name'] == key][0]

@@ -5,6 +5,7 @@ import numpy as np
 from mpi4py import MPI
 from mbd import mbd
 import sys
+from pathlib import Path
 
 
 class ArrayEncoder(json.JSONEncoder):
@@ -20,6 +21,16 @@ ntasks = MPI.COMM_WORLD.Get_size()
 myid = MPI.COMM_WORLD.Get_rank()
 
 
+def init(coords):
+    mbd.n_atoms = len(coords)
+    mbd.coords = coords.T
+    mbd.is_periodic = False
+    mbd.lattice_vector = np.zeros((3, 3))
+    mbd.electric_field = np.zeros(3)
+    mbd.n_tasks = ntasks
+    mbd.my_task = myid
+
+
 def printerr(s):
     if myid == 0:
         sys.stderr.write(s + '\n')
@@ -32,17 +43,31 @@ def block(msg):
     return decorator
 
 
-def init(coords):
-    mbd.n_atoms = len(coords)
-    mbd.coords = coords.T
-    mbd.is_periodic = False
-    mbd.lattice_vector = np.zeros((3, 3))
-    mbd.electric_field = np.zeros(3)
-    mbd.n_tasks = ntasks
-    mbd.my_task = myid
+def main(path, extension=None):
+    data = json.load(open(path))
+    if extension:
+        module, func = extension.split(':')
+        module = __import__(module)
+        extension = getattr(module, func)
+    else:
+        extension = run_mbd
+    for key in data:
+        data[key] = np.array(data[key])
+    printerr('Running on {} nodes...'.format(ntasks))
+    init(data['coords'])
+    results = extension(data, mbd)
+    return results
 
 
-def run_mbd(data):
+if __name__ == '__main__':
+    config = Path('config.json')
+    config = json.load(open(str(config))) if config.exists() else {}
+    results = main(sys.argv[1], config.get('extension'))
+    if myid == 0:
+        json.dump(results, sys.stdout, cls=ArrayEncoder, indent=4)
+
+
+def run_mbd(data, mbd):
     natoms = len(data['coords'])
     nomega = mbd.omega_grid.shape[0]
     alpha, C6, R_vdw, energy = {}, {}, {}, {}
@@ -162,21 +187,3 @@ def run_mbd(data):
                           a=damp_params['mbd_rsscs_a'])
 
     return energy
-
-
-def main(inputfile):
-    printerr('Running on %s nodes...' % ntasks)
-    with open(inputfile) as f:
-        data = json.load(f)
-    for key in data:
-        data[key] = np.array(data[key])
-    init(data['coords'])
-    energy = run_mbd(data)
-    return energy
-
-
-if __name__ == '__main__':
-    energy = main(sys.argv[1])
-    if myid == 0:
-        json.dump(energy, sys.stdout, cls=ArrayEncoder, indent=4)
-        print()

@@ -5,15 +5,6 @@ use mbd_interface, only: &
 
 implicit none
 
-! these variables need to be initialized before the module is used
-integer :: n_atoms
-real*8, allocatable :: coords(:, :)
-logical :: is_periodic
-real*8 :: lattice_vector(3, 3)
-real*8 :: electric_field(3)
-integer :: n_tasks, my_task
-
-! these variables can be modified but have defaults
 real*8 :: &
     pi = acos(-1.d0), &
     nan = sqrt(-sin(0.d0))
@@ -47,62 +38,101 @@ real*8 :: omega_grid_w(0:n_grid_omega) = (/ &
 contains
 
 function get_ts_energy( &
-        C6, alpha_0, version, R_vdw, s_R, d, damping_custom, overlap) &
+        coords, &
+        C6, &
+        alpha_0, &
+        version, &
+        R_vdw, s_R, d, &
+        overlap, &
+        damping_custom, &
+        lattice_vector, &
+        my_task, n_tasks) &
         result(ene)
     implicit none
 
-    real*8, intent(in) :: C6(:), alpha_0(size(C6))
+    real*8, intent(in) :: &
+       coords(:, :), &
+       C6(size(coords, 1)), &
+       alpha_0(size(coords, 1))
     character(len=*), intent(in) :: version
-    real*8, intent(in), optional :: R_vdw(size(C6))
-    real*8, intent(in), optional :: s_R, d
     real*8, intent(in), optional :: &
-        damping_custom(size(C6), size(C6)), &
-        overlap(size(C6), size(C6))
+        R_vdw(size(coords, 1)), &
+        s_R, d, &
+        overlap(size(coords, 1), size(coords, 1)), &
+        damping_custom(size(coords, 1), size(coords, 1)), &
+        lattice_vector(3, 3)
+    integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
-    real*8 :: C6_ij, r(3), r_norm, f_damp, R_vdw_sum, overlap_ij
+    real*8 :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij
     real*8 :: ene_add, ene_contrib
-    real*8 :: cell_shift(3)
+    real*8 :: r_cell(3)
     integer :: n_shell, i_cell, j_cell, k_cell, ijk_cell(3)
-    integer :: i_atom, j_atom
+    integer :: i_atom, j_atom, i_range, range_g_cell(3), g_cell(3)
+    real*8, parameter :: step = 100.d0
+    logical :: &
+        is_periodic = .false., &
+        is_parallel = .false.
 
+    if (present(lattice_vector)) then
+        if (any(lattice_vector > 0.d0)) then
+            is_periodic = .true.
+        end if
+    end if
+    if (present(n_tasks)) then
+        if (n_tasks > 0) then
+            is_parallel = .true.
+        end if
+    end if
     ene = 0.d0
-    n_shell = 0
+    i_range = 0
     do
         ene_add = 0.d0
-        do i_cell = -n_shell, n_shell
-        do j_cell = -n_shell, n_shell
-        do k_cell = -n_shell, n_shell
-            ijk_cell = (/ i_cell, j_cell, k_cell /)
-            if (all(abs(ijk_cell) /= n_shell)) cycle
-            cell_shift = matmul(lattice_vector, ijk_cell)
-            do i_atom = 1, n_atoms
-                if (my_task /= modulo(i_atom, n_tasks)) cycle
-                do j_atom = i_atom, n_atoms
-                    if (n_shell == 0 .and. i_atom == j_atom) cycle
-                    r = coords(:, i_atom)-coords(:, j_atom)-cell_shift
+        i_range = i_range+1
+        if (is_periodic) then
+            range_g_cell = supercell_circum(lattice_vector, i_range*step)
+        else
+            range_g_cell(:) = 0
+        end if
+        g_cell = (/ 0, 0, -1 /)
+        do i_cell = 1, product(1+2*range_g_cell)
+            call shift_cell (g_cell, -range_g_cell, range_g_cell)
+            if (is_parallel .and. is_periodic) then
+                if (my_task /= modulo(i_cell, n_tasks)) cycle
+            end if
+            if (is_periodic) then
+                r_cell = matmul(g_cell, lattice_vector)
+            else
+                r_cell(:) = 0.d0
+            end if
+            do i_atom = 1, size(coords, 1)
+                if (is_parallel .and. .not. is_periodic) then
+                    if (my_task /= modulo(i_atom, n_tasks)) cycle
+                end if
+                do j_atom = 1, i_atom
+                    if (i_cell == 1) then
+                        if (i_atom == j_atom) cycle
+                    end if
+                    r = coords(:, i_atom)-coords(:, j_atom)-r_cell
                     r_norm = sqrt(sum(r**2))
+                    if (r_norm > i_range*step .or. r_norm < (i_range-1)*step) cycle
                     C6_ij = combine_C6(C6(i_atom), C6(j_atom), &
-                                       alpha_0(i_atom), alpha_0(j_atom))
+                        alpha_0(i_atom), alpha_0(j_atom))
                     if (present(R_vdw)) then
-                        R_vdw_sum = R_vdw(i_atom)+R_vdw(j_atom)
+                        R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
                     end if
                     if (present(overlap)) then
-                        if (i_atom < j_atom) then
-                            overlap_ij = overlap(i_atom, j_atom)
-                        else
-                            overlap_ij = overlap(j_atom, i_atom)
-                        end if
+                        overlap_ij = overlap(i_atom, j_atom)
                     end if
                     select case (version)
                         case ("fermi")
-                            f_damp = damping_fermi(r_norm, s_R*R_vdw_sum, d)
+                            f_damp = damping_fermi(r_norm, s_R*R_vdw_ij, d)
                         case ("fermi2")
-                            f_damp = damping_fermi(r_norm, s_R*R_vdw_sum, d)**2
+                            f_damp = damping_fermi(r_norm, s_R*R_vdw_ij, d)**2
                         case ("erf")
-                            f_damp = damping_erf(r_norm, s_R*R_vdw_sum, d)
+                            f_damp = damping_erf(r_norm, s_R*R_vdw_ij, d)
                         case ("1mexp")
-                            f_damp = damping_1mexp(r_norm, s_R*R_vdw_sum, d)
+                            f_damp = damping_1mexp(r_norm, s_R*R_vdw_ij, d)
                         case ("overlap")
                             f_damp = damping_overlap( &
                                 r_norm, overlap_ij, C6_ij, s_R, d)
@@ -113,122 +143,214 @@ function get_ts_energy( &
                     if (i_atom == j_atom) then
                         ene_contrib = ene_contrib/2
                     endif
-                    ene_add = ene_add + ene_contrib
+                    ene_add = ene_add + (-C6_ij/r_norm**6*f_damp)
                 enddo
             enddo
-        enddo
-        enddo
         enddo
         call sync_sum_number (ene_add)
         ene = ene + ene_add
         if (.not. is_periodic) exit
-        if (n_shell > 0 .and. abs(ene_add) < param_energy_accuracy) then
+        if (i_range > 1 .and. abs(ene_add) < param_energy_accuracy) then
             exit
-        else
-            n_shell = n_shell+1
         endif
     enddo
 end function get_ts_energy
 
-function run_scs(alpha, version, R_vdw, beta, a, damping_custom) & 
-        result(relay)
+function build_dipole_matrix( &
+        coords, &
+        version, &
+        alpha, &
+        R_vdw, beta, a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        lattice_vector, &
+        dipole_cutoff, &
+        k_point, &
+        my_task, n_tasks) &
+        result(T)
     implicit none
 
-    real*8, intent(in) :: alpha(:)
+    real*8, intent(in) :: coords(:, :)
     character(len=*), intent(in) :: version
-    real*8, intent(in), optional :: R_vdw(size(alpha))
-    real*8, intent(in), optional :: beta, a
-    real*8, intent(in), optional :: damping_custom(size(alpha), size(alpha))
-    real*8 :: relay(3*size(alpha), 3*size(alpha))
+    real*8, intent(in), optional :: &
+        alpha(size(coords, 1)), &
+        R_vdw(size(coords, 1)), &
+        beta, a, &
+        overlap(size(coords, 1), size(coords, 1)), &
+        C6(size(coords, 1)), &
+        damping_custom(size(coords, 1), size(coords, 1)), &
+        potential_custom(size(coords, 1), size(coords, 1), 3, 3), &
+        lattice_vector(3, 3), &
+        dipole_cutoff, &
+        k_point(3)
+    integer, intent(in), optional :: my_task, n_tasks
+    real*8 :: T(3*size(coords, 1), 3*size(coords, 1))
 
-    integer :: i_atom, j_atom, i_xyz, j_xyz
-    real*8 :: lattice_dim(3)
-    integer :: i_cell, j_cell, k_cell, ijk_cell(3), supercell_dim(3)
-    real*8 :: r(3), r_norm, Tpp(3, 3), cell_shift(3)
-    real*8 :: sigma, R_vdw_sum
+    real*8 :: Tpp(3, 3)
+    real*8 :: r_cell(3), r(3), r_norm
+    real*8 :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
+    integer :: i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3)
+    logical :: &
+        is_periodic = .false., &
+        is_parallel = .false.
 
-    if (.not. is_periodic) then
-        supercell_dim(:) = 0
+    if (present(lattice_vector)) then
+        if (any(lattice_vector > 0.d0)) then
+            is_periodic = .true.
+        end if
+    end if
+    if (present(n_tasks)) then
+        if (n_tasks > 0) then
+            is_parallel = .true.
+        end if
+    end if
+    if (is_periodic) then
+        range_g_cell = supercell_circum(lattice_vector, dipole_cutoff)
     else
-        lattice_dim = sqrt(sum(lattice_vector**2, 1))
-        supercell_dim = ceiling(param_scs_dip_cutoff/lattice_dim)
-    endif
-    relay(:, :) = 0.d0
-    do i_atom = 1, n_atoms
-        if (my_task /= modulo(i_atom, n_tasks)) cycle
-        do i_xyz = 1, 3
-            relay(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = 1.d0/alpha(i_atom)
-        enddo
-    enddo
-    do i_cell = -supercell_dim(1), supercell_dim(1)
-    do j_cell = -supercell_dim(2), supercell_dim(2)
-    do k_cell = -supercell_dim(3), supercell_dim(3)
-        ijk_cell = (/ i_cell, j_cell, k_cell /)
-        cell_shift = matmul(lattice_vector, ijk_cell)
-        do i_atom = 1, n_atoms
-            if (my_task /= modulo(i_atom, n_tasks)) cycle
-            do j_atom = i_atom, n_atoms
-                if (i_atom == j_atom) then
-                    if (all(ijk_cell(:) == 0)) cycle
-                endif
-                r = coords(:, i_atom)-coords(:, j_atom)-cell_shift
+        range_g_cell(:) = 0
+    end if
+    T(:, :) = 0.d0
+    g_cell = (/ 0, 0, -1 /)
+    do i_cell = 1, product(1+2*range_g_cell)
+        call shift_cell (g_cell, -range_g_cell, range_g_cell)
+        if (is_parallel .and. is_periodic) then
+            if (my_task /= modulo(i_cell, n_tasks)) cycle
+        end if
+        if (is_periodic) then
+            r_cell = matmul(g_cell, lattice_vector)
+        else
+            r_cell(:) = 0.d0
+        end if
+        do i_atom = 1, size(coords, 1)
+            if (is_parallel .and. .not. is_periodic) then
+                if (my_task /= modulo(i_atom, n_tasks)) cycle
+            end if
+            do j_atom = 1, i_atom
+                if (i_cell == 1) then
+                    if (i_atom == j_atom) cycle
+                end if
+                r = coords(:, i_atom)-coords(:, j_atom)-r_cell
                 r_norm = sqrt(sum(r**2))
-                if (r_norm > param_scs_dip_cutoff) cycle
-                sigma = sqrt(sum( &
-                    get_sigma_selfint((/ alpha(i_atom), alpha(j_atom) /))**2))
+                if (is_periodic) then
+                    if (r_norm > dipole_cutoff) cycle
+                end if
                 if (present(R_vdw)) then
-                    R_vdw_sum = R_vdw(i_atom)+R_vdw(j_atom)
+                    R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
+                end if
+                if (present(alpha)) then
+                    sigma_ij = sqrt(sum(get_sigma_selfint(alpha((/ i_atom , j_atom /)))**2))
+                end if
+                if (present(overlap)) then
+                    overlap_ij = overlap(i_atom, j_atom)
+                end if
+                if (present(C6)) then
+                    C6_ij = combine_C6(C6(i_atom), C6(j_atom), alpha(i_atom), alpha(j_atom))
                 end if
                 select case (version)
+                    case ("dip,1mexp")
+                        Tpp = T_1mexp_coulomb(r, beta*R_vdw_ij, a)
+                    case ("dip,erf")
+                        Tpp = T_erf_coulomb(r, beta*R_vdw_ij, a)
+                    case ("dip,fermi")
+                        Tpp = T_fermi_coulomb(r, beta*R_vdw_ij, a)
+                    case ("dip,overlap")
+                        Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, beta, a)
+                    case ("1mexp,dip")
+                        Tpp = damping_1mexp(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("erf,dip")
+                        Tpp = damping_erf(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
+                        Tpp = damping_fermi(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("overlap,dip")
+                        Tpp = damping_overlap(r_norm, overlap_ij, C6_ij, beta, a)*T_bare(r)
+                    case ("custom,dip")
+                        Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
+                    case ("dip,custom")
+                        Tpp = potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, sigma, 1.d0)
+                        Tpp = T_erf_coulomb(r, sigma_ij, 1.d0)
                     case ("1mexp,dip,gg")
-                        Tpp = (1.d0-damping_1mexp(r_norm, beta*R_vdw_sum, a)) &
-                            *T_erf_coulomb(r, sigma, 1.d0)
+                        Tpp = (1.d0-damping_1mexp(r_norm, beta*R_vdw_ij, a)) &
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
                     case ("erf,dip,gg")
-                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_sum, a)) & 
-                            *T_erf_coulomb(r, sigma, 1.d0)
+                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
                     case ("fermi,dip,gg")
-                        Tpp = (1.d0-damping_fermi(r_norm, beta*R_vdw_sum, a)) &
-                            * T_erf_coulomb(r, sigma, 1.d0)
+                        Tpp = (1.d0-damping_fermi(r_norm, beta*R_vdw_ij, a)) &
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
                     case ("custom,dip,gg")
                         Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
-                            * T_erf_coulomb(r, sigma, 1.d0)
-                endselect
-                do i_xyz = 1, 3
-                do j_xyz = 1, 3
-                    relay(3*(i_atom-1)+i_xyz, 3*(j_atom-1)+j_xyz) &
-                        = relay(3*(i_atom-1)+i_xyz, 3*(j_atom-1)+j_xyz) &
-                            -Tpp(i_xyz, j_xyz)
-                    if (i_atom /= j_atom) then
-                        relay(3*(j_atom-1)+j_xyz, 3*(i_atom-1)+i_xyz) &
-                            = relay(3*(j_atom-1)+j_xyz, 3*(i_atom-1)+i_xyz) &
-                                -Tpp(i_xyz, j_xyz)
-                    endif
-                enddo
-                enddo
-            enddo
-        enddo
-    enddo
-    enddo
-    enddo
-    call sync_sum_array (relay, size(relay))
-    relay = invert_matrix(relay)
-end function run_scs
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                end select
+                T(3*(i_atom-1)+1:3*(i_atom-1)+3, &
+                    3*(j_atom-1)+1:3*(j_atom-1)+3) = &
+                    T(3*(i_atom-1)+1:3*(i_atom-1)+3, &
+                    3*(j_atom-1)+1:3*(j_atom-1)+3) + Tpp
+                T(3*(j_atom-1)+1:3*(j_atom-1)+3, &
+                    3*(i_atom-1)+1:3*(i_atom-1)+3) = &
+                    T(3*(j_atom-1)+1:3*(j_atom-1)+3, &
+                    3*(i_atom-1)+1:3*(i_atom-1)+3) + transpose(Tpp)
+            end do ! j_atom
+        end do ! i_atom
+    end do ! i_cell
+    if (is_parallel) then
+        call sync_sum_array (T, size(T))
+    end if
+end function build_dipole_matrix
 
-function contract_polarizability(relay) result(alpha)
+function run_scs( &
+        coords, &
+        alpha, &
+        version, &
+        R_vdw, beta, a, &
+        damping_custom, &
+        lattice_vector, &
+        my_task, n_tasks) & 
+        result(alpha_scs)
     implicit none
 
-    real*8, intent(in) :: relay(:, :)
-    real*8 :: alpha(size(relay, 1)/3)
+    real*8, intent(in) :: &
+        coords(:, :), &
+        alpha(size(coords, 1))
+    character(len=*), intent(in) :: version
+    real*8, intent(in), optional :: &
+        R_vdw(size(coords, 1)), &
+        beta, a, &
+        damping_custom(size(coords, 1), size(coords, 1)), &
+        lattice_vector(3, 3)
+    integer, intent(in), optional :: my_task, n_tasks
+    real*8 :: alpha_scs(3*size(coords, 1), 3*size(coords, 1))
+
+    real*8 :: T(3*size(coords, 1), 3*size(coords, 1))
+    integer :: i_atom, i_xyz
+
+    T = build_dipole_matrix( &
+        coords, version, alpha, R_vdw, beta, a, damping_custom=damping_custom, &
+        lattice_vector=lattice_vector, dipole_cutoff=param_mbd_dip_cutoff)
+    alpha_scs = -T
+    do i_atom = 1, size(coords, 1)
+        do i_xyz = 1, 3
+            alpha_scs(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = 1.d0/alpha(i_atom)
+        end do
+    end do
+    alpha_scs = invert_matrix(alpha_scs)
+end function run_scs
+
+function contract_polarizability(alpha_3n_3n) result(alpha)
+    implicit none
+
+    real*8, intent(in) :: alpha_3n_3n(:, :)
+    real*8 :: alpha(size(alpha_3n_3n, 1)/3)
 
     integer :: i_atom, i_xyz, j_xyz
     real*8 :: alpha_3_3(3, 3), alpha_diag(3)
 
-    do i_atom = 1, n_atoms
+    do i_atom = 1, size(alpha)
         do i_xyz = 1, 3
             do j_xyz = 1, 3
-                alpha_3_3(i_xyz, j_xyz) = sum(relay(i_xyz::3, 3*(i_atom-1)+j_xyz))
+                alpha_3_3(i_xyz, j_xyz) = sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
             enddo
         enddo
         alpha_diag = diagonalize_matrix(alpha_3_3)
@@ -237,333 +359,158 @@ function contract_polarizability(relay) result(alpha)
 end function
 
 function get_mbd_energy( &
-        omega, alpha_0, version, R_vdw, beta, a, &
-        damping_custom, potential_custom, overlap, C6, &
-        omegap, modes) &
+        coords, &
+        alpha_0, &
+        omega, &
+        version, &
+        R_vdw, beta, a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        lattice_vector, &
+        k_point, &
+        eigenomega, modes, &
+        my_task, n_tasks) &
         result(ene)
     implicit none
 
-    real*8, intent(in) :: omega(:), alpha_0(size(omega))
+    real*8, intent(in) :: &
+        coords(:, :), &
+        alpha_0(size(coords, 1)), &
+        omega(size(coords, 1))
     character(len=*), intent(in) :: version
-    real*8, intent(in), optional :: R_vdw(size(omega))
-    real*8, intent(in), optional :: beta, a
     real*8, intent(in), optional :: &
-        damping_custom(size(omega), size(omega)), &
-        overlap(size(omega), size(omega)), C6(size(omega))
-    real*8, intent(in), optional :: &
-        potential_custom(size(omega), size(omega), 3, 3)
+        R_vdw(size(coords, 1)), &
+        beta, a, &
+        overlap(size(coords, 1), size(coords, 1)), &
+        C6(size(coords, 1)), &
+        damping_custom(size(coords, 1), size(coords, 1)), &
+        potential_custom(size(coords, 1), size(coords, 1), 3, 3), &
+        lattice_vector(3, 3), &
+        k_point(3)
     real*8, intent(out), optional :: &
-        omegap(size(omega)), modes(3*size(omega), 3*size(omega))
+        eigenomega(3*size(coords, 1)), &
+        modes(3*size(coords, 1), 3*size(coords, 1))
+    integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
     character(len=1000) :: info_str
-    real*8, allocatable :: C(:, :), C_eigs(:), coords_hyper(:, :)
-    real*8, allocatable :: xi_delta(:), rhs(:)
-    real*8 :: delta_ene
-    logical :: is_electric_field
+    real*8, dimension(3*size(coords, 1), 3*size(coords, 1)) :: T, V
+    real*8 :: eigs(3*size(coords, 1))
     integer :: i_atom, j_atom, i_xyz, j_xyz
-    real*8 :: lattice_dim(3), cell_shift(3)
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), supercell_dim(3)
-    integer :: i_atom_hyp, j_atom_hyp, hypercell_dim(3), n_cells_hyper, &
-               n_atoms_hyper
-    real*8 :: lattice_vector_hyper(3, 3), lattice_dim_hyper(3)
+    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
     real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs
+    integer :: n_negative_eigs, g_cell(3), i_order
 
-    if (.not. is_periodic) then
-        hypercell_dim(:) = 1
-    else
-        lattice_dim = sqrt(sum(lattice_vector**2, 1))
-        hypercell_dim = ceiling(param_mbd_supercell_cutoff/lattice_dim)
-    endif
-    is_electric_field = any(electric_field /= 0.d0)
-    n_cells_hyper = product(hypercell_dim(:))
-    n_atoms_hyper = n_cells_hyper*n_atoms
-    allocate (C(3*n_atoms_hyper, 3*n_atoms_hyper))
-    C(:, :) = 0.d0
-    allocate (C_eigs(3*n_atoms_hyper))
-    allocate (coords_hyper(3, n_atoms_hyper))
-    if (is_electric_field) then
-        allocate (xi_delta(3*n_atoms_hyper))
-        allocate (rhs(3*n_atoms_hyper))
-        rhs(:) = 0.d0
-    endif
-    i_cell_total = 0
-    do i_cell = 0, hypercell_dim(1)-1
-    do j_cell = 0, hypercell_dim(2)-1
-    do k_cell = 0, hypercell_dim(3)-1
-        ijk_cell = (/ i_cell, j_cell, k_cell /)
-        cell_shift = matmul(lattice_vector, ijk_cell)
-        do i_atom = 1, n_atoms
-            coords_hyper(:, i_cell_total*n_atoms+i_atom) &
-                = coords(:, i_atom)+cell_shift
-        enddo
-        i_cell_total = i_cell_total+1
-    enddo
-    enddo
-    enddo
-    do i_xyz = 1, 3
-        lattice_vector_hyper(i_xyz, :) = hypercell_dim*lattice_vector(i_xyz, :)
-    enddo
-    if (.not. is_periodic) then
-        supercell_dim(:) = 0
-    else
-        lattice_dim_hyper = sqrt(sum(lattice_vector_hyper**2, 1))
-        supercell_dim = ceiling(param_mbd_dip_cutoff/lattice_dim_hyper)
-    endif
-    do i_atom_hyp = 1, n_atoms_hyper
-        i_atom = ind_orig(i_atom_hyp)
-        if (my_task /= modulo(i_atom, n_tasks)) cycle
+    V(:, :) = 0.d0
+    do i_atom = 1, size(coords, 1)
         do i_xyz = 1, 3
-            C(3*(i_atom_hyp-1)+i_xyz, 3*(i_atom_hyp-1)+i_xyz) = omega(i_atom)**2
-            if (is_electric_field) then
-                rhs(3*(i_atom_hyp-1)+i_xyz) &
-                    = -sqrt(alpha_0(i_atom))*omega(i_atom)*electric_field(i_xyz)
-            endif
-        enddo
-    enddo
-    do i_cell = -supercell_dim(1), supercell_dim(1)
-    do j_cell = -supercell_dim(2), supercell_dim(2)
-    do k_cell = -supercell_dim(3), supercell_dim(3)
-        ijk_cell = (/ i_cell, j_cell, k_cell /)
-        cell_shift = matmul(lattice_vector_hyper, ijk_cell)
-        do i_atom_hyp = 1, n_atoms_hyper
-            i_atom = ind_orig(i_atom_hyp)
-            if (my_task /= modulo(i_atom, n_tasks)) cycle
-            do j_atom_hyp = i_atom_hyp, n_atoms_hyper
-                j_atom = ind_orig(j_atom_hyp)
-                if (i_atom_hyp == j_atom_hyp) then
-                    if (all(ijk_cell(:) == 0)) cycle
-                endif
-                r = coords_hyper(:, i_atom_hyp) &
-                    -coords_hyper(:, j_atom_hyp)-cell_shift
-                r_norm = sqrt(sum(r**2))
-                if (r_norm > param_mbd_dip_cutoff) cycle
-                if (present(R_vdw)) then
-                    R_vdw_sum = R_vdw(i_atom)+R_vdw(j_atom)
-                end if
-                if (present(overlap)) then
-                    if (i_atom < j_atom) then
-                        overlap_ij = overlap(i_atom, j_atom)
-                    else
-                        overlap_ij = overlap(j_atom, i_atom)
-                    end if
-                end if
-                if (present(C6)) then
-                    C6_ij = combine_C6( &
-                        C6(i_atom), C6(j_atom), &
-                        alpha_0(i_atom), alpha_0(j_atom))
-                end if
-                select case (version)
-                    case ("dip,1mexp")
-                        Tpp = T_1mexp_coulomb(r, beta*R_vdw_sum, a)
-                    case ("dip,erf")
-                        Tpp = T_erf_coulomb(r, beta*R_vdw_sum, a)
-                    case ("dip,fermi")
-                        Tpp = T_fermi_coulomb(r, beta*R_vdw_sum, a)
-                    case ("dip,overlap")
-                        Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, beta, a)
-                    case ("1mexp,dip")
-                        Tpp = damping_1mexp(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                    case ("erf,dip")
-                        Tpp = damping_erf(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                    case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
-                        Tpp = damping_fermi(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                    case ("overlap,dip")
-                        Tpp = damping_overlap(r_norm, overlap_ij, C6_ij, beta, a) & 
-                            *T_bare(r)
-                    case ("custom,dip")
-                        Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
-                    case ("dip,custom")
-                        Tpp = potential_custom(i_atom, j_atom, :, :)
-                endselect
-                prefactor = omega(i_atom)*omega(j_atom) &
-                    *sqrt(alpha_0(i_atom)*alpha_0(j_atom))
-                do i_xyz = 1, 3
-                do j_xyz = 1, 3
-                    C(3*(i_atom_hyp-1)+i_xyz, 3*(j_atom_hyp-1)+j_xyz) &
-                        = C(3*(i_atom_hyp-1)+i_xyz, 3*(j_atom_hyp-1)+j_xyz) &
-                          -prefactor*Tpp(i_xyz, j_xyz)
-                    if (i_atom_hyp /= j_atom_hyp) then
-                        C(3*(j_atom_hyp-1)+j_xyz, 3*(i_atom_hyp-1)+i_xyz) &
-                            = C(3*(j_atom_hyp-1)+j_xyz, 3*(i_atom_hyp-1)+i_xyz) &
-                              -prefactor*Tpp(i_xyz, j_xyz)
-                    endif
-                enddo
-                enddo
-            enddo
-        enddo
-    enddo
-    enddo
-    enddo
-    call sync_sum_array (C, size(C))
-
-    if (present(omegap)) then
-        C_eigs = diagonalize_matrix(C, modes)
-        omegap = sqrt(C_eigs)
+            V(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = omega(i_atom)**2
+        end do
+    end do
+    T = build_dipole_matrix( &
+        coords, version, alpha_0, R_vdw, beta, a, overlap, C6, damping_custom, &
+        potential_custom, lattice_vector, param_mbd_dip_cutoff, k_point, &
+        my_task, n_tasks)
+    do i_atom = 1, size(coords, 1)
+        do j_atom = 1, size(coords, 1)
+            if (i_atom == j_atom) cycle
+            V(3*(i_atom-1)+1:3*(i_atom-1)+3, 3*(j_atom-1)+1:3*(j_atom-1)+3) = &
+                omega(i_atom)*omega(j_atom)*sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
+                T(3*(i_atom-1)+1:3*(i_atom-1)+3, 3*(j_atom-1)+1:3*(j_atom-1)+3)
+        end do
+    end do
+    if (present(eigenomega)) then
+        eigs = diagonalize_matrix(V, modes)
+        eigenomega = sqrt(eigs)
     else
-        C_eigs = diagonalize_matrix(C)
+        eigs = diagonalize_matrix(V)
     end if
-    n_negative_eigs = count(C_eigs(:) < 0)
+    n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         write (info_str, "(a,1x,i10,1x,a)") &
             "CFDM Hamiltonian has", n_negative_eigs, "negative eigenvalues"
         call print_warning (info_str)
     endif
-    where (C_eigs < 0) C_eigs = 0.d0
-    ene = 1.d0/2*sum(sqrt(C_eigs))/n_cells_hyper-3.d0/2*sum(omega)
-    if (is_electric_field) then
-        call sync_sum_array (rhs, size(rhs))
-        xi_delta(:) = solve_lin_sys(C, rhs)
-        delta_ene = &
-            (1.d0/2*expect_value(C, xi_delta) &
-            -dot_product(rhs, xi_delta))/n_cells_hyper &
-            +1.d0/2*sum(alpha_0)*sum(electric_field**2)
-        ene = ene+delta_ene
-    endif
-
-    deallocate (coords_hyper)
-    deallocate (C)
-    deallocate (C_eigs)
-    if (is_electric_field) then
-        deallocate (xi_delta)
-        deallocate (rhs)
-    endif
+    where (eigs < 0) eigs = 0.d0
+    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_mbd_energy
 
-function nbody_mbd( &
-        omega, alpha_0, version, R_vdw, beta, a, &
-        damping_custom, potential_custom, overlap, C6) &
-        result(ene)
+function mbd_nbody( &
+        coords, &
+        alpha_0, &
+        omega, &
+        version, &
+        R_vdw, beta, a, &
+        my_task, n_tasks) &
+        result(ene_orders)
     implicit none
 
-    real*8, intent(in) :: omega(:), alpha_0(size(omega))
+    real*8, intent(in) :: &
+        coords(:, :), &
+        alpha_0(size(coords, 1)), &
+        omega(size(coords, 1)), &
+        R_vdw(size(coords, 1)), &
+        beta, a
     character(len=*), intent(in) :: version
-    real*8, intent(in), optional :: R_vdw(size(omega))
-    real*8, intent(in), optional :: beta, a
-    real*8, intent(in), optional :: &
-        damping_custom(size(omega), size(omega)), &
-        overlap(size(omega), size(omega)), C6(size(omega))
-    real*8, intent(in), optional :: &
-        potential_custom(size(omega), size(omega), 3, 3)
-    real*8 :: ene(3)
+    integer, intent(in), optional :: my_task, n_tasks
+    real*8 :: ene_orders(20)
 
-    character(len=1000) :: info_str
-    real*8, allocatable :: C(:, :), C_eigs(:)
-    real*8 :: delta_ene
-    logical :: is_electric_field
-    integer :: i_atom, j_atom, i_xyz, j_xyz
-    real*8 :: lattice_dim(3), cell_shift(3)
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), supercell_dim(3)
-    integer :: i_atom_hyp, j_atom_hyp, hypercell_dim(3), n_cells_hyper, &
-               n_atoms_hyper
-    real*8 :: lattice_vector_hyper(3, 3), lattice_dim_hyper(3)
-    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs
-    integer :: multi_index(param_mbd_nbody_max), i_body, j_body, i_tuple, &
-               i_atom_ind, j_atom_ind, i_index
+    integer :: &
+        multi_index(param_mbd_nbody_max), i_body, j_body, i_tuple, &
+        i_atom_ind, j_atom_ind, i_index
+    real*8 :: ene
+    logical :: &
+        is_parallel = .false.
 
-    ene(:) = 0.d0
+    if (present(n_tasks)) then
+        if (n_tasks > 0) then
+            is_parallel = .true.
+        end if
+    end if
+    ene_orders(:) = 0.d0
     do i_body = 2, param_mbd_nbody_max
-        allocate (C(i_body*3, i_body*3))
-        allocate (C_eigs(i_body*3))
         i_tuple = 0
         multi_index(1:i_body-1) = 1
         multi_index(i_body:param_mbd_nbody_max) = 0
         do
             multi_index(i_body) = multi_index(i_body)+1
             do i_index = i_body, 2, -1
-                if (multi_index(i_index) > n_atoms) then
+                if (multi_index(i_index) > size(coords, 1)) then
                     multi_index(i_index) = 1
                     multi_index(i_index-1) = multi_index(i_index-1)+1
                 end if
             end do
-            if (multi_index(1) > n_atoms) exit
+            if (multi_index(1) > size(coords, 1)) exit
             if (any(multi_index(1:i_body-1)-multi_index(2:i_body) >= 0)) cycle
             i_tuple = i_tuple+1
-            if (my_task /= modulo(i_tuple, n_tasks)) cycle
-            C(:, :) = 0.d0
-            do i_atom_ind = 1, i_body
-                i_atom = multi_index(i_atom_ind)
-                do i_xyz = 1, 3
-                    C((i_atom_ind-1)*3+i_xyz, (i_atom_ind-1)*3+i_xyz) &
-                        = omega(i_atom)**2
-                enddo
-            end do
-            do i_atom_ind = 1, i_body
-            do j_atom_ind = i_atom_ind+1, i_body
-                i_atom = multi_index(i_atom_ind)
-                j_atom = multi_index(j_atom_ind)
-                r = coords(:, i_atom)-coords(:, j_atom)
-                r_norm = sqrt(sum(r**2))
-                if (present(R_vdw)) then
-                    R_vdw_sum = R_vdw(i_atom)+R_vdw(j_atom)
-                end if
-                if (present(overlap)) then
-                    if (i_atom < j_atom) then
-                        overlap_ij = overlap(i_atom, j_atom)
-                    else
-                        overlap_ij = overlap(j_atom, i_atom)
-                    end if
-                end if
-                if (present(C6)) then
-                    C6_ij = combine_C6( &
-                        C6(i_atom), C6(j_atom), alpha_0(i_atom), alpha_0(j_atom))
-                end if
-                select case (version)
-                    case ("dip,1mexp")
-                        Tpp = T_1mexp_coulomb(r, beta*R_vdw_sum, a)
-                    case ("dip,erf")
-                        Tpp = T_erf_coulomb(r, beta*R_vdw_sum, a)
-                    case ("dip,fermi")
-                        Tpp = T_fermi_coulomb(r, beta*R_vdw_sum, a)
-                    case ("dip,overlap")
-                        Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, beta, a)
-                    case ("1mexp,dip")
-                        Tpp = damping_1mexp(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                    case ("erf,dip")
-                        Tpp = damping_erf(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                    case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
-                        Tpp = damping_fermi(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                    case ("overlap,dip")
-                        Tpp = damping_overlap(r_norm, overlap_ij, C6_ij, beta, a) &
-                                *T_bare(r)
-                    case ("custom,dip")
-                        Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
-                    case ("dip,custom")
-                        Tpp = potential_custom(i_atom, j_atom, :, :)
-                endselect
-                prefactor = omega(i_atom)*omega(j_atom) &
-                            *sqrt(alpha_0(i_atom)*alpha_0(j_atom))
-                do i_xyz = 1, 3
-                do j_xyz = 1, 3
-                    C(3*(i_atom_ind-1)+i_xyz, 3*(j_atom_ind-1)+j_xyz) &
-                        = C(3*(i_atom_ind-1)+i_xyz, 3*(j_atom_ind-1)+j_xyz) &
-                        -prefactor*Tpp(i_xyz, j_xyz)
-                    C(3*(j_atom_ind-1)+j_xyz, 3*(i_atom_ind-1)+i_xyz) &
-                        = C(3*(j_atom_ind-1)+j_xyz, 3*(i_atom_ind-1)+i_xyz) &
-                        -prefactor*Tpp(i_xyz, j_xyz)
-                enddo
-                enddo
-            end do
-            end do
-            C_eigs = diagonalize_matrix(C)
-            where (C_eigs < 0) C_eigs = 0.d0
-            ene(i_body) = ene(i_body)+1.d0/2*sum(sqrt(C_eigs))
-        enddo ! end cycling over tuples
-        deallocate (C)
-        deallocate (C_eigs)
-    enddo ! end cycling over i_body
-    call sync_sum_array(ene, size(ene))
-    ene(1) = 3.d0/2*sum(omega)
-    do i_body = 2, min(param_mbd_nbody_max, n_atoms)
+            if (is_parallel) then
+                if (my_task /= modulo(i_tuple, n_tasks)) cycle
+            end if
+            ene = get_mbd_energy( &
+                coords(multi_index(1:i_body), :), &
+                alpha_0(multi_index(1:i_body)), &
+                omega(multi_index(1:i_body)), &
+                version, &
+                R_vdw(multi_index(1:i_body)), &
+                beta, a)
+            ene_orders(i_body) = ene_orders(i_body) &
+                +ene+3.d0/2*sum(omega(multi_index(1:i_body)))
+        end do ! i_tuple
+    end do ! i_body
+    if (is_parallel) then
+        call sync_sum_array(ene_orders, size(ene_orders))
+    end if
+    ene_orders(1) = 3.d0/2*sum(omega)
+    do i_body = 2, min(param_mbd_nbody_max, size(coords, 1))
         do j_body = 1, i_body-1
-            ene(i_body) = ene(i_body) &
-                -nbody_coeffs(j_body, i_body, n_atoms)*ene(j_body)
+            ene_orders(i_body) = ene_orders(i_body) &
+                -nbody_coeffs(j_body, i_body, size(coords, 1))*ene_orders(j_body)
         end do
     end do
-    ene(1) = sum(ene(2:param_mbd_nbody_max))
-end function nbody_mbd
+    ene_orders(1) = sum(ene_orders(2:param_mbd_nbody_max))
+end function mbd_nbody
 
 function nbody_coeffs(k, m, N) result(a)
     integer, intent(in) :: k, m, N
@@ -580,317 +527,82 @@ function nbody_coeffs(k, m, N) result(a)
     end do
 end function nbody_coeffs
 
-function pairwise_mbd( &
-        omega, alpha_0, version, R_vdw, beta, a, &
-        damping_custom, potential_custom, overlap, C6, &
-        omegap, modes) &
+function get_qho_rpa_energy( &
+        coords, &
+        alpha, &
+        version, &
+        R_vdw, beta, a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        rpa_orders, &
+        my_task, n_tasks) &
         result(ene)
     implicit none
 
-    real*8, intent(in) :: omega(:), alpha_0(size(omega))
+    real*8, intent(in) :: &
+        coords(:, :), &
+        alpha(:, :)
     character(len=*), intent(in) :: version
-    real*8, intent(in), optional :: R_vdw(size(omega))
-    real*8, intent(in), optional :: beta, a
     real*8, intent(in), optional :: &
-        damping_custom(size(omega), size(omega)), &
-        overlap(size(omega), size(omega)), C6(size(omega))
-    real*8, intent(in), optional :: &
-        potential_custom(size(omega), size(omega), 3, 3)
-    real*8, intent(out), optional :: modes(6, 6, 3*size(omega), 3*size(omega))
-    real*8, intent(out), optional :: omegap(6, 3*size(omega), 3*size(omega))
+        R_vdw(size(coords, 1)), &
+        beta, a, &
+        overlap(size(coords, 1), size(coords, 1)), &
+        C6(size(coords, 1)), &
+        damping_custom(size(coords, 1), size(coords, 1)), &
+        potential_custom(size(coords, 1), size(coords, 1), 3, 3)
+    real*8, intent(out), optional :: rpa_orders(20)
+    integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
-    character(len=1000) :: info_str
-    real*8 :: C(6, 6), C_eigs(6), C_modes(6, 6)
-    real*8 :: delta_ene
-    logical :: is_electric_field
-    integer :: i_atom, j_atom, i_xyz, j_xyz
-    real*8 :: lattice_dim(3), cell_shift(3)
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), supercell_dim(3)
-    integer :: i_atom_hyp, j_atom_hyp, hypercell_dim(3), n_cells_hyper, &
-               n_atoms_hyper
-    real*8 :: lattice_vector_hyper(3, 3), lattice_dim_hyper(3)
-    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs
+    real*8, dimension(3*size(coords, 1), 3*size(coords, 1)) :: &
+        T, big_alpha, AT, one
+    real*8 :: eigs(3*size(coords, 1))
+    integer :: i_atom, i_xyz, i_grid_omega
+    integer :: n_order
+    logical :: &
+        is_parallel = .false.
 
-
-    if (present(omegap)) then
-        modes(:, :, :, :) = 0.d0
-        omegap(:, :, :) = 0.d0
+    if (present(n_tasks)) then
+        if (n_tasks > 0) then
+            is_parallel = .true.
+        end if
     end if
-    ene = 0.d0
-    do i_atom = 1, n_atoms
-        if (my_task /= modulo(i_atom, n_tasks)) cycle
-        do j_atom = i_atom+1, n_atoms
-            C(:, :) = 0.d0
+    one = identity_matrix(3*size(coords, 1))
+    do i_grid_omega = 0, n_grid_omega
+        if (is_parallel) then
+            if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
+        end if
+        T = build_dipole_matrix( &
+            coords, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
+            overlap, C6, damping_custom, potential_custom)
+        big_alpha(:, :) = 0.d0
+        do i_atom = 1, size(coords, 1)
             do i_xyz = 1, 3
-                C(i_xyz, i_xyz) = omega(i_atom)**2
-                C(3+i_xyz, 3+i_xyz) = omega(j_atom)**2
-            enddo
-            r = coords(:, i_atom)-coords(:, j_atom)
-            r_norm = sqrt(sum(r**2))
-            if (present(R_vdw)) then
-                R_vdw_sum = R_vdw(i_atom)+R_vdw(j_atom)
-            end if
-            if (present(overlap)) then
-                if (i_atom < j_atom) then
-                    overlap_ij = overlap(i_atom, j_atom)
-                else
-                    overlap_ij = overlap(j_atom, i_atom)
-                end if
-            end if
-            if (present(C6)) then
-                C6_ij = combine_C6( &
-                    C6(i_atom), C6(j_atom), alpha_0(i_atom), alpha_0(j_atom))
-            end if
-            select case (version)
-                case ("dip,1mexp")
-                    Tpp = T_1mexp_coulomb(r, beta*R_vdw_sum, a)
-                case ("dip,erf")
-                    Tpp = T_erf_coulomb(r, beta*R_vdw_sum, a)
-                case ("dip,fermi")
-                    Tpp = T_fermi_coulomb(r, beta*R_vdw_sum, a)
-                case ("dip,overlap")
-                    Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, beta, a)
-                case ("1mexp,dip")
-                    Tpp = damping_1mexp(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                case ("erf,dip")
-                    Tpp = damping_erf(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
-                    Tpp = damping_fermi(r_norm, beta*R_vdw_sum, a)*T_bare(r)
-                case ("overlap,dip")
-                    Tpp = damping_overlap(r_norm, overlap_ij, C6_ij, beta, a) &
-                            *T_bare(r)
-                case ("custom,dip")
-                    Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
-                case ("dip,custom")
-                    Tpp = potential_custom(i_atom, j_atom, :, :)
-            endselect
-            prefactor = omega(i_atom)*omega(j_atom) &
-                        *sqrt(alpha_0(i_atom)*alpha_0(j_atom))
-            do i_xyz = 1, 3
-                do j_xyz = 1, 3
-                    C(i_xyz, 3+j_xyz) = C(i_xyz, 3+j_xyz) &
-                        -prefactor*Tpp(i_xyz, j_xyz)
-                    C(3+j_xyz, i_xyz) = C(3+j_xyz, i_xyz) &
-                        -prefactor*Tpp(i_xyz, j_xyz)
-                enddo
-            enddo
-            C_eigs = diagonalize_matrix(C, C_modes)
-            if (present(omegap)) then
-                omegap(:, i_atom, j_atom) = sqrt(C_eigs)
-                modes(:, :, i_atom, j_atom) = C_modes
-            end if
-            where (C_eigs < 0) C_eigs = 0.d0
-            ene = ene &
-                +1.d0/2*sum(sqrt(C_eigs))-3.d0/2*(omega(i_atom)+omega(j_atom))
-        enddo
-    enddo
-    call sync_sum_number (ene)
-    if (present(omegap)) then
-        call sync_sum_array (omegap, size(omegap))
-        call sync_sum_array (modes, size(modes))
-    end if
-end function pairwise_mbd
-
-function get_qho_rpa_energy( &
-        alpha, version, R_vdw, beta, a, & 
-        damping_custom, potential_custom) &
-        result(ene)
-    implicit none
-
-    real*8, intent(in) :: alpha(:, :) ! indexing from 1 here because of f2py
-    character(len=*), intent(in) :: version
-    real*8, intent(in), optional :: R_vdw(size(alpha, 2))
-    real*8, intent(in), optional :: beta, a
-    real*8, intent(in), optional :: &
-        damping_custom(size(alpha, 2), size(alpha, 2))
-    real*8, intent(in), optional :: &
-        potential_custom(size(alpha, 2), size(alpha, 2), 3, 3)
-    real*8 :: ene(10)
-
-    character(len=1000) :: info_str
-    real*8, allocatable :: AT(:, :), onemAT(:, :), AT_eigs(:), coords_hyper(:, :)
-    real*8, allocatable :: xi_delta(:), rhs(:)
-    real*8 :: delta_ene
-    logical :: is_electric_field
-    integer :: i_atom, j_atom, i_xyz, j_xyz
-    real*8 :: lattice_dim(3), cell_shift(3)
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), supercell_dim(3)
-    integer :: i_atom_hyp, j_atom_hyp, hypercell_dim(3), n_cells_hyper
-    integer :: n_atoms_hyper
-    integer :: i_grid_omega, i_order
-    real*8 :: lattice_vector_hyper(3, 3), lattice_dim_hyper(3)
-    real*8 :: prefactor, Tpp(3, 3), sigma, R_vdw_sum, r(3), r_norm
-    integer :: n_negative_eigs
-    real*8 :: AT_eigs_grid(param_rpa_order_max, n_grid_omega+1)
-
-    if (.not. is_periodic) then
-        hypercell_dim(:) = 1
-    else
-        lattice_dim = sqrt(sum(lattice_vector**2, 1))
-        hypercell_dim = ceiling(param_mbd_supercell_cutoff/lattice_dim)
-    endif
-    is_electric_field = any(electric_field /= 0.d0)
-    n_cells_hyper = product(hypercell_dim(:))
-    n_atoms_hyper = n_cells_hyper*n_atoms
-    allocate (AT(3*n_atoms_hyper, 3*n_atoms_hyper))
-    allocate (onemAT(3*n_atoms_hyper, 3*n_atoms_hyper))
-    AT(:, :) = 0.d0
-    allocate (AT_eigs(3*n_atoms_hyper))
-    allocate (coords_hyper(3, n_atoms_hyper))
-    if (is_electric_field) then
-        allocate (xi_delta(3*n_atoms_hyper))
-        allocate (rhs(3*n_atoms_hyper))
-        rhs(:) = 0.d0
-    endif
-    i_cell_total = 0
-    do i_cell = 0, hypercell_dim(1)-1
-    do j_cell = 0, hypercell_dim(2)-1
-    do k_cell = 0, hypercell_dim(3)-1
-        ijk_cell = (/ i_cell, j_cell, k_cell /)
-        cell_shift = matmul(lattice_vector, ijk_cell)
-        do i_atom = 1, n_atoms
-            coords_hyper(:, i_cell_total*n_atoms+i_atom) &
-                = coords(:, i_atom)+cell_shift
-        enddo
-        i_cell_total = i_cell_total+1
-    enddo
-    enddo
-    enddo
-    do i_xyz = 1, 3
-        lattice_vector_hyper(i_xyz, :) = hypercell_dim*lattice_vector(i_xyz, :)
-    enddo
-    if (.not. is_periodic) then
-        supercell_dim(:) = 0
-    else
-        lattice_dim_hyper = sqrt(sum(lattice_vector_hyper**2, 1))
-        supercell_dim = ceiling(param_mbd_dip_cutoff/lattice_dim_hyper)
-    endif
-    AT_eigs_grid(:, :) = 0.d0
-    do i_grid_omega = 1, n_grid_omega+1
-        if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
-        AT(:, :) = 0.d0
-        do i_cell = -supercell_dim(1), supercell_dim(1)
-        do j_cell = -supercell_dim(2), supercell_dim(2)
-        do k_cell = -supercell_dim(3), supercell_dim(3)
-            ijk_cell = (/ i_cell, j_cell, k_cell /)
-            cell_shift = matmul(lattice_vector_hyper, ijk_cell)
-            do i_atom_hyp = 1, n_atoms_hyper
-                i_atom = ind_orig(i_atom_hyp)
-                do j_atom_hyp = i_atom_hyp, n_atoms_hyper
-                    j_atom = ind_orig(j_atom_hyp)
-                    if (i_atom_hyp == j_atom_hyp) then
-                        if (all(ijk_cell(:) == 0)) cycle
-                    endif
-                    r = coords_hyper(:, i_atom_hyp) &
-                        -coords_hyper(:, j_atom_hyp)-cell_shift
-                    r_norm = sqrt(sum(r**2))
-                    if (r_norm > param_mbd_dip_cutoff) cycle
-                    sigma = sqrt(sum(get_sigma_selfint((/ &
-                        alpha(i_grid_omega, i_atom), & 
-                        alpha(i_grid_omega, j_atom) &
-                        /))**2))
-                    if (present(R_vdw)) then
-                        R_vdw_sum = R_vdw(i_atom)+R_vdw(j_atom)
-                    end if
-                    select case (version)
-                        case ("dip,1mexp")
-                            Tpp = T_1mexp_coulomb(r, beta*R_vdw_sum, a)
-                        case ("dip,erf")
-                            Tpp = T_erf_coulomb(r, beta*R_vdw_sum, a)
-                        case ("dip,fermi")
-                            Tpp = T_fermi_coulomb(r, beta*R_vdw_sum, a)
-                        case ("1mexp,dip")
-                            Tpp = damping_1mexp(r_norm, beta*R_vdw_sum, a) & 
-                                *T_bare(r)
-                        case ("erf,dip")
-                            Tpp = damping_erf(r_norm, beta*R_vdw_sum, a) &
-                                *T_bare(r)
-                        case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
-                            Tpp = damping_fermi(r_norm, beta*R_vdw_sum, a) &
-                                *T_bare(r)
-                        case ("dip")
-                            Tpp = T_bare(r)
-                        case ("dip,gg")
-                            Tpp = T_erf_coulomb(r, sigma, 1.d0)
-                        case ("1mexp,dip,gg")
-                            Tpp = damping_1mexp(r_norm, beta*R_vdw_sum, a) &
-                                *T_erf_coulomb(r, sigma, 1.d0)
-                        case ("erf,dip,gg")
-                            Tpp = damping_erf(r_norm, beta*R_vdw_sum, a) &
-                                *T_erf_coulomb(r, sigma, 1.d0)
-                        case ("fermi,dip,gg")
-                            Tpp = damping_fermi(r_norm, beta*R_vdw_sum, a) &
-                                *T_erf_coulomb(r, sigma, 1.d0)
-                        case ("custom,dip")
-                            Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
-                        case ("dip,custom")
-                            Tpp = potential_custom(i_atom, j_atom, :, :)
-                    endselect
-                    prefactor = sqrt( &
-                        alpha(i_grid_omega, i_atom)*alpha(i_grid_omega, j_atom))
-                    do i_xyz = 1, 3
-                    do j_xyz = 1, 3
-                        AT(3*(i_atom_hyp-1)+i_xyz, 3*(j_atom_hyp-1)+j_xyz) &
-                            = AT(3*(i_atom_hyp-1)+i_xyz, 3*(j_atom_hyp-1)+j_xyz) &
-                              +prefactor*Tpp(i_xyz, j_xyz)
-                        if (i_atom_hyp /= j_atom_hyp) then
-                            AT(3*(j_atom_hyp-1)+j_xyz, 3*(i_atom_hyp-1)+i_xyz) &
-                                = AT(3*(j_atom_hyp-1)+j_xyz, 3*(i_atom_hyp-1)+i_xyz) &
-                                  +prefactor*Tpp(i_xyz, j_xyz)
-                        endif
-                    enddo
-                    enddo
-                enddo
-            enddo
-        enddo
-        enddo
-        enddo
-        onemAT = -AT
-        do i_atom_hyp = 1, n_atoms_hyper
-            do i_xyz = 1, 3
-                onemAT(3*(i_atom_hyp-1)+i_xyz, 3*(i_atom_hyp-1)+i_xyz) = 1.d0
-            enddo
-        enddo
-        AT_eigs = diagonalize_matrix(onemAT)
-        n_negative_eigs = count(AT_eigs(:) < 0)
-        if (n_negative_eigs > 0) then
-            write (info_str, "(a,1x,i10,1x,a)") &
-                "RPA matrix has", n_negative_eigs, "negative eigenvalues"
-            call print_warning (info_str)
-        endif
-        where (AT_eigs < 0) AT_eigs = 0.d0
-        AT_eigs_grid(1, i_grid_omega) = sum(log(AT_eigs(:)))
-        AT_eigs = diagonalize_matrix(AT)
-        do i_order = 2, param_rpa_order_max
-            AT_eigs_grid(i_order, i_grid_omega) = sum(AT_eigs(:)**i_order)
+                big_alpha(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = &
+                    alpha(i_grid_omega+1, i_atom)
+            end do
         end do
-    enddo
-    call sync_sum_array (AT_eigs_grid, size(AT_eigs_grid))
-    ene(1) = 1.d0/(2*pi)*sum(AT_eigs_grid(1, :)*omega_grid_w(:))/n_cells_hyper
-    do i_order = 2, param_rpa_order_max
-        ene(i_order) = &
-            -1.d0/(2*pi*i_order)*sum(AT_eigs_grid(i_order, :)*omega_grid_w(:))/n_cells_hyper
+        AT = matmul(big_alpha, T)
+        eigs = diagonalize_matrix(one-AT)
+        ene = ene + 1.d0/(2*pi)*sum(log(eigs))*omega_grid_w(i_grid_omega)
+        if (present(rpa_orders)) then
+            eigs = diagonalize_matrix(AT)
+            do n_order = 2, param_rpa_order_max
+                rpa_orders(n_order) = rpa_orders(n_order) + &
+                    (-1.d0/(2*pi)*sum(eigs**n_order)/n_order) &
+                    *omega_grid_w(i_grid_omega)
+            end do
+        end if
     end do
-    deallocate (coords_hyper)
-    deallocate (AT)
-    deallocate (onemAT)
-    deallocate (AT_eigs)
-    if (is_electric_field) then
-        deallocate (xi_delta)
-        deallocate (rhs)
-    endif
+    if (is_parallel) then
+        call sync_sum_number (ene)
+        if (present(rpa_orders)) then
+            call sync_sum_array (rpa_orders, size(rpa_orders))
+        end if
+    end if
 end function get_qho_rpa_energy
-
-function ind_orig(i_atom_sup) result(i_atom)
-    implicit none
-
-    integer, intent(in) :: i_atom_sup
-    integer :: i_atom
-
-    i_atom = modulo(i_atom_sup-1, n_atoms)+1
-end function ind_orig
 
 function alpha_dynamic_ts(alpha_0, C6, omega) result(alpha)
     implicit none
@@ -964,7 +676,7 @@ function get_C6_from_alpha(alpha) result(C6)
     real*8 :: C6(size(alpha, 2))
     integer :: i_atom
 
-    do i_atom = 1, n_atoms
+    do i_atom = 1, size(alpha, 2)
         C6(i_atom) = 3.d0/pi*sum((alpha(:, i_atom)**2)*omega_grid_w(:))
     enddo
 end function get_C6_from_alpha
@@ -1175,11 +887,10 @@ function solve_lin_sys(A_arg, B_arg) result(X)
     X(:) = B(:)
 end function solve_lin_sys
 
-function invert_matrix(A_arg, n_work_arr_arg) result(A_inv)
+function invert_matrix(A_arg) result(A_inv)
     implicit none
 
     real*8, intent(in) :: A_arg(:, :)
-    integer, intent(in), optional :: n_work_arr_arg
     real*8 :: A_inv(size(A_arg, 1), size(A_arg, 1))
 
     character(len=1000) :: info_str
@@ -1199,12 +910,8 @@ function invert_matrix(A_arg, n_work_arr_arg) result(A_inv)
             "Matrix inversion failed in module mbd with error code", error_flag
         call print_error (info_str)
     endif
-    if (present(n_work_arr_arg)) then
-        n_work_arr = n_work_arr_arg
-    else
-        call DGETRI (n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
-        n_work_arr = nint(n_work_arr_optim)
-    endif
+    call DGETRI (n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
+    n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
     call DGETRI (n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
@@ -1253,6 +960,38 @@ function diagonalize_matrix(matrix, eigvecs) result(eigs)
     end if
 end function diagonalize_matrix
 
+function supercell_circum(uc, radius) result(sc)
+    implicit none
+
+    real*8, intent(in) :: uc(3, 3), radius
+    real*8 :: sc(3)
+
+    real*8 :: ruc(3, 3)
+
+    ruc = 2*pi*invert_matrix(transpose(uc))
+    sc = &
+        ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))-.5d0)
+end function supercell_circum
+
+subroutine shift_cell (ijk, first_cell, last_cell)
+    implicit none
+
+    integer, intent(inout) :: ijk(3)
+    integer, intent(in) :: first_cell(3), last_cell(3)
+
+    integer :: i_dim, i
+
+    do i_dim = 3, 1, -1
+        i = ijk(i_dim)+1
+        if (i <= last_cell(i_dim)) then
+            ijk(i_dim) = i
+            exit
+        else
+            ijk(i_dim) = first_cell(i_dim)
+        end if
+    end do
+end subroutine shift_cell
+
 function eye(N)
     implicit none
 
@@ -1266,6 +1005,20 @@ function eye(N)
         eye(i, i) = 1.d0
     enddo
 end function eye
+
+function identity_matrix(n) result(A)
+    implicit none
+
+    integer, intent(in) :: n
+    real*8 :: A(n, n)
+
+    integer :: i
+
+    A(:, :) = 0.d0
+    do i = 1, n
+        A(i, i) = 1.d0
+    enddo
+end function identity_matrix
 
 function cart_prod(a, b) result(c)
     implicit none
@@ -1281,6 +1034,20 @@ function cart_prod(a, b) result(c)
         enddo
     enddo
 end function cart_prod
+
+function diag(a) result(b)
+    implicit none
+
+    real*8, intent(in) :: a(:)
+    real*8 :: b(size(a), size(a))
+
+    integer :: i
+
+    b = 0.d0
+    do i = 1, size(a)
+        b(i, i) = a(i)
+    end do
+end function diag
 
 function expect_value(O, x) result(y)
     implicit none

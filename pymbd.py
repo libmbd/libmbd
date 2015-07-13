@@ -21,26 +21,16 @@ ntasks = MPI.COMM_WORLD.Get_size()
 myid = MPI.COMM_WORLD.Get_rank()
 
 
-def init(coords):
-    mbd.n_atoms = len(coords)
-    mbd.coords = coords.T
-    mbd.is_periodic = False
-    mbd.lattice_vector = np.zeros((3, 3))
-    mbd.electric_field = np.zeros(3)
-    mbd.n_tasks = ntasks
-    mbd.my_task = myid
-
-
 def printerr(s):
     if myid == 0:
         sys.stderr.write(s + '\n')
 
 
 def block(msg):
-    def decorator(f):
+    def runner(f):
         printerr(msg)
         f()
-    return decorator
+    return runner
 
 
 def main(path, extension=None):
@@ -54,7 +44,6 @@ def main(path, extension=None):
     for key in data:
         data[key] = np.array(data[key])
     printerr('Running on {} nodes...'.format(ntasks))
-    init(data['coords'])
     results = extension(data, mbd)
     return results
 
@@ -85,21 +74,28 @@ def run_mbd(data, mbd):
             alphas[:] = mbd.alpha_dynamic_ts(alpha['TS'][0], C6['TS'], omega)
         R_vdw['TS'] = data['R_vdw']*np.power(data['volume_ratio'], 1./3)
         energy['TS@TS~fermi@TS'] = \
-            mbd.get_ts_energy(C6['TS'], alpha['TS'][0], 'fermi', R_vdw['TS'],
-                              d=damp_params['ts_d'], s_r=damp_params['ts_s_r'])
+            mbd.get_ts_energy(data['coords'],
+                              C6['TS'],
+                              alpha['TS'][0],
+                              'fermi',
+                              R_vdw['TS'],
+                              d=damp_params['ts_d'],
+                              s_r=damp_params['ts_s_r'])
 
     @block("Evaluating MBD@TS...")
     def mbd_ts():
         energy['MBD@TS~erf@TS,dip'] = \
-            mbd.get_mbd_energy(mbd.omega_eff(C6['TS'], alpha['TS'][0]),
+            mbd.get_mbd_energy(data['coords'],
                                alpha['TS'][0],
+                               mbd.omega_eff(C6['TS'], alpha['TS'][0]),
                                'erf,dip',
                                R_vdw['TS'],
                                beta=damp_params['mbd_ts_erf_beta'],
                                a=4.)[0]
         energy['MBD@TS~fermi@TS,dip'] = \
-            mbd.get_mbd_energy(mbd.omega_eff(C6['TS'], alpha['TS'][0]),
+            mbd.get_mbd_energy(data['coords'],
                                alpha['TS'][0],
+                               mbd.omega_eff(C6['TS'], alpha['TS'][0]),
                                'fermi@TS,dip',
                                R_vdw['TS'],
                                beta=damp_params['mbd_ts_fermi_beta'],
@@ -109,7 +105,7 @@ def run_mbd(data, mbd):
     def scs():
         alpha['SCS'] = np.zeros((nomega, natoms))
         for alphas_ts, alphas_scs in zip(alpha['TS'], alpha['SCS']):
-            alpha_3n = mbd.run_scs(alphas_ts, 'dip,gg')
+            alpha_3n = mbd.run_scs(data['coords'], alphas_ts, 'dip,gg')
             alphas_scs[:] = mbd.contract_polarizability(alpha_3n)
         C6['SCS'] = mbd.get_c6_from_alpha(alpha['SCS'])
         R_vdw['SCS'] = \
@@ -118,7 +114,8 @@ def run_mbd(data, mbd):
     @block("Evaluating TS@SCS...")
     def ts_scs():
         energy['TS@SCS~fermi@SCS'] = \
-            mbd.get_ts_energy(C6['SCS'],
+            mbd.get_ts_energy(data['coords'],
+                              C6['SCS'],
                               alpha['SCS'][0],
                               'fermi',
                               R_vdw['SCS'],
@@ -128,8 +125,9 @@ def run_mbd(data, mbd):
     @block("Evaluating MBD@SCS...")
     def mbd_scs():
         energy['MBD@SCS~dip,1mexp@SCS'] = \
-            mbd.get_mbd_energy(mbd.omega_eff(C6['SCS'], alpha['SCS'][0]),
+            mbd.get_mbd_energy(data['coords'],
                                alpha['SCS'][0],
+                               mbd.omega_eff(C6['SCS'], alpha['SCS'][0]),
                                'dip,1mexp',
                                R_vdw['SCS'],
                                beta=1.,
@@ -139,7 +137,8 @@ def run_mbd(data, mbd):
     def rsscs():
         alpha['rsSCS'] = np.zeros((nomega, natoms))
         for alphas_ts, alphas_rsscs in zip(alpha['TS'], alpha['rsSCS']):
-            alpha_3n = mbd.run_scs(alphas_ts,
+            alpha_3n = mbd.run_scs(data['coords'],
+                                   alphas_ts,
                                    'fermi,dip,gg',
                                    R_vdw['TS'],
                                    beta=damp_params['mbd_rsscs_beta'],
@@ -152,38 +151,37 @@ def run_mbd(data, mbd):
     @block("Evaluating MBD@rsSCS...")
     def mbd_rsscs():
         energy['MBD@rsSCS~fermi@rsSCS,dip'] = \
-            mbd.get_mbd_energy(mbd.omega_eff(C6['rsSCS'], alpha['rsSCS'][0]),
+            mbd.get_mbd_energy(data['coords'],
                                alpha['rsSCS'][0],
+                               mbd.omega_eff(C6['rsSCS'], alpha['rsSCS'][0]),
                                'fermi@rsSCS,dip',
                                R_vdw['rsSCS'],
                                beta=damp_params['mbd_rsscs_beta'],
                                a=damp_params['mbd_rsscs_a'])[0]
         energy['MBD(TS)@rsSCS~fermi@rsSCS,dip'] = \
-            mbd.get_ts_energy(C6['rsSCS'],
+            mbd.get_ts_energy(data['coords'],
+                              C6['rsSCS'],
                               alpha['rsSCS'][0],
                               'fermi2',
                               R_vdw['rsSCS'],
                               s_r=damp_params['mbd_rsscs_beta'],
                               d=damp_params['mbd_rsscs_a'])
-        energy['MBD(pair)@rsSCS~fermi@rsSCS,dip'] = \
-            mbd.pairwise_mbd(mbd.omega_eff(C6['rsSCS'], alpha['rsSCS'][0]),
-                             alpha['rsSCS'][0],
-                             'fermi@rsSCS,dip',
-                             R_vdw['rsSCS'],
-                             beta=damp_params['mbd_rsscs_beta'],
-                             a=damp_params['mbd_rsscs_a'])[0]
-        energy['MBD(RPA)@rsSCS~fermi@rsSCS,dip'] = \
-            mbd.get_qho_rpa_energy(alpha['rsSCS'],
+        rpa_ene, rpa_orders = \
+            mbd.get_qho_rpa_energy(data['coords'],
+                                   alpha['rsSCS'],
                                    'fermi@rsSCS,dip',
                                    R_vdw['rsSCS'],
                                    beta=damp_params['mbd_rsscs_beta'],
                                    a=damp_params['mbd_rsscs_a'])
+        rpa_orders[0] = rpa_ene
+        energy['MBD(RPA)@rsSCS~fermi@rsSCS,dip'] = rpa_orders[:10]
         energy['MBD(nbody)@rsSCS~fermi@rsSCS,dip'] = \
-            mbd.nbody_mbd(mbd.omega_eff(C6['rsSCS'], alpha['rsSCS'][0]),
+            mbd.mbd_nbody(data['coords'],
                           alpha['rsSCS'][0],
+                          mbd.omega_eff(C6['rsSCS'], alpha['rsSCS'][0]),
                           'fermi@rsSCS,dip',
                           R_vdw['rsSCS'],
                           beta=damp_params['mbd_rsscs_beta'],
-                          a=damp_params['mbd_rsscs_a'])
+                          a=damp_params['mbd_rsscs_a'])[:3]
 
     return energy

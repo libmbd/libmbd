@@ -70,10 +70,10 @@ function get_ts_energy( &
     integer :: n_shell, i_cell, j_cell, k_cell, ijk_cell(3)
     integer :: i_atom, j_atom, i_range, range_g_cell(3), g_cell(3)
     real*8, parameter :: step = 100.d0
-    logical :: &
-        is_periodic = .false., &
-        is_parallel = .false.
+    logical :: is_periodic, is_parallel
 
+    is_periodic = .false.
+    is_parallel = .false.
     if (present(lattice_vector)) then
         if (any(lattice_vector > 0.d0)) then
             is_periodic = .true.
@@ -144,16 +144,18 @@ function get_ts_energy( &
                         ene_contrib = ene_contrib/2
                     endif
                     ene_add = ene_add + (-C6_ij/r_norm**6*f_damp)
-                enddo
-            enddo
-        enddo
-        call sync_sum_number (ene_add)
+                end do ! j_atom
+            enddo ! i_atom
+        enddo ! i_cell
+        if (is_parallel) then
+            call sync_sum_number (ene_add)
+        end if
         ene = ene + ene_add
         if (.not. is_periodic) exit
         if (i_range > 1 .and. abs(ene_add) < param_energy_accuracy) then
             exit
         endif
-    enddo
+    enddo ! i_range
 end function get_ts_energy
 
 function build_dipole_matrix( &
@@ -192,10 +194,10 @@ function build_dipole_matrix( &
     real*8 :: r_cell(3), r(3), r_norm
     real*8 :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
     integer :: i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3)
-    logical :: &
-        is_periodic = .false., &
-        is_parallel = .false.
+    logical :: is_periodic, is_parallel
 
+    is_periodic = .false.
+    is_parallel = .false.
     if (present(lattice_vector)) then
         if (any(lattice_vector > 0.d0)) then
             is_periodic = .true.
@@ -313,7 +315,7 @@ function run_scs( &
 
     real*8, intent(in) :: &
         coords(:, :), &
-        alpha(size(coords, 1))
+        alpha(:, :)
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
         R_vdw(size(coords, 1)), &
@@ -339,17 +341,17 @@ function run_scs( &
         if (is_parallel) then
             if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
         end if
-    T = build_dipole_matrix( &
+        T = build_dipole_matrix( &
             coords, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
             damping_custom=damping_custom, lattice_vector=lattice_vector, &
             dipole_cutoff=param_mbd_dip_cutoff)
         alpha_full = -T
-    do i_atom = 1, size(coords, 1)
-        do i_xyz = 1, 3
+        do i_atom = 1, size(coords, 1)
+            do i_xyz = 1, 3
                 alpha_full(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = &
                     1.d0/alpha(i_grid_omega+1, i_atom)
+            end do
         end do
-    end do
         alpha_full = invert_matrix(alpha_full)
         alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
     end do
@@ -481,9 +483,9 @@ function mbd_nbody( &
         multi_index(param_mbd_nbody_max), i_body, j_body, i_tuple, &
         i_atom_ind, j_atom_ind, i_index
     real*8 :: ene
-    logical :: &
-        is_parallel = .false.
-
+    logical :: is_parallel
+    
+    is_parallel = .false.
     if (present(n_tasks)) then
         if (n_tasks > 0) then
             is_parallel = .true.
@@ -581,9 +583,9 @@ function get_qho_rpa_energy( &
     real*8 :: eigs(3*size(coords, 1))
     integer :: i_atom, i_xyz, i_grid_omega
     integer :: n_order
-    logical :: &
-        is_parallel = .false.
-
+    logical :: is_parallel
+    
+    is_parallel = .false.
     if (present(n_tasks)) then
         if (n_tasks > 0) then
             is_parallel = .true.

@@ -80,7 +80,8 @@ def run_mbd(data, mbd):
                               'fermi',
                               R_vdw['TS'],
                               d=damp_params['ts_d'],
-                              s_r=damp_params['ts_s_r'])
+                              s_r=damp_params['ts_s_r'],
+                              my_task=myid, n_tasks=ntasks)
 
     @block("Evaluating MBD@TS...")
     def mbd_ts():
@@ -91,7 +92,8 @@ def run_mbd(data, mbd):
                                'erf,dip',
                                R_vdw['TS'],
                                beta=damp_params['mbd_ts_erf_beta'],
-                               a=4.)[0]
+                               a=4.,
+                               my_task=myid, n_tasks=ntasks)[0]
         energy['MBD@TS~fermi@TS,dip'] = \
             mbd.get_mbd_energy(data['coords'],
                                alpha['TS'][0],
@@ -99,7 +101,8 @@ def run_mbd(data, mbd):
                                'fermi@TS,dip',
                                R_vdw['TS'],
                                beta=damp_params['mbd_ts_fermi_beta'],
-                               a=damp_params['mbd_ts_a'])[0]
+                               a=damp_params['mbd_ts_a'],
+                               my_task=myid, n_tasks=ntasks)[0]
 
     @block("Evaluating SCS...")
     def scs():
@@ -120,7 +123,8 @@ def run_mbd(data, mbd):
                               'fermi',
                               R_vdw['SCS'],
                               d=damp_params['ts_d'],
-                              s_r=damp_params['ts_s_r'])
+                              s_r=damp_params['ts_s_r'],
+                              my_task=myid, n_tasks=ntasks)
 
     @block("Evaluating MBD@SCS...")
     def mbd_scs():
@@ -131,15 +135,16 @@ def run_mbd(data, mbd):
                                'dip,1mexp',
                                R_vdw['SCS'],
                                beta=1.,
-                               a=damp_params['mbd_scs_a'])[0]
+                               a=damp_params['mbd_scs_a'],
+                               my_task=myid, n_tasks=ntasks)[0]
 
     @block("Evaluating rsSCS...")
     def rsscs():
         alpha['rsSCS'] = mbd.run_scs(data['coords'],
                                      alpha['TS'],
-                                   'fermi,dip,gg',
-                                   R_vdw['TS'],
-                                   beta=damp_params['mbd_rsscs_beta'],
+                                     'fermi,dip,gg',
+                                     R_vdw['TS'],
+                                     beta=damp_params['mbd_rsscs_beta'],
                                      a=damp_params['mbd_rsscs_a'],
                                      my_task=myid, n_tasks=ntasks)
         C6['rsSCS'] = mbd.get_c6_from_alpha(alpha['rsSCS'])
@@ -155,7 +160,8 @@ def run_mbd(data, mbd):
                                'fermi@rsSCS,dip',
                                R_vdw['rsSCS'],
                                beta=damp_params['mbd_rsscs_beta'],
-                               a=damp_params['mbd_rsscs_a'])[0]
+                               a=damp_params['mbd_rsscs_a'],
+                               my_task=myid, n_tasks=ntasks)[0]
         energy['MBD(TS)@rsSCS~fermi@rsSCS,dip'] = \
             mbd.get_ts_energy(data['coords'],
                               C6['rsSCS'],
@@ -163,14 +169,16 @@ def run_mbd(data, mbd):
                               'fermi2',
                               R_vdw['rsSCS'],
                               s_r=damp_params['mbd_rsscs_beta'],
-                              d=damp_params['mbd_rsscs_a'])
+                              d=damp_params['mbd_rsscs_a'],
+                              my_task=myid, n_tasks=ntasks)
         rpa_ene, rpa_orders = \
             mbd.get_qho_rpa_energy(data['coords'],
                                    alpha['rsSCS'],
                                    'fermi@rsSCS,dip',
                                    R_vdw['rsSCS'],
                                    beta=damp_params['mbd_rsscs_beta'],
-                                   a=damp_params['mbd_rsscs_a'])
+                                   a=damp_params['mbd_rsscs_a'],
+                                   my_task=myid, n_tasks=ntasks)
         rpa_orders[0] = rpa_ene
         energy['MBD(RPA)@rsSCS~fermi@rsSCS,dip'] = rpa_orders[:10]
         energy['MBD(nbody)@rsSCS~fermi@rsSCS,dip'] = \
@@ -180,6 +188,7 @@ def run_mbd(data, mbd):
                           'fermi@rsSCS,dip',
                           R_vdw['rsSCS'],
                           beta=damp_params['mbd_rsscs_beta'],
-                          a=damp_params['mbd_rsscs_a'])[:3]
+                          a=damp_params['mbd_rsscs_a'],
+                          my_task=myid, n_tasks=ntasks)[:3]
 
     return energy

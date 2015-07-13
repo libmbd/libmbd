@@ -21,14 +21,14 @@ ntasks = MPI.COMM_WORLD.Get_size()
 myid = MPI.COMM_WORLD.Get_rank()
 
 
-def printerr(s):
+def printmsg(s):
     if myid == 0:
-        sys.stderr.write(s + '\n')
+        print(s)
 
 
 def block(msg):
     def runner(f):
-        printerr(msg)
+        printmsg(msg)
         f()
     return runner
 
@@ -43,7 +43,7 @@ def main(path, extension=None):
         extension = run_mbd
     for key in data:
         data[key] = np.array(data[key])
-    printerr('Running on {} nodes...'.format(ntasks))
+    printmsg('Running on {} nodes...'.format(ntasks))
     results = extension(data, mbd)
     return results
 
@@ -53,7 +53,8 @@ if __name__ == '__main__':
     config = json.load(open(str(config))) if config.exists() else {}
     results = main(sys.argv[1], config.get('extension'))
     if myid == 0:
-        json.dump(results, sys.stdout, cls=ArrayEncoder, indent=4)
+        with open(sys.argv[2], 'w') as f:
+            json.dump(results, f, cls=ArrayEncoder, indent=4)
 
 
 def run_mbd(data, mbd):

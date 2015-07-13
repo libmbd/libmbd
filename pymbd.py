@@ -103,10 +103,10 @@ def run_mbd(data, mbd):
 
     @block("Evaluating SCS...")
     def scs():
-        alpha['SCS'] = np.zeros((nomega, natoms))
-        for alphas_ts, alphas_scs in zip(alpha['TS'], alpha['SCS']):
-            alpha_3n = mbd.run_scs(data['coords'], alphas_ts, 'dip,gg')
-            alphas_scs[:] = mbd.contract_polarizability(alpha_3n)
+        alpha['SCS'] = mbd.run_scs(data['coords'],
+                                   alpha['TS'],
+                                   'dip,gg',
+                                   my_task=myid, n_tasks=ntasks)
         C6['SCS'] = mbd.get_c6_from_alpha(alpha['SCS'])
         R_vdw['SCS'] = \
             data['R_vdw']*np.power(alpha['SCS'][0]/data['alpha_0'], 1./3)
@@ -135,15 +135,13 @@ def run_mbd(data, mbd):
 
     @block("Evaluating rsSCS...")
     def rsscs():
-        alpha['rsSCS'] = np.zeros((nomega, natoms))
-        for alphas_ts, alphas_rsscs in zip(alpha['TS'], alpha['rsSCS']):
-            alpha_3n = mbd.run_scs(data['coords'],
-                                   alphas_ts,
+        alpha['rsSCS'] = mbd.run_scs(data['coords'],
+                                     alpha['TS'],
                                    'fermi,dip,gg',
                                    R_vdw['TS'],
                                    beta=damp_params['mbd_rsscs_beta'],
-                                   a=damp_params['mbd_rsscs_a'])
-            alphas_rsscs[:] = mbd.contract_polarizability(alpha_3n)
+                                     a=damp_params['mbd_rsscs_a'],
+                                     my_task=myid, n_tasks=ntasks)
         C6['rsSCS'] = mbd.get_c6_from_alpha(alpha['rsSCS'])
         R_vdw['rsSCS'] = \
             data['R_vdw']*np.power(alpha['rsSCS'][0]/data['alpha_0'], 1./3)

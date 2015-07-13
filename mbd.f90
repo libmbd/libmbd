@@ -321,21 +321,41 @@ function run_scs( &
         damping_custom(size(coords, 1), size(coords, 1)), &
         lattice_vector(3, 3)
     integer, intent(in), optional :: my_task, n_tasks
-    real*8 :: alpha_scs(3*size(coords, 1), 3*size(coords, 1))
+    real*8 :: alpha_scs(size(alpha, 1), size(alpha, 2))
 
+    real*8 :: alpha_full(3*size(coords, 1), 3*size(coords, 1))
     real*8 :: T(3*size(coords, 1), 3*size(coords, 1))
-    integer :: i_atom, i_xyz
+    integer :: i_atom, i_xyz, i_grid_omega
+    logical :: is_parallel
 
+    is_parallel = .false.
+    if (present(n_tasks)) then
+        if (n_tasks > 0) then
+            is_parallel = .true.
+        end if
+    end if
+    alpha_scs(:, :) = 0.d0
+    do i_grid_omega = 0, n_grid_omega
+        if (is_parallel) then
+            if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
+        end if
     T = build_dipole_matrix( &
-        coords, version, alpha, R_vdw, beta, a, damping_custom=damping_custom, &
-        lattice_vector=lattice_vector, dipole_cutoff=param_mbd_dip_cutoff)
-    alpha_scs = -T
+            coords, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
+            damping_custom=damping_custom, lattice_vector=lattice_vector, &
+            dipole_cutoff=param_mbd_dip_cutoff)
+        alpha_full = -T
     do i_atom = 1, size(coords, 1)
         do i_xyz = 1, 3
-            alpha_scs(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = 1.d0/alpha(i_atom)
+                alpha_full(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = &
+                    1.d0/alpha(i_grid_omega+1, i_atom)
         end do
     end do
-    alpha_scs = invert_matrix(alpha_scs)
+        alpha_full = invert_matrix(alpha_full)
+        alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
+    end do
+    if (is_parallel) then
+        call sync_sum_array (alpha_scs, size(alpha_scs))
+    end if
 end function run_scs
 
 function contract_polarizability(alpha_3n_3n) result(alpha)

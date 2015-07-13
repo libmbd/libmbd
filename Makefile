@@ -16,6 +16,9 @@ mbd.so: ${sources}
 test:
 	python test.py
 
+test2:
+	python -m doctest -v README.md 
+
 clean:
 	-rm *.mod
 

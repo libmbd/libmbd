@@ -33,30 +33,6 @@ def block(msg):
     return runner
 
 
-def main(path, extension=None):
-    data = json.load(open(path))
-    if extension:
-        module, func = extension.split(':')
-        module = __import__(module)
-        extension = getattr(module, func)
-    else:
-        extension = run_mbd
-    for key in data:
-        data[key] = np.array(data[key])
-    printmsg('Running on {} nodes...'.format(ntasks))
-    results = extension(data, mbd)
-    return results
-
-
-if __name__ == '__main__':
-    config = Path('config.json')
-    config = json.load(open(str(config))) if config.exists() else {}
-    results = main(sys.argv[1], config.get('extension'))
-    if myid == 0:
-        with open(sys.argv[2], 'w') as f:
-            json.dump(results, f, cls=ArrayEncoder, indent=4)
-
-
 def run_mbd(data, mbd):
     natoms = len(data['coords'])
     nomega = mbd.omega_grid.shape[0]
@@ -193,3 +169,27 @@ def run_mbd(data, mbd):
                           my_task=myid, n_tasks=ntasks)[:3]
 
     return energy
+
+
+def main(path, extension=None):
+    data = json.load(open(path))
+    if extension:
+        module, func = extension.split(':')
+        module = __import__(module)
+        extension = getattr(module, func)
+    else:
+        extension = run_mbd
+    for key in data:
+        data[key] = np.array(data[key])
+    printmsg('Running on {} nodes...'.format(ntasks))
+    results = extension(data, mbd)
+    return results
+
+
+if __name__ == '__main__':
+    config = Path('config.json')
+    config = json.load(open(str(config))) if config.exists() else {}
+    results = main(sys.argv[1], config.get('extension'))
+    if myid == 0:
+        with open(sys.argv[2], 'w') as f:
+            json.dump(results, f, cls=ArrayEncoder, indent=4)

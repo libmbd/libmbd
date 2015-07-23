@@ -1,10 +1,11 @@
 include system.mk
+sources = mbd_interface.f90 mbd.f90
 
 blddir = build
 
 all: mbd.so
 
-mbd.so: mbd_interface.f90 mbd.f90
+mbd.so: ${sources}
 	mkdir -p ${blddir}
 	CFLAGS="${CFLAGS}" f2py -c --build-dir ${blddir} --fcompiler=${FVENDOR} \
 		   --f90exec=${FC} --f90flags="${FFLAGS}" --compiler=${CVENDOR} \

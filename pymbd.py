@@ -17,14 +17,6 @@ import sys
 from contextlib import contextmanager
 
 
-class ArrayEncoder(json.JSONEncoder):
-    def default(self, obj):
-        try:
-            return obj.tolist()
-        except AttributeError:
-            return super().default(obj)
-
-
 bohr = 0.529177249
 ntasks = MPI.COMM_WORLD.Get_size()
 myid = MPI.COMM_WORLD.Get_rank()
@@ -52,10 +44,10 @@ def run_mbd(data, mbd):
     with block('TS'):
         alpha['TS'] = np.zeros((nomega, natoms))
         alpha['TS'][0] = data['alpha_0']*data['volume_ratio']
-        C6['TS'] = data['C6']*np.power(data['volume_ratio'], 2)
+        C6['TS'] = data['C6']*data['volume_ratio']**2
         for alphas, omega in zip(alpha['TS'][1:], mbd.omega_grid[1:]):
             alphas[:] = mbd.alpha_dynamic_ts(alpha['TS'][0], C6['TS'], omega)
-        R_vdw['TS'] = data['R_vdw']*np.power(data['volume_ratio'], 1./3)
+        R_vdw['TS'] = data['R_vdw']*data['volume_ratio']**(1./3)
         energy['TS@TS~fermi@TS'] = \
             mbd.get_ts_energy(data['coords'],
                               C6['TS'],
@@ -91,7 +83,7 @@ def run_mbd(data, mbd):
                                    my_task=myid, n_tasks=ntasks)
         C6['SCS'] = mbd.get_c6_from_alpha(alpha['SCS'])
         R_vdw['SCS'] = \
-            data['R_vdw']*np.power(alpha['SCS'][0]/data['alpha_0'], 1./3)
+            data['R_vdw']*(alpha['SCS'][0]/data['alpha_0'])**(1./3)
     with block('TS@SCS'):
         energy['TS@SCS~fermi@SCS'] = \
             mbd.get_ts_energy(data['coords'],
@@ -122,7 +114,7 @@ def run_mbd(data, mbd):
                                      my_task=myid, n_tasks=ntasks)
         C6['rsSCS'] = mbd.get_c6_from_alpha(alpha['rsSCS'])
         R_vdw['rsSCS'] = \
-            data['R_vdw']*np.power(alpha['rsSCS'][0]/data['alpha_0'], 1./3)
+            data['R_vdw']*(alpha['rsSCS'][0]/data['alpha_0'])**(1./3)
     with block('MBD@rsSCS'):
         energy['MBD@rsSCS~fermi@rsSCS,dip'] = \
             mbd.get_mbd_energy(data['coords'],
@@ -172,11 +164,18 @@ def main(f, extension=None):
         extension = getattr(module, func)
     else:
         extension = run_mbd
-    for key in data:
-        data[key] = np.array(data[key])
+    data = {k: np.array(v) for k, v in data.items()}
     printmsg('Running on {} nodes...'.format(ntasks))
     results = extension(data, mbd)
     return results
+
+
+class ArrayEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            return obj.tolist()
+        except AttributeError:
+            return super().default(obj)
 
 
 if __name__ == '__main__':

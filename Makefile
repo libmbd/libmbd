@@ -12,7 +12,7 @@ mbd.so: ${sources}
 	rsync -a ${blddir}/*.mod .
 
 test:
-	cd example && python ../pymbd.py <argon-dimer.json | python process.py
+	@${MAKE} -C tests
 
 clean:
 	-rm *.mod

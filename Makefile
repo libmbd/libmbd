@@ -1,7 +1,6 @@
 include system.mk
-sources = mbd_interface.f90 mbd.f90
-
 blddir = build
+sources = mbd_interface.f90 mbd.f90
 
 all: mbd.so
 
@@ -11,16 +10,13 @@ mbd.so: ${sources}
 		   --f90exec=${FC} --f90flags="${FFLAGS}" --compiler=${CVENDOR} \
 		   -m $(basename $@) ${LDFLAGS} $^
 	rsync -a ${blddir}/*.mod .
-	rm -r ${blddir}
 
 test:
-	python test.py
-
-test2:
-	python -m doctest -v README.md 
+	cd example && python ../pymbd.py <argon-dimer.json | python process.py
 
 clean:
 	-rm *.mod
+	-rm -r build
 
 distclean: clean
 	-rm mbd.so

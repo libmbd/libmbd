@@ -92,7 +92,7 @@ function get_ts_energy( &
         if (is_periodic) then
             range_g_cell = supercell_circum(lattice_vector, i_range*step)
         else
-            range_g_cell(:) = 0
+            range_g_cell(:) = (/ 0, 0, 0 /)
         end if
         g_cell = (/ 0, 0, -1 /)
         do i_cell = 1, product(1+2*range_g_cell)
@@ -113,7 +113,7 @@ function get_ts_energy( &
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = coords(:, i_atom)-coords(:, j_atom)-r_cell
+                    r = coords(i_atom, :)-coords(j_atom, :)-r_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm > i_range*step .or. r_norm < (i_range-1)*step) cycle
                     C6_ij = combine_C6(C6(i_atom), C6(j_atom), &
@@ -211,7 +211,7 @@ function build_dipole_matrix( &
     if (is_periodic) then
         range_g_cell = supercell_circum(lattice_vector, dipole_cutoff)
     else
-        range_g_cell(:) = 0
+        range_g_cell(:) = (/ 0, 0, 0 /)
     end if
     T(:, :) = 0.d0
     g_cell = (/ 0, 0, -1 /)
@@ -233,7 +233,7 @@ function build_dipole_matrix( &
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                r = coords(:, i_atom)-coords(:, j_atom)-r_cell
+                r = coords(i_atom, :)-coords(j_atom, :)-r_cell
                 r_norm = sqrt(sum(r**2))
                 if (is_periodic) then
                     if (r_norm > dipole_cutoff) cycle

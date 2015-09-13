@@ -1,11 +1,20 @@
 #!/usr/bin/env python
+"""pymbd -- Pythom wrapper for MBD.
+
+Usage:
+    pymbd.py [-e <extension>] [<input>]
+
+Options:
+    -e <extension>    Format "<module>:<callable>"
+"""
 from __future__ import print_function
 import json
 import numpy as np
+from docopt import docopt
 from mpi4py import MPI
 from mbd import mbd
 import sys
-from pathlib import Path
+from contextlib import contextmanager
 
 
 class ArrayEncoder(json.JSONEncoder):
@@ -23,14 +32,13 @@ myid = MPI.COMM_WORLD.Get_rank()
 
 def printmsg(s):
     if myid == 0:
-        print(s)
+        sys.stderr.write('{}\n'.format(s))
 
 
-def block(msg):
-    def runner(f):
-        printmsg(msg)
-        f()
-    return runner
+@contextmanager
+def block(name):
+    printmsg('Evaluating {}...'.format(name))
+    yield
 
 
 def run_mbd(data, mbd):
@@ -41,9 +49,7 @@ def run_mbd(data, mbd):
                             'mbd_ts_erf_beta', 'mbd_ts_fermi_beta', 'mbd_rsscs_a',
                             'mbd_rsscs_beta'],
                            mbd.get_damping_parameters('pbe')))
-
-    @block('Evaluating TS...')
-    def ts():
+    with block('TS'):
         alpha['TS'] = np.zeros((nomega, natoms))
         alpha['TS'][0] = data['alpha_0']*data['volume_ratio']
         C6['TS'] = data['C6']*np.power(data['volume_ratio'], 2)
@@ -59,9 +65,7 @@ def run_mbd(data, mbd):
                               d=damp_params['ts_d'],
                               s_r=damp_params['ts_s_r'],
                               my_task=myid, n_tasks=ntasks)
-
-    @block("Evaluating MBD@TS...")
-    def mbd_ts():
+    with block('MBD@TS'):
         energy['MBD@TS~erf@TS,dip'] = \
             mbd.get_mbd_energy(data['coords'],
                                alpha['TS'][0],
@@ -80,9 +84,7 @@ def run_mbd(data, mbd):
                                beta=damp_params['mbd_ts_fermi_beta'],
                                a=damp_params['mbd_ts_a'],
                                my_task=myid, n_tasks=ntasks)[0]
-
-    @block("Evaluating SCS...")
-    def scs():
+    with block('SCS'):
         alpha['SCS'] = mbd.run_scs(data['coords'],
                                    alpha['TS'],
                                    'dip,gg',
@@ -90,9 +92,7 @@ def run_mbd(data, mbd):
         C6['SCS'] = mbd.get_c6_from_alpha(alpha['SCS'])
         R_vdw['SCS'] = \
             data['R_vdw']*np.power(alpha['SCS'][0]/data['alpha_0'], 1./3)
-
-    @block("Evaluating TS@SCS...")
-    def ts_scs():
+    with block('TS@SCS'):
         energy['TS@SCS~fermi@SCS'] = \
             mbd.get_ts_energy(data['coords'],
                               C6['SCS'],
@@ -102,9 +102,7 @@ def run_mbd(data, mbd):
                               d=damp_params['ts_d'],
                               s_r=damp_params['ts_s_r'],
                               my_task=myid, n_tasks=ntasks)
-
-    @block("Evaluating MBD@SCS...")
-    def mbd_scs():
+    with block('MBD@SCS'):
         energy['MBD@SCS~dip,1mexp@SCS'] = \
             mbd.get_mbd_energy(data['coords'],
                                alpha['SCS'][0],
@@ -114,9 +112,7 @@ def run_mbd(data, mbd):
                                beta=1.,
                                a=damp_params['mbd_scs_a'],
                                my_task=myid, n_tasks=ntasks)[0]
-
-    @block("Evaluating rsSCS...")
-    def rsscs():
+    with block('rsSCS'):
         alpha['rsSCS'] = mbd.run_scs(data['coords'],
                                      alpha['TS'],
                                      'fermi,dip,gg',
@@ -127,9 +123,7 @@ def run_mbd(data, mbd):
         C6['rsSCS'] = mbd.get_c6_from_alpha(alpha['rsSCS'])
         R_vdw['rsSCS'] = \
             data['R_vdw']*np.power(alpha['rsSCS'][0]/data['alpha_0'], 1./3)
-
-    @block("Evaluating MBD@rsSCS...")
-    def mbd_rsscs():
+    with block('MBD@rsSCS'):
         energy['MBD@rsSCS~fermi@rsSCS,dip'] = \
             mbd.get_mbd_energy(data['coords'],
                                alpha['rsSCS'][0],
@@ -167,12 +161,11 @@ def run_mbd(data, mbd):
                           beta=damp_params['mbd_rsscs_beta'],
                           a=damp_params['mbd_rsscs_a'],
                           my_task=myid, n_tasks=ntasks)[:3]
-
     return energy
 
 
-def main(path, extension=None):
-    data = json.load(open(path))
+def main(f, extension=None):
+    data = json.load(f)
     if extension:
         module, func = extension.split(':')
         module = __import__(module)
@@ -187,9 +180,8 @@ def main(path, extension=None):
 
 
 if __name__ == '__main__':
-    config = Path('config.json')
-    config = json.load(open(str(config))) if config.exists() else {}
-    results = main(sys.argv[1], config.get('extension'))
+    args = docopt(__doc__)
+    results = main(open(args['<input>']) if args['<input>'] else sys.stdin,
+                   args['-e'])
     if myid == 0:
-        with open(sys.argv[2], 'w') as f:
-            json.dump(results, f, cls=ArrayEncoder, indent=4)
+        json.dump(results, sys.stdout, cls=ArrayEncoder, indent=4)

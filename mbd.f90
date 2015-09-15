@@ -1,33 +1,43 @@
 module mbd
 
+
 use mbd_interface, only: &
     sync_sum_array, sync_sum_number, print_error, print_warning, print_log
 
+
 implicit none
+
 
 real*8 :: &
     pi = acos(-1.d0), &
     nan = sqrt(-sin(0.d0))
+
 real*8, parameter :: &
     bohr = 0.529177249
+
 real*8 :: &
     param_scs_dip_cutoff = 120.d0/bohr, &
     param_mbd_supercell_cutoff = 25.d0/bohr, &
     param_mbd_dip_cutoff = 100.d0/bohr, &
     param_energy_accuracy = 1.d-6
+
 integer :: &
     param_mbd_nbody_max = 3, &
     param_rpa_order_max = 10
+
 logical :: &
     param_vacuum_axis(3) = (/ .false., .false., .false. /)
+
 integer, parameter :: &
     n_grid_omega = 20
+
 real*8 :: omega_grid(0:n_grid_omega) = (/ &
     0.0000000, &
     0.0392901, 0.1183580, 0.1989120, 0.2820290, 0.3689190, &
     0.4610060, 0.5600270, 0.6681790, 0.7883360, 0.9243900, &
     1.0817900, 1.2684900, 1.4966100, 1.7856300, 2.1691700, &
     2.7106200, 3.5457300, 5.0273400, 8.4489600, 25.451700 /)
+
 real*8 :: omega_grid_w(0:n_grid_omega) = (/ &
     0.0000000, &
     0.0786611, 0.0796400, 0.0816475, 0.0847872, 0.0892294, &
@@ -35,32 +45,34 @@ real*8 :: omega_grid_w(0:n_grid_omega) = (/ &
     0.1704530, 0.2049170, 0.2544560, 0.3289620, 0.4480920, &
     0.6556060, 1.0659600, 2.0635700, 5.6851000, 50.955800 /)
 
+
 contains
 
+
 function get_ts_energy( &
-        coords, &
+        xyz, &
         C6, &
         alpha_0, &
         version, &
         R_vdw, s_R, d, &
         overlap, &
         damping_custom, &
-        lattice_vector, &
+        unit_cell, &
         my_task, n_tasks) &
         result(ene)
     implicit none
 
     real*8, intent(in) :: &
-       coords(:, :), &
-       C6(size(coords, 1)), &
-       alpha_0(size(coords, 1))
+       xyz(:, :), &
+       C6(size(xyz, 1)), &
+       alpha_0(size(xyz, 1))
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
-        R_vdw(size(coords, 1)), &
+        R_vdw(size(xyz, 1)), &
         s_R, d, &
-        overlap(size(coords, 1), size(coords, 1)), &
-        damping_custom(size(coords, 1), size(coords, 1)), &
-        lattice_vector(3, 3)
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        unit_cell(3, 3)
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
@@ -74,8 +86,8 @@ function get_ts_energy( &
 
     is_periodic = .false.
     is_parallel = .false.
-    if (present(lattice_vector)) then
-        if (any(lattice_vector > 0.d0)) then
+    if (present(unit_cell)) then
+        if (any(unit_cell > 0.d0)) then
             is_periodic = .true.
         end if
     end if
@@ -90,7 +102,7 @@ function get_ts_energy( &
         ene_add = 0.d0
         i_range = i_range+1
         if (is_periodic) then
-            range_g_cell = supercell_circum(lattice_vector, i_range*step)
+            range_g_cell = supercell_circum(unit_cell, i_range*step)
         else
             range_g_cell(:) = (/ 0, 0, 0 /)
         end if
@@ -101,11 +113,11 @@ function get_ts_energy( &
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
             end if
             if (is_periodic) then
-                r_cell = matmul(g_cell, lattice_vector)
+                r_cell = matmul(g_cell, unit_cell)
             else
                 r_cell(:) = 0.d0
             end if
-            do i_atom = 1, size(coords, 1)
+            do i_atom = 1, size(xyz, 1)
                 if (is_parallel .and. .not. is_periodic) then
                     if (my_task /= modulo(i_atom, n_tasks)) cycle
                 end if
@@ -113,7 +125,7 @@ function get_ts_energy( &
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = coords(i_atom, :)-coords(j_atom, :)-r_cell
+                    r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm > i_range*step .or. r_norm < (i_range-1)*step) cycle
                     C6_ij = combine_C6(C6(i_atom), C6(j_atom), &
@@ -158,8 +170,9 @@ function get_ts_energy( &
     enddo ! i_range
 end function get_ts_energy
 
+
 function build_dipole_matrix( &
-        coords, &
+        xyz, &
         version, &
         alpha, &
         R_vdw, beta, a, &
@@ -167,28 +180,28 @@ function build_dipole_matrix( &
         C6, &
         damping_custom, &
         potential_custom, &
-        lattice_vector, &
+        unit_cell, &
         dipole_cutoff, &
         k_point, &
         my_task, n_tasks) &
         result(T)
     implicit none
 
-    real*8, intent(in) :: coords(:, :)
+    real*8, intent(in) :: xyz(:, :)
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
-        alpha(size(coords, 1)), &
-        R_vdw(size(coords, 1)), &
+        alpha(size(xyz, 1)), &
+        R_vdw(size(xyz, 1)), &
         beta, a, &
-        overlap(size(coords, 1), size(coords, 1)), &
-        C6(size(coords, 1)), &
-        damping_custom(size(coords, 1), size(coords, 1)), &
-        potential_custom(size(coords, 1), size(coords, 1), 3, 3), &
-        lattice_vector(3, 3), &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
+        unit_cell(3, 3), &
         dipole_cutoff, &
         k_point(3)
     integer, intent(in), optional :: my_task, n_tasks
-    real*8 :: T(3*size(coords, 1), 3*size(coords, 1))
+    real*8 :: T(3*size(xyz, 1), 3*size(xyz, 1))
 
     real*8 :: Tpp(3, 3)
     real*8 :: r_cell(3), r(3), r_norm
@@ -198,8 +211,8 @@ function build_dipole_matrix( &
 
     is_periodic = .false.
     is_parallel = .false.
-    if (present(lattice_vector)) then
-        if (any(lattice_vector > 0.d0)) then
+    if (present(unit_cell)) then
+        if (any(unit_cell > 0.d0)) then
             is_periodic = .true.
         end if
     end if
@@ -209,7 +222,7 @@ function build_dipole_matrix( &
         end if
     end if
     if (is_periodic) then
-        range_g_cell = supercell_circum(lattice_vector, dipole_cutoff)
+        range_g_cell = supercell_circum(unit_cell, dipole_cutoff)
     else
         range_g_cell(:) = (/ 0, 0, 0 /)
     end if
@@ -221,11 +234,11 @@ function build_dipole_matrix( &
             if (my_task /= modulo(i_cell, n_tasks)) cycle
         end if
         if (is_periodic) then
-            r_cell = matmul(g_cell, lattice_vector)
+            r_cell = matmul(g_cell, unit_cell)
         else
             r_cell(:) = 0.d0
         end if
-        do i_atom = 1, size(coords, 1)
+        do i_atom = 1, size(xyz, 1)
             if (is_parallel .and. .not. is_periodic) then
                 if (my_task /= modulo(i_atom, n_tasks)) cycle
             end if
@@ -233,7 +246,7 @@ function build_dipole_matrix( &
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                r = coords(i_atom, :)-coords(j_atom, :)-r_cell
+                r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
                 r_norm = sqrt(sum(r**2))
                 if (is_periodic) then
                     if (r_norm > dipole_cutoff) cycle
@@ -286,6 +299,9 @@ function build_dipole_matrix( &
                         Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                 end select
+                if (present(k_point)) then
+                    Tpp = Tpp*cos(sum(k_point*r_cell))
+                end if
                 T(3*(i_atom-1)+1:3*(i_atom-1)+3, &
                     3*(j_atom-1)+1:3*(j_atom-1)+3) = &
                     T(3*(i_atom-1)+1:3*(i_atom-1)+3, &
@@ -302,31 +318,32 @@ function build_dipole_matrix( &
     end if
 end function build_dipole_matrix
 
+
 function run_scs( &
-        coords, &
+        xyz, &
         alpha, &
         version, &
         R_vdw, beta, a, &
         damping_custom, &
-        lattice_vector, &
+        unit_cell, &
         my_task, n_tasks) & 
         result(alpha_scs)
     implicit none
 
     real*8, intent(in) :: &
-        coords(:, :), &
+        xyz(:, :), &
         alpha(:, :)
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
-        R_vdw(size(coords, 1)), &
+        R_vdw(size(xyz, 1)), &
         beta, a, &
-        damping_custom(size(coords, 1), size(coords, 1)), &
-        lattice_vector(3, 3)
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        unit_cell(3, 3)
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: alpha_scs(size(alpha, 1), size(alpha, 2))
 
-    real*8 :: alpha_full(3*size(coords, 1), 3*size(coords, 1))
-    real*8 :: T(3*size(coords, 1), 3*size(coords, 1))
+    real*8 :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    real*8 :: T(3*size(xyz, 1), 3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega
     logical :: is_parallel
 
@@ -342,11 +359,11 @@ function run_scs( &
             if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
         end if
         T = build_dipole_matrix( &
-            coords, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
-            damping_custom=damping_custom, lattice_vector=lattice_vector, &
+            xyz, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
+            damping_custom=damping_custom, unit_cell=unit_cell, &
             dipole_cutoff=param_mbd_dip_cutoff)
         alpha_full = -T
-        do i_atom = 1, size(coords, 1)
+        do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 alpha_full(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = &
                     1.d0/alpha(i_grid_omega+1, i_atom)
@@ -359,6 +376,7 @@ function run_scs( &
         call sync_sum_array (alpha_scs, size(alpha_scs))
     end if
 end function run_scs
+
 
 function contract_polarizability(alpha_3n_3n) result(alpha)
     implicit none
@@ -380,8 +398,9 @@ function contract_polarizability(alpha_3n_3n) result(alpha)
     enddo
 end function
 
+
 function get_mbd_energy( &
-        coords, &
+        xyz, &
         alpha_0, &
         omega, &
         version, &
@@ -390,7 +409,7 @@ function get_mbd_energy( &
         C6, &
         damping_custom, &
         potential_custom, &
-        lattice_vector, &
+        unit_cell, &
         k_point, &
         eigenomega, modes, &
         my_task, n_tasks) &
@@ -398,45 +417,45 @@ function get_mbd_energy( &
     implicit none
 
     real*8, intent(in) :: &
-        coords(:, :), &
-        alpha_0(size(coords, 1)), &
-        omega(size(coords, 1))
+        xyz(:, :), &
+        alpha_0(size(xyz, 1)), &
+        omega(size(xyz, 1))
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
-        R_vdw(size(coords, 1)), &
+        R_vdw(size(xyz, 1)), &
         beta, a, &
-        overlap(size(coords, 1), size(coords, 1)), &
-        C6(size(coords, 1)), &
-        damping_custom(size(coords, 1), size(coords, 1)), &
-        potential_custom(size(coords, 1), size(coords, 1), 3, 3), &
-        lattice_vector(3, 3), &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
+        unit_cell(3, 3), &
         k_point(3)
     real*8, intent(out), optional :: &
-        eigenomega(3*size(coords, 1)), &
-        modes(3*size(coords, 1), 3*size(coords, 1))
+        eigenomega(3*size(xyz, 1)), &
+        modes(3*size(xyz, 1), 3*size(xyz, 1))
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
     character(len=1000) :: info_str
-    real*8, dimension(3*size(coords, 1), 3*size(coords, 1)) :: T, V
-    real*8 :: eigs(3*size(coords, 1))
+    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
+    real*8 :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, j_xyz
     integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
     real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
     integer :: n_negative_eigs, g_cell(3), i_order
 
     V(:, :) = 0.d0
-    do i_atom = 1, size(coords, 1)
+    do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             V(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = omega(i_atom)**2
         end do
     end do
     T = build_dipole_matrix( &
-        coords, version, alpha_0, R_vdw, beta, a, overlap, C6, damping_custom, &
-        potential_custom, lattice_vector, param_mbd_dip_cutoff, k_point, &
+        xyz, version, alpha_0, R_vdw, beta, a, overlap, C6, damping_custom, &
+        potential_custom, unit_cell, param_mbd_dip_cutoff, k_point, &
         my_task, n_tasks)
-    do i_atom = 1, size(coords, 1)
-        do j_atom = 1, size(coords, 1)
+    do i_atom = 1, size(xyz, 1)
+        do j_atom = 1, size(xyz, 1)
             if (i_atom == j_atom) cycle
             V(3*(i_atom-1)+1:3*(i_atom-1)+3, 3*(j_atom-1)+1:3*(j_atom-1)+3) = &
                 omega(i_atom)*omega(j_atom)*sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
@@ -459,8 +478,124 @@ function get_mbd_energy( &
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_mbd_energy
 
+
+function get_periodic_mbd_energy( &
+        xyz, &
+        alpha_0, &
+        omega, &
+        version, &
+        unit_cell, &
+        k_grid, &
+        R_vdw, beta, a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        eigenomega, modes, &
+        my_task, n_tasks) &
+        result(ene)
+    implicit none
+
+    real*8, intent(in) :: &
+        xyz(:, :), &
+        alpha_0(size(xyz, 1)), &
+        omega(size(xyz, 1)), &
+        unit_cell(3, 3)
+    integer, intent(in) :: &
+        k_grid(3)
+    character(len=*), intent(in) :: version
+    real*8, intent(in), optional :: &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    real*8, intent(out), optional :: &
+        eigenomega(k_grid(1), k_grid(2), k_grid(3), 3*size(xyz, 1)), &
+        modes(k_grid(1), k_grid(2), k_grid(3), 3*size(xyz, 1), 3*size(xyz, 1))
+    integer, intent(in), optional :: my_task, n_tasks
+    real*8 :: ene
+
+    character(len=1000) :: info_str
+    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
+    real*8 :: eigs(3*size(xyz, 1))
+    integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim
+    logical :: is_parallel
+    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
+    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
+    integer :: n_negative_eigs, g_cell(3), i_order, g_kpt(3), g_kpt_shifted(3)
+    real*8 :: ruc(3, 3)
+
+    is_parallel = .false.
+    if (present(n_tasks)) then
+        if (n_tasks > 0) then
+            is_parallel = .true.
+        end if
+    end if
+    ruc = 2*pi*invert_matrix(transpose(unit_cell))
+    g_kpt = (/ 0, 0, -1 /)
+    ene = 0.d0
+    do i_kpt = 1, product(k_grid)
+        call shift_cell (g_kpt, (/ 0, 0, 0 /), k_grid-1)
+        if (is_parallel) then
+            if (my_task /= modulo(i_kpt, n_tasks)) cycle
+        end if
+        g_kpt_shifted = g_kpt
+        where (2*g_kpt > k_grid) g_kpt_shifted = g_kpt-k_grid
+        k_point = matmul(real(g_kpt)/k_grid, ruc)
+        if (present(eigenomega) .and. present(modes)) then
+            ene = ene + get_mbd_energy( &
+                xyz, &
+                alpha_0, &
+                omega, &
+                version, &
+                R_vdw, beta, a, &
+                overlap, &
+                C6, &
+                damping_custom, &
+                potential_custom, &
+                unit_cell, &
+                k_point, &
+                eigenomega(g_kpt(1)+1, g_kpt(2)+1, g_kpt(3)+1, :), &
+                modes(g_kpt(1)+1, g_kpt(2)+1, g_kpt(3)+1, :, :), &
+                my_task, n_tasks)
+        else if (present(eigenomega)) then
+            ene = ene + get_mbd_energy( &
+                xyz, &
+                alpha_0, &
+                omega, &
+                version, &
+                R_vdw, beta, a, &
+                overlap, &
+                C6, &
+                damping_custom, &
+                potential_custom, &
+                unit_cell, &
+                k_point, &
+                eigenomega(g_kpt(1)+1, g_kpt(2)+1, g_kpt(3)+1, :), &
+                my_task=my_task, n_tasks=n_tasks)
+        else
+            ene = ene + get_mbd_energy( &
+                xyz, &
+                alpha_0, &
+                omega, &
+                version, &
+                R_vdw, beta, a, &
+                overlap, &
+                C6, &
+                damping_custom, &
+                potential_custom, &
+                unit_cell, &
+                k_point, &
+                my_task=my_task, n_tasks=n_tasks)
+        end if
+    end do ! k_point loop
+end function get_periodic_mbd_energy
+
+
 function mbd_nbody( &
-        coords, &
+        xyz, &
         alpha_0, &
         omega, &
         version, &
@@ -470,10 +605,10 @@ function mbd_nbody( &
     implicit none
 
     real*8, intent(in) :: &
-        coords(:, :), &
-        alpha_0(size(coords, 1)), &
-        omega(size(coords, 1)), &
-        R_vdw(size(coords, 1)), &
+        xyz(:, :), &
+        alpha_0(size(xyz, 1)), &
+        omega(size(xyz, 1)), &
+        R_vdw(size(xyz, 1)), &
         beta, a
     character(len=*), intent(in) :: version
     integer, intent(in), optional :: my_task, n_tasks
@@ -499,19 +634,19 @@ function mbd_nbody( &
         do
             multi_index(i_body) = multi_index(i_body)+1
             do i_index = i_body, 2, -1
-                if (multi_index(i_index) > size(coords, 1)) then
+                if (multi_index(i_index) > size(xyz, 1)) then
                     multi_index(i_index) = 1
                     multi_index(i_index-1) = multi_index(i_index-1)+1
                 end if
             end do
-            if (multi_index(1) > size(coords, 1)) exit
+            if (multi_index(1) > size(xyz, 1)) exit
             if (any(multi_index(1:i_body-1)-multi_index(2:i_body) >= 0)) cycle
             i_tuple = i_tuple+1
             if (is_parallel) then
                 if (my_task /= modulo(i_tuple, n_tasks)) cycle
             end if
             ene = get_mbd_energy( &
-                coords(multi_index(1:i_body), :), &
+                xyz(multi_index(1:i_body), :), &
                 alpha_0(multi_index(1:i_body)), &
                 omega(multi_index(1:i_body)), &
                 version, &
@@ -525,14 +660,15 @@ function mbd_nbody( &
         call sync_sum_array(ene_orders, size(ene_orders))
     end if
     ene_orders(1) = 3.d0/2*sum(omega)
-    do i_body = 2, min(param_mbd_nbody_max, size(coords, 1))
+    do i_body = 2, min(param_mbd_nbody_max, size(xyz, 1))
         do j_body = 1, i_body-1
             ene_orders(i_body) = ene_orders(i_body) &
-                -nbody_coeffs(j_body, i_body, size(coords, 1))*ene_orders(j_body)
+                -nbody_coeffs(j_body, i_body, size(xyz, 1))*ene_orders(j_body)
         end do
     end do
     ene_orders(1) = sum(ene_orders(2:param_mbd_nbody_max))
 end function mbd_nbody
+
 
 function nbody_coeffs(k, m, N) result(a)
     integer, intent(in) :: k, m, N
@@ -549,8 +685,9 @@ function nbody_coeffs(k, m, N) result(a)
     end do
 end function nbody_coeffs
 
+
 function get_qho_rpa_energy( &
-        coords, &
+        xyz, &
         alpha, &
         version, &
         R_vdw, beta, a, &
@@ -564,23 +701,23 @@ function get_qho_rpa_energy( &
     implicit none
 
     real*8, intent(in) :: &
-        coords(:, :), &
+        xyz(:, :), &
         alpha(:, :)
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
-        R_vdw(size(coords, 1)), &
+        R_vdw(size(xyz, 1)), &
         beta, a, &
-        overlap(size(coords, 1), size(coords, 1)), &
-        C6(size(coords, 1)), &
-        damping_custom(size(coords, 1), size(coords, 1)), &
-        potential_custom(size(coords, 1), size(coords, 1), 3, 3)
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real*8, intent(out), optional :: rpa_orders(20)
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
-    real*8, dimension(3*size(coords, 1), 3*size(coords, 1)) :: &
+    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: &
         T, big_alpha, AT, one
-    real*8 :: eigs(3*size(coords, 1))
+    real*8 :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega
     integer :: n_order
     logical :: is_parallel
@@ -591,16 +728,16 @@ function get_qho_rpa_energy( &
             is_parallel = .true.
         end if
     end if
-    one = identity_matrix(3*size(coords, 1))
+    one = identity_matrix(3*size(xyz, 1))
     do i_grid_omega = 0, n_grid_omega
         if (is_parallel) then
             if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
         end if
         T = build_dipole_matrix( &
-            coords, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
+            xyz, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
             overlap, C6, damping_custom, potential_custom)
         big_alpha(:, :) = 0.d0
-        do i_atom = 1, size(coords, 1)
+        do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 big_alpha(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = &
                     alpha(i_grid_omega+1, i_atom)
@@ -626,6 +763,7 @@ function get_qho_rpa_energy( &
     end if
 end function get_qho_rpa_energy
 
+
 function alpha_dynamic_ts(alpha_0, C6, omega) result(alpha)
     implicit none
 
@@ -634,6 +772,7 @@ function alpha_dynamic_ts(alpha_0, C6, omega) result(alpha)
 
     alpha(:) = alpha_osc(alpha_0, omega_eff(C6, alpha_0), omega)
 end function alpha_dynamic_ts
+
 
 elemental function alpha_osc(alpha_0, omega, u) result(alpha)
     implicit none
@@ -644,6 +783,7 @@ elemental function alpha_osc(alpha_0, omega, u) result(alpha)
     alpha = alpha_0/(1+(u/omega)**2)
 end function alpha_osc
 
+
 elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     implicit none
 
@@ -653,6 +793,7 @@ elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     C6_ij = 2*C6_i*C6_j/(alpha_0_j/alpha_0_i*C6_i+alpha_0_i/alpha_0_j*C6_j)
 end function combine_C6
 
+
 elemental function V_to_R(V) result(R)
     implicit none
 
@@ -661,6 +802,7 @@ elemental function V_to_R(V) result(R)
 
     R = (3.d0*V/(4.d0*pi))**(1.d0/3)
 end function V_to_R
+
 
 !> Evaluates a local polarizability model of Vydrov & van Voorhis
 !> \cite vydrov_dispersion_2010 .
@@ -673,6 +815,7 @@ elemental function vv_polarizability(rho, rho_grad, omega, C) result(alpha)
     alpha = rho/(4*pi/3*rho+C*(rho_grad/rho)**4+omega**2)
 end function vv_polarizability
 
+
 function omega_eff(C6, alpha) result(omega)
     implicit none
 
@@ -682,6 +825,7 @@ function omega_eff(C6, alpha) result(omega)
     omega = 4.d0/3*C6/alpha**2
 end function omega_eff
 
+
 elemental function get_sigma_selfint(alpha) result(sigma)
     implicit none
 
@@ -690,6 +834,7 @@ elemental function get_sigma_selfint(alpha) result(sigma)
 
     sigma = (sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
 end function get_sigma_selfint
+
 
 function get_C6_from_alpha(alpha) result(C6)
     implicit none
@@ -703,6 +848,7 @@ function get_C6_from_alpha(alpha) result(C6)
     enddo
 end function get_C6_from_alpha
 
+
 function get_total_C6_from_alpha(alpha) result(C6)
     implicit none
 
@@ -711,6 +857,7 @@ function get_total_C6_from_alpha(alpha) result(C6)
 
     C6 = 3.d0/pi*sum((sum(alpha, 2)**2)*omega_grid_w(:))
 end function get_total_C6_from_alpha
+
 
 function T_bare(rxyz) result(T)
     implicit none
@@ -733,6 +880,7 @@ function T_bare(rxyz) result(T)
     end do
 end function T_bare
 
+
 function damping_fermi(r, sigma, a) result(f)
     implicit none
 
@@ -741,6 +889,7 @@ function damping_fermi(r, sigma, a) result(f)
 
     f = 1.d0/(1+exp(-a*(r/sigma-1)))
 end function damping_fermi
+
 
 function damping_erf(r, sigma, a) result(f)
     implicit none
@@ -751,6 +900,7 @@ function damping_erf(r, sigma, a) result(f)
     f = erf((r/sigma)**a)
 end function damping_erf
 
+
 function damping_1mexp(r, sigma, a) result(f)
     implicit none
 
@@ -760,6 +910,7 @@ function damping_1mexp(r, sigma, a) result(f)
     f = 1-exp(-(r/sigma)**a)
 end function damping_1mexp
 
+
 function damping_overlap(r, overlap, C6, beta, a) result(f)
     implicit none
 
@@ -768,6 +919,7 @@ function damping_overlap(r, overlap, C6, beta, a) result(f)
 
     f = 1.d0-terf(-overlap/(erf(r/6)**6*C6/r**6), beta, a)
 end function damping_overlap
+
 
 function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
     implicit none
@@ -796,6 +948,7 @@ function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
     T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_overlap_coulomb
 
+
 function T_fermi_coulomb(rxyz, sigma, a) result(T)
     implicit none
 
@@ -813,6 +966,7 @@ function T_fermi_coulomb(rxyz, sigma, a) result(T)
     T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_fermi_coulomb
 
+
 function T_erf_coulomb(rxyz, sigma, a) result(T)
     implicit none
 
@@ -828,6 +982,7 @@ function T_erf_coulomb(rxyz, sigma, a) result(T)
     T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_erf_coulomb
 
+
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     implicit none
 
@@ -841,6 +996,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
     T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_1mexp_coulomb
+
 
 subroutine get_damping_parameters ( &
         xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
@@ -890,6 +1046,7 @@ subroutine get_damping_parameters ( &
     endselect
 end subroutine get_damping_parameters
 
+
 function solve_lin_sys(A_arg, B_arg) result(X)
     implicit none
 
@@ -908,6 +1065,7 @@ function solve_lin_sys(A_arg, B_arg) result(X)
     call DGESV (n, 1, A, n, i_pivot, B, n, error_flag)
     X(:) = B(:)
 end function solve_lin_sys
+
 
 function invert_matrix(A_arg) result(A_inv)
     implicit none
@@ -944,6 +1102,7 @@ function invert_matrix(A_arg) result(A_inv)
     endif
     A_inv(:, :) = A(:, :)
 end function invert_matrix
+
 
 function diagonalize_matrix(matrix, eigvecs) result(eigs)
     implicit none
@@ -982,6 +1141,7 @@ function diagonalize_matrix(matrix, eigvecs) result(eigs)
     end if
 end function diagonalize_matrix
 
+
 function supercell_circum(uc, radius) result(sc)
     implicit none
 
@@ -994,6 +1154,7 @@ function supercell_circum(uc, radius) result(sc)
     sc = &
         ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))-.5d0)
 end function supercell_circum
+
 
 subroutine shift_cell (ijk, first_cell, last_cell)
     implicit none
@@ -1014,6 +1175,7 @@ subroutine shift_cell (ijk, first_cell, last_cell)
     end do
 end subroutine shift_cell
 
+
 function eye(N)
     implicit none
 
@@ -1028,6 +1190,7 @@ function eye(N)
     enddo
 end function eye
 
+
 function identity_matrix(n) result(A)
     implicit none
 
@@ -1041,6 +1204,7 @@ function identity_matrix(n) result(A)
         A(i, i) = 1.d0
     enddo
 end function identity_matrix
+
 
 function cart_prod(a, b) result(c)
     implicit none
@@ -1057,6 +1221,7 @@ function cart_prod(a, b) result(c)
     enddo
 end function cart_prod
 
+
 function diag(a) result(b)
     implicit none
 
@@ -1070,6 +1235,7 @@ function diag(a) result(b)
         b(i, i) = a(i)
     end do
 end function diag
+
 
 function expect_value(O, x) result(y)
     implicit none
@@ -1086,6 +1252,7 @@ function expect_value(O, x) result(y)
     enddo
 end function expect_value
 
+
 elemental function terf(r, r0, a)
     implicit none
 
@@ -1094,5 +1261,6 @@ elemental function terf(r, r0, a)
 
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function terf
+
 
 end module mbd

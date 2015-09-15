@@ -512,20 +512,20 @@ function get_periodic_mbd_energy( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real*8, intent(out), optional :: &
-        eigenomega(k_grid(1), k_grid(2), k_grid(3), 3*size(xyz, 1)), &
-        modes(k_grid(1), k_grid(2), k_grid(3), 3*size(xyz, 1), 3*size(xyz, 1))
+        eigenomega(:, :, :, :), &
+        modes(:, :, :, :, :)
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
     character(len=1000) :: info_str
     real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
     real*8 :: eigs(3*size(xyz, 1))
-    integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim
     logical :: is_parallel
+    integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim, i_kpt
     integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
     real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
     integer :: n_negative_eigs, g_cell(3), i_order, g_kpt(3), g_kpt_shifted(3)
-    real*8 :: ruc(3, 3)
+    real*8 :: ruc(3, 3), k_point(3)
 
     is_parallel = .false.
     if (present(n_tasks)) then

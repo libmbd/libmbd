@@ -2,13 +2,13 @@ include system.mk
 blddir = build
 sources = mbd_interface.f90 mbd.f90
 
-all: mbd.so
+all: mbd
 
-mbd.so: ${sources}
+mbd:
 	mkdir -p ${blddir}
 	CFLAGS="${CFLAGS}" f2py -c --build-dir ${blddir} --fcompiler=${FVENDOR} \
 		   --f90exec=${FC} --f90flags="${FFLAGS}" --compiler=${CVENDOR} \
-		   -m $(basename $@) ${LDFLAGS} $^
+		   -m $@ ${LDFLAGS} ${sources}
 	rsync -a ${blddir}/*.mod .
 
 test:

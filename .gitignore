@@ -1,5 +1,6 @@
 /build
 /*.mod
 /*.so
+/*.dSYM
 /system.mk
 *.pyc

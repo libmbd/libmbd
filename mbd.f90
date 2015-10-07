@@ -109,25 +109,29 @@ function get_ts_energy( &
         g_cell = (/ 0, 0, -1 /)
         do i_cell = 1, product(1+2*range_g_cell)
             call shift_cell (g_cell, -range_g_cell, range_g_cell)
+            ! MPI code begin
             if (is_parallel .and. is_periodic) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
             end if
+            ! MPI code end
             if (is_periodic) then
                 r_cell = matmul(g_cell, unit_cell)
             else
                 r_cell(:) = 0.d0
             end if
             do i_atom = 1, size(xyz, 1)
+                ! MPI code begin
                 if (is_parallel .and. .not. is_periodic) then
                     if (my_task /= modulo(i_atom, n_tasks)) cycle
                 end if
+                ! MPI code end
                 do j_atom = 1, i_atom
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
                     r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
                     r_norm = sqrt(sum(r**2))
-                    if (r_norm > i_range*step .or. r_norm < (i_range-1)*step) cycle
+                    if (r_norm >= i_range*step .or. r_norm < (i_range-1)*step) cycle
                     C6_ij = combine_C6(C6(i_atom), C6(j_atom), &
                         alpha_0(i_atom), alpha_0(j_atom))
                     if (present(R_vdw)) then
@@ -159,9 +163,11 @@ function get_ts_energy( &
                 end do ! j_atom
             enddo ! i_atom
         enddo ! i_cell
+        ! MPI code begin
         if (is_parallel) then
             call sync_sum_number (ene_add)
         end if
+        ! MPI code end
         ene = ene + ene_add
         if (.not. is_periodic) exit
         if (i_range > 1 .and. abs(ene_add) < param_energy_accuracy) then
@@ -206,7 +212,7 @@ function build_dipole_matrix( &
     real*8 :: Tpp(3, 3)
     real*8 :: r_cell(3), r(3), r_norm
     real*8 :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
-    integer :: i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3)
+    integer :: i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j
     logical :: is_periodic, is_parallel
 
     is_periodic = .false.
@@ -300,16 +306,14 @@ function build_dipole_matrix( &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                 end select
                 if (present(k_point)) then
-                    Tpp = Tpp*cos(sum(k_point*r_cell))
+                    Tpp = Tpp*cos(sum(k_point*r))
                 end if
-                T(3*(i_atom-1)+1:3*(i_atom-1)+3, &
-                    3*(j_atom-1)+1:3*(j_atom-1)+3) = &
-                    T(3*(i_atom-1)+1:3*(i_atom-1)+3, &
-                    3*(j_atom-1)+1:3*(j_atom-1)+3) + Tpp
-                T(3*(j_atom-1)+1:3*(j_atom-1)+3, &
-                    3*(i_atom-1)+1:3*(i_atom-1)+3) = &
-                    T(3*(j_atom-1)+1:3*(j_atom-1)+3, &
-                    3*(i_atom-1)+1:3*(i_atom-1)+3) + transpose(Tpp)
+                i = 3*(i_atom-1)
+                j = 3*(j_atom-1)
+                T(i+1:i+3, j+1:j+3) = T(i+1:i+3, j+1:j+3) + Tpp
+                if (i_atom /= j_atom) then
+                    T(j+1:j+3, i+1:i+3) = T(j+1:j+3, i+1:i+3) + transpose(Tpp)
+                end if
             end do ! j_atom
         end do ! i_atom
     end do ! i_cell
@@ -344,7 +348,7 @@ function run_scs( &
 
     real*8 :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
     real*8 :: T(3*size(xyz, 1), 3*size(xyz, 1))
-    integer :: i_atom, i_xyz, i_grid_omega
+    integer :: i_atom, i_xyz, i_grid_omega, i
     logical :: is_parallel
 
     is_parallel = .false.
@@ -358,17 +362,18 @@ function run_scs( &
         if (is_parallel) then
             if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
         end if
+        alpha_full(:, :) = 0.d0
+        do i_atom = 1, size(xyz, 1)
+            do i_xyz = 1, 3
+                i = 3*(i_atom-1)+i_xyz
+                alpha_full(i, i) = 1.d0/alpha(i_grid_omega+1, i_atom)
+            end do
+        end do
         T = build_dipole_matrix( &
             xyz, version, alpha(i_grid_omega+1, :), R_vdw, beta, a, &
             damping_custom=damping_custom, unit_cell=unit_cell, &
-            dipole_cutoff=param_mbd_dip_cutoff)
-        alpha_full = -T
-        do i_atom = 1, size(xyz, 1)
-            do i_xyz = 1, 3
-                alpha_full(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = &
-                    1.d0/alpha(i_grid_omega+1, i_atom)
-            end do
-        end do
+            dipole_cutoff=param_mbd_dip_cutoff, n_tasks=0)
+        alpha_full = alpha_full-T
         alpha_full = invert_matrix(alpha_full)
         alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
     end do
@@ -411,7 +416,8 @@ function get_mbd_energy( &
         potential_custom, &
         unit_cell, &
         k_point, &
-        eigenomega, modes, &
+        mode_enes, &
+        modes, &
         my_task, n_tasks) &
         result(ene)
     implicit none
@@ -431,7 +437,7 @@ function get_mbd_energy( &
         unit_cell(3, 3), &
         k_point(3)
     real*8, intent(out), optional :: &
-        eigenomega(3*size(xyz, 1)), &
+        mode_enes(3*size(xyz, 1)), &
         modes(3*size(xyz, 1), 3*size(xyz, 1))
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
@@ -439,7 +445,7 @@ function get_mbd_energy( &
     character(len=1000) :: info_str
     real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
     real*8 :: eigs(3*size(xyz, 1))
-    integer :: i_atom, j_atom, i_xyz, j_xyz
+    integer :: i_atom, j_atom, i_xyz, j_xyz, i, j
     integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
     real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
     integer :: n_negative_eigs, g_cell(3), i_order
@@ -447,7 +453,8 @@ function get_mbd_energy( &
     V(:, :) = 0.d0
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
-            V(3*(i_atom-1)+i_xyz, 3*(i_atom-1)+i_xyz) = omega(i_atom)**2
+            i = 3*(i_atom-1)+i_xyz
+            V(i, i) = omega(i_atom)**2
         end do
     end do
     T = build_dipole_matrix( &
@@ -456,15 +463,17 @@ function get_mbd_energy( &
         my_task, n_tasks)
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
-            if (i_atom == j_atom) cycle
-            V(3*(i_atom-1)+1:3*(i_atom-1)+3, 3*(j_atom-1)+1:3*(j_atom-1)+3) = &
+            i = 3*(i_atom-1)
+            j = 3*(j_atom-1)
+            V(i+1:i+3, j+1:j+3) = V(i+1:i+3, j+1:j+3) - &
                 omega(i_atom)*omega(j_atom)*sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
-                T(3*(i_atom-1)+1:3*(i_atom-1)+3, 3*(j_atom-1)+1:3*(j_atom-1)+3)
+                T(i+1:i+3, j+1:j+3)
         end do
     end do
-    if (present(eigenomega)) then
+    if (present(mode_enes)) then
         eigs = diagonalize_matrix(V, modes)
-        eigenomega = sqrt(eigs)
+        mode_enes = 0.d0
+        where (eigs > 0) mode_enes = sqrt(eigs)
     else
         eigs = diagonalize_matrix(V)
     end if
@@ -479,6 +488,37 @@ function get_mbd_energy( &
 end function get_mbd_energy
 
 
+function make_g_grid(n1, n2, n3) result(g_grid)
+    integer, intent(in) :: n1, n2, n3
+    real*8 :: g_grid(n1*n2*n3, 3)
+
+    integer :: g_kpt(3), i_kpt, kpt_range(3), g_kpt_shifted(3)
+
+    g_kpt = (/ 0, 0, -1 /)
+    kpt_range = (/ n1, n2, n3 /)
+    do i_kpt = 1, n1*n2*n3
+        call shift_cell (g_kpt, (/ 0, 0, 0 /), kpt_range-1)
+        g_kpt_shifted = g_kpt
+        where (2*g_kpt > kpt_range) g_kpt_shifted = g_kpt-kpt_range
+        g_grid(i_kpt, :) = real(g_kpt_shifted)/kpt_range
+    end do
+end function make_g_grid
+
+
+function make_k_grid(g_grid, uc) result(k_grid)
+    real*8, intent(in) :: g_grid(:, :), uc(3, 3)
+    real*8 :: k_grid(size(g_grid, 1), 3)
+
+    integer :: i_kpt
+    real*8 :: ruc(3, 3)
+
+    ruc = 2*pi*invert_matrix(transpose(uc))
+    do i_kpt = 1, size(g_grid, 1)
+        k_grid(i_kpt, :) = matmul(g_grid(i_kpt, :), ruc)
+    end do
+end function make_k_grid
+
+
 function get_periodic_mbd_energy( &
         xyz, &
         alpha_0, &
@@ -491,7 +531,7 @@ function get_periodic_mbd_energy( &
         C6, &
         damping_custom, &
         potential_custom, &
-        eigenomega, modes, &
+        mode_enes, modes, &
         my_task, n_tasks) &
         result(ene)
     implicit none
@@ -500,9 +540,8 @@ function get_periodic_mbd_energy( &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
+        k_grid(:, :), &
         unit_cell(3, 3)
-    integer, intent(in) :: &
-        k_grid(3)
     character(len=*), intent(in) :: version
     real*8, intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
@@ -512,11 +551,12 @@ function get_periodic_mbd_energy( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real*8, intent(out), optional :: &
-        eigenomega(:, :, :, :), &
-        modes(:, :, :, :, :)
+        mode_enes(size(k_grid, 1), 3*size(xyz, 1)), &
+        modes(size(k_grid, 1), 3*size(xyz, 1), 3*size(xyz, 1))
     integer, intent(in), optional :: my_task, n_tasks
     real*8 :: ene
 
+    integer :: n_tasks_out
     character(len=1000) :: info_str
     real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
     real*8 :: eigs(3*size(xyz, 1))
@@ -524,8 +564,8 @@ function get_periodic_mbd_energy( &
     integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim, i_kpt
     integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
     real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs, g_cell(3), i_order, g_kpt(3), g_kpt_shifted(3)
-    real*8 :: ruc(3, 3), k_point(3)
+    integer :: n_negative_eigs, g_cell(3), i_order, g_kpt_shifted(3)
+    real*8 :: k_point(3)
 
     is_parallel = .false.
     if (present(n_tasks)) then
@@ -533,18 +573,13 @@ function get_periodic_mbd_energy( &
             is_parallel = .true.
         end if
     end if
-    ruc = 2*pi*invert_matrix(transpose(unit_cell))
-    g_kpt = (/ 0, 0, -1 /)
     ene = 0.d0
-    do i_kpt = 1, product(k_grid)
-        call shift_cell (g_kpt, (/ 0, 0, 0 /), k_grid-1)
+    do i_kpt = 1, size(k_grid, 1)
         if (is_parallel) then
             if (my_task /= modulo(i_kpt, n_tasks)) cycle
         end if
-        g_kpt_shifted = g_kpt
-        where (2*g_kpt > k_grid) g_kpt_shifted = g_kpt-k_grid
-        k_point = matmul(real(g_kpt)/k_grid, ruc)
-        if (present(eigenomega) .and. present(modes)) then
+        k_point = k_grid(i_kpt, :)
+        if (present(mode_enes)) then
             ene = ene + get_mbd_energy( &
                 xyz, &
                 alpha_0, &
@@ -557,24 +592,9 @@ function get_periodic_mbd_energy( &
                 potential_custom, &
                 unit_cell, &
                 k_point, &
-                eigenomega(g_kpt(1)+1, g_kpt(2)+1, g_kpt(3)+1, :), &
-                modes(g_kpt(1)+1, g_kpt(2)+1, g_kpt(3)+1, :, :), &
-                my_task, n_tasks)
-        else if (present(eigenomega)) then
-            ene = ene + get_mbd_energy( &
-                xyz, &
-                alpha_0, &
-                omega, &
-                version, &
-                R_vdw, beta, a, &
-                overlap, &
-                C6, &
-                damping_custom, &
-                potential_custom, &
-                unit_cell, &
-                k_point, &
-                eigenomega(g_kpt(1)+1, g_kpt(2)+1, g_kpt(3)+1, :), &
-                my_task=my_task, n_tasks=n_tasks)
+                mode_enes(i_kpt, :), &
+                modes(i_kpt, :, :), &
+                my_task=my_task, n_tasks=0)
         else
             ene = ene + get_mbd_energy( &
                 xyz, &
@@ -588,11 +608,112 @@ function get_periodic_mbd_energy( &
                 potential_custom, &
                 unit_cell, &
                 k_point, &
-                my_task=my_task, n_tasks=n_tasks)
+                my_task=my_task, n_tasks=0)
         end if
     end do ! k_point loop
+    call sync_sum_number(ene)
+    if (present(mode_enes)) then
+        call sync_sum_array(mode_enes, size(mode_enes))
+        call sync_sum_array(modes, size(modes))
+    end if
+    ene = ene/size(k_grid, 1)
 end function get_periodic_mbd_energy
 
+
+function get_supercell_mbd_energy( &
+        xyz, &
+        alpha_0, &
+        omega, &
+        version, &
+        unit_cell, &
+        k_grid, &
+        R_vdw, beta, a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        my_task, n_tasks) &
+        result(ene)
+    implicit none
+
+    real*8, intent(in) :: &
+        xyz(:, :), &
+        alpha_0(size(xyz, 1)), &
+        omega(size(xyz, 1)), &
+        k_grid(:, :), &
+        unit_cell(3, 3)
+    character(len=*), intent(in) :: version
+    real*8, intent(in), optional :: &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    integer, intent(in), optional :: my_task, n_tasks
+    real*8 :: ene
+
+    integer :: n_tasks_out
+    character(len=1000) :: info_str
+    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
+    real*8 :: eigs(3*size(xyz, 1)), r_cell(3)
+    logical :: is_parallel
+    integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim, i_kpt, i
+    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
+    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
+    integer :: n_negative_eigs, g_cell(3), i_order, g_kpt_shifted(3), n_cells
+    real*8 :: k_point(3)
+
+    real*8, allocatable :: &
+        xyz_super(:, :), alpha_0_super(:), omega_super(:), &
+        R_vdw_super(:), C6_super(:)
+    real*8 :: unit_cell_super(3, 3)
+
+    range_g_cell = supercell_circum(unit_cell, param_mbd_supercell_cutoff)
+    n_cells = product(1+2*range_g_cell)
+    do i = 1, 3
+        unit_cell_super(i, :) = unit_cell(i, :)*(1+2*range_g_cell(i))
+    end do
+    write (0, *) range_g_cell
+    allocate (xyz_super(n_cells*size(xyz, 1), 3))
+    allocate (alpha_0_super(n_cells*size(alpha_0)))
+    allocate (omega_super(n_cells*size(omega)))
+    allocate (R_vdw_super(n_cells*size(R_vdw)))
+    allocate (C6_super(n_cells*size(C6)))
+    g_cell = (/ 0, 0, -1 /)
+    do i_cell = 1, n_cells
+        call shift_cell (g_cell, -range_g_cell, range_g_cell)
+        r_cell = matmul(g_cell, unit_cell)
+        do i_atom = 1, size(xyz, 1)
+            i = (i_cell-1)*size(xyz, 1)+i_atom
+            xyz_super(i, :) = xyz(i_atom, :)+r_cell
+            alpha_0_super(i) = alpha_0(i_atom)
+            omega_super(i) = omega(i_atom)
+            if (present(R_vdw)) then
+                R_vdw_super(i) = R_vdw(i_atom)
+            end if
+            if (present(C6)) then
+                C6_super(i) = C6(i_atom)
+            end if
+        end do
+    end do
+    ene = get_mbd_energy( &
+        xyz_super, &
+        alpha_0_super, &
+        omega_super, &
+        version, &
+        R_vdw_super, beta, a, &
+        C6=C6_super, &
+        unit_cell=unit_cell_super, &
+        my_task=my_task, n_tasks=n_tasks)
+    deallocate (xyz_super)
+    deallocate (alpha_0_super)
+    deallocate (omega_super)
+    deallocate (R_vdw_super)
+    deallocate (C6_super)
+    ene = ene/n_cells
+end function get_supercell_mbd_energy
+    
 
 function mbd_nbody( &
         xyz, &

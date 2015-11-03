@@ -383,6 +383,46 @@ function run_scs( &
 end function run_scs
 
 
+function do_scs( &
+        xyz, &
+        alpha, &
+        version, &
+        R_vdw, beta, a, &
+        damping_custom, &
+        unit_cell) & 
+        result(alpha_full)
+    implicit none
+
+    real*8, intent(in) :: &
+        xyz(:, :), &
+        alpha(:)
+    character(len=*), intent(in) :: version
+    real*8, intent(in), optional :: &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        unit_cell(3, 3)
+    real*8 :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+
+    real*8 :: T(3*size(xyz, 1), 3*size(xyz, 1))
+    integer :: i_atom, i_xyz, i
+
+    alpha_full(:, :) = 0.d0
+    do i_atom = 1, size(xyz, 1)
+        do i_xyz = 1, 3
+            i = 3*(i_atom-1)+i_xyz
+            alpha_full(i, i) = 1.d0/alpha(i_atom)
+        end do
+    end do
+    T = build_dipole_matrix( &
+        xyz, version, alpha(:), R_vdw, beta, a, &
+        damping_custom=damping_custom, unit_cell=unit_cell, &
+        dipole_cutoff=param_mbd_dip_cutoff, n_tasks=0)
+    alpha_full = alpha_full-T
+    alpha_full = invert_matrix(alpha_full)
+end function do_scs
+
+
 function contract_polarizability(alpha_3n_3n) result(alpha)
     implicit none
 

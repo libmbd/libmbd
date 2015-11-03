@@ -14,14 +14,14 @@ from mpi4py import MPI
 from mbd import mbd
 import sys
 from contextlib import contextmanager
-import os
+from pathlib import Path
 
 
 bohr = 0.529177249
 ntasks = MPI.COMM_WORLD.Get_size()
 myid = MPI.COMM_WORLD.Get_rank()
 
-free_atom_db = json.load(open(os.path.join(sys.path[0], 'free_atoms.json')))
+free_atom_db = json.load((Path(__file__).parent/'free_atoms.json').open())
 
 
 def printmsg(s):

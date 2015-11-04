@@ -1,15 +1,19 @@
 include system.mk
 blddir = build
-sources = mbd_interface.f90 mbd.f90
+extern = mbd_interface.f90 mbd_helper.f90
 
 all: mbd
 
-mbd:
-	mkdir -p ${blddir}
+mbd: $(addprefix ${blddir}/,${extern:.f90=.o})
+	@mkdir -p ${blddir}
 	CFLAGS="${CFLAGS}" f2py -c --build-dir ${blddir} --fcompiler=${FVENDOR} \
 		   --f90exec=${FC} --f90flags="${FFLAGS}" --compiler=${CVENDOR} \
-		   -m $@ ${LDFLAGS} ${sources}
+		   $(addprefix ${blddir}/,mbd_interface.o mbd_helper.o) -m $@ ${LDFLAGS} mbd.f90
 	rsync -a ${blddir}/*.mod .
+
+${blddir}/%.o: %.f90
+	@mkdir -p ${blddir}
+	${FC} -c -fPIC -J ${blddir} -o $@ $^
 
 test:
 	@${MAKE} -C tests

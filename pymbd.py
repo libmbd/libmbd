@@ -23,14 +23,19 @@ myid = MPI.COMM_WORLD.Get_rank()
 free_atom_db = json.load((Path(__file__).parent/'free_atoms.json').open())
 
 
-def printmsg(s):
-    if myid == 0:
+def printout(s, each=False):
+    if each or myid == 0:
+        sys.stdout.write('{}\n'.format(s))
+
+
+def printerr(s, each=False):
+    if each or myid == 0:
         sys.stderr.write('{}\n'.format(s))
 
 
 @contextmanager
 def block(name):
-    printmsg('Evaluating {}...'.format(name))
+    printerr('Evaluating {}...'.format(name))
     yield
 
 
@@ -190,7 +195,7 @@ def main(data, extension=None):
         extension = getattr(module, func)
     else:
         extension = run_mbd
-    printmsg('Running on {} nodes...'.format(ntasks))
+    printerr('Running on {} nodes...'.format(ntasks))
     results = extension(data, mbd)
     return results
 

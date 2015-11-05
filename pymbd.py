@@ -7,7 +7,6 @@ Usage:
 Options:
     -e, --extension EXTENSION      Format "MODULE:CALLABLE".
 """
-from __future__ import print_function
 import json
 import numpy as np
 from mpi4py import MPI

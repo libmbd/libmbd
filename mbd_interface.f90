@@ -21,6 +21,18 @@ subroutine sync_sum_array(array, n_array)
     array = array_buff
 end subroutine sync_sum_array
 
+subroutine broadcast_array(array, n_array)
+    implicit none
+
+    integer, intent(in) :: n_array
+    real*8, intent(inout) :: array(n_array)
+
+    integer :: mpi_err
+
+    call MPI_BCAST(array, n_array, MPI_DOUBLE_PRECISION, 0, &
+        MPI_COMM_WORLD, mpi_err)
+end subroutine broadcast_array
+
 subroutine sync_sum_array_c (array, n_array)
     implicit none
 

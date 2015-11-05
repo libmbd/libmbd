@@ -65,23 +65,36 @@ subroutine print_log(str)
     implicit none
 
     character(len=*), intent(in) :: str
+    integer :: myid, error
 
-    write (0, *) str
+    call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
+    if (myid == 0) then
+        write (6, *) str
+    end if
 end subroutine print_log
 
 subroutine print_warning(str)
     implicit none
 
     character(len=*), intent(in) :: str
+    integer :: myid, error
 
-    write (0, *) "Warning: " // str
+    call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
+    if (myid == 0) then
+        write (0, *) "Warning: " // str
+    end if
 end subroutine print_warning
 
 subroutine print_error(str)
     implicit none
 
     character(len=*), intent(in) :: str
-    write (0, *) "Error: " // str
+    integer :: myid, error
+
+    call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
+    if (myid == 0) then
+        write (0, *) "Error: " // str
+    end if
 end subroutine print_error
 
 end module mbd_interface

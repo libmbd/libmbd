@@ -811,9 +811,9 @@ function get_single_mbd_energy( &
         call print_warning(info_str)
         ene = nan
     else
-    call ts(14)
-    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
-    call ts(-14)
+        call ts(14)
+        ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+        call ts(-14)
     end if
 end function get_single_mbd_energy
 
@@ -1297,7 +1297,7 @@ function get_qho_rpa_energy( &
     real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
     complex(kind=8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i, j
-    integer :: n_order
+    integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
 
     is_parallel = is_in('M', mode)
@@ -1337,6 +1337,12 @@ function get_qho_rpa_energy( &
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1-alpha*T
         end do
         call diagonalize_matrix_ge('N', relay, eigs)
+        n_negative_eigs = count(dble(eigs) < 0)
+        if (n_negative_eigs > 0) then
+            write (info_str, "(a,i10,a)") &
+                "1-AT matrix has ", n_negative_eigs, " negative eigenvalues"
+            call print_warning(info_str)
+        end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
             call diagonalize_matrix_ge('N', AT, eigs)
@@ -1473,7 +1479,7 @@ function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
 
     select case (mode)
         case  ('O')
-        alpha(:) = alpha_osc(alpha_0, omega, u)
+            alpha(:) = alpha_osc(alpha_0, omega, u)
         case ('C')
             alpha(:) = alpha_osc(alpha_0, omega_eff(C6, alpha_0), u)
     end select

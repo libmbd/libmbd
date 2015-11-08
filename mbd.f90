@@ -1154,7 +1154,7 @@ function get_supercell_mbd_energy( &
             mode, &
             version, &
             xyz_super, &
-            alpha_dynamic_ts_all(alpha_0_super, n_grid_omega, omega=omega_super), &
+            alpha_dynamic_ts_all('O', n_grid_omega, alpha_0_super, omega=omega_super), &
             R_vdw=R_vdw_super, &
             beta=beta, &
             a=a, &
@@ -1443,35 +1443,40 @@ subroutine get_omega_grid(n, a, m, x, w)
 end subroutine get_omega_grid
 
 
-function alpha_dynamic_ts_all(alpha_0, n, C6, omega) result(alpha)
+function alpha_dynamic_ts_all(mode, n, alpha_0, C6, omega) result(alpha_dyn)
     implicit none
 
-    real*8, intent(in) :: alpha_0(:)
+    character(len=1), intent(in) :: mode
     integer, intent(in) :: n
-    real*8, intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
-    real*8 :: alpha(0:n, size(alpha_0))
+    real*8, intent(in) :: alpha_0(:)
+    real*8, intent(in), optional :: &
+        C6(size(alpha_0)), omega(size(alpha_0))
+    real*8 :: alpha_dyn(0:n, size(alpha_0))
 
     integer :: i_grid_omega
 
     do i_grid_omega = 0, n_grid_omega
-        alpha(i_grid_omega, :) = alpha_dynamic_ts( &
-            alpha_0, omega_grid(i_grid_omega), C6, omega)
+        alpha_dyn(i_grid_omega, :) = alpha_dynamic_ts( &
+            mode, alpha_0, omega_grid(i_grid_omega), C6, omega)
     end do
 end function alpha_dynamic_ts_all
 
 
-function alpha_dynamic_ts(alpha_0, u, C6, omega) result(alpha)
+function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
     implicit none
 
+    character(len=1), intent(in) :: mode
     real*8, intent(in) :: alpha_0(:), u
-    real*8, intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
+    real*8, intent(in), optional :: &
+        C6(size(alpha_0)), omega(size(alpha_0))
     real*8 :: alpha(size(alpha_0))
 
-    if (present(C6)) then
-        alpha(:) = alpha_osc(alpha_0, omega_eff(C6, alpha_0), u)
-    else
+    select case (mode)
+        case  ('O')
         alpha(:) = alpha_osc(alpha_0, omega, u)
-    end if
+        case ('C')
+            alpha(:) = alpha_osc(alpha_0, omega_eff(C6, alpha_0), u)
+    end select
 end function alpha_dynamic_ts
 
 

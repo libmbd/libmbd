@@ -8,6 +8,7 @@ module mbd
 ! E: get eigenvalues
 ! V: get eigenvectors
 ! O: get RPA orders
+! L: scale dipole with lambda
 
 
 use mbd_interface, only: &
@@ -465,6 +466,7 @@ function do_scs( &
         R_vdw, &
         beta, &
         a, &
+        lam, &
         unit_cell) & 
         result(alpha_full)
     implicit none
@@ -477,18 +479,16 @@ function do_scs( &
     real*8, intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
-        unit_cell(3, 3)
+        unit_cell(3, 3), &
+        lam
     real*8 :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    logical :: scale_lambda
 
     integer :: i_atom, i_xyz, i
 
+    scale_lambda = is_in('L', mode)
+
     alpha_full(:, :) = 0.d0
-    do i_atom = 1, size(xyz, 1)
-        do i_xyz = 1, 3
-            i = 3*(i_atom-1)+i_xyz
-            alpha_full(i, i) = -1.d0/alpha(i_atom)
-        end do
-    end do
     call add_dipole_matrix( &
         mode, &
         version, &
@@ -499,6 +499,15 @@ function do_scs( &
         a=a, &
         unit_cell=unit_cell, &
         relay=alpha_full)
+    if (scale_lambda) then
+        alpha_full = lam*alpha_full
+    end if
+    do i_atom = 1, size(xyz, 1)
+        do i_xyz = 1, 3
+            i = 3*(i_atom-1)+i_xyz
+            alpha_full(i, i) = alpha_full(i, i)-1.d0/alpha(i_atom)
+        end do
+    end do
     call invert_matrix(alpha_full)
     alpha_full = -alpha_full
 end function do_scs

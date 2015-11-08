@@ -1294,7 +1294,7 @@ function get_qho_rpa_energy( &
     real*8 :: ene
 
     real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
-    real*8 :: eigs(3*size(xyz, 1))
+    complex(kind=8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i, j
     integer :: n_order
     logical :: is_parallel, get_orders
@@ -1335,13 +1335,13 @@ function get_qho_rpa_energy( &
         do i = 1, 3*size(xyz, 1)
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1-alpha*T
         end do
-        call diagonalize_matrix('N', relay, eigs)
-        ene = ene+1.d0/(2*pi)*sum(log(eigs))*omega_grid_w(i_grid_omega)
+        call diagonalize_matrix_ge('N', relay, eigs)
+        ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
-            call diagonalize_matrix('N', AT, eigs)
+            call diagonalize_matrix_ge('N', AT, eigs)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
-                    +(-1.d0/(2*pi)*sum(eigs**n_order)/n_order) &
+                    +(-1.d0/(2*pi)*sum(dble(eigs)**n_order)/n_order) &
                     *omega_grid_w(i_grid_omega)
             end do
         end if
@@ -1834,6 +1834,39 @@ subroutine diagonalize_matrix(mode, A, eigs)
         call print_error(info_str)
     endif
 end subroutine diagonalize_matrix
+
+
+subroutine diagonalize_matrix_ge(mode, A, eigs)
+    implicit none
+
+    character(len=1), intent(in) :: mode
+    real*8, intent(inout) :: A(:, :)
+    complex(kind=8), intent(out) :: eigs(size(A, 1))
+
+    real*8, allocatable :: work_arr(:)
+    integer :: n
+    real*8 :: n_work_arr
+    integer :: error_flag
+    real*8 :: eigs_r(size(A, 1)), eigs_i(size(A, 1))
+    real*8 :: dummy
+    real*8 :: vectors(size(A, 1), size(A, 2))
+
+    n = size(A, 1)
+    call DGEEV('N', mode, n, A, n, eigs_r, eigs_i, dummy, 1, &
+        vectors, n, n_work_arr, -1, error_flag)
+    allocate (work_arr(nint(n_work_arr)))
+    call DGEEV('N', mode, n, A, n, eigs_r, eigs_i, dummy, 1, &
+        vectors, n, work_arr, size(work_arr), error_flag)
+    deallocate (work_arr)
+    if (error_flag /= 0) then
+        write (info_str, "(a,i5)") &
+            "Matrix diagonalization failed in module mbd with error code", &
+            error_flag
+        call print_error(info_str)
+    endif
+    eigs = cmplx(eigs_r, eigs_i)
+    A = vectors
+end subroutine diagonalize_matrix_ge
 
 
 subroutine diagonalize_matrix_c(mode, A, eigs)

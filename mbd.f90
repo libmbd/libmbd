@@ -809,11 +809,12 @@ function get_single_mbd_energy( &
         write (info_str, "(a,i10,a)") &
             "CDM Hamiltonian has ", n_negative_eigs, " negative eigenvalues"
         call print_warning(info_str)
-    endif
+        ene = nan
+    else
     call ts(14)
-    where (eigs < 0) eigs = 0.d0
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
     call ts(-14)
+    end if
 end function get_single_mbd_energy
 
 

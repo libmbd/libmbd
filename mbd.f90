@@ -505,11 +505,10 @@ function do_scs( &
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
-            alpha_full(i, i) = alpha_full(i, i)-1.d0/alpha(i_atom)
+            alpha_full(i, i) = alpha_full(i, i)+1.d0/alpha(i_atom)
         end do
     end do
     call invert_matrix(alpha_full)
-    alpha_full = -alpha_full
 end function do_scs
 
 
@@ -768,8 +767,8 @@ function get_single_mbd_energy( &
         do j_atom = 1, size(xyz, 1)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
-            relay(i+1:i+3, j+1:j+3) = & ! relay = -sqrt(a*a)*w*w*T
-                -omega(i_atom)*omega(j_atom) &
+            relay(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
+                omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 relay(i+1:i+3, j+1:j+3)
         end do
@@ -780,7 +779,7 @@ function get_single_mbd_energy( &
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             relay(i, i) = relay(i, i)+omega(i_atom)**2
-            ! relay = w^2-sqrt(a*a)*w*w*T
+            ! relay = w^2+sqrt(a*a)*w*w*T
         end do
     end do
     call ts(-12)
@@ -893,8 +892,8 @@ function get_single_reciprocal_mbd_energy( &
         do j_atom = 1, size(xyz, 1)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
-            relay(i+1:i+3, j+1:j+3) = & ! relay = -sqrt(a*a)*w*w*T
-                -omega(i_atom)*omega(j_atom) &
+            relay(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
+                omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 relay(i+1:i+3, j+1:j+3)
         end do
@@ -905,7 +904,7 @@ function get_single_reciprocal_mbd_energy( &
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             relay(i, i) = relay(i, i)+omega(i_atom)**2
-            ! relay = w^2-sqrt(a*a)*w*w*T
+            ! relay = w^2+sqrt(a*a)*w*w*T
         end do
     end do
     call ts(-12)
@@ -1332,15 +1331,14 @@ function get_qho_rpa_energy( &
             end do
         end do
         AT = relay
-        relay = -relay ! relay = -alpha*T
         do i = 1, 3*size(xyz, 1)
-            relay(i, i) = 1.d0+relay(i, i) ! relay = 1-alpha*T
+            relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
         end do
         call diagonalize_matrix_ge('N', relay, eigs)
         n_negative_eigs = count(dble(eigs) < 0)
         if (n_negative_eigs > 0) then
             write (info_str, "(a,i10,a)") &
-                "1-AT matrix has ", n_negative_eigs, " negative eigenvalues"
+                "1+AT matrix has ", n_negative_eigs, " negative eigenvalues"
             call print_warning(info_str)
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
@@ -1348,7 +1346,7 @@ function get_qho_rpa_energy( &
             call diagonalize_matrix_ge('N', AT, eigs)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
-                    +(-1.d0/(2*pi)*sum(dble(eigs)**n_order)/n_order) &
+                    +(-1.d0/(2*pi)*(-1)**n_order*sum(dble(eigs)**n_order)/n_order) &
                     *omega_grid_w(i_grid_omega)
             end do
         end if
@@ -1590,6 +1588,7 @@ function T_bare(rxyz) result(T)
             T(j, i) = T(i, j)
         end do
     end do
+    T = -T
 end function T_bare
 
 
@@ -1657,7 +1656,7 @@ function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
         *(2*a**2*qenep**2*(beta*(-1.d0+exp(4*a**2*beta*qene)) &
         -qene*(1.d0+exp(4*a**2*beta*qene))) &
         +qenepp*(1.d0+exp(4*a**2*beta*qene)))
-    T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_overlap_coulomb
 
 
@@ -1675,7 +1674,7 @@ function T_fermi_coulomb(rxyz, sigma, a) result(T)
         -a/2.d0*r_sigma/(1.d0+cosh(-d_r_sigma_m_1))
     zeta_2 = 2.d0*a**2*r_sigma**2/sinh(-d_r_sigma_m_1)**3 &
         *sinh(-d_r_sigma_m_1/2.d0)**4
-    T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_fermi_coulomb
 
 
@@ -1691,7 +1690,7 @@ function T_erf_coulomb(rxyz, sigma, a) result(T)
     zeta_1 = erf(r_sigma)-2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2)
     zeta_2 = -2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2) &
         *(1.d0+a*(-1.d0+2.d0*r_sigma**2))
-    T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_erf_coulomb
 
 
@@ -1706,7 +1705,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1.d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
-    T = zeta_1*T_bare(rxyz)+zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function T_1mexp_coulomb
 
 

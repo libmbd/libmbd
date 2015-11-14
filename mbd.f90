@@ -743,7 +743,7 @@ function get_single_mbd_energy( &
 
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
-    is_parallel = is_in('P', mode)
+    is_parallel = is_in('M', mode)
 
     call ts(10)
     relay(:, :) = 0.d0

@@ -131,7 +131,7 @@ subroutine print_log(str)
     if (myid == 0) then
         write (6, *) str
     end if
-end subroutine print_log
+end subroutine
 
 subroutine print_warning(str)
     implicit none
@@ -143,7 +143,7 @@ subroutine print_warning(str)
     if (myid == 0) then
         write (0, *) "Warning: " // str
     end if
-end subroutine print_warning
+end subroutine
 
 subroutine print_error(str)
     implicit none
@@ -155,6 +155,6 @@ subroutine print_error(str)
     if (myid == 0) then
         write (0, *) "Error: " // str
     end if
-end subroutine print_error
+end subroutine
 
 end module mbd_interface

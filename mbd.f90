@@ -12,9 +12,7 @@ module mbd
 
 
 use mbd_interface, only: &
-    sync_sum_array, sync_sum_array_c, &
-    sync_sum_number, print_error, print_warning, print_log, &
-    broadcast_array
+    sync_sum, broadcast, print_error, print_warning, print_log
 use mbd_helper, only: &
     is_in, blanked
 
@@ -222,7 +220,7 @@ function get_ts_energy( &
         call ts(20)
         ! MPI code begin
         if (is_parallel) then
-            call sync_sum_number(ene_shell)
+            call sync_sum(ene_shell)
         end if
         ! MPI code end
         call ts(-20)
@@ -447,9 +445,9 @@ subroutine add_dipole_matrix( &
     ! MPI code begin
     if (is_parallel) then
         if (is_reciprocal) then
-            call sync_sum_array_c(relay_c, size(relay_c))
+            call sync_sum(relay_c)
         else
-            call sync_sum_array(relay, size(relay))
+            call sync_sum(relay)
         end if
     end if
     ! MPI code end
@@ -583,7 +581,7 @@ function run_scs( &
     end do
     ! MPI code begin
     if (is_parallel) then
-        call sync_sum_array(alpha_scs, size(alpha_scs))
+        call sync_sum(alpha_scs)
     end if
     ! MPI code end
 end function run_scs
@@ -1043,13 +1041,13 @@ function get_reciprocal_mbd_energy( &
     call ts(2)
     ! MPI code begin
     if (is_parallel) then
-        call sync_sum_number(ene)
+        call sync_sum(ene)
         if (get_eigenvalues .and. get_eigenvectors) then
-            call sync_sum_array(mode_enes, size(mode_enes))
-            call sync_sum_array_c(modes, size(modes))
+            call sync_sum(mode_enes)
+            call sync_sum(modes(:, 1, 1), size(modes))
         end if
         if (get_orders) then
-            call sync_sum_array(rpa_orders, size(rpa_orders))
+            call sync_sum(rpa_orders)
         end if
     end if
     ! MPI code end
@@ -1247,7 +1245,7 @@ end function get_supercell_mbd_energy
 !         end do ! i_tuple
 !     end do ! i_body
 !     if (is_parallel) then
-!         call sync_sum_array(ene_orders, size(ene_orders))
+!         call sync_sum(ene_orders, size(ene_orders))
 !     end if
 !     ene_orders(1) = 3.d0/2*sum(omega)
 !     do i_body = 2, min(param_mbd_nbody_max, size(xyz, 1))
@@ -1352,9 +1350,9 @@ function get_qho_rpa_energy( &
         end if
     end do
     if (is_parallel) then
-        call sync_sum_number(ene)
+        call sync_sum(ene)
         if (get_orders) then
-            call sync_sum_array(rpa_orders, size(rpa_orders))
+            call sync_sum(rpa_orders)
         end if
     end if
 end function get_qho_rpa_energy

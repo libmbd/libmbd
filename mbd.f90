@@ -19,6 +19,7 @@ use mbd_helper, only: &
 
 implicit none
 
+
 real*8 :: &
     pi = acos(-1.d0), &
     nan = sqrt(-sin(0.d0))
@@ -54,6 +55,28 @@ integer(kind=8) :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 character(len=1000) :: info_str
 
 integer :: my_task, n_tasks
+
+
+interface operator(.cprod.)
+    module procedure cart_prod_
+end interface
+
+interface diag
+    module procedure get_diag_
+    module procedure make_diag_
+end interface
+
+interface diagonalize
+    module procedure diagonalize_sym_dble_
+    module procedure diagonalize_ge_dble_
+    module procedure diagonalize_he_cmplx_
+end interface
+
+interface diagonalized
+    module procedure diagonalized_sym_dble_
+end interface
+
+
 
 contains
 
@@ -506,7 +529,7 @@ function do_scs( &
             alpha_full(i, i) = alpha_full(i, i)+1.d0/alpha(i_atom)
         end do
     end do
-    call invert_matrix(alpha_full)
+    call invert(alpha_full)
 end function do_scs
 
 
@@ -673,10 +696,10 @@ end function run_scs
 !         end do
 !     end do
 !     if (get_eigenvectors) then
-!         call diagonalize_matrix(relay, eigs, vectors=.true.)
+!         call diagonalize(relay, eigs, vectors=.true.)
 !         modes = relay
 !     else
-!         call diagonalize_matrix(relay, eigs)
+!         call diagonalize(relay, eigs)
 !     end if
 !     if (get_eigenvalues) then
 !         mode_enes(:) = 0.d0
@@ -784,17 +807,17 @@ function get_single_mbd_energy( &
     if (my_task == 0) then
         call ts(13)
         if (get_eigenvectors) then
-            call diagonalize_matrix('V', relay, eigs)
+            call diagonalize('V', relay, eigs)
             modes = relay
         else
-            call diagonalize_matrix('N', relay, eigs)
+            call diagonalize('N', relay, eigs)
         end if
         call ts(-13)
     end if
     ! MPI code begin
     if (is_parallel) then
-        call broadcast_array(relay, size(relay))
-        call broadcast_array(eigs, size(eigs))
+        call broadcast(relay)
+        call broadcast(eigs)
     end if
     ! MPI code end
     if (get_eigenvalues) then
@@ -908,10 +931,10 @@ function get_single_reciprocal_mbd_energy( &
     call ts(-12)
     call ts(13)
     if (get_eigenvectors) then
-        call diagonalize_matrix_c('V', relay, eigs)
+        call diagonalize('V', relay, eigs)
         modes = relay
     else
-        call diagonalize_matrix_c('N', relay, eigs)
+        call diagonalize('N', relay, eigs)
     end if
     call ts(-13)
     if (get_eigenvalues) then
@@ -1044,7 +1067,7 @@ function get_reciprocal_mbd_energy( &
         call sync_sum(ene)
         if (get_eigenvalues .and. get_eigenvectors) then
             call sync_sum(mode_enes)
-            call sync_sum(modes(:, 1, 1), size(modes))
+            call sync_sum(modes)
         end if
         if (get_orders) then
             call sync_sum(rpa_orders)
@@ -1332,7 +1355,7 @@ function get_qho_rpa_energy( &
         do i = 1, 3*size(xyz, 1)
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
         end do
-        call diagonalize_matrix_ge('N', relay, eigs)
+        call diagonalize('N', relay, eigs)
         n_negative_eigs = count(dble(eigs) < 0)
         if (n_negative_eigs > 0) then
             write (info_str, "(a,i10,a)") &
@@ -1341,7 +1364,7 @@ function get_qho_rpa_energy( &
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
-            call diagonalize_matrix_ge('N', AT, eigs)
+            call diagonalize('N', AT, eigs)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
                     +(-1.d0/(2*pi)*(-1)**n_order*sum(dble(eigs)**n_order)/n_order) &
@@ -1382,7 +1405,7 @@ function make_k_grid(g_grid, uc) result(k_grid)
     integer :: i_kpt
     real*8 :: ruc(3, 3)
 
-    ruc = 2*pi*inverted_matrix(transpose(uc))
+    ruc = 2*pi*inverted(transpose(uc))
     do i_kpt = 1, size(g_grid, 1)
         k_grid(i_kpt, :) = matmul(g_grid(i_kpt, :), ruc)
     end do
@@ -1415,13 +1438,9 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
     real*8 :: alpha_3_3(3, 3), alpha_diag(3)
 
     do i_atom = 1, size(alpha_n)
-        do i_xyz = 1, 3
-            do j_xyz = 1, 3
-                alpha_3_3(i_xyz, j_xyz) = &
-                    sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
-            end do
-        end do
-        alpha_diag = diagonalized_matrix(alpha_3_3)
+        forall (i_xyz = 1:3, j_xyz = 1:3) alpha_3_3(i_xyz, j_xyz) &
+                = sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
+        alpha_diag = diagonalized(alpha_3_3)
         alpha_n(i_atom) = sum(alpha_diag)/3
     end do
 end function contract_polarizability
@@ -1451,8 +1470,7 @@ function alpha_dynamic_ts_all(mode, n, alpha_0, C6, omega) result(alpha_dyn)
     character(len=1), intent(in) :: mode
     integer, intent(in) :: n
     real*8, intent(in) :: alpha_0(:)
-    real*8, intent(in), optional :: &
-        C6(size(alpha_0)), omega(size(alpha_0))
+    real*8, intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
     real*8 :: alpha_dyn(0:n, size(alpha_0))
 
     integer :: i_grid_omega
@@ -1469,8 +1487,7 @@ function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
 
     character(len=1), intent(in) :: mode
     real*8, intent(in) :: alpha_0(:), u
-    real*8, intent(in), optional :: &
-        C6(size(alpha_0)), omega(size(alpha_0))
+    real*8, intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
     real*8 :: alpha(size(alpha_0))
 
     select case (mode)
@@ -1479,7 +1496,7 @@ function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
         case ('C')
             alpha(:) = alpha_osc(alpha_0, omega_eff(C6, alpha_0), u)
     end select
-end function alpha_dynamic_ts
+end function
 
 
 elemental function alpha_osc(alpha_0, omega, u) result(alpha)
@@ -1489,7 +1506,7 @@ elemental function alpha_osc(alpha_0, omega, u) result(alpha)
     real*8 :: alpha
 
     alpha = alpha_0/(1+(u/omega)**2)
-end function alpha_osc
+end function
 
 
 elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
@@ -1499,7 +1516,7 @@ elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     real*8 :: C6_ij
 
     C6_ij = 2*C6_i*C6_j/(alpha_0_j/alpha_0_i*C6_i+alpha_0_i/alpha_0_j*C6_j)
-end function combine_C6
+end function
 
 
 elemental function V_to_R(V) result(R)
@@ -1509,11 +1526,9 @@ elemental function V_to_R(V) result(R)
     real*8 :: R
 
     R = (3.d0*V/(4.d0*pi))**(1.d0/3)
-end function V_to_R
+end function
 
 
-!> Evaluates a local polarizability model of Vydrov & van Voorhis
-!> \cite vydrov_dispersion_2010 .
 elemental function vv_polarizability(rho, rho_grad, omega, C) result(alpha)
     implicit none
 
@@ -1521,7 +1536,7 @@ elemental function vv_polarizability(rho, rho_grad, omega, C) result(alpha)
     real*8 :: alpha
 
     alpha = rho/(4*pi/3*rho+C*(rho_grad/rho)**4+omega**2)
-end function vv_polarizability
+end function
 
 
 function omega_eff(C6, alpha) result(omega)
@@ -1531,7 +1546,7 @@ function omega_eff(C6, alpha) result(omega)
     real*8 :: omega(size(C6))
 
     omega = 4.d0/3*C6/alpha**2
-end function omega_eff
+end function
 
 
 elemental function get_sigma_selfint(alpha) result(sigma)
@@ -1541,7 +1556,7 @@ elemental function get_sigma_selfint(alpha) result(sigma)
     real*8 :: sigma
 
     sigma = (sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
-end function get_sigma_selfint
+end function
 
 
 function get_C6_from_alpha(alpha) result(C6)
@@ -1554,7 +1569,7 @@ function get_C6_from_alpha(alpha) result(C6)
     do i_atom = 1, size(alpha, 2)
         C6(i_atom) = 3.d0/pi*sum((alpha(:, i_atom)**2)*omega_grid_w(:))
     end do
-end function get_C6_from_alpha
+end function
 
 
 function get_total_C6_from_alpha(alpha) result(C6)
@@ -1564,7 +1579,7 @@ function get_total_C6_from_alpha(alpha) result(C6)
     real*8 :: C6
 
     C6 = 3.d0/pi*sum((sum(alpha, 2)**2)*omega_grid_w(:))
-end function get_total_C6_from_alpha
+end function
 
 
 function T_bare(rxyz) result(T)
@@ -1587,7 +1602,7 @@ function T_bare(rxyz) result(T)
         end do
     end do
     T = -T
-end function T_bare
+end function
 
 
 function damping_fermi(r, sigma, a) result(f)
@@ -1597,7 +1612,7 @@ function damping_fermi(r, sigma, a) result(f)
     real*8 :: f
 
     f = 1.d0/(1+exp(-a*(r/sigma-1)))
-end function damping_fermi
+end function
 
 
 function damping_erf(r, sigma, a) result(f)
@@ -1607,7 +1622,7 @@ function damping_erf(r, sigma, a) result(f)
     real*8 :: f
 
     f = erf((r/sigma)**a)
-end function damping_erf
+end function
 
 
 function damping_1mexp(r, sigma, a) result(f)
@@ -1617,7 +1632,7 @@ function damping_1mexp(r, sigma, a) result(f)
     real*8 :: f
 
     f = 1-exp(-(r/sigma)**a)
-end function damping_1mexp
+end function
 
 
 function damping_overlap(r, overlap, C6, beta, a) result(f)
@@ -1627,7 +1642,7 @@ function damping_overlap(r, overlap, C6, beta, a) result(f)
     real*8 :: f
 
     f = 1.d0-terf(-overlap/(erf(r/6)**6*C6/r**6), beta, a)
-end function damping_overlap
+end function
 
 
 function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
@@ -1654,8 +1669,8 @@ function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
         *(2*a**2*qenep**2*(beta*(-1.d0+exp(4*a**2*beta*qene)) &
         -qene*(1.d0+exp(4*a**2*beta*qene))) &
         +qenepp*(1.d0+exp(4*a**2*beta*qene)))
-    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
-end function T_overlap_coulomb
+    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
+end function
 
 
 function T_fermi_coulomb(rxyz, sigma, a) result(T)
@@ -1672,8 +1687,8 @@ function T_fermi_coulomb(rxyz, sigma, a) result(T)
         -a/2.d0*r_sigma/(1.d0+cosh(-d_r_sigma_m_1))
     zeta_2 = 2.d0*a**2*r_sigma**2/sinh(-d_r_sigma_m_1)**3 &
         *sinh(-d_r_sigma_m_1/2.d0)**4
-    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
-end function T_fermi_coulomb
+    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
+end function
 
 
 function T_erf_coulomb(rxyz, sigma, a) result(T)
@@ -1688,8 +1703,8 @@ function T_erf_coulomb(rxyz, sigma, a) result(T)
     zeta_1 = erf(r_sigma)-2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2)
     zeta_2 = -2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2) &
         *(1.d0+a*(-1.d0+2.d0*r_sigma**2))
-    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
-end function T_erf_coulomb
+    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
+end function
 
 
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)
@@ -1703,8 +1718,8 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1.d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
-    T = zeta_1*T_bare(rxyz)-zeta_2*cart_prod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
-end function T_1mexp_coulomb
+    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
+end function
 
 
 subroutine get_damping_parameters( &
@@ -1756,27 +1771,27 @@ subroutine get_damping_parameters( &
 end subroutine get_damping_parameters
 
 
-function solve_lin_sys(A_arg, B_arg) result(X)
+function solve_lin_sys(A, b) result(x)
     implicit none
 
-    real*8, intent(in) :: A_arg(:, :), B_arg(size(A_arg, 1))
-    real*8 :: X(size(B_arg))
+    real*8, intent(in) :: A(:, :), b(size(A, 1))
+    real*8 :: x(size(b))
 
-    real*8 :: A(size(B_arg), size(B_arg))
-    real*8 :: B(size(B_arg))
-    integer :: i_pivot(size(B_arg))
+    real*8 :: A_(size(b), size(b))
+    integer :: i_pivot(size(b))
     integer :: n
     integer :: error_flag
 
-    A(:, :) = A_arg(:, :)
-    B(:) = B_arg(:)
-    n = size(B_arg)
-    call DGESV(n, 1, A, n, i_pivot, B, n, error_flag)
-    X(:) = B(:)
-end function solve_lin_sys
+    A_ = A
+    x = b
+    n = size(b)
+    call DGESV(n, 1, A_, n, i_pivot, x, n, error_flag)
+end function
 
 
-subroutine invert_matrix(A)
+
+
+subroutine invert(A)
     implicit none
 
     real*8, intent(inout) :: A(:, :)
@@ -1805,21 +1820,21 @@ subroutine invert_matrix(A)
             "Matrix inversion failed in module mbd with error code ", error_flag
         call print_error(info_str)
     endif
-end subroutine invert_matrix
+end subroutine
 
 
-function inverted_matrix(A_in) result(A_out)
+function inverted(A) result(A_inv)
     implicit none
 
-    real*8, intent(in) :: A_in(:, :)
-    real*8 :: A_out(size(A_in, 1), size(A_in, 2))
+    real*8, intent(in) :: A(:, :)
+    real*8 :: A_inv(size(A, 1), size(A, 2))
 
-    A_out = A_in
-    call invert_matrix(A_out)
-end function inverted_matrix
+    A_inv = A
+    call invert(A_inv)
+end function
 
 
-subroutine diagonalize_matrix(mode, A, eigs)
+subroutine diagonalize_sym_dble_(mode, A, eigs)
     implicit none
 
     character(len=1), intent(in) :: mode
@@ -1842,10 +1857,35 @@ subroutine diagonalize_matrix(mode, A, eigs)
             error_flag
         call print_error(info_str)
     endif
-end subroutine diagonalize_matrix
+end subroutine
 
 
-subroutine diagonalize_matrix_ge(mode, A, eigs)
+function diagonalized_sym_dble_(A, eigvecs) result(eigs)
+    implicit none
+
+    real*8, intent(in) :: A(:, :)
+    real*8, intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    real*8 :: eigs(size(A, 1))
+
+    real*8, pointer :: eigvecs_p(:, :)
+    character(len=1) :: mode
+
+    if (present(eigvecs)) then
+        mode = 'V'
+        eigvecs_p => eigvecs
+    else
+        mode = 'N'
+        allocate (eigvecs_p(size(A, 1), size(A, 2)))
+    end if
+    eigvecs_p = A
+    call diagonalize(mode, eigvecs_p, eigs)
+    if (.not. present(eigvecs)) then
+        deallocate (eigvecs_p)
+    end if
+end function
+
+
+subroutine diagonalize_ge_dble_(mode, A, eigs)
     implicit none
 
     character(len=1), intent(in) :: mode
@@ -1875,10 +1915,10 @@ subroutine diagonalize_matrix_ge(mode, A, eigs)
     endif
     eigs = cmplx(eigs_r, eigs_i)
     A = vectors
-end subroutine diagonalize_matrix_ge
+end subroutine
 
 
-subroutine diagonalize_matrix_c(mode, A, eigs)
+subroutine diagonalize_he_cmplx_(mode, A, eigs)
     implicit none
 
     character(len=1), intent(in) :: mode
@@ -1886,7 +1926,7 @@ subroutine diagonalize_matrix_c(mode, A, eigs)
     real*8, intent(out) :: eigs(size(A, 1))
 
     complex(kind=8), allocatable :: work(:)
-    complex(kind=8) :: lwork_c
+    complex(kind=8) :: lwork_cmplx
     real*8, allocatable :: rwork(:)
     integer :: n, lwork
     integer :: error_flag
@@ -1894,8 +1934,8 @@ subroutine diagonalize_matrix_c(mode, A, eigs)
 
     n = size(A, 1)
     allocate (rwork(max(1, 3*n-2)))
-    call ZHEEV(mode, "U", n, A, n, eigs, lwork_c, -1, rwork, error_flag)
-    lwork = nint(dble(lwork_c))
+    call ZHEEV(mode, "U", n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
+    lwork = nint(dble(lwork_cmplx))
     allocate (work(lwork))
     call ZHEEV(mode, "U", n, A, n, eigs, work, lwork, rwork, error_flag)
     deallocate (rwork)
@@ -1906,44 +1946,7 @@ subroutine diagonalize_matrix_c(mode, A, eigs)
             error_flag
         call print_error(info_str)
     endif
-end subroutine diagonalize_matrix_c
-
-
-function diagonalized_matrix(A, eigvecs) result(eigs)
-    implicit none
-
-    real*8, intent(in) :: A(:, :)
-    real*8, intent(out), optional :: eigvecs(size(A, 1), size(A, 2))
-    real*8 :: eigs(size(A, 1))
-
-    real*8 :: A_work(size(A, 1), size(A, 2))
-    real*8, allocatable :: work_arr(:)
-    integer :: n
-    real*8 :: n_work_arr
-    integer :: error_flag
-    character(len=1) :: mode
-
-    if (present(eigvecs)) then
-        mode = 'V'
-    else
-        mode = 'N'
-    end if
-    A_work = A
-    n = size(A, 1)
-    call DSYEV(mode, "U", n, A_work, n, eigs, n_work_arr, -1, error_flag)
-    allocate (work_arr(nint(n_work_arr)))
-    call DSYEV(mode, "U", n, A_work, n, eigs, work_arr, size(work_arr), error_flag)
-    deallocate (work_arr)
-    if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix diagonalization failed in module mbd with error code ", &
-            error_flag
-        call print_error(info_str)
-    endif
-    if (present(eigvecs)) then
-        eigvecs = A_work
-    end if
-end function diagonalized_matrix
+end subroutine
 
 
 function supercell_circum(uc, radius) result(sc)
@@ -2009,9 +2012,7 @@ function identity_matrix(n) result(A)
         A(i, i) = 1.d0
     end do
 end function identity_matrix
-
-
-function cart_prod(a, b) result(c)
+function cart_prod_(a, b) result(c)
     implicit none
 
     real*8, intent(in) :: a(:), b(:)
@@ -2024,22 +2025,19 @@ function cart_prod(a, b) result(c)
             c(i, j) = a(i)*b(j)
         end do
     end do
-end function cart_prod
+end function
 
 
-function diag(a) result(b)
+function get_diag_(A) result(d)
     implicit none
 
-    real*8, intent(in) :: a(:)
-    real*8 :: b(size(a), size(a))
+    real*8, intent(in) :: A(:, :)
+    real*8 :: d(size(A, 1))
 
     integer :: i
 
-    b = 0.d0
-    do i = 1, size(a)
-        b(i, i) = a(i)
-    end do
-end function diag
+    forall (i = 1:size(A, 1)) d(i) = A(i, i)
+end function
 
 
 function expect_value(O, x) result(y)
@@ -2056,21 +2054,15 @@ function expect_value(O, x) result(y)
         end do
     end do
 end function expect_value
-
-
-function make_diag(diag) result(A)
+function make_diag_(d) result(A)
     implicit none
 
-    real*8, intent(in) :: diag(:)
-    real*8 :: A(size(diag), size(diag))
+    real*8, intent(in) :: d(:)
+    real*8 :: A(size(d), size(d))
 
     integer :: i
 
     A(:, :) = 0.d0
-    do i = 1, size(diag)
-        A(i, i) = diag(i)
-    end do
-end function make_diag
 
 
 elemental function terf(r, r0, a)
@@ -2081,6 +2073,8 @@ elemental function terf(r, r0, a)
 
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function terf
+    forall (i = 1:size(d)) A(i, i) = d(i)
+end function
 
 
 end module mbd

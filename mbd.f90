@@ -1789,6 +1789,61 @@ function solve_lin_sys(A, b) result(x)
 end function
 
 
+function supercell_circum(uc, radius) result(sc)
+    implicit none
+
+    real*8, intent(in) :: uc(3, 3), radius
+    integer :: sc(3)
+
+    real*8 :: ruc(3, 3)
+
+    ruc = 2*pi*inverted(transpose(uc))
+    sc = ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))-0.5d0)
+    where (param_vacuum_axis) sc = 0
+end function
+
+
+subroutine shift_cell(ijk, first_cell, last_cell)
+    implicit none
+
+    integer, intent(inout) :: ijk(3)
+    integer, intent(in) :: first_cell(3), last_cell(3)
+
+    integer :: i_dim, i
+
+    do i_dim = 3, 1, -1
+        i = ijk(i_dim)+1
+        if (i <= last_cell(i_dim)) then
+            ijk(i_dim) = i
+            return
+        else
+            ijk(i_dim) = first_cell(i_dim)
+        end if
+    end do
+end subroutine
+
+
+function eye(n) result(A)
+    implicit none
+
+    integer, intent(in) :: n
+    real*8 :: A(n, n)
+
+    integer :: i
+
+    A(:, :) = 0.d0
+    forall (i = 1:n) A(i, i) = 1.d0
+end function
+
+
+elemental function terf(r, r0, a)
+    implicit none
+
+    real*8, intent(in) :: r, r0, a
+    real*8 :: terf
+
+    terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
+end function
 
 
 subroutine invert(A)
@@ -1949,69 +2004,6 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
 end subroutine
 
 
-function supercell_circum(uc, radius) result(sc)
-    implicit none
-
-    real*8, intent(in) :: uc(3, 3), radius
-    integer :: sc(3)
-
-    real*8 :: ruc(3, 3)
-
-    ruc = 2*pi*inverted_matrix(transpose(uc))
-    sc = &
-        ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))-.5d0)
-    where (param_vacuum_axis) sc = 0
-end function supercell_circum
-
-
-subroutine shift_cell(ijk, first_cell, last_cell)
-    implicit none
-
-    integer, intent(inout) :: ijk(3)
-    integer, intent(in) :: first_cell(3), last_cell(3)
-
-    integer :: i_dim, i
-
-    do i_dim = 3, 1, -1
-        i = ijk(i_dim)+1
-        if (i <= last_cell(i_dim)) then
-            ijk(i_dim) = i
-            exit
-        else
-            ijk(i_dim) = first_cell(i_dim)
-        end if
-    end do
-end subroutine shift_cell
-
-
-function eye(N)
-    implicit none
-
-    integer, intent(in) :: N
-    real*8 :: eye(N, N)
-
-    integer :: i
-
-    eye(:, :) = 0.d0
-    do i = 1, N
-        eye(i, i) = 1.d0
-    end do
-end function eye
-
-
-function identity_matrix(n) result(A)
-    implicit none
-
-    integer, intent(in) :: n
-    real*8 :: A(n, n)
-
-    integer :: i
-
-    A(:, :) = 0.d0
-    do i = 1, n
-        A(i, i) = 1.d0
-    end do
-end function identity_matrix
 function cart_prod_(a, b) result(c)
     implicit none
 
@@ -2040,20 +2032,6 @@ function get_diag_(A) result(d)
 end function
 
 
-function expect_value(O, x) result(y)
-    implicit none
-
-    real*8, intent(in) :: O(:, :), x(:)
-    real*8 :: y
-    integer :: i, j
-
-    y = 0.d0
-    do i = 1, size(x)
-        do j = 1, size(x)
-            y = y+x(i)*x(j)*O(i, j)
-        end do
-    end do
-end function expect_value
 function make_diag_(d) result(A)
     implicit none
 
@@ -2063,16 +2041,6 @@ function make_diag_(d) result(A)
     integer :: i
 
     A(:, :) = 0.d0
-
-
-elemental function terf(r, r0, a)
-    implicit none
-
-    real*8, intent(in) :: r, r0, a
-    real*8 :: terf
-
-    terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
-end function terf
     forall (i = 1:size(d)) A(i, i) = d(i)
 end function
 

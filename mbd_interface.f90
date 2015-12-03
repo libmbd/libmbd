@@ -24,13 +24,17 @@ interface broadcast
     module procedure broadcast_4d_dble_
 end interface
 
+external :: &
+    MPI_COMM_WORLD, MPI_DOUBLE_PRECISION, MPI_COMPLEX16, MPI_SUM, &
+    MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
+
 contains
 
 subroutine sync_sum_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x
-    real*8 :: x_buff
+    real(8), intent(inout) :: x
+    real(8) :: x_buff
     integer :: mpi_err
 
     call MPI_ALLREDUCE( &
@@ -43,9 +47,9 @@ subroutine sync_sum_array_dble_(array, n_array)
     implicit none
 
     integer, intent(in) :: n_array
-    real*8, intent(inout) :: array(n_array)
+    real(8), intent(inout) :: array(n_array)
 
-    real*8 :: array_buff(n_array)
+    real(8) :: array_buff(n_array)
     integer :: mpi_err
 
     call MPI_ALLREDUCE( &
@@ -57,7 +61,7 @@ end subroutine
 subroutine sync_sum_vector_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:)
+    real(8), intent(inout) :: x(:)
 
     call sync_sum_array_dble_(x, size(x))
 end subroutine
@@ -65,7 +69,7 @@ end subroutine
 subroutine sync_sum_matrix_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:, :)
+    real(8), intent(inout) :: x(:, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
@@ -73,7 +77,7 @@ end subroutine
 subroutine sync_sum_3d_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:, :, :)
+    real(8), intent(inout) :: x(:, :, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
@@ -81,7 +85,7 @@ end subroutine
 subroutine sync_sum_4d_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:, :, :, :)
+    real(8), intent(inout) :: x(:, :, :, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
@@ -150,7 +154,7 @@ subroutine broadcast_array_dble_(array, n_array)
     implicit none
 
     integer, intent(in) :: n_array
-    real*8, intent(inout) :: array(n_array)
+    real(8), intent(inout) :: array(n_array)
 
     integer :: mpi_err
 
@@ -161,7 +165,7 @@ end subroutine
 subroutine broadcast_vector_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:)
+    real(8), intent(inout) :: x(:)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
@@ -169,7 +173,7 @@ end subroutine
 subroutine broadcast_matrix_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:, :)
+    real(8), intent(inout) :: x(:, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
@@ -177,7 +181,7 @@ end subroutine
 subroutine broadcast_3d_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:, :, :)
+    real(8), intent(inout) :: x(:, :, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
@@ -185,7 +189,7 @@ end subroutine
 subroutine broadcast_4d_dble_(x)
     implicit none
 
-    real*8, intent(inout) :: x(:, :, :, :)
+    real(8), intent(inout) :: x(:, :, :, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine

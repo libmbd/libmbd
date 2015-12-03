@@ -20,14 +20,14 @@ use mbd_helper, only: &
 implicit none
 
 
-real*8 :: &
+real(8) :: &
     pi = acos(-1.d0), &
     nan = sqrt(-sin(0.d0))
 
-real*8, parameter :: &
-    bohr = 0.529177249
+real(8), parameter :: &
+    bohr = 0.529177249d0
 
-real*8 :: &
+real(8) :: &
     param_scs_dip_cutoff = 120.d0/bohr, &
     param_mbd_supercell_cutoff = 25.d0/bohr, &
     param_mbd_dip_cutoff = 100.d0/bohr, &
@@ -44,13 +44,13 @@ logical :: &
 integer :: &
     n_grid_omega
 
-real*8, allocatable :: &
+real(8), allocatable :: &
     omega_grid(:), &
     omega_grid_w(:)
 
 logical :: measure_time = .false.
-integer(kind=8) :: timestamps(100), ts_counts(100)
-integer(kind=8) :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
+integer(8) :: timestamps(100), ts_counts(100)
+integer(8) :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 
 character(len=1000) :: info_str
 
@@ -76,6 +76,7 @@ interface diagonalized
     module procedure diagonalized_sym_dble_
 end interface
 
+external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV
 
 
 contains
@@ -102,7 +103,7 @@ end subroutine ts
 function clock_rate() result(rate)
     implicit none
 
-    integer(kind=8) :: cnt, rate, cnt_max
+    integer(8) :: cnt, rate, cnt_max
 
     call system_clock(cnt, rate, cnt_max) 
 end function clock_rate
@@ -125,24 +126,24 @@ function get_ts_energy( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         C6(size(xyz, 1)), &
         alpha_0(size(xyz, 1))
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         s_R, d, &
         overlap(size(xyz, 1), size(xyz, 1)), &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         unit_cell(3, 3)
-    real*8 :: ene
+    real(8) :: ene
 
-    real*8 :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij
-    real*8 :: ene_shell, ene_pair
-    real*8 :: r_cell(3)
-    integer :: i_shell, i_cell, j_cell, k_cell, ijk_cell(3)
-    integer :: i_atom, j_atom, i_range, range_g_cell(3), g_cell(3)
-    real*8, parameter :: shell_thickness = 10.d0
+    real(8) :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij
+    real(8) :: ene_shell, ene_pair
+    real(8) :: r_cell(3)
+    integer :: i_shell, i_cell
+    integer :: i_atom, j_atom, range_g_cell(3), g_cell(3)
+    real(8), parameter :: shell_thickness = 10.d0
     logical :: is_periodic, is_parallel
 
     is_periodic = is_in('P', mode)
@@ -284,9 +285,9 @@ subroutine add_dipole_matrix( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         alpha(size(xyz, 1)), &
         R_vdw(size(xyz, 1)), &
         beta, a, &
@@ -296,18 +297,18 @@ subroutine add_dipole_matrix( &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3), &
         k_point(3)
-    real*8, intent(inout), optional :: &
+    real(8), intent(inout), optional :: &
         relay(3*size(xyz, 1), 3*size(xyz, 1))
-    complex(kind=8), intent(inout), optional :: &
+    complex(8), intent(inout), optional :: &
         relay_c(3*size(xyz, 1), 3*size(xyz, 1))
 
-    real*8 :: Tpp(3, 3)
-    complex(kind=8) :: Tpp_c(3, 3)
-    real*8 :: r_cell(3), r(3), r_norm
-    real*8 :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
-    real*8 :: max_change
+    real(8) :: Tpp(3, 3)
+    complex(8) :: Tpp_c(3, 3)
+    real(8) :: r_cell(3), r(3), r_norm
+    real(8) :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
+    real(8) :: max_change
     character(len=1) :: parallel_mode
-    real*8, parameter :: shell_thickness = 50.d0
+    real(8), parameter :: shell_thickness = 50.d0
     integer :: &
         i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j, &
         i_shell
@@ -427,7 +428,7 @@ subroutine add_dipole_matrix( &
                     max_change = max(max_change, maxval(abs(Tpp)))
                     call ts(48)
                     if (is_reciprocal) then
-                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0)*sum(k_point*r_cell))
+                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*sum(k_point*r_cell))
                     end if
                     call ts(-48)
                     call ts(49)
@@ -494,15 +495,15 @@ function do_scs( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         unit_cell(3, 3), &
         lam
-    real*8 :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
     logical :: scale_lambda
 
     integer :: i_atom, i_xyz, i
@@ -569,17 +570,17 @@ function run_scs( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:, :)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         unit_cell(3, 3)
-    real*8 :: alpha_scs(size(alpha, 1), size(alpha, 2))
+    real(8) :: alpha_scs(size(alpha, 1), size(alpha, 2))
 
-    real*8 :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
-    integer :: i_atom, i_xyz, i_grid_omega, i
+    real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    integer :: i_grid_omega
     logical :: is_parallel
 
     is_parallel = is_in('M', mode)
@@ -632,9 +633,9 @@ end function run_scs
 !     implicit none
 !
 !     character(len=*), intent(in) :: mode, version
-!     real*8, intent(in) :: &
+!     real(8), intent(in) :: &
 !         xyz(:, :)
-!     real*8, intent(in), optional :: &
+!     real(8), intent(in), optional :: &
 !         alpha_0(size(xyz, 1)), &
 !         omega(size(xyz, 1)), &
 !         R_vdw(size(xyz, 1)), &
@@ -646,17 +647,17 @@ end function run_scs
 !         unit_cell(3, 3), &
 !         k_point(3)
 !     integer, intent(in), optional :: my_task, n_tasks
-!     real*8, intent(out), optional :: &
+!     real(8), intent(out), optional :: &
 !         mode_enes(3*size(xyz, 1)), &
 !         modes(3*size(xyz, 1), 3*size(xyz, 1))
 !         rpa_orders(3*size(xyz, 1), 3*size(xyz, 1))
-!     real*8 :: ene
+!     real(8) :: ene
 !
-!     real*8 :: relay(3*size(xyz, 1), 3*size(xyz, 1))
-!     real*8 :: eigs(3*size(xyz, 1))
+!     real(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+!     real(8) :: eigs(3*size(xyz, 1))
 !     integer :: i_atom, j_atom, i_xyz, j_xyz, i, j
 !     integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3)
-!     real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
+!     real(8) :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
 !     integer :: n_negative_eigs, g_cell(3), i_order
 !     logical :: get_eigenvalues, get_eigenvectors
 !
@@ -737,11 +738,11 @@ function get_single_mbd_energy( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1))
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         overlap(size(xyz, 1), size(xyz, 1)), &
@@ -749,17 +750,15 @@ function get_single_mbd_energy( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3)
-    real*8, intent(out), optional :: &
+    real(8), intent(out), optional :: &
         mode_enes(3*size(xyz, 1)), &
         modes(3*size(xyz, 1), 3*size(xyz, 1))
-    real*8 :: ene
+    real(8) :: ene
 
-    real*8 :: relay(3*size(xyz, 1), 3*size(xyz, 1))
-    real*8 :: eigs(3*size(xyz, 1))
-    integer :: i_atom, j_atom, i_xyz, j_xyz, i, j
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3)
-    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs, g_cell(3), i_order
+    real(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8) :: eigs(3*size(xyz, 1))
+    integer :: i_atom, j_atom, i_xyz, i, j
+    integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
 
     get_eigenvalues = is_in('E', mode)
@@ -860,38 +859,36 @@ function get_single_reciprocal_mbd_energy( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         k_point(3), &
         unit_cell(3, 3)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         overlap(size(xyz, 1), size(xyz, 1)), &
         C6(size(xyz, 1)), &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
-    real*8, intent(out), optional :: &
+    real(8), intent(out), optional :: &
         mode_enes(3*size(xyz, 1))
-    complex(kind=8), intent(out), optional :: &
+    complex(8), intent(out), optional :: &
         modes(3*size(xyz, 1), 3*size(xyz, 1))
-    real*8 :: ene
+    real(8) :: ene
 
-    complex(kind=8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
-    real*8 :: eigs(3*size(xyz, 1))
-    integer :: i_atom, j_atom, i_xyz, j_xyz, i, j
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3)
-    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs, g_cell(3), i_order
+    complex(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8) :: eigs(3*size(xyz, 1))
+    integer :: i_atom, j_atom, i_xyz, i, j
+    integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors
 
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
 
     call ts(10)
-    relay(:, :) = cmplx(0.d0, 0.d0)
+    relay(:, :) = cmplx(0.d0, 0.d0, 8)
     call add_dipole_matrix( & ! relay = T
         mode, &
         version, &
@@ -977,35 +974,29 @@ function get_reciprocal_mbd_energy( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         k_grid(:, :), &
         unit_cell(3, 3)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         overlap(size(xyz, 1), size(xyz, 1)), &
         C6(size(xyz, 1)), &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
-    real*8, intent(out), optional :: &
+    real(8), intent(out), optional :: &
         rpa_orders(size(k_grid, 1), 20), &
         mode_enes(size(k_grid, 1), 3*size(xyz, 1))
-    complex(kind=8), intent(out), optional :: &
+    complex(8), intent(out), optional :: &
         modes(size(k_grid, 1), 3*size(xyz, 1), 3*size(xyz, 1))
-    real*8 :: ene
+    real(8) :: ene
 
-    integer :: n_tasks_out
-    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
-    real*8 :: eigs(3*size(xyz, 1))
     logical :: is_parallel, do_rpa, get_orders, get_eigenvalues, get_eigenvectors
-    integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim, i_kpt
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3)
-    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs, g_cell(3), i_order, g_kpt_shifted(3)
-    real*8 :: k_point(3)
+    integer :: i_kpt
+    real(8) :: k_point(3)
 
     is_parallel = is_in('M', mode)
     do_rpa = is_in('Q', mode)
@@ -1090,46 +1081,35 @@ function get_supercell_mbd_energy( &
         R_vdw, &
         beta, &
         a, &
-        overlap, &
         C6, &
-        damping_custom, &
-        potential_custom, &
         rpa_orders) &
         result(ene)
     implicit none
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         unit_cell(3, 3)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
-    real*8, intent(out), optional :: rpa_orders(20)
-    real*8 :: ene
+        C6(size(xyz, 1))
+    real(8), intent(out), optional :: rpa_orders(20)
+    real(8) :: ene
 
     logical :: do_rpa
-    integer :: n_tasks_out
-    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: T, V
-    real*8 :: eigs(3*size(xyz, 1)), r_cell(3)
-    logical :: is_parallel
-    integer :: i_atom, j_atom, i_xyz, j_xyz, i_dim, i_kpt, i
-    integer :: i_cell, j_cell, k_cell, i_cell_total, ijk_cell(3), range_g_cell(3)
-    real*8 :: prefactor, Tpp(3, 3), R_vdw_sum, r(3), r_norm, C6_ij, overlap_ij
-    integer :: n_negative_eigs, g_cell(3), i_order, g_kpt_shifted(3), n_cells
-    real*8 :: k_point(3)
+    real(8) :: r_cell(3)
+    integer :: i_atom, i
+    integer :: i_cell, range_g_cell(3)
+    integer :: g_cell(3), n_cells
 
-    real*8, allocatable :: &
+    real(8), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
         R_vdw_super(:), C6_super(:)
-    real*8 :: unit_cell_super(3, 3)
+    real(8) :: unit_cell_super(3, 3)
 
     do_rpa = is_in('Q', mode)
 
@@ -1215,7 +1195,7 @@ end function get_supercell_mbd_energy
 !         result(ene_orders)
 !     implicit none
 !
-!     real*8, intent(in) :: &
+!     real(8), intent(in) :: &
 !         xyz(:, :), &
 !         alpha_0(size(xyz, 1)), &
 !         omega(size(xyz, 1)), &
@@ -1223,12 +1203,12 @@ end function get_supercell_mbd_energy
 !         beta, a
 !     character(len=*), intent(in) :: version
 !     integer, intent(in), optional :: my_task, n_tasks
-!     real*8 :: ene_orders(20)
+!     real(8) :: ene_orders(20)
 !
 !     integer :: &
 !         multi_index(param_mbd_nbody_max), i_body, j_body, i_tuple, &
 !         i_atom_ind, j_atom_ind, i_index
-!     real*8 :: ene
+!     real(8) :: ene
 !     logical :: is_parallel
 !     
 !     is_parallel = .false.
@@ -1300,10 +1280,10 @@ function get_qho_rpa_energy( &
 
     character(len=*), intent(in) :: &
         mode, version
-    real*8, intent(in) :: &
+    real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:, :)
-    real*8, intent(in), optional :: &
+    real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
         overlap(size(xyz, 1), size(xyz, 1)), &
@@ -1311,12 +1291,12 @@ function get_qho_rpa_energy( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3)
-    real*8, intent(out), optional :: rpa_orders(20)
-    real*8 :: ene
+    real(8), intent(out), optional :: rpa_orders(20)
+    real(8) :: ene
 
-    real*8, dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
-    complex(kind=8) :: eigs(3*size(xyz, 1))
-    integer :: i_atom, i_xyz, i_grid_omega, i, j
+    real(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
+    complex(8) :: eigs(3*size(xyz, 1))
+    integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
 
@@ -1383,7 +1363,7 @@ end function get_qho_rpa_energy
 
 function make_g_grid(n1, n2, n3) result(g_grid)
     integer, intent(in) :: n1, n2, n3
-    real*8 :: g_grid(n1*n2*n3, 3)
+    real(8) :: g_grid(n1*n2*n3, 3)
 
     integer :: g_kpt(3), i_kpt, kpt_range(3), g_kpt_shifted(3)
 
@@ -1399,11 +1379,11 @@ end function make_g_grid
 
 
 function make_k_grid(g_grid, uc) result(k_grid)
-    real*8, intent(in) :: g_grid(:, :), uc(3, 3)
-    real*8 :: k_grid(size(g_grid, 1), 3)
+    real(8), intent(in) :: g_grid(:, :), uc(3, 3)
+    real(8) :: k_grid(size(g_grid, 1), 3)
 
     integer :: i_kpt
-    real*8 :: ruc(3, 3)
+    real(8) :: ruc(3, 3)
 
     ruc = 2*pi*inverted(transpose(uc))
     do i_kpt = 1, size(g_grid, 1)
@@ -1431,11 +1411,11 @@ end function nbody_coeffs
 function contract_polarizability(alpha_3n_3n) result(alpha_n)
     implicit none
 
-    real*8, intent(in) :: alpha_3n_3n(:, :)
-    real*8 :: alpha_n(size(alpha_3n_3n, 1)/3)
+    real(8), intent(in) :: alpha_3n_3n(:, :)
+    real(8) :: alpha_n(size(alpha_3n_3n, 1)/3)
 
     integer :: i_atom, i_xyz, j_xyz
-    real*8 :: alpha_3_3(3, 3), alpha_diag(3)
+    real(8) :: alpha_3_3(3, 3), alpha_diag(3)
 
     do i_atom = 1, size(alpha_n)
         forall (i_xyz = 1:3, j_xyz = 1:3) alpha_3_3(i_xyz, j_xyz) &
@@ -1450,11 +1430,11 @@ subroutine get_omega_grid(n, a, m, x, w)
     implicit none
 
     integer, intent(in) :: n
-    real*8, intent(in) :: a, m
-    real*8, intent(out) :: x(n), w(n)
+    real(8), intent(in) :: a, m
+    real(8), intent(out) :: x(n), w(n)
 
     integer :: i
-    real :: j(n), v(n)
+    real(8) :: j(n), v(n)
 
     v = (/ (i, i = n, 1, -1) /)
     v = cos((2.d0*v-1.d0)/(2.d0*n)*pi)
@@ -1469,9 +1449,9 @@ function alpha_dynamic_ts_all(mode, n, alpha_0, C6, omega) result(alpha_dyn)
 
     character(len=1), intent(in) :: mode
     integer, intent(in) :: n
-    real*8, intent(in) :: alpha_0(:)
-    real*8, intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
-    real*8 :: alpha_dyn(0:n, size(alpha_0))
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
+    real(8) :: alpha_dyn(0:n, size(alpha_0))
 
     integer :: i_grid_omega
 
@@ -1486,9 +1466,9 @@ function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
     implicit none
 
     character(len=1), intent(in) :: mode
-    real*8, intent(in) :: alpha_0(:), u
-    real*8, intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
-    real*8 :: alpha(size(alpha_0))
+    real(8), intent(in) :: alpha_0(:), u
+    real(8), intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
+    real(8) :: alpha(size(alpha_0))
 
     select case (mode)
         case  ('O')
@@ -1502,8 +1482,8 @@ end function
 elemental function alpha_osc(alpha_0, omega, u) result(alpha)
     implicit none
 
-    real*8, intent(in) :: alpha_0, omega, u
-    real*8 :: alpha
+    real(8), intent(in) :: alpha_0, omega, u
+    real(8) :: alpha
 
     alpha = alpha_0/(1+(u/omega)**2)
 end function
@@ -1512,8 +1492,8 @@ end function
 elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     implicit none
 
-    real*8, intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
-    real*8 :: C6_ij
+    real(8), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
+    real(8) :: C6_ij
 
     C6_ij = 2*C6_i*C6_j/(alpha_0_j/alpha_0_i*C6_i+alpha_0_i/alpha_0_j*C6_j)
 end function
@@ -1522,8 +1502,8 @@ end function
 elemental function V_to_R(V) result(R)
     implicit none
 
-    real*8, intent(in) :: V
-    real*8 :: R
+    real(8), intent(in) :: V
+    real(8) :: R
 
     R = (3.d0*V/(4.d0*pi))**(1.d0/3)
 end function
@@ -1532,8 +1512,8 @@ end function
 elemental function vv_polarizability(rho, rho_grad, omega, C) result(alpha)
     implicit none
 
-    real*8, intent(in) :: rho, rho_grad, omega, C
-    real*8 :: alpha
+    real(8), intent(in) :: rho, rho_grad, omega, C
+    real(8) :: alpha
 
     alpha = rho/(4*pi/3*rho+C*(rho_grad/rho)**4+omega**2)
 end function
@@ -1542,8 +1522,8 @@ end function
 function omega_eff(C6, alpha) result(omega)
     implicit none
 
-    real*8, intent(in) :: C6(:), alpha(size(C6))
-    real*8 :: omega(size(C6))
+    real(8), intent(in) :: C6(:), alpha(size(C6))
+    real(8) :: omega(size(C6))
 
     omega = 4.d0/3*C6/alpha**2
 end function
@@ -1552,8 +1532,8 @@ end function
 elemental function get_sigma_selfint(alpha) result(sigma)
     implicit none
 
-    real*8, intent(in) :: alpha
-    real*8 :: sigma
+    real(8), intent(in) :: alpha
+    real(8) :: sigma
 
     sigma = (sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
 end function
@@ -1562,8 +1542,8 @@ end function
 function get_C6_from_alpha(alpha) result(C6)
     implicit none
 
-    real*8, intent(in) :: alpha(:, :)
-    real*8 :: C6(size(alpha, 2))
+    real(8), intent(in) :: alpha(:, :)
+    real(8) :: C6(size(alpha, 2))
     integer :: i_atom
 
     do i_atom = 1, size(alpha, 2)
@@ -1575,8 +1555,8 @@ end function
 function get_total_C6_from_alpha(alpha) result(C6)
     implicit none
 
-    real*8, intent(in) :: alpha(:, :)
-    real*8 :: C6
+    real(8), intent(in) :: alpha(:, :)
+    real(8) :: C6
 
     C6 = 3.d0/pi*sum((sum(alpha, 2)**2)*omega_grid_w(:))
 end function
@@ -1585,12 +1565,11 @@ end function
 function T_bare(rxyz) result(T)
     implicit none
 
-    real*8, intent(in) :: rxyz(3)
-    real*8 :: T(3, 3)
+    real(8), intent(in) :: rxyz(3)
+    real(8) :: T(3, 3)
 
     integer :: i, j
-    real*8 :: r_sq, r_5
-    real*8 :: rarb(3, 3)
+    real(8) :: r_sq, r_5
 
     r_sq = sum(rxyz(:)**2)
     r_5 = sqrt(r_sq)**5
@@ -1608,8 +1587,8 @@ end function
 function damping_fermi(r, sigma, a) result(f)
     implicit none
 
-    real*8, intent(in) :: r, sigma, a
-    real*8 :: f
+    real(8), intent(in) :: r, sigma, a
+    real(8) :: f
 
     f = 1.d0/(1+exp(-a*(r/sigma-1)))
 end function
@@ -1618,8 +1597,8 @@ end function
 function damping_erf(r, sigma, a) result(f)
     implicit none
 
-    real*8, intent(in) :: r, sigma, a
-    real*8 :: f
+    real(8), intent(in) :: r, sigma, a
+    real(8) :: f
 
     f = erf((r/sigma)**a)
 end function
@@ -1628,8 +1607,8 @@ end function
 function damping_1mexp(r, sigma, a) result(f)
     implicit none
 
-    real*8, intent(in) :: r, sigma, a
-    real*8 :: f
+    real(8), intent(in) :: r, sigma, a
+    real(8) :: f
 
     f = 1-exp(-(r/sigma)**a)
 end function
@@ -1638,8 +1617,8 @@ end function
 function damping_overlap(r, overlap, C6, beta, a) result(f)
     implicit none
 
-    real*8, intent(in) :: r, overlap, C6, beta, a
-    real*8 :: f
+    real(8), intent(in) :: r, overlap, C6, beta, a
+    real(8) :: f
 
     f = 1.d0-terf(-overlap/(erf(r/6)**6*C6/r**6), beta, a)
 end function
@@ -1648,11 +1627,11 @@ end function
 function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
     implicit none
 
-    real*8, intent(in) :: rxyz(3), overlap, C6, beta, a
-    real*8 :: T(3, 3)
+    real(8), intent(in) :: rxyz(3), overlap, C6, beta, a
+    real(8) :: T(3, 3)
 
-    real*8 :: zeta_1, zeta_2
-    real*8 :: r, erff, exp36, qene, qenep, qenepp
+    real(8) :: zeta_1, zeta_2
+    real(8) :: r, erff, exp36, qene, qenep, qenepp
 
     r = sqrt(sum(rxyz**2))
     erff = erf(r/6)
@@ -1676,10 +1655,10 @@ end function
 function T_fermi_coulomb(rxyz, sigma, a) result(T)
     implicit none
 
-    real*8, intent(in) :: rxyz(3), sigma, a
-    real*8 :: T(3, 3)
+    real(8), intent(in) :: rxyz(3), sigma, a
+    real(8) :: T(3, 3)
 
-    real*8 :: r_sigma, d_r_sigma_m_1, zeta_1, zeta_2
+    real(8) :: r_sigma, d_r_sigma_m_1, zeta_1, zeta_2
 
     r_sigma = sqrt(sum(rxyz**2))/sigma
     d_r_sigma_m_1 = a*(r_sigma-1)
@@ -1694,10 +1673,10 @@ end function
 function T_erf_coulomb(rxyz, sigma, a) result(T)
     implicit none
 
-    real*8, intent(in) :: rxyz(3), sigma, a
-    real*8 :: T(3, 3)
+    real(8), intent(in) :: rxyz(3), sigma, a
+    real(8) :: T(3, 3)
 
-    real*8 :: r_sigma, zeta_1, zeta_2
+    real(8) :: r_sigma, zeta_1, zeta_2
 
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = erf(r_sigma)-2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2)
@@ -1710,10 +1689,10 @@ end function
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     implicit none
 
-    real*8, intent(in) :: rxyz(3), sigma, a
-    real*8 :: T(3, 3)
+    real(8), intent(in) :: rxyz(3), sigma, a
+    real(8) :: T(3, 3)
 
-    real*8 :: r_sigma, zeta_1, zeta_2
+    real(8) :: r_sigma, zeta_1, zeta_2
 
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1.d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
@@ -1728,7 +1707,7 @@ subroutine get_damping_parameters( &
     implicit none
 
     character(len=*), intent(in) :: xc
-    real*8, intent(out) :: &
+    real(8), intent(out) :: &
         ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
         mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta
 
@@ -1774,10 +1753,10 @@ end subroutine get_damping_parameters
 function solve_lin_sys(A, b) result(x)
     implicit none
 
-    real*8, intent(in) :: A(:, :), b(size(A, 1))
-    real*8 :: x(size(b))
+    real(8), intent(in) :: A(:, :), b(size(A, 1))
+    real(8) :: x(size(b))
 
-    real*8 :: A_(size(b), size(b))
+    real(8) :: A_(size(b), size(b))
     integer :: i_pivot(size(b))
     integer :: n
     integer :: error_flag
@@ -1792,10 +1771,10 @@ end function
 function supercell_circum(uc, radius) result(sc)
     implicit none
 
-    real*8, intent(in) :: uc(3, 3), radius
+    real(8), intent(in) :: uc(3, 3), radius
     integer :: sc(3)
 
-    real*8 :: ruc(3, 3)
+    real(8) :: ruc(3, 3)
 
     ruc = 2*pi*inverted(transpose(uc))
     sc = ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))-0.5d0)
@@ -1827,7 +1806,7 @@ function eye(n) result(A)
     implicit none
 
     integer, intent(in) :: n
-    real*8 :: A(n, n)
+    real(8) :: A(n, n)
 
     integer :: i
 
@@ -1839,8 +1818,8 @@ end function
 elemental function terf(r, r0, a)
     implicit none
 
-    real*8, intent(in) :: r, r0, a
-    real*8 :: terf
+    real(8), intent(in) :: r, r0, a
+    real(8) :: terf
 
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function
@@ -1849,13 +1828,13 @@ end function
 subroutine invert(A)
     implicit none
 
-    real*8, intent(inout) :: A(:, :)
+    real(8), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
-    real*8, allocatable :: work_arr(:)
+    real(8), allocatable :: work_arr(:)
     integer :: n
     integer :: n_work_arr
-    real*8 :: n_work_arr_optim
+    real(8) :: n_work_arr_optim
     integer :: error_flag
 
     n = size(A, 1)
@@ -1881,8 +1860,8 @@ end subroutine
 function inverted(A) result(A_inv)
     implicit none
 
-    real*8, intent(in) :: A(:, :)
-    real*8 :: A_inv(size(A, 1), size(A, 2))
+    real(8), intent(in) :: A(:, :)
+    real(8) :: A_inv(size(A, 1), size(A, 2))
 
     A_inv = A
     call invert(A_inv)
@@ -1893,12 +1872,12 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     implicit none
 
     character(len=1), intent(in) :: mode
-    real*8, intent(inout) :: A(:, :)
-    real*8, intent(out) :: eigs(size(A, 1))
+    real(8), intent(inout) :: A(:, :)
+    real(8), intent(out) :: eigs(size(A, 1))
 
-    real*8, allocatable :: work_arr(:)
+    real(8), allocatable :: work_arr(:)
     integer :: n
-    real*8 :: n_work_arr
+    real(8) :: n_work_arr
     integer :: error_flag
 
     n = size(A, 1)
@@ -1918,11 +1897,11 @@ end subroutine
 function diagonalized_sym_dble_(A, eigvecs) result(eigs)
     implicit none
 
-    real*8, intent(in) :: A(:, :)
-    real*8, intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
-    real*8 :: eigs(size(A, 1))
+    real(8), intent(in) :: A(:, :)
+    real(8), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    real(8) :: eigs(size(A, 1))
 
-    real*8, pointer :: eigvecs_p(:, :)
+    real(8), pointer :: eigvecs_p(:, :)
     character(len=1) :: mode
 
     if (present(eigvecs)) then
@@ -1944,16 +1923,16 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
     implicit none
 
     character(len=1), intent(in) :: mode
-    real*8, intent(inout) :: A(:, :)
-    complex(kind=8), intent(out) :: eigs(size(A, 1))
+    real(8), intent(inout) :: A(:, :)
+    complex(8), intent(out) :: eigs(size(A, 1))
 
-    real*8, allocatable :: work_arr(:)
+    real(8), allocatable :: work_arr(:)
     integer :: n
-    real*8 :: n_work_arr
+    real(8) :: n_work_arr
     integer :: error_flag
-    real*8 :: eigs_r(size(A, 1)), eigs_i(size(A, 1))
-    real*8 :: dummy
-    real*8 :: vectors(size(A, 1), size(A, 2))
+    real(8) :: eigs_r(size(A, 1)), eigs_i(size(A, 1))
+    real(8) :: dummy
+    real(8) :: vectors(size(A, 1), size(A, 2))
 
     n = size(A, 1)
     call DGEEV('N', mode, n, A, n, eigs_r, eigs_i, dummy, 1, &
@@ -1968,7 +1947,7 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
             error_flag
         call print_error(info_str)
     endif
-    eigs = cmplx(eigs_r, eigs_i)
+    eigs = cmplx(eigs_r, eigs_i, 8)
     A = vectors
 end subroutine
 
@@ -1977,12 +1956,12 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     implicit none
 
     character(len=1), intent(in) :: mode
-    complex(kind=8), intent(inout) :: A(:, :)
-    real*8, intent(out) :: eigs(size(A, 1))
+    complex(8), intent(inout) :: A(:, :)
+    real(8), intent(out) :: eigs(size(A, 1))
 
-    complex(kind=8), allocatable :: work(:)
-    complex(kind=8) :: lwork_cmplx
-    real*8, allocatable :: rwork(:)
+    complex(8), allocatable :: work(:)
+    complex(8) :: lwork_cmplx
+    real(8), allocatable :: rwork(:)
     integer :: n, lwork
     integer :: error_flag
     integer, external :: ILAENV
@@ -2007,8 +1986,8 @@ end subroutine
 function cart_prod_(a, b) result(c)
     implicit none
 
-    real*8, intent(in) :: a(:), b(:)
-    real*8 :: c(size(a), size(b))
+    real(8), intent(in) :: a(:), b(:)
+    real(8) :: c(size(a), size(b))
 
     integer :: i, j
 
@@ -2023,8 +2002,8 @@ end function
 function get_diag_(A) result(d)
     implicit none
 
-    real*8, intent(in) :: A(:, :)
-    real*8 :: d(size(A, 1))
+    real(8), intent(in) :: A(:, :)
+    real(8) :: d(size(A, 1))
 
     integer :: i
 
@@ -2035,8 +2014,8 @@ end function
 function make_diag_(d) result(A)
     implicit none
 
-    real*8, intent(in) :: d(:)
-    real*8 :: A(size(d), size(d))
+    real(8), intent(in) :: d(:)
+    real(8) :: A(size(d), size(d))
 
     integer :: i
 

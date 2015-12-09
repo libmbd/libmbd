@@ -1509,16 +1509,6 @@ elemental function V_to_R(V) result(R)
 end function
 
 
-elemental function vv_polarizability(rho, rho_grad, omega, C) result(alpha)
-    implicit none
-
-    real(8), intent(in) :: rho, rho_grad, omega, C
-    real(8) :: alpha
-
-    alpha = rho/(4*pi/3*rho+C*(rho_grad/rho)**4+omega**2)
-end function
-
-
 function omega_eff(C6, alpha) result(omega)
     implicit none
 

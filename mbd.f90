@@ -1006,6 +1006,8 @@ function get_reciprocal_mbd_energy( &
 
     call ts(1)
     ene = 0.d0
+    mode_enes(:, :) = 0.d0
+    modes(:, :, :) = 0.d0
     do i_kpt = 1, size(k_grid, 1)
         ! MPI code begin
         if (is_parallel) then

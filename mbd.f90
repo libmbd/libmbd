@@ -4,6 +4,7 @@ module mbd
 ! M: multiprocessing (MPI)
 ! P: periodic
 ! R: reciprocal
+! F: fourier
 ! Q: do RPA
 ! E: get eigenvalues
 ! V: get eigenvectors
@@ -279,6 +280,8 @@ subroutine add_dipole_matrix( &
         potential_custom, &
         unit_cell, &
         k_point, &
+        G_vector, &
+        Gp_vector, &
         relay, &
         relay_c)
     implicit none
@@ -296,7 +299,9 @@ subroutine add_dipole_matrix( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3), &
-        k_point(3)
+        k_point(3), &
+        G_vector(3), &
+        Gp_vector(3)
     real(8), intent(inout), optional :: &
         relay(3*size(xyz, 1), 3*size(xyz, 1))
     complex(8), intent(inout), optional :: &
@@ -312,11 +317,12 @@ subroutine add_dipole_matrix( &
     integer :: &
         i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j, &
         i_shell
-    logical :: is_periodic, is_parallel, is_reciprocal
+    logical :: is_periodic, is_parallel, is_reciprocal, is_fourier
 
-    is_periodic = is_in('P', mode) .or. is_in('R', mode)
     is_parallel = is_in('M', mode)
     is_reciprocal = is_in('R', mode)
+    is_fourier = is_in('F', mode)
+    is_periodic = is_in('P', mode) .or. is_reciprocal .or. is_fourier
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
         if (is_periodic .and. size(xyz, 1) < n_tasks) then
@@ -428,13 +434,19 @@ subroutine add_dipole_matrix( &
                     max_change = max(max_change, maxval(abs(Tpp)))
                     call ts(48)
                     if (is_reciprocal) then
-                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*sum(k_point*r_cell))
+                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r_cell))
+                    end if
+                    if (is_fourier) then
+                        Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
+                            dot_product(k_point, r) &
+                            +dot_product(G_vector, xyz(i_atom, :)) &
+                            -dot_product(Gp_vector, xyz(j_atom, :))))
                     end if
                     call ts(-48)
                     call ts(49)
                     i = 3*(i_atom-1)
                     j = 3*(j_atom-1)
-                    if (is_reciprocal) then
+                    if (is_reciprocal .or. is_fourier) then
                         relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3) &
                             +Tpp_c
                         if (i_atom /= j_atom) then
@@ -468,7 +480,7 @@ subroutine add_dipole_matrix( &
     call ts(41)
     ! MPI code begin
     if (is_parallel) then
-        if (is_reciprocal) then
+        if (is_reciprocal .or. is_fourier) then
             call sync_sum(relay_c)
         else
             call sync_sum(relay)

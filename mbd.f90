@@ -83,12 +83,13 @@ external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV
 contains
 
 
-subroutine ts(id)
+subroutine ts(id, always)
     implicit none
 
     integer, intent(in) :: id
+    logical, intent(in), optional :: always
 
-    if (measure_time) then
+    if (measure_time .or. present(always)) then
         call system_clock(ts_cnt, ts_rate, ts_cnt_max) 
         if (id > 0) then
             timestamps(id) = timestamps(id)-ts_cnt

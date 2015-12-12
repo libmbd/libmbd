@@ -31,9 +31,9 @@ interface broadcast
     module procedure broadcast_4d_dble_
 end interface
 
-external :: &
-    MPI_COMM_WORLD, MPI_DOUBLE_PRECISION, MPI_COMPLEX16, MPI_SUM, &
-    MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
+! external :: &
+!     MPI_COMM_WORLD, MPI_DOUBLE_PRECISION, MPI_COMPLEX16, MPI_SUM, &
+!     MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
 
 contains
 

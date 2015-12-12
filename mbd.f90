@@ -82,7 +82,7 @@ interface diagonalized
     module procedure diagonalized_sym_dble_
 end interface
 
-external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI
+! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI
 
 
 contains

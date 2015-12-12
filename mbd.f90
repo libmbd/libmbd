@@ -67,6 +67,11 @@ interface diag
     module procedure make_diag_
 end interface
 
+interface invert
+    module procedure invert_sym_dble_
+    module procedure invert_ge_cmplx_
+end interface
+
 interface diagonalize
     module procedure diagonalize_sym_dble_
     module procedure diagonalize_ge_dble_
@@ -77,7 +82,7 @@ interface diagonalized
     module procedure diagonalized_sym_dble_
 end interface
 
-external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV
+external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI
 
 
 contains
@@ -545,6 +550,65 @@ function do_scs( &
     end do
     call invert(alpha_full)
 end function do_scs
+
+
+function do_scs_k_point( &
+        mode, &
+        version, &
+        xyz, &
+        alpha, &
+        k_point, &
+        R_vdw, &
+        beta, &
+        a, &
+        lam, &
+        unit_cell) & 
+        result(alpha_full)
+    implicit none
+
+    character(len=*), intent(in) :: &
+        mode, version
+    real(8), intent(in) :: &
+        xyz(:, :), &
+        alpha(:), &
+        k_point(3)
+    real(8), intent(in), optional :: &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        unit_cell(3, 3), &
+        lam
+    complex(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    logical :: scale_lambda
+
+    integer :: i_atom, i_xyz, i
+
+    scale_lambda = is_in('L', mode)
+
+    alpha_full(:, :) = cmplx(0.d0, 0.d0, 8)
+    call add_dipole_matrix( &
+        mode//'F', &
+        version, &
+        xyz=xyz, &
+        alpha=alpha, &
+        R_vdw=R_vdw, &
+        beta=beta, &
+        a=a, &
+        unit_cell=unit_cell, &
+        k_point=k_point, &
+        G_vector=(/ 0.d0, 0.d0, 0.d0 /), &
+        Gp_vector=(/ 0.d0, 0.d0, 0.d0 /), &
+        relay_c=alpha_full)
+    if (scale_lambda) then
+        alpha_full = lam*alpha_full
+    end if
+    do i_atom = 1, size(xyz, 1)
+        do i_xyz = 1, 3
+            i = 3*(i_atom-1)+i_xyz
+            alpha_full(i, i) = alpha_full(i, i)+1.d0/alpha(i_atom)
+        end do
+    end do
+    call invert(alpha_full)
+end function 
 
 
 subroutine init_grid(n)
@@ -1838,7 +1902,7 @@ elemental function terf(r, r0, a)
 end function
 
 
-subroutine invert(A)
+subroutine invert_sym_dble_(A)
     implicit none
 
     real(8), intent(inout) :: A(:, :)
@@ -1861,6 +1925,38 @@ subroutine invert(A)
     n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
     call DGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
+    deallocate (work_arr)
+    if (error_flag /= 0) then
+        write (info_str, "(a,i5)") &
+            "Matrix inversion failed in module mbd with error code ", error_flag
+        call print_error(info_str)
+    endif
+end subroutine
+
+
+subroutine invert_ge_cmplx_(A)
+    implicit none
+
+    complex(8), intent(inout) :: A(:, :)
+
+    integer :: i_pivot(size(A, 1))
+    complex(8), allocatable :: work_arr(:)
+    integer :: n
+    integer :: n_work_arr
+    complex(8) :: n_work_arr_optim
+    integer :: error_flag
+
+    n = size(A, 1)
+    call ZGETRF(n, n, A, n, i_pivot, error_flag)
+    if (error_flag /= 0) then
+        write (info_str, "(a,i5)") &
+            "Matrix inversion failed in module mbd with error code ", error_flag
+        call print_error(info_str)
+    endif
+    call ZGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
+    n_work_arr = nint(dble(n_work_arr_optim))
+    allocate (work_arr(n_work_arr))
+    call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
         write (info_str, "(a,i5)") &

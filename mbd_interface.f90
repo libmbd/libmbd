@@ -4,6 +4,13 @@ use mpi
 
 implicit none
 
+private
+
+public :: &
+    sync_sum, broadcast, print_log, print_error, print_warning
+
+character(len=1000) :: buff
+
 interface sync_sum
     module procedure sync_sum_dble_
     module procedure sync_sum_vector_dble_
@@ -200,10 +207,12 @@ subroutine print_log(str)
     character(len=*), intent(in) :: str
     integer :: myid, error
 
+    if (str == buff) return
     call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
     if (myid == 0) then
         write (6, *) str
     end if
+    buff = str
 end subroutine
 
 subroutine print_warning(str)

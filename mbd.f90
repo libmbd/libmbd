@@ -89,8 +89,6 @@ contains
 
 
 subroutine ts(id, always)
-    implicit none
-
     integer, intent(in) :: id
     logical, intent(in), optional :: always
 
@@ -108,8 +106,6 @@ end subroutine ts
 
 
 function clock_rate() result(rate)
-    implicit none
-
     integer(8) :: cnt, rate, cnt_max
 
     call system_clock(cnt, rate, cnt_max) 
@@ -129,8 +125,6 @@ function get_ts_energy( &
         damping_custom, &
         unit_cell) &
         result(ene)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -290,8 +284,6 @@ subroutine add_dipole_matrix( &
         Gp_vector, &
         relay, &
         relay_c)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -509,8 +501,6 @@ function do_scs( &
         lam, &
         unit_cell) & 
         result(alpha_full)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -564,8 +554,6 @@ function do_scs_k_point( &
         lam, &
         unit_cell) & 
         result(alpha_full)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -612,8 +600,6 @@ end function
 
 
 subroutine init_grid(n)
-    implicit none
-
     integer, intent(in) :: n
 
     n_grid_omega = n
@@ -626,8 +612,6 @@ end subroutine
 
 
 subroutine destroy_grid()
-    implicit none
-
     deallocate (omega_grid)
     deallocate (omega_grid_w)
 end subroutine
@@ -643,8 +627,6 @@ function run_scs( &
         a, &
         unit_cell) & 
         result(alpha_scs)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -707,8 +689,6 @@ end function run_scs
 !         mode_enes, modes, &
 !         rpa_orders) &
 !         result(ene)
-!     implicit none
-!
 !     character(len=*), intent(in) :: mode, version
 !     real(8), intent(in) :: &
 !         xyz(:, :)
@@ -811,8 +791,6 @@ function get_single_mbd_energy( &
         mode_enes, &
         modes) &
         result(ene)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -932,8 +910,6 @@ function get_single_reciprocal_mbd_energy( &
         mode_enes, &
         modes) &
         result(ene)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -1047,8 +1023,6 @@ function get_reciprocal_mbd_energy( &
         modes, &
         rpa_orders) &
         result(ene)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -1161,8 +1135,6 @@ function get_supercell_mbd_energy( &
         C6, &
         rpa_orders) &
         result(ene)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -1270,8 +1242,6 @@ end function get_supercell_mbd_energy
 !         R_vdw, beta, a, &
 !         my_task, n_tasks) &
 !         result(ene_orders)
-!     implicit none
-!
 !     real(8), intent(in) :: &
 !         xyz(:, :), &
 !         alpha_0(size(xyz, 1)), &
@@ -1353,8 +1323,6 @@ function get_qho_rpa_energy( &
         unit_cell, &
         rpa_orders) &
         result(ene)
-    implicit none
-
     character(len=*), intent(in) :: &
         mode, version
     real(8), intent(in) :: &
@@ -1486,8 +1454,6 @@ end function nbody_coeffs
 
 
 function contract_polarizability(alpha_3n_3n) result(alpha_n)
-    implicit none
-
     real(8), intent(in) :: alpha_3n_3n(:, :)
     real(8) :: alpha_n(size(alpha_3n_3n, 1)/3)
 
@@ -1504,8 +1470,6 @@ end function contract_polarizability
 
 
 subroutine get_omega_grid(n, a, m, x, w)
-    implicit none
-
     integer, intent(in) :: n
     real(8), intent(in) :: a, m
     real(8), intent(out) :: x(n), w(n)
@@ -1522,8 +1486,6 @@ end subroutine get_omega_grid
 
 
 function alpha_dynamic_ts_all(mode, n, alpha_0, C6, omega) result(alpha_dyn)
-    implicit none
-
     character(len=1), intent(in) :: mode
     integer, intent(in) :: n
     real(8), intent(in) :: alpha_0(:)
@@ -1540,8 +1502,6 @@ end function alpha_dynamic_ts_all
 
 
 function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
-    implicit none
-
     character(len=1), intent(in) :: mode
     real(8), intent(in) :: alpha_0(:), u
     real(8), intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
@@ -1557,8 +1517,6 @@ end function
 
 
 elemental function alpha_osc(alpha_0, omega, u) result(alpha)
-    implicit none
-
     real(8), intent(in) :: alpha_0, omega, u
     real(8) :: alpha
 
@@ -1567,8 +1525,6 @@ end function
 
 
 elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
-    implicit none
-
     real(8), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
     real(8) :: C6_ij
 
@@ -1577,8 +1533,6 @@ end function
 
 
 elemental function V_to_R(V) result(R)
-    implicit none
-
     real(8), intent(in) :: V
     real(8) :: R
 
@@ -1587,8 +1541,6 @@ end function
 
 
 elemental function vv_polarizability(rho, rho_grad, omega, C) result(alpha)
-    implicit none
-
     real(8), intent(in) :: rho, rho_grad, omega, C
     real(8) :: alpha
 
@@ -1597,8 +1549,6 @@ end function
 
 
 function omega_eff(C6, alpha) result(omega)
-    implicit none
-
     real(8), intent(in) :: C6(:), alpha(size(C6))
     real(8) :: omega(size(C6))
 
@@ -1607,8 +1557,6 @@ end function
 
 
 elemental function get_sigma_selfint(alpha) result(sigma)
-    implicit none
-
     real(8), intent(in) :: alpha
     real(8) :: sigma
 
@@ -1617,8 +1565,6 @@ end function
 
 
 function get_C6_from_alpha(alpha) result(C6)
-    implicit none
-
     real(8), intent(in) :: alpha(:, :)
     real(8) :: C6(size(alpha, 2))
     integer :: i_atom
@@ -1630,8 +1576,6 @@ end function
 
 
 function get_total_C6_from_alpha(alpha) result(C6)
-    implicit none
-
     real(8), intent(in) :: alpha(:, :)
     real(8) :: C6
 
@@ -1640,8 +1584,6 @@ end function
 
 
 function T_bare(rxyz) result(T)
-    implicit none
-
     real(8), intent(in) :: rxyz(3)
     real(8) :: T(3, 3)
 
@@ -1662,8 +1604,6 @@ end function
 
 
 function damping_fermi(r, sigma, a) result(f)
-    implicit none
-
     real(8), intent(in) :: r, sigma, a
     real(8) :: f
 
@@ -1672,8 +1612,6 @@ end function
 
 
 function damping_erf(r, sigma, a) result(f)
-    implicit none
-
     real(8), intent(in) :: r, sigma, a
     real(8) :: f
 
@@ -1682,8 +1620,6 @@ end function
 
 
 function damping_1mexp(r, sigma, a) result(f)
-    implicit none
-
     real(8), intent(in) :: r, sigma, a
     real(8) :: f
 
@@ -1692,8 +1628,6 @@ end function
 
 
 function damping_overlap(r, overlap, C6, beta, a) result(f)
-    implicit none
-
     real(8), intent(in) :: r, overlap, C6, beta, a
     real(8) :: f
 
@@ -1702,8 +1636,6 @@ end function
 
 
 function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
-    implicit none
-
     real(8), intent(in) :: rxyz(3), overlap, C6, beta, a
     real(8) :: T(3, 3)
 
@@ -1730,8 +1662,6 @@ end function
 
 
 function T_fermi_coulomb(rxyz, sigma, a) result(T)
-    implicit none
-
     real(8), intent(in) :: rxyz(3), sigma, a
     real(8) :: T(3, 3)
 
@@ -1748,8 +1678,6 @@ end function
 
 
 function T_erf_coulomb(rxyz, sigma, a) result(T)
-    implicit none
-
     real(8), intent(in) :: rxyz(3), sigma, a
     real(8) :: T(3, 3)
 
@@ -1764,8 +1692,6 @@ end function
 
 
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)
-    implicit none
-
     real(8), intent(in) :: rxyz(3), sigma, a
     real(8) :: T(3, 3)
 
@@ -1781,8 +1707,6 @@ end function
 subroutine get_damping_parameters( &
         xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
         mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta)
-    implicit none
-
     character(len=*), intent(in) :: xc
     real(8), intent(out) :: &
         ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
@@ -1828,8 +1752,6 @@ end subroutine get_damping_parameters
 
 
 function solve_lin_sys(A, b) result(x)
-    implicit none
-
     real(8), intent(in) :: A(:, :), b(size(A, 1))
     real(8) :: x(size(b))
 
@@ -1846,8 +1768,6 @@ end function
 
 
 function supercell_circum(uc, radius) result(sc)
-    implicit none
-
     real(8), intent(in) :: uc(3, 3), radius
     integer :: sc(3)
 
@@ -1860,8 +1780,6 @@ end function
 
 
 subroutine shift_cell(ijk, first_cell, last_cell)
-    implicit none
-
     integer, intent(inout) :: ijk(3)
     integer, intent(in) :: first_cell(3), last_cell(3)
 
@@ -1880,8 +1798,6 @@ end subroutine
 
 
 function eye(n) result(A)
-    implicit none
-
     integer, intent(in) :: n
     real(8) :: A(n, n)
 
@@ -1893,8 +1809,6 @@ end function
 
 
 elemental function terf(r, r0, a)
-    implicit none
-
     real(8), intent(in) :: r, r0, a
     real(8) :: terf
 
@@ -1903,8 +1817,6 @@ end function
 
 
 subroutine invert_sym_dble_(A)
-    implicit none
-
     real(8), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
@@ -1935,8 +1847,6 @@ end subroutine
 
 
 subroutine invert_ge_cmplx_(A)
-    implicit none
-
     complex(8), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
@@ -1967,8 +1877,6 @@ end subroutine
 
 
 function inverted(A) result(A_inv)
-    implicit none
-
     real(8), intent(in) :: A(:, :)
     real(8) :: A_inv(size(A, 1), size(A, 2))
 
@@ -1978,8 +1886,6 @@ end function
 
 
 subroutine diagonalize_sym_dble_(mode, A, eigs)
-    implicit none
-
     character(len=1), intent(in) :: mode
     real(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
@@ -2004,8 +1910,6 @@ end subroutine
 
 
 function diagonalized_sym_dble_(A, eigvecs) result(eigs)
-    implicit none
-
     real(8), intent(in) :: A(:, :)
     real(8), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
     real(8) :: eigs(size(A, 1))
@@ -2029,8 +1933,6 @@ end function
 
 
 subroutine diagonalize_ge_dble_(mode, A, eigs)
-    implicit none
-
     character(len=1), intent(in) :: mode
     real(8), intent(inout) :: A(:, :)
     complex(8), intent(out) :: eigs(size(A, 1))
@@ -2062,8 +1964,6 @@ end subroutine
 
 
 subroutine diagonalize_he_cmplx_(mode, A, eigs)
-    implicit none
-
     character(len=1), intent(in) :: mode
     complex(8), intent(inout) :: A(:, :)
     real(8), intent(out) :: eigs(size(A, 1))
@@ -2093,8 +1993,6 @@ end subroutine
 
 
 function cart_prod_(a, b) result(c)
-    implicit none
-
     real(8), intent(in) :: a(:), b(:)
     real(8) :: c(size(a), size(b))
 
@@ -2109,8 +2007,6 @@ end function
 
 
 function get_diag_(A) result(d)
-    implicit none
-
     real(8), intent(in) :: A(:, :)
     real(8) :: d(size(A, 1))
 
@@ -2121,8 +2017,6 @@ end function
 
 
 function make_diag_(d) result(A)
-    implicit none
-
     real(8), intent(in) :: d(:)
     real(8) :: A(size(d), size(d))
 

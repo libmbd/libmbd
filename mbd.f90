@@ -29,11 +29,12 @@ real(8), parameter :: &
     bohr = 0.529177249d0
 
 real(8) :: &
-    param_scs_dip_cutoff = 120.d0/bohr, &
     param_mbd_supercell_cutoff = 25.d0/bohr, &
-    param_mbd_dip_cutoff = 100.d0/bohr, &
     param_ts_energy_accuracy = 1.d-10, &
-    param_dipole_matrix_accuracy = 1.d-10
+    param_dipole_real_space_cutoff = 50.d0/bohr, &
+    param_ewald_alpha = 0.3
+integer :: &
+    param_dipole_max_G_vec = 6
 
 integer :: &
     param_mbd_nbody_max = 3, &
@@ -309,6 +310,305 @@ subroutine add_dipole_matrix( &
     complex(8) :: Tpp_c(3, 3)
     real(8) :: r_cell(3), r(3), r_norm
     real(8) :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
+    character(len=1) :: parallel_mode
+    integer :: &
+        i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j
+    logical :: is_periodic, is_parallel, is_reciprocal, is_fourier
+
+    is_parallel = is_in('M', mode)
+    is_reciprocal = is_in('R', mode)
+    is_fourier = is_in('F', mode)
+    is_periodic = is_reciprocal .or. is_fourier
+    if (is_parallel) then
+        parallel_mode = 'A' ! atoms
+        if (is_periodic .and. size(xyz, 1) < n_tasks) then
+            parallel_mode = 'C' ! cells
+        end if
+    else
+        parallel_mode = ''
+    end if
+
+    ! MPI code begin
+    if (is_parallel) then
+        ! will be restored by syncing at the end
+        if (is_periodic) then
+            relay_c = relay_c/n_tasks
+        else
+            relay = relay/n_tasks
+        end if
+    end if
+    ! MPI code end
+    if (is_periodic) then
+        range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_cutoff)
+    else
+        range_g_cell(:) = 0
+    end if
+    g_cell = (/ 0, 0, -1 /)
+    do i_cell = 1, product(1+2*range_g_cell)
+        call shift_cell(g_cell, -range_g_cell, range_g_cell)
+        ! MPI code begin
+        if (parallel_mode == 'C') then
+            if (my_task /= modulo(i_cell, n_tasks)) cycle
+        end if
+        ! MPI code end
+        if (is_periodic) then
+            r_cell = matmul(g_cell, unit_cell)
+        else
+            r_cell(:) = 0.d0
+        end if
+        do i_atom = 1, size(xyz, 1)
+            ! MPI code begin
+            if (parallel_mode == 'A') then
+                if (my_task /= modulo(i_atom, n_tasks)) cycle
+            end if
+            ! MPI code end
+            do j_atom = 1, i_atom
+                if (i_cell == 1) then
+                    if (i_atom == j_atom) cycle
+                end if
+                r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
+                r_norm = sqrt(sum(r**2))
+                if (r_norm > param_dipole_real_space_cutoff) cycle
+                if (present(R_vdw)) then
+                    R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
+                end if
+                if (present(alpha)) then
+                    sigma_ij = sqrt(sum(get_sigma_selfint( &
+                        alpha((/ i_atom , j_atom /)))**2))
+                end if
+                if (present(overlap)) then
+                    overlap_ij = overlap(i_atom, j_atom)
+                end if
+                if (present(C6)) then
+                    C6_ij = combine_C6( &
+                        C6(i_atom), C6(j_atom), &
+                        alpha(i_atom), alpha(j_atom))
+                end if
+                select case (version)
+                    case ("bare")
+                        Tpp = T_bare(r)
+                    case ("dip,1mexp")
+                        Tpp = T_1mexp_coulomb(r, beta*R_vdw_ij, a)
+                    case ("dip,erf")
+                        Tpp = T_erf_coulomb(r, beta*R_vdw_ij, a)
+                    case ("dip,fermi")
+                        Tpp = T_fermi_coulomb(r, beta*R_vdw_ij, a)
+                    case ("dip,overlap")
+                        Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, beta, a)
+                    case ("1mexp,dip")
+                        Tpp = damping_1mexp(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("erf,dip")
+                        Tpp = damping_erf(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
+                        Tpp = damping_fermi(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("overlap,dip")
+                        Tpp = damping_overlap( &
+                            r_norm, overlap_ij, C6_ij, beta, a)*T_bare(r)
+                    case ("custom,dip")
+                        Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
+                    case ("dip,custom")
+                        Tpp = potential_custom(i_atom, j_atom, :, :)
+                    case ("dip,gg")
+                        Tpp = T_erf_coulomb(r, sigma_ij, 1.d0)
+                    case ("1mexp,dip,gg")
+                        Tpp = (1.d0-damping_1mexp(r_norm, beta*R_vdw_ij, a)) &
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                    case ("erf,dip,gg")
+                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                    case ("fermi,dip,gg")
+                        Tpp = (1.d0-damping_fermi(r_norm, beta*R_vdw_ij, a)) &
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                    case ("custom,dip,gg")
+                        Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
+                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                end select
+                if (is_periodic) then
+                    Tpp = Tpp+T_erfc(r, param_ewald_alpha)-T_bare(r)
+                    if (is_reciprocal) then
+                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r_cell))
+                    else if (is_fourier) then
+                        Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
+                            dot_product(k_point, r) &
+                            +dot_product(G_vector, xyz(i_atom, :)) &
+                            -dot_product(Gp_vector, xyz(j_atom, :))))
+                    end if
+                end if
+                i = 3*(i_atom-1)
+                j = 3*(j_atom-1)
+                if (is_periodic) then
+                    relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3) &
+                        +Tpp_c
+                    if (i_atom /= j_atom) then
+                        relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
+                            +transpose(Tpp_c)
+                    end if
+                else
+                    relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3) &
+                        +Tpp
+                    if (i_atom /= j_atom) then
+                        relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3) &
+                            +transpose(Tpp)
+                    end if
+                end if
+            end do ! j_atom
+        end do ! i_atom
+    end do ! i_cell
+    ! MPI code begin
+    if (is_parallel) then
+        if (is_periodic) then
+            call sync_sum(relay_c)
+        else
+            call sync_sum(relay)
+        end if
+    end if
+    ! MPI code end
+    if (is_periodic) then
+        call add_ewald_dipole_parts( &
+            mode, xyz, unit_cell, param_ewald_alpha, relay_c, &
+            q_point=k_point, G_vector=G_vector, Gp_vector=Gp_vector)
+    end if
+end subroutine add_dipole_matrix
+
+
+subroutine add_ewald_dipole_parts( &
+        mode, xyz, unit_cell, alpha, relay, q_point, G_vector, Gp_vector)
+    character(len=*), intent(in) :: mode
+    real(8), intent(in) :: xyz(:, :), unit_cell(3, 3), alpha
+    complex(8), intent(inout) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8), intent(in), optional :: q_point(3), G_vector(3), Gp_vector(3)
+
+    logical :: is_parallel, is_reciprocal, is_fourier
+    real(8) :: &
+        rec_unit_cell(3, 3), k_point(3), volume, G_vec(3), k_sq, &
+        r(3)
+    complex(8) :: Tpp(3, 3)
+    integer :: &
+        i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vec(3), i_G_vec, &
+        range_G_vec(3)
+    character(len=1) :: parallel_mode
+
+    is_parallel = is_in('M', mode)
+    is_reciprocal = is_in('R', mode)
+    is_fourier = is_in('F', mode)
+    if (is_parallel) then
+        parallel_mode = 'A' ! atoms
+        if (size(xyz, 1) < n_tasks) then
+            parallel_mode = 'G' ! G vectors
+        end if
+    else
+        parallel_mode = ''
+    end if
+
+    ! MPI code begin
+    if (is_parallel) then
+        relay = relay/n_tasks  ! will be restored by syncing at the end
+    end if
+    ! MPI code end
+    rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
+    volume = product(diagonalized(unit_cell))
+    idx_G_vec = (/ 0, 0, -1 /)
+    range_G_vec(:) = param_dipole_max_G_vec
+    do i_G_vec = 1, (1+2*param_dipole_max_G_vec)**3
+        call shift_cell(idx_G_vec, -range_G_vec, range_G_vec)
+        if (i_G_vec == 1) cycle
+        ! MPI code begin
+        if (parallel_mode == 'G') then
+            if (my_task /= modulo(i_G_vec, n_tasks)) cycle
+        end if
+        ! MPI code end
+        G_vec = matmul(idx_G_vec, rec_unit_cell)
+        if (is_fourier) then
+            k_point = G_vec+q_point+G_vector-Gp_vector
+        end if
+        k_sq = sum(k_point**2)
+        do i_atom = 1, size(xyz, 1)
+            ! MPI code begin
+            if (parallel_mode == 'A') then
+                if (my_task /= modulo(i_atom, n_tasks)) cycle
+            end if
+            ! MPI code end
+            do j_atom = 1, i_atom
+                r = xyz(i_atom, :)-xyz(j_atom, :)
+                Tpp(:, :) = exp(-k_sq/(4*alpha**2)) &
+                    *exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r))
+                forall (i_xyz = 1:3, j_xyz = 1:3) &
+                    Tpp(i_xyz, j_xyz) = Tpp(i_xyz, j_xyz)*k_point(i_xyz)*k_point(j_xyz)/k_sq
+                Tpp = 4*pi/volume*Tpp
+                i = 3*(i_atom-1)
+                j = 3*(j_atom-1)
+                relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3)+Tpp
+                if (i_atom /= j_atom) then
+                    relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3)+transpose(Tpp)
+                end if
+            end do ! j_atom
+        end do ! i_atom
+    end do ! i_G_vec
+    ! MPI code begin
+    if (is_parallel) then
+        call sync_sum(relay)
+    end if
+    ! MPI code end
+    do i_atom = 1, size(xyz, 1)
+        do i_xyz = 1, 3
+            i = 3*(i_atom-1)+i_xyz
+            relay(i, i) = relay(i, i)-4*alpha**3/(3*sqrt(pi)) ! self energy
+        end do
+        do j_atom = 1, i_atom
+            do i_xyz = 1, 3
+                i = 3*(i_atom-1)+i_xyz
+                j = 3*(j_atom-1)+i_xyz
+                relay(i, j) = relay(i, j)+4*pi/(3*volume) ! surface energy
+                relay(j, i) = relay(i, j)
+            end do
+        end do
+    end do
+end subroutine
+
+
+subroutine add_dipole_matrix_old( &
+        mode, &
+        version, &
+        xyz, &
+        alpha, &
+        R_vdw, &
+        beta, &
+        a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        unit_cell, &
+        k_point, &
+        G_vector, &
+        Gp_vector, &
+        relay, &
+        relay_c)
+    character(len=*), intent(in) :: &
+        mode, version
+    real(8), intent(in) :: &
+        xyz(:, :)
+    real(8), intent(in), optional :: &
+        alpha(size(xyz, 1)), &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
+        unit_cell(3, 3), &
+        k_point(3), &
+        G_vector(3), &
+        Gp_vector(3)
+    real(8), intent(inout), optional :: &
+        relay(3*size(xyz, 1), 3*size(xyz, 1))
+    complex(8), intent(inout), optional :: &
+        relay_c(3*size(xyz, 1), 3*size(xyz, 1))
+
+    real(8) :: Tpp(3, 3)
+    complex(8) :: Tpp_c(3, 3)
+    real(8) :: r_cell(3), r(3), r_norm
+    real(8) :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
     real(8) :: max_change
     character(len=1) :: parallel_mode
     real(8), parameter :: shell_thickness = 50.d0
@@ -487,7 +787,7 @@ subroutine add_dipole_matrix( &
     ! MPI code end
     call ts(-41)
     call ts(-40)
-end subroutine add_dipole_matrix
+end subroutine add_dipole_matrix_old
 
 
 function do_scs( &
@@ -1600,6 +1900,40 @@ function T_bare(rxyz) result(T)
         end do
     end do
     T = -T
+end function
+
+
+real(8) function B_erfc(r, a) result(B)
+    real(8), intent(in) :: r, a
+
+    B = (erfc(a*r)+(2*a*r/sqrt(pi))*exp(-(a*r)**2))/r**3
+end function
+
+
+real(8) elemental function C_erfc(r, a) result(C)
+    real(8), intent(in) :: r, a
+
+    C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3.d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
+end function
+
+
+function T_erfc(rxyz, alpha) result(T)
+    real(8), intent(in) :: rxyz(3), alpha
+    real(8) :: T(3, 3)
+
+    integer :: i, j
+    real(8) :: r, B, C
+
+    r = sqrt(sum(rxyz(:)**2))
+    B = B_erfc(r, alpha)
+    C = C_erfc(r, alpha)
+    do i = 1, 3
+        do j = i, 3
+            T(i, j) = -C*rxyz(i)*rxyz(j)
+            if (i /= j) T(j, i) = T(i, j)
+        end do
+        T(i, i) = T(i, i)+B
+    end do
 end function
 
 

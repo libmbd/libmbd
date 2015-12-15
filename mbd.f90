@@ -543,6 +543,7 @@ subroutine add_ewald_dipole_parts( &
             k_total = G_vec
         end if
         k_sq = sum(k_total**2)
+        if (sqrt(k_sq) > param_dipole_rec_space_cutoff) cycle
         do i_atom = 1, size(xyz, 1)
             ! MPI code begin
             if (parallel_mode == 'A') then

@@ -31,9 +31,9 @@ real(8) :: &
     param_mbd_supercell_cutoff = 25.d0/bohr, &
     param_ts_energy_accuracy = 1.d-10, &
     param_dipole_real_space_cutoff = 50.d0/bohr, &
+    param_dipole_real_space_lowdim_cutoff = 100.d0/bohr, &
+    param_dipole_rec_space_cutoff = 10.d0*bohr, &
     param_ewald_alpha = 0.3
-integer :: &
-    param_dipole_max_G_vec = 6
 
 integer :: &
     param_mbd_nbody_max = 3, &
@@ -287,8 +287,6 @@ subroutine add_dipole_matrix( &
         potential_custom, &
         unit_cell, &
         k_point, &
-        G_vector, &
-        Gp_vector, &
         relay, &
         relay_c)
     character(len=*), intent(in) :: &
@@ -304,9 +302,7 @@ subroutine add_dipole_matrix( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3), &
-        k_point(3), &
-        G_vector(3), &
-        Gp_vector(3)
+        k_point(3)
     real(8), intent(inout), optional :: &
         relay(3*size(xyz, 1), 3*size(xyz, 1))
     complex(8), intent(inout), optional :: &
@@ -344,8 +340,12 @@ subroutine add_dipole_matrix( &
         end if
     end if
     ! MPI code end
-        range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_cutoff)
     if (is_crystal) then
+        if (is_lowdim) then
+            range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_lowdim_cutoff)
+        else
+            range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_cutoff)
+        end if
     else
         range_g_cell(:) = 0
     end if
@@ -431,14 +431,10 @@ subroutine add_dipole_matrix( &
                 end select
                 if (is_crystal .and. .not. is_lowdim) then
                     Tpp = Tpp+T_erfc(r, param_ewald_alpha)-T_bare(r)
-                    if (is_reciprocal) then
-                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r_cell))
-                    else if (is_fourier) then
-                        Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
-                            dot_product(k_point, r) &
-                            +dot_product(G_vector, xyz(i_atom, :)) &
-                            -dot_product(Gp_vector, xyz(j_atom, :))))
-                    end if
+                end if
+                if (is_reciprocal) then
+                    Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
+                        dot_product(k_point, r)))
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
@@ -471,24 +467,25 @@ subroutine add_dipole_matrix( &
     ! MPI code end
     if (is_crystal .and. .not. is_lowdim) then
         call add_ewald_dipole_parts( &
-            mode, xyz, unit_cell, param_ewald_alpha, relay_c, &
-            q_point=k_point, G_vector=G_vector, Gp_vector=Gp_vector)
+            mode, xyz, unit_cell, param_ewald_alpha, k_point, &
+            relay, relay_c)
     end if
 end subroutine add_dipole_matrix
 
 
 subroutine add_ewald_dipole_parts( &
-        mode, xyz, unit_cell, alpha, relay, q_point, G_vector, Gp_vector)
+        mode, xyz, unit_cell, alpha, k_point, relay, relay_c)
     character(len=*), intent(in) :: mode
     real(8), intent(in) :: xyz(:, :), unit_cell(3, 3), alpha
-    complex(8), intent(inout) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
-    real(8), intent(in), optional :: q_point(3), G_vector(3), Gp_vector(3)
+    real(8), intent(inout), optional :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+    complex(8), intent(inout), optional :: relay_c(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8), intent(in), optional :: k_point(3)
 
-    logical :: is_parallel, is_reciprocal, is_fourier
+    logical :: is_parallel, is_reciprocal
     real(8) :: &
-        rec_unit_cell(3, 3), k_point(3), volume, G_vec(3), k_sq, &
-        r(3)
-    complex(8) :: Tpp(3, 3)
+        rec_unit_cell(3, 3), volume, G_vec(3), r(3), k_total(3), k_sq
+    real(8) :: Tpp(3, 3)
+    complex(8) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vec(3), i_G_vec, &
         range_G_vec(3)
@@ -496,7 +493,6 @@ subroutine add_ewald_dipole_parts( &
 
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
-    is_fourier = is_in('F', mode)
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
         if (size(xyz, 1) < n_tasks) then
@@ -508,14 +504,19 @@ subroutine add_ewald_dipole_parts( &
 
     ! MPI code begin
     if (is_parallel) then
-        relay = relay/n_tasks  ! will be restored by syncing at the end
+        ! will be restored by syncing at the end
+        if (is_reciprocal) then
+            relay_c = relay_c/n_tasks
+        else
+            relay = relay/n_tasks
+        end if
     end if
     ! MPI code end
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
     volume = product(dble(diagonalized(unit_cell)))
+    range_G_vec = supercell_circum(rec_unit_cell, param_dipole_rec_space_cutoff)
     idx_G_vec = (/ 0, 0, -1 /)
-    range_G_vec(:) = param_dipole_max_G_vec
-    do i_G_vec = 1, (1+2*param_dipole_max_G_vec)**3
+    do i_G_vec = 1, product(1+2*range_G_vec)
         call shift_cell(idx_G_vec, -range_G_vec, range_G_vec)
         if (i_G_vec == 1) cycle
         ! MPI code begin
@@ -524,10 +525,12 @@ subroutine add_ewald_dipole_parts( &
         end if
         ! MPI code end
         G_vec = matmul(idx_G_vec, rec_unit_cell)
-        if (is_fourier) then
-            k_point = G_vec+q_point+G_vector-Gp_vector
+        if (is_reciprocal) then
+            k_total = k_point+G_vec
+        else
+            k_total = G_vec
         end if
-        k_sq = sum(k_point**2)
+        k_sq = sum(k_total**2)
         do i_atom = 1, size(xyz, 1)
             ! MPI code begin
             if (parallel_mode == 'A') then
@@ -536,39 +539,95 @@ subroutine add_ewald_dipole_parts( &
             ! MPI code end
             do j_atom = 1, i_atom
                 r = xyz(i_atom, :)-xyz(j_atom, :)
-                Tpp(:, :) = exp(-k_sq/(4*alpha**2)) &
-                    *exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r))
+                Tpp(:, :) = 4*pi/volume*exp(-k_sq/(4*alpha**2))
                 forall (i_xyz = 1:3, j_xyz = 1:3) &
-                    Tpp(i_xyz, j_xyz) = Tpp(i_xyz, j_xyz)*k_point(i_xyz)*k_point(j_xyz)/k_sq
-                Tpp = 4*pi/volume*Tpp
+                    Tpp(i_xyz, j_xyz) = Tpp(i_xyz, j_xyz)*k_total(i_xyz)*k_total(j_xyz)/k_sq
+                if (is_reciprocal) then
+                    Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(G_vec, r))
+                else
+                    Tpp = Tpp*cos(dot_product(G_vec, r))
+                end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
-                relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3)+Tpp
-                if (i_atom /= j_atom) then
-                    relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3)+transpose(Tpp)
+                if (is_reciprocal) then
+                    relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3)+Tpp_c
+                    if (i_atom /= j_atom) then
+                        relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3)+transpose(Tpp_c)
+                    end if
+                else
+                    relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3)+Tpp
+                    if (i_atom /= j_atom) then
+                        relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3)+transpose(Tpp)
+                    end if
                 end if
             end do ! j_atom
         end do ! i_atom
     end do ! i_G_vec
     ! MPI code begin
     if (is_parallel) then
-        call sync_sum(relay)
+        if (is_reciprocal) then
+            call sync_sum(relay_c)
+        else
+            call sync_sum(relay)
+        end if
     end if
     ! MPI code end
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
-            relay(i, i) = relay(i, i)-4*alpha**3/(3*sqrt(pi)) ! self energy
-        end do
-        do j_atom = 1, i_atom
-            do i_xyz = 1, 3
-                i = 3*(i_atom-1)+i_xyz
-                j = 3*(j_atom-1)+i_xyz
-                relay(i, j) = relay(i, j)+4*pi/(3*volume) ! surface energy
-                relay(j, i) = relay(i, j)
-            end do
+            if (is_reciprocal) then
+                relay_c(i, i) = relay_c(i, i)-4*alpha**3/(3*sqrt(pi)) ! self energy
+            else
+                relay(i, i) = relay(i, i)-4*alpha**3/(3*sqrt(pi)) ! self energy
+            end if
         end do
     end do
+    if (present(k_point)) then
+        k_sq = sum(k_point**2)
+        if (sqrt(k_sq) > 1.d-15) then
+            do i_atom = 1, size(xyz, 1)
+                do j_atom = 1, i_atom
+                    do i_xyz = 1, 3
+                        do j_xyz = 1, 3
+                            i = 3*(i_atom-1)+i_xyz
+                            j = 3*(j_atom-1)+j_xyz
+                            if (is_reciprocal) then
+                                relay_c(i, j) = relay_c(i, j) &
+                                    +4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
+                                    *exp(-k_sq/(4*alpha**2))
+                                if (i_atom /= j_atom) then
+                                    relay_c(j, i) = relay_c(i, j)
+                                end if
+                            else
+                                relay(i, j) = relay(i, j) &
+                                    +4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
+                                    *exp(-k_sq/(4*alpha**2))
+                                if (i_atom /= j_atom) then
+                                    relay(j, i) = relay(i, j)
+                                end if
+                            end if
+                        end do
+                    end do
+                end do
+            end do
+        else
+            do i_atom = 1, size(xyz, 1)
+                do j_atom = 1, i_atom
+                    do i_xyz = 1, 3
+                        i = 3*(i_atom-1)+i_xyz
+                        j = 3*(j_atom-1)+i_xyz
+                        if (is_reciprocal) then
+                            relay_c(i, j) = relay_c(i, j)+4*pi/(3*volume) ! surface energy
+                            relay_c(j, i) = relay_c(i, j)
+                        else
+                            relay(i, j) = relay(i, j)+4*pi/(3*volume) ! surface energy
+                            relay(j, i) = relay(i, j)
+                        end if
+                    end do
+                end do
+            end do
+        end if
+    end if
 end subroutine
 
 
@@ -586,8 +645,6 @@ subroutine add_dipole_matrix_old( &
         potential_custom, &
         unit_cell, &
         k_point, &
-        G_vector, &
-        Gp_vector, &
         relay, &
         relay_c)
     character(len=*), intent(in) :: &
@@ -603,9 +660,7 @@ subroutine add_dipole_matrix_old( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3), &
-        k_point(3), &
-        G_vector(3), &
-        Gp_vector(3)
+        k_point(3)
     real(8), intent(inout), optional :: &
         relay(3*size(xyz, 1), 3*size(xyz, 1))
     complex(8), intent(inout), optional :: &
@@ -737,19 +792,14 @@ subroutine add_dipole_matrix_old( &
                     max_change = max(max_change, maxval(abs(Tpp)))
                     call ts(48)
                     if (is_reciprocal) then
-                        Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r_cell))
-                    end if
-                    if (is_fourier) then
                         Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
-                            dot_product(k_point, r) &
-                            +dot_product(G_vector, xyz(i_atom, :)) &
-                            -dot_product(Gp_vector, xyz(j_atom, :))))
+                            dot_product(k_point, r)))
                     end if
                     call ts(-48)
                     call ts(49)
                     i = 3*(i_atom-1)
                     j = 3*(j_atom-1)
-                    if (is_reciprocal .or. is_fourier) then
+                    if (is_reciprocal) then
                         relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3) &
                             +Tpp_c
                         if (i_atom /= j_atom) then
@@ -783,7 +833,7 @@ subroutine add_dipole_matrix_old( &
     call ts(41)
     ! MPI code begin
     if (is_parallel) then
-        if (is_reciprocal .or. is_fourier) then
+        if (is_reciprocal) then
             call sync_sum(relay_c)
         else
             call sync_sum(relay)
@@ -879,7 +929,7 @@ function do_scs_k_point( &
 
     alpha_full(:, :) = cmplx(0.d0, 0.d0, 8)
     call add_dipole_matrix( &
-        mode//'F', &
+        mode//'R', &
         version, &
         xyz=xyz, &
         alpha=alpha, &
@@ -888,8 +938,6 @@ function do_scs_k_point( &
         a=a, &
         unit_cell=unit_cell, &
         k_point=k_point, &
-        G_vector=(/ 0.d0, 0.d0, 0.d0 /), &
-        Gp_vector=(/ 0.d0, 0.d0, 0.d0 /), &
         relay_c=alpha_full)
     if (scale_lambda) then
         alpha_full = lam*alpha_full

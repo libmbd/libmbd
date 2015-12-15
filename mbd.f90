@@ -9,6 +9,7 @@ module mbd
 ! V: get eigenvectors
 ! O: get RPA orders
 ! L: scale dipole with lambda
+! M: mute
 
 
 use mbd_interface, only: &
@@ -87,6 +88,11 @@ end interface
 
 interface sdiagonalized
     module procedure diagonalized_sym_dble_
+end interface
+
+interface tostr
+    module procedure tostr_int_
+    module procedure tostr_dble_
 end interface
 
 ! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI
@@ -315,12 +321,13 @@ subroutine add_dipole_matrix( &
     character(len=1) :: parallel_mode
     integer :: &
         i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j
-    logical :: is_crystal, is_parallel, is_reciprocal, is_lowdim
+    logical :: is_crystal, is_parallel, is_reciprocal, is_lowdim, mute
 
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     is_crystal = is_in('C', mode) .or. is_reciprocal
     is_lowdim = any(param_vacuum_axis)
+    mute = is_in('M', mode)
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
         if (is_crystal .and. size(xyz, 1) < n_tasks) then
@@ -348,6 +355,12 @@ subroutine add_dipole_matrix( &
         end if
     else
         range_g_cell(:) = 0
+    end if
+    if (is_crystal) then
+        call print_log('Ewald: cell vector range of ' &
+            //trim(tostr(1+2*range_g_cell(1)))//'x' &
+            //trim(tostr(1+2*range_g_cell(2)))//'x' &
+            //trim(tostr(1+2*range_g_cell(3))), mute)
     end if
     g_cell = (/ 0, 0, -1 /)
     do i_cell = 1, product(1+2*range_g_cell)
@@ -481,7 +494,7 @@ subroutine add_ewald_dipole_parts( &
     complex(8), intent(inout), optional :: relay_c(3*size(xyz, 1), 3*size(xyz, 1))
     real(8), intent(in), optional :: k_point(3)
 
-    logical :: is_parallel, is_reciprocal
+    logical :: is_parallel, is_reciprocal, mute
     real(8) :: &
         rec_unit_cell(3, 3), volume, G_vec(3), r(3), k_total(3), k_sq
     real(8) :: Tpp(3, 3)
@@ -493,6 +506,7 @@ subroutine add_ewald_dipole_parts( &
 
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
+    mute = is_in('M', mode)
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
         if (size(xyz, 1) < n_tasks) then
@@ -515,6 +529,10 @@ subroutine add_ewald_dipole_parts( &
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
     volume = product(dble(diagonalized(unit_cell)))
     range_G_vec = supercell_circum(rec_unit_cell, param_dipole_rec_space_cutoff)
+    call print_log('Ewald: G vector range of ' &
+        //trim(tostr(1+2*range_G_vec(1)))//'x' &
+        //trim(tostr(1+2*range_G_vec(2)))//'x' &
+        //trim(tostr(1+2*range_G_vec(3))), mute)
     idx_G_vec = (/ 0, 0, -1 /)
     do i_G_vec = 1, product(1+2*range_G_vec)
         call shift_cell(idx_G_vec, -range_G_vec, range_G_vec)
@@ -1083,12 +1101,18 @@ function get_reciprocal_mbd_energy( &
     logical :: is_parallel, do_rpa, get_orders, get_eigenvalues, get_eigenvectors
     integer :: i_kpt
     real(8) :: k_point(3)
+    character(len=1) :: mute
 
     is_parallel = is_in('P', mode)
     do_rpa = is_in('Q', mode)
     get_eigenvalues= is_in('E', mode)
     get_eigenvectors= is_in('V', mode)
     get_orders = is_in('O', mode)
+    if (is_in('M', mode)) then
+        mute = 'M'
+    else
+        mute = ''
+    end if
 
     call ts(1)
     ene = 0.d0
@@ -1103,7 +1127,7 @@ function get_reciprocal_mbd_energy( &
         else
             if (get_eigenvalues .and. get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_energy( &
-                    blanked('P', mode), &
+                    blanked('P', mode)//mute, &
                     version, &
                     xyz, &
                     alpha_0, &
@@ -1121,7 +1145,7 @@ function get_reciprocal_mbd_energy( &
                     modes=modes(i_kpt, :, :))
             else
                 ene = ene+get_single_reciprocal_mbd_energy( &
-                    blanked('P', mode), &
+                    blanked('P', mode)//mute, &
                     version, &
                     xyz, &
                     alpha_0, &
@@ -1137,6 +1161,7 @@ function get_reciprocal_mbd_energy( &
                     potential_custom=potential_custom)
             end if
         end if
+        mute = 'M'
     end do ! k_point loop
     call ts(2)
     ! MPI code begin
@@ -1379,9 +1404,15 @@ function get_qho_rpa_energy( &
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
+    character(len=1) :: mute
 
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
+    if (is_in('M', mode)) then
+        mute = 'M'
+    else
+        mute = ''
+    end if
 
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
@@ -1391,7 +1422,7 @@ function get_qho_rpa_energy( &
         ! MPI code end
         relay(:, :) = 0.d0
         call add_dipole_matrix( & ! relay = T
-            blanked('P', mode), &
+            blanked('P', mode)//mute, &
             version, &
             xyz, &
             alpha=alpha(i_grid_omega+1, :), &
@@ -1431,6 +1462,7 @@ function get_qho_rpa_energy( &
                     *omega_grid_w(i_grid_omega)
             end do
         end if
+        mute = 'M'
     end do
     if (is_parallel) then
         call sync_sum(ene)
@@ -2117,6 +2149,36 @@ function make_diag_(d) result(A)
     A(:, :) = 0.d0
     forall (i = 1:size(d)) A(i, i) = d(i)
 end function
+
+
+character(len=50) elemental function tostr_int_(k, format)
+    implicit none
+
+    integer, intent(in) :: k
+    character(*), intent(in), optional :: format
+
+    if (present(format)) then
+        write (tostr_int_, format) k
+    else
+        write (tostr_int_, "(i20)") k
+    end if
+    tostr_int_ = adjustl(tostr_int_)
+end function tostr_int_
+
+
+character(len=50) elemental function tostr_dble_(x, format)
+    implicit none
+
+    double precision, intent(in) :: x
+    character(*), intent(in), optional :: format
+
+    if (present(format)) then
+        write (tostr_dble_, format) x
+    else
+        write (tostr_dble_, "(g50.17e3)") x
+    end if
+    tostr_dble_ = adjustl(tostr_dble_)
+end function tostr_dble_
 
 
 end module mbd

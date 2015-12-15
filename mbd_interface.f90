@@ -9,8 +9,6 @@ private
 public :: &
     sync_sum, broadcast, print_log, print_error, print_warning
 
-character(len=1000) :: buff
-
 interface sync_sum
     module procedure sync_sum_dble_
     module procedure sync_sum_vector_dble_
@@ -201,18 +199,20 @@ subroutine broadcast_4d_dble_(x)
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
-subroutine print_log(str)
+subroutine print_log(str, mute)
     implicit none
 
     character(len=*), intent(in) :: str
     integer :: myid, error
+    logical, optional :: mute
 
-    if (str == buff) return
+    if (present(mute)) then
+        if (mute) return
+    end if
     call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
     if (myid == 0) then
         write (6, *) str
     end if
-    buff = str
 end subroutine
 
 subroutine print_warning(str)

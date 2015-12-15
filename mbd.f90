@@ -54,8 +54,6 @@ logical :: measure_time = .false.
 integer(8) :: timestamps(100), ts_counts(100)
 integer(8) :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 
-character(len=1000) :: info_str
-
 integer :: my_task, n_tasks
 
 
@@ -265,13 +263,9 @@ function get_ts_energy( &
         ene = ene+ene_shell
         if (.not. is_crystal) exit
         if (i_shell > 1 .and. abs(ene_shell) < param_ts_energy_accuracy) then
-            write (info_str, "(a,i10,a,f10.0,a)") &
-                "Periodic TS converged in ", &
-                i_shell, &
-                " shells, ", &
-                i_shell*shell_thickness*bohr, &
-                " angstroms"
-            call print_log(info_str)
+            call print_log("Periodic TS converged in " &
+                //trim(tostr(i_shell))//" shells, " &
+                //trim(tostr(i_shell*shell_thickness*bohr))//" angstroms")
             exit
         endif
     end do ! i_shell
@@ -933,9 +927,8 @@ function get_single_mbd_energy( &
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        write (info_str, "(a,i10,a)") &
-            "CDM Hamiltonian has ", n_negative_eigs, " negative eigenvalues"
-        call print_warning(info_str)
+        call print_warning("CDM Hamiltonian has " &
+            //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         ene = nan
     else
         call ts(14)
@@ -1046,9 +1039,8 @@ function get_single_reciprocal_mbd_energy( &
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        write (info_str, "(a,i10,a)") &
-            "CDM Hamiltonian has ", n_negative_eigs, " negative eigenvalues"
-        call print_warning(info_str)
+        call print_warning("CDM Hamiltonian has " &
+            //trim(tostr(n_negative_eigs))//" negative eigenvalues")
     endif
     call ts(14)
     where (eigs < 0) eigs = 0.d0
@@ -1224,11 +1216,10 @@ function get_supercell_mbd_energy( &
 
     call ts(1)
     range_g_cell = supercell_circum(unit_cell, param_mbd_supercell_cutoff)
-    write (info_str, "(a,i4,'x',i4,'x',i4,a)") &
-        "Supercell MBD will be done in a ", &
-        1+2*range_g_cell(1), 1+2*range_g_cell(2), 1+2*range_g_cell(3), &
-        " supercell"
-    call print_log(info_str)
+    call print_log("Supercell MBD will be done in a " &
+        //trim(tostr(1+2*range_g_cell(1)))//'x' &
+        //trim(tostr(1+2*range_g_cell(2)))//'x' &
+        //trim(tostr(1+2*range_g_cell(3)))//' supercell')
     n_cells = product(1+2*range_g_cell)
     call ts(2)
     do i = 1, 3
@@ -1449,9 +1440,8 @@ function get_qho_rpa_energy( &
         call diagonalize('N', relay, eigs)
         n_negative_eigs = count(dble(eigs) < 0)
         if (n_negative_eigs > 0) then
-            write (info_str, "(a,i10,a)") &
-                "1+AT matrix has ", n_negative_eigs, " negative eigenvalues"
-            call print_warning(info_str)
+            call print_warning("1+AT matrix has " &
+                //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
@@ -1930,9 +1920,9 @@ subroutine invert_ge_dble_(A)
     n = size(A, 1)
     call DGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix inversion failed in module mbd with error code ", error_flag
-        call print_error(info_str)
+        call print_error( &
+            "Matrix inversion failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
     endif
     call DGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(n_work_arr_optim)
@@ -1940,9 +1930,9 @@ subroutine invert_ge_dble_(A)
     call DGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix inversion failed in module mbd with error code ", error_flag
-        call print_error(info_str)
+        call print_error( &
+            "Matrix inversion failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
     endif
 end subroutine
 
@@ -1960,9 +1950,9 @@ subroutine invert_ge_cmplx_(A)
     n = size(A, 1)
     call ZGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix inversion failed in module mbd with error code ", error_flag
-        call print_error(info_str)
+        call print_error( &
+            "Matrix inversion failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
     endif
     call ZGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(dble(n_work_arr_optim))
@@ -1970,9 +1960,9 @@ subroutine invert_ge_cmplx_(A)
     call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix inversion failed in module mbd with error code ", error_flag
-        call print_error(info_str)
+        call print_error( &
+            "Matrix inversion failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
     endif
 end subroutine
 
@@ -2002,10 +1992,9 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     call DSYEV(mode, "U", n, A, n, eigs, work_arr, size(work_arr), error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix diagonalization failed in module mbd with error code", &
-            error_flag
-        call print_error(info_str)
+        call print_log( &
+            "Matrix diagonalization failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
     endif
 end subroutine
 
@@ -2054,10 +2043,9 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
         vectors, n, work_arr, size(work_arr), error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix diagonalization failed in module mbd with error code", &
-            error_flag
-        call print_error(info_str)
+        call print_log( &
+            "Matrix diagonalization failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
     endif
     eigs = cmplx(eigs_r, eigs_i, 8)
     A = vectors
@@ -2108,10 +2096,9 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     deallocate (rwork)
     deallocate (work)
     if (error_flag /= 0) then
-        write (info_str, "(a,i5)") &
-            "Matrix diagonalization failed in module mbd with error code", &
-            error_flag
-        call print_error(info_str)
+        call print_error( &
+            "Matrix diagonalization failed in module mbd with error code" &
+            //trim(tostr(error_flag)))
     endif
 end subroutine
 

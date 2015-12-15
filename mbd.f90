@@ -1,10 +1,9 @@
 module mbd
 
 ! modes:
-! M: multiprocessing (MPI)
-! P: periodic
+! P: parallel (MPI)
+! C: crystal
 ! R: reciprocal
-! F: fourier
 ! Q: do RPA
 ! E: get eigenvalues
 ! V: get eigenvectors
@@ -153,10 +152,10 @@ function get_ts_energy( &
     integer :: i_shell, i_cell
     integer :: i_atom, j_atom, range_g_cell(3), g_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
-    logical :: is_periodic, is_parallel
+    logical :: is_crystal, is_parallel
 
-    is_periodic = is_in('P', mode)
-    is_parallel = is_in('M', mode)
+    is_crystal = is_in('C', mode)
+    is_parallel = is_in('P', mode)
 
     ene = 0.d0
     i_shell = 0
@@ -165,7 +164,7 @@ function get_ts_energy( &
         i_shell = i_shell+1
         ene_shell = 0.d0
         call ts(10)
-        if (is_periodic) then
+        if (is_crystal) then
             range_g_cell = supercell_circum(unit_cell, i_shell*shell_thickness)
         else
             range_g_cell = (/ 0, 0, 0 /)
@@ -177,12 +176,12 @@ function get_ts_energy( &
             call shift_cell(g_cell, -range_g_cell, range_g_cell)
             call ts(-11)
             ! MPI code begin
-            if (is_parallel .and. is_periodic) then
+            if (is_parallel .and. is_crystal) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
             end if
             ! MPI code end
             call ts(12)
-            if (is_periodic) then
+            if (is_crystal) then
                 r_cell = matmul(g_cell, unit_cell)
             else
                 r_cell = (/ 0.d0, 0.d0, 0.d0 /)
@@ -190,7 +189,7 @@ function get_ts_energy( &
             call ts(-12)
             do i_atom = 1, size(xyz, 1)
                 ! MPI code begin
-                if (is_parallel .and. .not. is_periodic) then
+                if (is_parallel .and. .not. is_crystal) then
                     if (my_task /= modulo(i_atom, n_tasks)) cycle
                 end if
                 ! MPI code end
@@ -258,7 +257,7 @@ function get_ts_energy( &
         ! MPI code end
         call ts(-20)
         ene = ene+ene_shell
-        if (.not. is_periodic) exit
+        if (.not. is_crystal) exit
         if (i_shell > 1 .and. abs(ene_shell) < param_ts_energy_accuracy) then
             write (info_str, "(a,i10,a,f10.0,a)") &
                 "Periodic TS converged in ", &
@@ -320,15 +319,15 @@ subroutine add_dipole_matrix( &
     character(len=1) :: parallel_mode
     integer :: &
         i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j
-    logical :: is_periodic, is_parallel, is_reciprocal, is_fourier
+    logical :: is_crystal, is_parallel, is_reciprocal, is_lowdim
 
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
-    is_fourier = is_in('F', mode)
-    is_periodic = is_reciprocal .or. is_fourier
+    is_crystal = is_in('C', mode) .or. is_reciprocal
+    is_lowdim = any(param_vacuum_axis)
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
-        if (is_periodic .and. size(xyz, 1) < n_tasks) then
+        if (is_crystal .and. size(xyz, 1) < n_tasks) then
             parallel_mode = 'C' ! cells
         end if
     else
@@ -338,15 +337,15 @@ subroutine add_dipole_matrix( &
     ! MPI code begin
     if (is_parallel) then
         ! will be restored by syncing at the end
-        if (is_periodic) then
+        if (is_reciprocal) then
             relay_c = relay_c/n_tasks
         else
             relay = relay/n_tasks
         end if
     end if
     ! MPI code end
-    if (is_periodic) then
         range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_cutoff)
+    if (is_crystal) then
     else
         range_g_cell(:) = 0
     end if
@@ -358,7 +357,7 @@ subroutine add_dipole_matrix( &
             if (my_task /= modulo(i_cell, n_tasks)) cycle
         end if
         ! MPI code end
-        if (is_periodic) then
+        if (is_crystal) then
             r_cell = matmul(g_cell, unit_cell)
         else
             r_cell(:) = 0.d0
@@ -430,7 +429,7 @@ subroutine add_dipole_matrix( &
                         Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                 end select
-                if (is_periodic) then
+                if (is_crystal .and. .not. is_lowdim) then
                     Tpp = Tpp+T_erfc(r, param_ewald_alpha)-T_bare(r)
                     if (is_reciprocal) then
                         Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(k_point, r_cell))
@@ -443,7 +442,7 @@ subroutine add_dipole_matrix( &
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
-                if (is_periodic) then
+                if (is_reciprocal) then
                     relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3) &
                         +Tpp_c
                     if (i_atom /= j_atom) then
@@ -463,14 +462,14 @@ subroutine add_dipole_matrix( &
     end do ! i_cell
     ! MPI code begin
     if (is_parallel) then
-        if (is_periodic) then
+        if (is_reciprocal) then
             call sync_sum(relay_c)
         else
             call sync_sum(relay)
         end if
     end if
     ! MPI code end
-    if (is_periodic) then
+    if (is_crystal .and. .not. is_lowdim) then
         call add_ewald_dipole_parts( &
             mode, xyz, unit_cell, param_ewald_alpha, relay_c, &
             q_point=k_point, G_vector=G_vector, Gp_vector=Gp_vector)
@@ -495,7 +494,7 @@ subroutine add_ewald_dipole_parts( &
         range_G_vec(3)
     character(len=1) :: parallel_mode
 
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     is_fourier = is_in('F', mode)
     if (is_parallel) then
@@ -622,15 +621,14 @@ subroutine add_dipole_matrix_old( &
     integer :: &
         i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j, &
         i_shell
-    logical :: is_periodic, is_parallel, is_reciprocal, is_fourier
+    logical :: is_crystal, is_parallel, is_reciprocal
 
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
-    is_fourier = is_in('F', mode)
-    is_periodic = is_in('P', mode) .or. is_reciprocal .or. is_fourier
+    is_crystal = is_in('P', mode) .or. is_reciprocal
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
-        if (is_periodic .and. size(xyz, 1) < n_tasks) then
+        if (is_crystal .and. size(xyz, 1) < n_tasks) then
             parallel_mode = 'C' ! cells
         end if
     end if
@@ -641,7 +639,7 @@ subroutine add_dipole_matrix_old( &
         i_shell = i_shell+1
         max_change = 0.d0
         call ts(42)
-        if (is_periodic) then
+        if (is_crystal) then
             range_g_cell = supercell_circum(unit_cell, i_shell*shell_thickness)
         else
             range_g_cell = (/ 0, 0, 0 /)
@@ -658,7 +656,7 @@ subroutine add_dipole_matrix_old( &
             end if
             ! MPI code end
             call ts(44)
-            if (is_periodic) then
+            if (is_crystal) then
                 r_cell = matmul(g_cell, unit_cell)
             else
                 r_cell = (/ 0.d0, 0.d0, 0.d0 /)
@@ -770,7 +768,7 @@ subroutine add_dipole_matrix_old( &
                 end do ! j_atom
             end do ! i_atom
         end do ! i_cell
-        if (.not. is_periodic) exit
+        if (.not. is_crystal) exit
         if (i_shell > 1 .and. max_change < param_dipole_matrix_accuracy) then
             write (info_str, "(a,i10,a,f10.0,a)") &
                 "Periodic dipole matrix converged in ", &
@@ -949,7 +947,7 @@ function run_scs( &
     integer :: i_grid_omega
     logical :: is_parallel
 
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
 
     alpha_scs(:, :) = 0.d0
     do i_grid_omega = 0, n_grid_omega
@@ -959,7 +957,7 @@ function run_scs( &
         end if
         ! MPI code end
         alpha_full = do_scs( &
-            blanked('M', mode), &
+            blanked('P', mode), &
             version, &
             xyz, &
             alpha=alpha(i_grid_omega+1, :), &
@@ -1125,7 +1123,7 @@ function get_single_mbd_energy( &
 
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
 
     call ts(10)
     relay(:, :) = 0.d0
@@ -1356,7 +1354,7 @@ function get_reciprocal_mbd_energy( &
     integer :: i_kpt
     real(8) :: k_point(3)
 
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
     do_rpa = is_in('Q', mode)
     get_eigenvalues= is_in('E', mode)
     get_eigenvectors= is_in('V', mode)
@@ -1375,7 +1373,7 @@ function get_reciprocal_mbd_energy( &
         else
             if (get_eigenvalues .and. get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_energy( &
-                    blanked('M', mode), &
+                    blanked('P', mode), &
                     version, &
                     xyz, &
                     alpha_0, &
@@ -1393,7 +1391,7 @@ function get_reciprocal_mbd_energy( &
                     modes=modes(i_kpt, :, :))
             else
                 ene = ene+get_single_reciprocal_mbd_energy( &
-                    blanked('M', mode), &
+                    blanked('P', mode), &
                     version, &
                     xyz, &
                     alpha_0, &
@@ -1652,7 +1650,7 @@ function get_qho_rpa_energy( &
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
 
-    is_parallel = is_in('M', mode)
+    is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
 
     do i_grid_omega = 0, n_grid_omega
@@ -1663,7 +1661,7 @@ function get_qho_rpa_energy( &
         ! MPI code end
         relay(:, :) = 0.d0
         call add_dipole_matrix( & ! relay = T
-            blanked('M', mode), &
+            blanked('P', mode), &
             version, &
             xyz, &
             alpha=alpha(i_grid_omega+1, :), &

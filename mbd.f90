@@ -30,11 +30,11 @@ real(8), parameter :: &
 
 real(8) :: &
     param_ts_energy_accuracy = 1.d-10, &
-    param_dipole_real_space_cutoff = 50.d0/bohr, &
-    param_dipole_real_space_lowdim_cutoff = 100.d0/bohr, &
-    param_dipole_rec_space_cutoff = 10.d0*bohr, &
-    param_ewald_alpha = 0.3
+    param_dipole_low_dim_cutoff = 100.d0/bohr, &
     param_mayer_scaling = 1.d0, &
+    param_dipole_real_cutoff_scaling = 1.d0, &
+    param_dipole_rec_cutoff_scaling = 1.d0
+
 
 integer :: &
     param_mbd_nbody_max = 3, &
@@ -314,16 +314,18 @@ subroutine add_dipole_matrix( &
     real(8) :: Tpp(3, 3)
     complex(8) :: Tpp_c(3, 3)
     real(8) :: r_cell(3), r(3), r_norm
-    real(8) :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij
+    real(8) :: R_vdw_ij, C6_ij, overlap_ij, sigma_ij, volume, ewald_alpha
+    real(8) :: real_space_cutoff
     character(len=1) :: parallel_mode
     integer :: &
         i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j
-    logical :: is_crystal, is_parallel, is_reciprocal, is_lowdim, mute
+    logical :: is_crystal, is_parallel, is_reciprocal, is_low_dim, mute, &
+        is_lrange
 
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     is_crystal = is_in('C', mode) .or. is_reciprocal
-    is_lowdim = any(param_vacuum_axis)
+    is_low_dim = any(param_vacuum_axis)
     mute = is_in('M', mode)
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
@@ -345,16 +347,21 @@ subroutine add_dipole_matrix( &
     end if
     ! MPI code end
     if (is_crystal) then
-        if (is_lowdim) then
-            range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_lowdim_cutoff)
+        if (is_low_dim) then
+            real_space_cutoff = param_dipole_low_dim_cutoff
         else
-            range_g_cell = supercell_circum(unit_cell, param_dipole_real_space_cutoff)
+            volume = max(product(dble(diagonalized(unit_cell))), 0.2d0)
+            ewald_alpha = 2.5d0/(volume)**(1.d0/3)
+            real_space_cutoff = 6.d0/ewald_alpha*param_dipole_real_cutoff_scaling
+            call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
+                //', real cutoff = '//trim(tostr(real_space_cutoff)), mute)
         end if
+        range_g_cell = supercell_circum(unit_cell, real_space_cutoff)
     else
         range_g_cell(:) = 0
     end if
     if (is_crystal) then
-        call print_log('Ewald: cell vector range of ' &
+        call print_log('Ewald: summing real part in cell vector range of ' &
             //trim(tostr(1+2*range_g_cell(1)))//'x' &
             //trim(tostr(1+2*range_g_cell(2)))//'x' &
             //trim(tostr(1+2*range_g_cell(3))), mute)
@@ -384,7 +391,7 @@ subroutine add_dipole_matrix( &
                 end if
                 r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
                 r_norm = sqrt(sum(r**2))
-                if (r_norm > param_dipole_real_space_cutoff) cycle
+                if (is_crystal .and. r_norm > real_space_cutoff) cycle
                 if (present(R_vdw)) then
                     R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
                 end if
@@ -400,6 +407,7 @@ subroutine add_dipole_matrix( &
                         C6(i_atom), C6(j_atom), &
                         alpha(i_atom), alpha(j_atom))
                 end if
+                is_lrange = .true.
                 select case (version)
                     case ("bare")
                         Tpp = T_bare(r)
@@ -429,18 +437,22 @@ subroutine add_dipole_matrix( &
                     case ("1mexp,dip,gg")
                         Tpp = (1.d0-damping_1mexp(r_norm, beta*R_vdw_ij, a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
+                        is_lrange = .false.
                     case ("erf,dip,gg")
                         Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
+                        is_lrange = .false.
                     case ("fermi,dip,gg")
                         Tpp = (1.d0-damping_fermi(r_norm, beta*R_vdw_ij, a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
+                        is_lrange = .false.
                     case ("custom,dip,gg")
                         Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
+                        is_lrange = .false.
                 end select
-                if (is_crystal .and. .not. is_lowdim) then
-                    Tpp = Tpp+T_erfc(r, param_ewald_alpha)-T_bare(r)
+                if (is_crystal .and. .not. is_low_dim .and. is_lrange) then
+                    Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
                 if (is_reciprocal) then
                     Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
@@ -475,9 +487,9 @@ subroutine add_dipole_matrix( &
         end if
     end if
     ! MPI code end
-    if (is_crystal .and. .not. is_lowdim) then
+    if (is_crystal .and. .not. is_low_dim .and. is_lrange) then
         call add_ewald_dipole_parts( &
-            mode, xyz, unit_cell, param_ewald_alpha, k_point, &
+            mode, xyz, unit_cell, ewald_alpha, k_point, &
             relay, relay_c)
     end if
 end subroutine add_dipole_matrix
@@ -491,9 +503,10 @@ subroutine add_ewald_dipole_parts( &
     complex(8), intent(inout), optional :: relay_c(3*size(xyz, 1), 3*size(xyz, 1))
     real(8), intent(in), optional :: k_point(3)
 
-    logical :: is_parallel, is_reciprocal, mute
+    logical :: is_parallel, is_reciprocal, mute, do_surface
     real(8) :: &
-        rec_unit_cell(3, 3), volume, G_vec(3), r(3), k_total(3), k_sq
+        rec_unit_cell(3, 3), volume, G_vec(3), r(3), k_total(3), k_sq, &
+        rec_space_cutoff
     real(8) :: Tpp(3, 3)
     complex(8) :: Tpp_c(3, 3)
     integer :: &
@@ -525,8 +538,11 @@ subroutine add_ewald_dipole_parts( &
     ! MPI code end
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
     volume = product(dble(diagonalized(unit_cell)))
-    range_G_vec = supercell_circum(rec_unit_cell, param_dipole_rec_space_cutoff)
-    call print_log('Ewald: G vector range of ' &
+    rec_space_cutoff = 10.d0*alpha*param_dipole_rec_cutoff_scaling
+    range_G_vec = supercell_circum(rec_unit_cell, rec_space_cutoff)
+    call print_log('Ewald: using reciprocal cutoff = '//trim(tostr(rec_space_cutoff)), &
+        mute)
+    call print_log('Ewald: summing reciprocal part in G vector range of ' &
         //trim(tostr(1+2*range_G_vec(1)))//'x' &
         //trim(tostr(1+2*range_G_vec(2)))//'x' &
         //trim(tostr(1+2*range_G_vec(3))), mute)
@@ -546,7 +562,7 @@ subroutine add_ewald_dipole_parts( &
             k_total = G_vec
         end if
         k_sq = sum(k_total**2)
-        if (sqrt(k_sq) > param_dipole_rec_space_cutoff) cycle
+        if (sqrt(k_sq) > rec_space_cutoff) cycle
         do i_atom = 1, size(xyz, 1)
             ! MPI code begin
             if (parallel_mode == 'A') then
@@ -598,9 +614,11 @@ subroutine add_ewald_dipole_parts( &
             end if
         end do
     end do
+    do_surface = .true.
     if (present(k_point)) then
         k_sq = sum(k_point**2)
         if (sqrt(k_sq) > 1.d-15) then
+            do_surface = .false.
             do i_atom = 1, size(xyz, 1)
                 do j_atom = 1, i_atom
                     do i_xyz = 1, 3
@@ -626,23 +644,24 @@ subroutine add_ewald_dipole_parts( &
                     end do
                 end do
             end do
-        else
-            do i_atom = 1, size(xyz, 1)
-                do j_atom = 1, i_atom
-                    do i_xyz = 1, 3
-                        i = 3*(i_atom-1)+i_xyz
-                        j = 3*(j_atom-1)+i_xyz
-                        if (is_reciprocal) then
-                            relay_c(i, j) = relay_c(i, j)+4*pi/(3*volume) ! surface energy
-                            relay_c(j, i) = relay_c(i, j)
-                        else
-                            relay(i, j) = relay(i, j)+4*pi/(3*volume) ! surface energy
-                            relay(j, i) = relay(i, j)
-                        end if
-                    end do
+        end if
+    end if
+    if (do_surface) then
+        do i_atom = 1, size(xyz, 1)
+            do j_atom = 1, i_atom
+                do i_xyz = 1, 3
+                    i = 3*(i_atom-1)+i_xyz
+                    j = 3*(j_atom-1)+i_xyz
+                    if (is_reciprocal) then
+                        relay_c(i, j) = relay_c(i, j)+4*pi/(3*volume) ! surface energy
+                        relay_c(j, i) = relay_c(i, j)
+                    else
+                        relay(i, j) = relay(i, j)+4*pi/(3*volume) ! surface energy
+                        relay(j, i) = relay(i, j)
+                    end if
                 end do
             end do
-        end if
+        end do
     end if
 end subroutine
 

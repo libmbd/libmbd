@@ -69,17 +69,24 @@ interface diag
 end interface
 
 interface invert
-    module procedure invert_sym_dble_
+    module procedure invert_ge_dble_
     module procedure invert_ge_cmplx_
 end interface
 
 interface diagonalize
-    module procedure diagonalize_sym_dble_
     module procedure diagonalize_ge_dble_
+end interface
+
+interface sdiagonalize
+    module procedure diagonalize_sym_dble_
     module procedure diagonalize_he_cmplx_
 end interface
 
 interface diagonalized
+    module procedure diagonalized_ge_dble_
+end interface
+
+interface sdiagonalized
     module procedure diagonalized_sym_dble_
 end interface
 
@@ -506,7 +513,7 @@ subroutine add_ewald_dipole_parts( &
     end if
     ! MPI code end
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
-    volume = product(diagonalized(unit_cell))
+    volume = product(dble(diagonalized(unit_cell)))
     idx_G_vec = (/ 0, 0, -1 /)
     range_G_vec(:) = param_dipole_max_G_vec
     do i_G_vec = 1, (1+2*param_dipole_max_G_vec)**3
@@ -1161,10 +1168,10 @@ function get_single_mbd_energy( &
     if (my_task == 0) then
         call ts(13)
         if (get_eigenvectors) then
-            call diagonalize('V', relay, eigs)
+            call sdiagonalize('V', relay, eigs)
             modes = relay
         else
-            call diagonalize('N', relay, eigs)
+            call sdiagonalize('N', relay, eigs)
         end if
         call ts(-13)
     end if
@@ -1281,10 +1288,10 @@ function get_single_reciprocal_mbd_energy( &
     call ts(-12)
     call ts(13)
     if (get_eigenvectors) then
-        call diagonalize('V', relay, eigs)
+        call sdiagonalize('V', relay, eigs)
         modes = relay
     else
-        call diagonalize('N', relay, eigs)
+        call sdiagonalize('N', relay, eigs)
     end if
     call ts(-13)
     if (get_eigenvalues) then
@@ -1763,7 +1770,7 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
     do i_atom = 1, size(alpha_n)
         forall (i_xyz = 1:3, j_xyz = 1:3) alpha_3_3(i_xyz, j_xyz) &
                 = sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
-        alpha_diag = diagonalized(alpha_3_3)
+        alpha_diag = sdiagonalized(alpha_3_3)
         alpha_n(i_atom) = sum(alpha_diag)/3
     end do
 end function contract_polarizability
@@ -2150,7 +2157,7 @@ elemental function terf(r, r0, a)
 end function
 
 
-subroutine invert_sym_dble_(A)
+subroutine invert_ge_dble_(A)
     real(8), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
@@ -2259,7 +2266,7 @@ function diagonalized_sym_dble_(A, eigvecs) result(eigs)
         allocate (eigvecs_p(size(A, 1), size(A, 2)))
     end if
     eigvecs_p = A
-    call diagonalize(mode, eigvecs_p, eigs)
+    call sdiagonalize(mode, eigvecs_p, eigs)
     if (.not. present(eigvecs)) then
         deallocate (eigvecs_p)
     end if
@@ -2295,6 +2302,29 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
     eigs = cmplx(eigs_r, eigs_i, 8)
     A = vectors
 end subroutine
+
+
+function diagonalized_ge_dble_(A, eigvecs) result(eigs)
+    real(8), intent(in) :: A(:, :)
+    real(8), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    complex(8) :: eigs(size(A, 1))
+
+    real(8), pointer :: eigvecs_p(:, :)
+    character(len=1) :: mode
+
+    if (present(eigvecs)) then
+        mode = 'V'
+        eigvecs_p => eigvecs
+    else
+        mode = 'N'
+        allocate (eigvecs_p(size(A, 1), size(A, 2)))
+    end if
+    eigvecs_p = A
+    call diagonalize(mode, eigvecs_p, eigs)
+    if (.not. present(eigvecs)) then
+        deallocate (eigvecs_p)
+    end if
+end function
 
 
 subroutine diagonalize_he_cmplx_(mode, A, eigs)

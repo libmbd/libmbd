@@ -29,7 +29,6 @@ real(8), parameter :: &
     bohr = 0.529177249d0
 
 real(8) :: &
-    param_mbd_supercell_cutoff = 25.d0/bohr, &
     param_ts_energy_accuracy = 1.d-10, &
     param_dipole_real_space_cutoff = 50.d0/bohr, &
     param_dipole_real_space_lowdim_cutoff = 100.d0/bohr, &
@@ -1218,6 +1217,7 @@ function get_supercell_mbd_energy( &
         alpha_0, &
         omega, &
         unit_cell, &
+        supercell, &
         R_vdw, &
         beta, &
         a, &
@@ -1231,6 +1231,8 @@ function get_supercell_mbd_energy( &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         unit_cell(3, 3)
+    integer, intent(in) :: &
+        supercell(3)
     real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &
@@ -1241,7 +1243,7 @@ function get_supercell_mbd_energy( &
     logical :: do_rpa
     real(8) :: r_cell(3)
     integer :: i_atom, i
-    integer :: i_cell, range_g_cell(3)
+    integer :: i_cell
     integer :: g_cell(3), n_cells
 
     real(8), allocatable :: &
@@ -1252,15 +1254,10 @@ function get_supercell_mbd_energy( &
     do_rpa = is_in('Q', mode)
 
     call ts(1)
-    range_g_cell = supercell_circum(unit_cell, param_mbd_supercell_cutoff)
-    call print_log("Supercell MBD will be done in a " &
-        //trim(tostr(1+2*range_g_cell(1)))//'x' &
-        //trim(tostr(1+2*range_g_cell(2)))//'x' &
-        //trim(tostr(1+2*range_g_cell(3)))//' supercell')
-    n_cells = product(1+2*range_g_cell)
     call ts(2)
+    n_cells = product(supercell)
     do i = 1, 3
-        unit_cell_super(i, :) = unit_cell(i, :)*(1+2*range_g_cell(i))
+        unit_cell_super(i, :) = unit_cell(i, :)*supercell(i)
     end do
     allocate (xyz_super(n_cells*size(xyz, 1), 3))
     allocate (alpha_0_super(n_cells*size(alpha_0)))
@@ -1269,7 +1266,7 @@ function get_supercell_mbd_energy( &
     allocate (C6_super(n_cells*size(C6)))
     g_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
-        call shift_cell(g_cell, -range_g_cell, range_g_cell)
+        call shift_cell(g_cell, (/ 0, 0, 0 /), supercell-1)
         r_cell = matmul(g_cell, unit_cell)
         do i_atom = 1, size(xyz, 1)
             i = (i_cell-1)*size(xyz, 1)+i_atom

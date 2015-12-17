@@ -796,8 +796,14 @@ function run_scs( &
     real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
     integer :: i_grid_omega
     logical :: is_parallel
+    character(len=1) :: mute
 
     is_parallel = is_in('P', mode)
+    if (is_in('M', mode)) then
+        mute = 'M'
+    else
+        mute = ''
+    end if
 
     alpha_scs(:, :) = 0.d0
     do i_grid_omega = 0, n_grid_omega
@@ -807,7 +813,7 @@ function run_scs( &
         end if
         ! MPI code end
         alpha_full = do_scs( &
-            blanked('P', mode), &
+            blanked('P', mode)//mute, &
             version, &
             xyz, &
             alpha=alpha(i_grid_omega+1, :), &
@@ -816,6 +822,7 @@ function run_scs( &
             a=a, &
             unit_cell=unit_cell)
         alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
+        mute = 'M'
     end do
     ! MPI code begin
     if (is_parallel) then

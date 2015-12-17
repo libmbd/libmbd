@@ -38,8 +38,6 @@ end interface
 contains
 
 subroutine sync_sum_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x
     real(8) :: x_buff
     integer :: mpi_err
@@ -51,8 +49,6 @@ subroutine sync_sum_dble_(x)
 end subroutine
 
 subroutine sync_sum_array_dble_(array, n_array)
-    implicit none
-
     integer, intent(in) :: n_array
     real(8), intent(inout) :: array(n_array)
 
@@ -66,40 +62,30 @@ subroutine sync_sum_array_dble_(array, n_array)
 end subroutine
 
 subroutine sync_sum_vector_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:)
 
     call sync_sum_array_dble_(x, size(x))
 end subroutine
 
 subroutine sync_sum_matrix_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
 
 subroutine sync_sum_3d_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:, :, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
 
 subroutine sync_sum_4d_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:, :, :, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
 
 subroutine sync_sum_cmplx_(x)
-    implicit none
-
     complex(kind=8), intent(inout) :: x
     complex(kind=8) :: x_buff
     integer :: mpi_err
@@ -111,8 +97,6 @@ subroutine sync_sum_cmplx_(x)
 end subroutine
 
 subroutine sync_sum_array_cmplx_(array, n_array)
-    implicit none
-
     integer, intent(in) :: n_array
     complex(kind=8), intent(inout) :: array(n_array)
 
@@ -126,40 +110,30 @@ subroutine sync_sum_array_cmplx_(array, n_array)
 end subroutine
 
 subroutine sync_sum_vector_cmplx_(x)
-    implicit none
-
     complex(kind=8), intent(inout) :: x(:)
 
     call sync_sum_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine sync_sum_matrix_cmplx_(x)
-    implicit none
-
     complex(kind=8), intent(inout) :: x(:, :)
 
     call  sync_sum_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine sync_sum_3d_cmplx_(x)
-    implicit none
-
     complex(kind=8), intent(inout) :: x(:, :, :)
 
     call  sync_sum_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine sync_sum_4d_cmplx_(x)
-    implicit none
-
     complex(kind=8), intent(inout) :: x(:, :, :, :)
 
     call  sync_sum_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine broadcast_array_dble_(array, n_array)
-    implicit none
-
     integer, intent(in) :: n_array
     real(8), intent(inout) :: array(n_array)
 
@@ -170,40 +144,30 @@ subroutine broadcast_array_dble_(array, n_array)
 end subroutine
 
 subroutine broadcast_vector_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 subroutine broadcast_matrix_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 subroutine broadcast_3d_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:, :, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 subroutine broadcast_4d_dble_(x)
-    implicit none
-
     real(8), intent(inout) :: x(:, :, :, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 subroutine broadcast_array_cmplx_(array, n_array)
-    implicit none
-
     integer, intent(in) :: n_array
     complex(8), intent(inout) :: array(n_array)
 
@@ -214,24 +178,18 @@ subroutine broadcast_array_cmplx_(array, n_array)
 end subroutine
 
 subroutine broadcast_vector_cmplx_(x)
-    implicit none
-
     complex(8), intent(inout) :: x(:)
 
     call broadcast_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine broadcast_matrix_cmplx_(x)
-    implicit none
-
     complex(8), intent(inout) :: x(:, :)
 
     call broadcast_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine print_log(str, mute)
-    implicit none
-
     character(len=*), intent(in) :: str
     integer :: myid, error
     logical, optional :: mute
@@ -246,8 +204,6 @@ subroutine print_log(str, mute)
 end subroutine
 
 subroutine print_warning(str)
-    implicit none
-
     character(len=*), intent(in) :: str
     integer :: myid, error
 
@@ -258,8 +214,6 @@ subroutine print_warning(str)
 end subroutine
 
 subroutine print_error(str)
-    implicit none
-
     character(len=*), intent(in) :: str
     integer :: myid, error
 

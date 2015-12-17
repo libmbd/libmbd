@@ -6,8 +6,6 @@ contains
 
 
 function is_in(c, str) result(is)
-    implicit none
-
     character(len=1), intent(in) :: c
     character(len=*), intent(in) :: str
     logical :: is
@@ -25,8 +23,6 @@ end function is_in
 
 
 function blanked(cs, str) result(str_out)
-    implicit none
-
     character(len=*), intent(in) :: cs
     character(len=*), intent(in) :: str
     character(len=len(str)) :: str_out

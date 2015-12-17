@@ -1316,6 +1316,9 @@ function get_supercell_mbd_energy( &
     deallocate (C6_super)
     ene = ene/n_cells
     call ts(-1)
+    if (is_in('Q', mode)) then
+        rpa_orders = rpa_orders/n_cells
+    end if
 end function get_supercell_mbd_energy
     
 

@@ -2010,7 +2010,7 @@ function supercell_circum(uc, radius) result(sc)
     real(8) :: ruc(3, 3)
 
     ruc = 2*pi*inverted(transpose(uc))
-    sc = ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))-0.5d0)
+    sc = ceiling(radius/sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))+0.5d0)
     where (param_vacuum_axis) sc = 0
 end function
 

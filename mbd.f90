@@ -12,16 +12,13 @@ module mbd
 ! M: mute
 
 use mbd_interface, only: &
-    sync_sum, broadcast, print_error, print_warning, print_log
+    sync_sum, broadcast, print_error, print_warning, print_log, pi, nan
 use mbd_helper, only: &
     is_in, blanked
 
 implicit none
 
-real(8), parameter :: &
-    pi = acos(-1.d0), &
-    nan = sqrt(-sin(0.d0)), &
-    bohr = 0.529177249d0
+real(8), parameter :: bohr = 0.529177249d0
 
 real(8) :: &
     param_ts_energy_accuracy = 1.d-10, &
@@ -40,8 +37,8 @@ real(8), allocatable :: omega_grid(:), omega_grid_w(:)
 
 integer, parameter :: n_timestamps = 100
 logical :: measure_time = .true.
-integer(8) :: timestamps(n_timestamps), ts_counts(n_timestamps)
-integer(8) :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
+integer :: timestamps(n_timestamps), ts_counts(n_timestamps)
+integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 
 integer :: my_task, n_tasks
 
@@ -107,7 +104,7 @@ end subroutine ts
 
 
 function clock_rate() result(rate)
-    integer(8) :: cnt, rate, cnt_max
+    integer :: cnt, rate, cnt_max
 
     call system_clock(cnt, rate, cnt_max) 
 end function clock_rate
@@ -861,7 +858,7 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
 end function get_single_mbd_energy
 
 
-function get_single_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
+function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
         k_point, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
         potential_custom, mode_enes, modes) result(ene)
     character(len=*), intent(in) :: mode, version
@@ -952,7 +949,7 @@ function get_single_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     endif
     where (eigs < 0) eigs = 0.d0
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
-end function get_single_reciprocal_mbd_energy
+end function get_single_reciprocal_mbd_ene
 
 
 function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
@@ -1010,7 +1007,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         k_point = k_grid(i_kpt, :)
         if (do_rpa) then
             if (get_orders) then
-                ene = ene+get_single_reciprocal_rpa_energy( &
+                ene = ene+get_single_reciprocal_rpa_ene( &
                     blanked('P', mode)//mute, &
                     version, &
                     xyz, &
@@ -1026,7 +1023,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
                     potential_custom=potential_custom, &
                     rpa_orders=rpa_orders(i_kpt, :))
             else
-                ene = ene+get_single_reciprocal_rpa_energy( &
+                ene = ene+get_single_reciprocal_rpa_ene( &
                     blanked('P', mode)//mute, &
                     version, &
                     xyz, &
@@ -1043,7 +1040,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
             end if
         else
             if (get_eigenvalues .and. get_eigenvectors) then
-                ene = ene+get_single_reciprocal_mbd_energy( &
+                ene = ene+get_single_reciprocal_mbd_ene( &
                     blanked('P', mode)//mute, &
                     version, &
                     xyz, &
@@ -1061,7 +1058,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
                     mode_enes=mode_enes(i_kpt, :), &
                     modes=modes(i_kpt, :, :))
             else
-                ene = ene+get_single_reciprocal_mbd_energy( &
+                ene = ene+get_single_reciprocal_mbd_ene( &
                     blanked('P', mode)//mute, &
                     version, &
                     xyz, &
@@ -1360,7 +1357,7 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
 end function get_single_rpa_energy
 
 
-function get_single_reciprocal_rpa_energy(mode, version, xyz, alpha, k_point, &
+function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
         potential_custom, rpa_orders) result(ene)
     character(len=*), intent(in) :: mode, version
@@ -1457,7 +1454,7 @@ function get_single_reciprocal_rpa_energy(mode, version, xyz, alpha, k_point, &
             call sync_sum(rpa_orders)
         end if
     end if
-end function get_single_reciprocal_rpa_energy
+end function get_single_reciprocal_rpa_ene
 
 
 function make_g_grid(n1, n2, n3) result(g_grid)

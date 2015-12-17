@@ -15,7 +15,6 @@ free_atom_db = json.load((Path(__file__).parent/'free_atoms.json').open())
 
 mbd.my_task = myid
 mbd.n_tasks = ntasks
-mbd.init_grid(30)
 
 
 def get_free_atom_data(species):

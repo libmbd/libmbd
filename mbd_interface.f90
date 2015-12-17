@@ -4,6 +4,11 @@ use mpi
 
 implicit none
 
+private
+
+public :: &
+    sync_sum, broadcast, print_log, print_error, print_warning
+
 interface sync_sum
     module procedure sync_sum_dble_
     module procedure sync_sum_vector_dble_
@@ -22,11 +27,13 @@ interface broadcast
     module procedure broadcast_matrix_dble_
     module procedure broadcast_3d_dble_
     module procedure broadcast_4d_dble_
+    module procedure broadcast_vector_cmplx_
+    module procedure broadcast_matrix_cmplx_
 end interface
 
-external :: &
-    MPI_COMM_WORLD, MPI_DOUBLE_PRECISION, MPI_COMPLEX16, MPI_SUM, &
-    MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
+! external :: &
+!     MPI_COMM_WORLD, MPI_DOUBLE_PRECISION, MPI_COMPLEX16, MPI_SUM, &
+!     MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
 
 contains
 
@@ -194,12 +201,44 @@ subroutine broadcast_4d_dble_(x)
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
-subroutine print_log(str)
+subroutine broadcast_array_cmplx_(array, n_array)
+    implicit none
+
+    integer, intent(in) :: n_array
+    complex(8), intent(inout) :: array(n_array)
+
+    integer :: mpi_err
+
+    call MPI_BCAST(array, n_array, MPI_COMPLEX16, 0, &
+        MPI_COMM_WORLD, mpi_err)
+end subroutine
+
+subroutine broadcast_vector_cmplx_(x)
+    implicit none
+
+    complex(8), intent(inout) :: x(:)
+
+    call broadcast_array_cmplx_(x, size(x))
+end subroutine
+
+subroutine broadcast_matrix_cmplx_(x)
+    implicit none
+
+    complex(8), intent(inout) :: x(:, :)
+
+    call broadcast_array_cmplx_(x, size(x))
+end subroutine
+
+subroutine print_log(str, mute)
     implicit none
 
     character(len=*), intent(in) :: str
     integer :: myid, error
+    logical, optional :: mute
 
+    if (present(mute)) then
+        if (mute) return
+    end if
     call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
     if (myid == 0) then
         write (6, *) str

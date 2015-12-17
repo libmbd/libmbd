@@ -50,8 +50,9 @@ real(8), allocatable :: &
     omega_grid(:), &
     omega_grid_w(:)
 
-logical :: measure_time = .false.
-integer(8) :: timestamps(100), ts_counts(100)
+integer, parameter :: n_timestamps = 100
+logical :: measure_time = .true.
+integer(8) :: timestamps(n_timestamps), ts_counts(n_timestamps)
 integer(8) :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 
 integer :: my_task, n_tasks
@@ -166,34 +167,27 @@ function get_ts_energy( &
 
     ene = 0.d0
     i_shell = 0
-    call ts(1)
     do
         i_shell = i_shell+1
         ene_shell = 0.d0
-        call ts(10)
         if (is_crystal) then
             range_g_cell = supercell_circum(unit_cell, i_shell*shell_thickness)
         else
             range_g_cell = (/ 0, 0, 0 /)
         end if
-        call ts(-10)
         g_cell = (/ 0, 0, -1 /)
         do i_cell = 1, product(1+2*range_g_cell)
-            call ts(11)
             call shift_cell(g_cell, -range_g_cell, range_g_cell)
-            call ts(-11)
             ! MPI code begin
             if (is_parallel .and. is_crystal) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
             end if
             ! MPI code end
-            call ts(12)
             if (is_crystal) then
                 r_cell = matmul(g_cell, unit_cell)
             else
                 r_cell = (/ 0.d0, 0.d0, 0.d0 /)
             end if
-            call ts(-12)
             do i_atom = 1, size(xyz, 1)
                 ! MPI code begin
                 if (is_parallel .and. .not. is_crystal) then
@@ -204,31 +198,21 @@ function get_ts_energy( &
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    call ts(13)
                     r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
                     r_norm = sqrt(sum(r**2))
-                    call ts(-13)
-                    call ts(14)
                     if (r_norm >= i_shell*shell_thickness &
                         .or. r_norm < (i_shell-1)*shell_thickness) then
-                        call ts(-14)
                         cycle
                     end if
-                    call ts(-14)
-                    call ts(15)
                     C6_ij = combine_C6( &
                         C6(i_atom), C6(j_atom), &
                         alpha_0(i_atom), alpha_0(j_atom))
-                    call ts(-15)
-                    call ts(16)
                     if (present(R_vdw)) then
                         R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
                     end if
-                    call ts(-16)
                     if (present(overlap)) then
                         overlap_ij = overlap(i_atom, j_atom)
                     end if
-                    call ts(2)
                     select case (version)
                         case ("fermi")
                             f_damp = damping_fermi(r_norm, s_R*R_vdw_ij, d)
@@ -244,10 +228,7 @@ function get_ts_energy( &
                         case ("custom")
                             f_damp = damping_custom(i_atom, j_atom)
                     end select
-                    call ts(-2)
-                    call ts(3)
                     ene_pair = -C6_ij*f_damp/r_norm**6
-                    call ts(-3)
                     if (i_atom == j_atom) then
                         ene_shell = ene_shell+ene_pair/2
                     else
@@ -256,13 +237,11 @@ function get_ts_energy( &
                 end do ! j_atom
             end do ! i_atom
         end do ! i_cell
-        call ts(20)
         ! MPI code begin
         if (is_parallel) then
             call sync_sum(ene_shell)
         end if
         ! MPI code end
-        call ts(-20)
         ene = ene+ene_shell
         if (.not. is_crystal) exit
         if (i_shell > 1 .and. abs(ene_shell) < param_ts_energy_accuracy) then
@@ -272,7 +251,6 @@ function get_ts_energy( &
             exit
         endif
     end do ! i_shell
-    call ts(-1)
 end function get_ts_energy
 
 
@@ -366,6 +344,7 @@ subroutine add_dipole_matrix( &
             //trim(tostr(1+2*range_g_cell(2)))//'x' &
             //trim(tostr(1+2*range_g_cell(3))), mute)
     end if
+    call ts(11)
     g_cell = (/ 0, 0, -1 /)
     do i_cell = 1, product(1+2*range_g_cell)
         call shift_cell(g_cell, -range_g_cell, range_g_cell)
@@ -478,6 +457,7 @@ subroutine add_dipole_matrix( &
             end do ! j_atom
         end do ! i_atom
     end do ! i_cell
+    call ts(-11)
     ! MPI code begin
     if (is_parallel) then
         if (is_reciprocal) then
@@ -546,6 +526,7 @@ subroutine add_ewald_dipole_parts( &
         //trim(tostr(1+2*range_G_vec(1)))//'x' &
         //trim(tostr(1+2*range_G_vec(2)))//'x' &
         //trim(tostr(1+2*range_G_vec(3))), mute)
+    call ts(12)
     idx_G_vec = (/ 0, 0, -1 /)
     do i_G_vec = 1, product(1+2*range_G_vec)
         call shift_cell(idx_G_vec, -range_G_vec, range_G_vec)
@@ -663,6 +644,7 @@ subroutine add_ewald_dipole_parts( &
             end do
         end do
     end if
+    call ts(-12)
 end subroutine
 
 
@@ -714,7 +696,9 @@ function do_scs( &
             alpha_full(i, i) = alpha_full(i, i)+1.d0/alpha(i_atom)
         end do
     end do
+    call ts(31)
     call invert(alpha_full)
+    call ts(-31)
 end function do_scs
 
 
@@ -769,7 +753,9 @@ function do_scs_k_point( &
             alpha_full(i, i) = alpha_full(i, i)+1.d0/alpha(i_atom)
         end do
     end do
+    call ts(32)
     call invert(alpha_full)
+    call ts(-32)
 end function 
 
 
@@ -897,7 +883,6 @@ function get_single_mbd_energy( &
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
 
-    call ts(10)
     relay(:, :) = 0.d0
     call add_dipole_matrix( & ! relay = T
         mode, &
@@ -913,8 +898,6 @@ function get_single_mbd_energy( &
         potential_custom=potential_custom, &
         unit_cell=unit_cell, &
         relay=relay)
-    call ts(-10)
-    call ts(11)
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
             i = 3*(i_atom-1)
@@ -925,8 +908,6 @@ function get_single_mbd_energy( &
                 relay(i+1:i+3, j+1:j+3)
         end do
     end do
-    call ts(-11)
-    call ts(12)
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
@@ -934,16 +915,14 @@ function get_single_mbd_energy( &
             ! relay = w^2+sqrt(a*a)*w*w*T
         end do
     end do
-    call ts(-12)
+    call ts(21)
     if (my_task == 0) then
-        call ts(13)
         if (get_eigenvectors) then
             call sdiagonalize('V', relay, eigs)
             modes = relay
         else
             call sdiagonalize('N', relay, eigs)
         end if
-        call ts(-13)
     end if
     ! MPI code begin
     if (is_parallel) then
@@ -951,6 +930,7 @@ function get_single_mbd_energy( &
         call broadcast(eigs)
     end if
     ! MPI code end
+    call ts(-21)
     if (get_eigenvalues) then
         mode_enes(:) = 0.d0
         where (eigs > 0) mode_enes = sqrt(eigs)
@@ -961,9 +941,7 @@ function get_single_mbd_energy( &
             //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         ene = nan
     else
-        call ts(14)
         ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
-        call ts(-14)
     end if
 end function get_single_mbd_energy
 
@@ -1017,7 +995,6 @@ function get_single_reciprocal_mbd_energy( &
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
 
-    call ts(10)
     relay(:, :) = cmplx(0.d0, 0.d0, 8)
     call add_dipole_matrix( & ! relay = T
         mode, &
@@ -1034,8 +1011,6 @@ function get_single_reciprocal_mbd_energy( &
         unit_cell=unit_cell, &
         k_point=k_point, &
         relay_c=relay)
-    call ts(-10)
-    call ts(11)
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
             i = 3*(i_atom-1)
@@ -1046,8 +1021,6 @@ function get_single_reciprocal_mbd_energy( &
                 relay(i+1:i+3, j+1:j+3)
         end do
     end do
-    call ts(-11)
-    call ts(12)
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
@@ -1055,8 +1028,7 @@ function get_single_reciprocal_mbd_energy( &
             ! relay = w^2+sqrt(a*a)*w*w*T
         end do
     end do
-    call ts(-12)
-    call ts(13)
+    call ts(22)
     if (my_task == 0) then
         if (get_eigenvectors) then
             call sdiagonalize('V', relay, eigs)
@@ -1065,13 +1037,13 @@ function get_single_reciprocal_mbd_energy( &
             call sdiagonalize('N', relay, eigs)
         end if
     end if
-    call ts(-13)
     ! MPI code begin
     if (is_parallel) then
         call broadcast(relay)
         call broadcast(eigs)
     end if
     ! MPI code end
+    call ts(-22)
     if (get_eigenvalues) then
         mode_enes(:) = 0.d0
         where (eigs > 0) mode_enes = sqrt(eigs)
@@ -1081,10 +1053,8 @@ function get_single_reciprocal_mbd_energy( &
         call print_warning("CDM Hamiltonian has " &
             //trim(tostr(n_negative_eigs))//" negative eigenvalues")
     endif
-    call ts(14)
     where (eigs < 0) eigs = 0.d0
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
-    call ts(-14)
 end function get_single_reciprocal_mbd_energy
 
 
@@ -1145,7 +1115,6 @@ function get_reciprocal_mbd_energy( &
         mute = ''
     end if
 
-    call ts(1)
     ene = 0.d0
     do i_kpt = 1, size(k_grid, 1)
         ! MPI code begin
@@ -1226,7 +1195,6 @@ function get_reciprocal_mbd_energy( &
         end if
         mute = 'M'
     end do ! k_point loop
-    call ts(2)
     ! MPI code begin
     if (is_parallel) then
         call sync_sum(ene)
@@ -1239,9 +1207,7 @@ function get_reciprocal_mbd_energy( &
         end if
     end if
     ! MPI code end
-    call ts(-2)
     ene = ene/size(k_grid, 1)
-    call ts(-1)
 end function get_reciprocal_mbd_energy
 
 
@@ -1288,8 +1254,6 @@ function get_supercell_mbd_energy( &
 
     do_rpa = is_in('Q', mode)
 
-    call ts(1)
-    call ts(2)
     n_cells = product(supercell)
     do i = 1, 3
         unit_cell_super(i, :) = unit_cell(i, :)*supercell(i)
@@ -1316,8 +1280,6 @@ function get_supercell_mbd_energy( &
             end if
         end do
     end do
-    call ts(-2)
-    call ts(3)
     if (do_rpa) then
         ene = get_single_rpa_energy( &
             mode, &
@@ -1343,14 +1305,12 @@ function get_supercell_mbd_energy( &
             C6=C6_super, &
             unit_cell=unit_cell_super)
     end if
-    call ts(-3)
     deallocate (xyz_super)
     deallocate (alpha_0_super)
     deallocate (omega_super)
     deallocate (R_vdw_super)
     deallocate (C6_super)
     ene = ene/n_cells
-    call ts(-1)
     if (is_in('Q', mode)) then
         rpa_orders = rpa_orders/n_cells
     end if
@@ -1509,7 +1469,9 @@ function get_single_rpa_energy( &
         do i = 1, 3*size(xyz, 1)
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
         end do
+        call ts(23)
         call diagonalize('N', relay, eigs)
+        call ts(-23)
         n_negative_eigs = count(dble(eigs) < 0)
         if (n_negative_eigs > 0) then
             call print_warning("1+AT matrix has " &
@@ -1517,7 +1479,9 @@ function get_single_rpa_energy( &
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
+            call ts(24)
             call diagonalize('N', AT, eigs)
+            call ts(-24)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
                     +(-1.d0/(2*pi)*(-1)**n_order*sum(dble(eigs)**n_order)/n_order) &
@@ -1617,7 +1581,9 @@ function get_single_reciprocal_rpa_energy( &
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
         end do
         relay = sqrt(relay*conjg(relay))
+        call ts(25)
         call diagonalize('N', relay, eigs)
+        call ts(-25)
         n_negative_eigs = count(dble(eigs) < 0)
         if (n_negative_eigs > 0) then
             call print_warning("1+AT matrix has " &
@@ -1626,7 +1592,9 @@ function get_single_reciprocal_rpa_energy( &
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
             AT = 2*dble(AT)+AT*conjg(AT)
+            call ts(26)
             call diagonalize('N', AT, eigs)
+            call ts(-26)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
                     +(-1.d0/(2*pi)*(-1)**n_order*sum(dble(eigs)**n_order)/n_order) &

@@ -130,8 +130,8 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
     real(8) :: ene
 
     real(8) :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij, &
-        ene_shell, ene_pair, r_cell(3)
-    integer :: i_shell, i_cell, i_atom, j_atom, range_g_cell(3), g_cell(3)
+        ene_shell, ene_pair, R_cell(3)
+    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
 
@@ -144,22 +144,22 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         i_shell = i_shell+1
         ene_shell = 0.d0
         if (is_crystal) then
-            range_g_cell = supercell_circum(unit_cell, i_shell*shell_thickness)
+            range_cell = supercell_circum(unit_cell, i_shell*shell_thickness)
         else
-            range_g_cell = (/ 0, 0, 0 /)
+            range_cell = (/ 0, 0, 0 /)
         end if
-        g_cell = (/ 0, 0, -1 /)
-        do i_cell = 1, product(1+2*range_g_cell)
-            call shift_cell(g_cell, -range_g_cell, range_g_cell)
+        idx_cell = (/ 0, 0, -1 /)
+        do i_cell = 1, product(1+2*range_cell)
+            call shift_cell(idx_cell, -range_cell, range_cell)
             ! MPI code begin
             if (is_parallel .and. is_crystal) then
                 if (my_task /= modulo(i_cell, n_tasks)) cycle
             end if
             ! MPI code end
             if (is_crystal) then
-                r_cell = matmul(g_cell, unit_cell)
+                R_cell = matmul(idx_cell, unit_cell)
             else
-                r_cell = (/ 0.d0, 0.d0, 0.d0 /)
+                R_cell = (/ 0.d0, 0.d0, 0.d0 /)
             end if
             do i_atom = 1, size(xyz, 1)
                 ! MPI code begin
@@ -171,7 +171,7 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
+                    r = xyz(i_atom, :)-xyz(j_atom, :)-R_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm >= i_shell*shell_thickness &
                         .or. r_norm < (i_shell-1)*shell_thickness) then
@@ -246,11 +246,11 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
     complex(8), intent(inout), optional :: &
         relay_c(3*size(xyz, 1), 3*size(xyz, 1))
 
-    real(8) :: Tpp(3, 3), r_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
+    real(8) :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
         overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
-    integer :: i_atom, j_atom, i_cell, g_cell(3), range_g_cell(3), i, j
+    integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j
     logical :: is_crystal, is_parallel, is_reciprocal, is_low_dim, mute, &
         is_lrange
 
@@ -288,29 +288,29 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
             call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
                 //', real cutoff = '//trim(tostr(real_space_cutoff)), mute)
         end if
-        range_g_cell = supercell_circum(unit_cell, real_space_cutoff)
+        range_cell = supercell_circum(unit_cell, real_space_cutoff)
     else
-        range_g_cell(:) = 0
+        range_cell(:) = 0
     end if
     if (is_crystal) then
         call print_log('Ewald: summing real part in cell vector range of ' &
-            //trim(tostr(1+2*range_g_cell(1)))//'x' &
-            //trim(tostr(1+2*range_g_cell(2)))//'x' &
-            //trim(tostr(1+2*range_g_cell(3))), mute)
+            //trim(tostr(1+2*range_cell(1)))//'x' &
+            //trim(tostr(1+2*range_cell(2)))//'x' &
+            //trim(tostr(1+2*range_cell(3))), mute)
     end if
     call ts(11)
-    g_cell = (/ 0, 0, -1 /)
-    do i_cell = 1, product(1+2*range_g_cell)
-        call shift_cell(g_cell, -range_g_cell, range_g_cell)
+    idx_cell = (/ 0, 0, -1 /)
+    do i_cell = 1, product(1+2*range_cell)
+        call shift_cell(idx_cell, -range_cell, range_cell)
         ! MPI code begin
         if (parallel_mode == 'C') then
             if (my_task /= modulo(i_cell, n_tasks)) cycle
         end if
         ! MPI code end
         if (is_crystal) then
-            r_cell = matmul(g_cell, unit_cell)
+            R_cell = matmul(idx_cell, unit_cell)
         else
-            r_cell(:) = 0.d0
+            R_cell(:) = 0.d0
         end if
         do i_atom = 1, size(xyz, 1)
             ! MPI code begin
@@ -322,7 +322,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                r = xyz(i_atom, :)-xyz(j_atom, :)-r_cell
+                r = xyz(i_atom, :)-xyz(j_atom, :)-R_cell
                 r_norm = sqrt(sum(r**2))
                 if (is_crystal .and. r_norm > real_space_cutoff) cycle
                 if (present(R_vdw)) then
@@ -442,12 +442,12 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         relay_c(3*size(xyz, 1), 3*size(xyz, 1))
 
     logical :: is_parallel, is_reciprocal, mute, do_surface
-    real(8) :: rec_unit_cell(3, 3), volume, G_vec(3), r(3), k_total(3), k_sq, &
-        rec_space_cutoff, Tpp(3, 3)
+    real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
+        k_sq, rec_space_cutoff, Tpp(3, 3)
     complex(8) :: Tpp_c(3, 3)
     integer :: &
-        i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vec(3), i_G_vec, &
-        range_G_vec(3)
+        i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
+        range_G_vector(3)
     character(len=1) :: parallel_mode
 
     is_parallel = is_in('P', mode)
@@ -475,28 +475,28 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
     volume = product(dble(diagonalized(unit_cell)))
     rec_space_cutoff = 10.d0*alpha*param_ewald_rec_cutoff_scaling
-    range_G_vec = supercell_circum(rec_unit_cell, rec_space_cutoff)
+    range_G_vector = supercell_circum(rec_unit_cell, rec_space_cutoff)
     call print_log('Ewald: using reciprocal cutoff = ' &
         //trim(tostr(rec_space_cutoff)), mute)
     call print_log('Ewald: summing reciprocal part in G vector range of ' &
-        //trim(tostr(1+2*range_G_vec(1)))//'x' &
-        //trim(tostr(1+2*range_G_vec(2)))//'x' &
-        //trim(tostr(1+2*range_G_vec(3))), mute)
+        //trim(tostr(1+2*range_G_vector(1)))//'x' &
+        //trim(tostr(1+2*range_G_vector(2)))//'x' &
+        //trim(tostr(1+2*range_G_vector(3))), mute)
     call ts(12)
-    idx_G_vec = (/ 0, 0, -1 /)
-    do i_G_vec = 1, product(1+2*range_G_vec)
-        call shift_cell(idx_G_vec, -range_G_vec, range_G_vec)
-        if (i_G_vec == 1) cycle
+    idx_G_vector = (/ 0, 0, -1 /)
+    do i_G_vector = 1, product(1+2*range_G_vector)
+        call shift_cell(idx_G_vector, -range_G_vector, range_G_vector)
+        if (i_G_vector == 1) cycle
         ! MPI code begin
         if (parallel_mode == 'G') then
-            if (my_task /= modulo(i_G_vec, n_tasks)) cycle
+            if (my_task /= modulo(i_G_vector, n_tasks)) cycle
         end if
         ! MPI code end
-        G_vec = matmul(idx_G_vec, rec_unit_cell)
+        G_vector = matmul(idx_G_vector, rec_unit_cell)
         if (is_reciprocal) then
-            k_total = k_point+G_vec
+            k_total = k_point+G_vector
         else
-            k_total = G_vec
+            k_total = G_vector
         end if
         k_sq = sum(k_total**2)
         if (sqrt(k_sq) > rec_space_cutoff) cycle
@@ -513,9 +513,9 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     Tpp(i_xyz, j_xyz) = Tpp(i_xyz, j_xyz) &
                     *k_total(i_xyz)*k_total(j_xyz)/k_sq
                 if (is_reciprocal) then
-                    Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(G_vec, r))
+                    Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(G_vector, r))
                 else
-                    Tpp = Tpp*cos(dot_product(G_vec, r))
+                    Tpp = Tpp*cos(dot_product(G_vector, r))
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
@@ -534,7 +534,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                 end if
             end do ! j_atom
         end do ! i_atom
-    end do ! i_G_vec
+    end do ! i_G_vector
     ! MPI code begin
     if (is_parallel) then
         if (is_reciprocal) then
@@ -1111,10 +1111,10 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
     real(8) :: ene
 
     logical :: do_rpa
-    real(8) :: r_cell(3)
+    real(8) :: R_cell(3)
     integer :: i_atom, i
     integer :: i_cell
-    integer :: g_cell(3), n_cells
+    integer :: idx_cell(3), n_cells
 
     real(8), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
@@ -1132,13 +1132,13 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
     allocate (omega_super(n_cells*size(omega)))
     allocate (R_vdw_super(n_cells*size(R_vdw)))
     allocate (C6_super(n_cells*size(C6)))
-    g_cell = (/ 0, 0, -1 /)
+    idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
-        call shift_cell(g_cell, (/ 0, 0, 0 /), supercell-1)
-        r_cell = matmul(g_cell, unit_cell)
+        call shift_cell(idx_cell, (/ 0, 0, 0 /), supercell-1)
+        R_cell = matmul(idx_cell, unit_cell)
         do i_atom = 1, size(xyz, 1)
             i = (i_cell-1)*size(xyz, 1)+i_atom
-            xyz_super(i, :) = xyz(i_atom, :)+r_cell
+            xyz_super(i, :) = xyz(i_atom, :)+R_cell
             alpha_0_super(i) = alpha_0(i_atom)
             omega_super(i) = omega(i_atom)
             if (present(R_vdw)) then

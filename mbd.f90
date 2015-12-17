@@ -63,6 +63,7 @@ end interface
 
 interface diag
     module procedure get_diag_
+    module procedure get_diag_cmplx_
     module procedure make_diag_
 end interface
 
@@ -73,6 +74,7 @@ end interface
 
 interface diagonalize
     module procedure diagonalize_ge_dble_
+    module procedure diagonalize_ge_cmplx_
 end interface
 
 interface sdiagonalize
@@ -93,7 +95,8 @@ interface tostr
     module procedure tostr_dble_
 end interface
 
-! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI
+! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
+!     ZGEEV, ZGEEB
 
 
 contains
@@ -1085,8 +1088,8 @@ function get_reciprocal_mbd_energy( &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
     real(8), intent(out), optional :: &
-        rpa_orders(size(k_grid, 1), 20), &
-        mode_enes(size(k_grid, 1), 3*size(xyz, 1))
+        mode_enes(size(k_grid, 1), 3*size(xyz, 1)), &
+        rpa_orders(size(k_grid, 1), 20)
     complex(8), intent(out), optional :: &
         modes(size(k_grid, 1), 3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: ene
@@ -1117,6 +1120,38 @@ function get_reciprocal_mbd_energy( &
         ! MPI code end
         k_point = k_grid(i_kpt, :)
         if (do_rpa) then
+            if (get_orders) then
+                ene = ene+get_single_reciprocal_rpa_energy( &
+                    blanked('P', mode)//mute, &
+                    version, &
+                    xyz, &
+                    alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, omega=omega), &
+                    k_point, &
+                    unit_cell, &
+                    R_vdw=R_vdw, &
+                    beta=beta, &
+                    a=a, &
+                    overlap=overlap, &
+                    C6=C6, &
+                    damping_custom=damping_custom, &
+                    potential_custom=potential_custom, &
+                    rpa_orders=rpa_orders(i_kpt, :))
+            else
+                ene = ene+get_single_reciprocal_rpa_energy( &
+                    blanked('P', mode)//mute, &
+                    version, &
+                    xyz, &
+                    alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, omega=omega), &
+                    k_point, &
+                    unit_cell, &
+                    R_vdw=R_vdw, &
+                    beta=beta, &
+                    a=a, &
+                    overlap=overlap, &
+                    C6=C6, &
+                    damping_custom=damping_custom, &
+                    potential_custom=potential_custom)
+            end if
         else
             if (get_eigenvalues .and. get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_energy( &
@@ -1251,7 +1286,7 @@ function get_supercell_mbd_energy( &
     call ts(-2)
     call ts(3)
     if (do_rpa) then
-        ene = get_qho_rpa_energy( &
+        ene = get_single_rpa_energy( &
             mode, &
             version, &
             xyz_super, &
@@ -1360,7 +1395,7 @@ end function get_supercell_mbd_energy
 ! end function mbd_nbody
 
 
-function get_qho_rpa_energy( &
+function get_single_rpa_energy( &
         mode, &
         version, &
         xyz, &
@@ -1461,7 +1496,116 @@ function get_qho_rpa_energy( &
             call sync_sum(rpa_orders)
         end if
     end if
-end function get_qho_rpa_energy
+end function get_single_rpa_energy
+
+
+function get_single_reciprocal_rpa_energy( &
+        mode, &
+        version, &
+        xyz, &
+        alpha, &
+        k_point, &
+        unit_cell, &
+        R_vdw, &
+        beta, &
+        a, &
+        overlap, &
+        C6, &
+        damping_custom, &
+        potential_custom, &
+        rpa_orders) &
+        result(ene)
+    character(len=*), intent(in) :: &
+        mode, version
+    real(8), intent(in) :: &
+        xyz(:, :), &
+        alpha(:, :), &
+        k_point(3), &
+        unit_cell(3, 3)
+    real(8), intent(in), optional :: &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    real(8), intent(out), optional :: rpa_orders(20)
+    real(8) :: ene
+
+    complex(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
+    complex(8) :: eigs(3*size(xyz, 1))
+    integer :: i_atom, i_xyz, i_grid_omega, i
+    integer :: n_order, n_negative_eigs
+    logical :: is_parallel, get_orders
+    character(len=1) :: mute
+
+    is_parallel = is_in('P', mode)
+    get_orders = is_in('O', mode)
+    if (is_in('M', mode)) then
+        mute = 'M'
+    else
+        mute = ''
+    end if
+
+    do i_grid_omega = 0, n_grid_omega
+        ! MPI code begin
+        if (is_parallel) then
+            if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
+        end if
+        ! MPI code end
+        relay(:, :) = 0.d0
+        call add_dipole_matrix( & ! relay = T
+            blanked('P', mode)//mute, &
+            version, &
+            xyz, &
+            alpha=alpha(i_grid_omega+1, :), &
+            R_vdw=R_vdw, &
+            beta=beta, &
+            a=a, &
+            overlap=overlap, &
+            C6=C6, &
+            damping_custom=damping_custom, &
+            potential_custom=potential_custom, &
+            k_point=k_point, &
+            unit_cell=unit_cell, &
+            relay_c=relay)
+        do i_atom = 1, size(xyz, 1)
+            do i_xyz = 1, 3
+                i = (i_atom-1)*3+i_xyz
+                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :) 
+                ! relay = alpha*T
+            end do
+        end do
+        AT = relay
+        do i = 1, 3*size(xyz, 1)
+            relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
+        end do
+        relay = sqrt(relay*conjg(relay))
+        call diagonalize('N', relay, eigs)
+        n_negative_eigs = count(dble(eigs) < 0)
+        if (n_negative_eigs > 0) then
+            call print_warning("1+AT matrix has " &
+                //trim(tostr(n_negative_eigs))//" negative eigenvalues")
+        end if
+        ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
+        if (get_orders) then
+            AT = 2*dble(AT)+AT*conjg(AT)
+            call diagonalize('N', AT, eigs)
+            do n_order = 2, param_rpa_order_max
+                rpa_orders(n_order) = rpa_orders(n_order) &
+                    +(-1.d0/(2*pi)*(-1)**n_order*sum(dble(eigs)**n_order)/n_order) &
+                    *omega_grid_w(i_grid_omega)
+            end do
+        end if
+        mute = 'M'
+    end do
+    if (is_parallel) then
+        call sync_sum(ene)
+        if (get_orders) then
+            call sync_sum(rpa_orders)
+        end if
+    end if
+end function get_single_reciprocal_rpa_energy
 
 
 function make_g_grid(n1, n2, n3) result(g_grid)
@@ -2104,6 +2248,36 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
 end subroutine
 
 
+subroutine diagonalize_ge_cmplx_(mode, A, eigs)
+    character(len=1), intent(in) :: mode
+    complex(8), intent(inout) :: A(:, :)
+    complex(8), intent(out) :: eigs(size(A, 1))
+
+    complex(8), allocatable :: work(:)
+    real(8) :: rwork(2*size(A, 1))
+    integer :: n, lwork
+    complex(8) :: lwork_arr
+    integer :: error_flag
+    complex(8) :: dummy
+    complex(8) :: vectors(size(A, 1), size(A, 2))
+
+    n = size(A, 1)
+    call ZGEEV('N', mode, n, A, n, eigs, dummy, 1, &
+        vectors, n, lwork_arr, -1, rwork, error_flag)
+    lwork = nint(dble(lwork_arr))
+    allocate (work(lwork))
+    call ZGEEV('N', mode, n, A, n, eigs, dummy, 1, &
+        vectors, n, work, lwork, rwork, error_flag)
+    deallocate (work)
+    if (error_flag /= 0) then
+        call print_log( &
+            "Matrix diagonalization failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
+    endif
+    A = vectors
+end subroutine
+
+
 function cart_prod_(a, b) result(c)
     real(8), intent(in) :: a(:), b(:)
     real(8) :: c(size(a), size(b))
@@ -2121,6 +2295,16 @@ end function
 function get_diag_(A) result(d)
     real(8), intent(in) :: A(:, :)
     real(8) :: d(size(A, 1))
+
+    integer :: i
+
+    forall (i = 1:size(A, 1)) d(i) = A(i, i)
+end function
+
+
+function get_diag_cmplx_(A) result(d)
+    complex(8), intent(in) :: A(:, :)
+    complex(8) :: d(size(A, 1))
 
     integer :: i
 

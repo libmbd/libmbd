@@ -27,6 +27,8 @@ interface broadcast
     module procedure broadcast_matrix_dble_
     module procedure broadcast_3d_dble_
     module procedure broadcast_4d_dble_
+    module procedure broadcast_vector_cmplx_
+    module procedure broadcast_matrix_cmplx_
 end interface
 
 ! external :: &
@@ -197,6 +199,34 @@ subroutine broadcast_4d_dble_(x)
     real(8), intent(inout) :: x(:, :, :, :)
 
     call broadcast_array_dble_(x, size(x))
+end subroutine
+
+subroutine broadcast_array_cmplx_(array, n_array)
+    implicit none
+
+    integer, intent(in) :: n_array
+    complex(8), intent(inout) :: array(n_array)
+
+    integer :: mpi_err
+
+    call MPI_BCAST(array, n_array, MPI_COMPLEX16, 0, &
+        MPI_COMM_WORLD, mpi_err)
+end subroutine
+
+subroutine broadcast_vector_cmplx_(x)
+    implicit none
+
+    complex(8), intent(inout) :: x(:)
+
+    call broadcast_array_cmplx_(x, size(x))
+end subroutine
+
+subroutine broadcast_matrix_cmplx_(x)
+    implicit none
+
+    complex(8), intent(inout) :: x(:, :)
+
+    call broadcast_array_cmplx_(x, size(x))
 end subroutine
 
 subroutine print_log(str, mute)

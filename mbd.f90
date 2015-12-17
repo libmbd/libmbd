@@ -985,10 +985,11 @@ function get_single_reciprocal_mbd_energy( &
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
-    logical :: get_eigenvalues, get_eigenvectors
+    logical :: get_eigenvalues, get_eigenvectors, is_parallel
 
     get_eigenvalues = is_in('E', mode)
     get_eigenvectors = is_in('V', mode)
+    is_parallel = is_in('P', mode)
 
     call ts(10)
     relay(:, :) = cmplx(0.d0, 0.d0, 8)
@@ -1030,13 +1031,21 @@ function get_single_reciprocal_mbd_energy( &
     end do
     call ts(-12)
     call ts(13)
-    if (get_eigenvectors) then
-        call sdiagonalize('V', relay, eigs)
-        modes = relay
-    else
-        call sdiagonalize('N', relay, eigs)
+    if (my_task == 0) then
+        if (get_eigenvectors) then
+            call sdiagonalize('V', relay, eigs)
+            modes = relay
+        else
+            call sdiagonalize('N', relay, eigs)
+        end if
     end if
     call ts(-13)
+    ! MPI code begin
+    if (is_parallel) then
+        call broadcast(relay)
+        call broadcast(eigs)
+    end if
+    ! MPI code end
     if (get_eigenvalues) then
         mode_enes(:) = 0.d0
         where (eigs > 0) mode_enes = sqrt(eigs)

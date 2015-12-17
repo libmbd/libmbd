@@ -35,6 +35,7 @@ real(8) :: &
     param_dipole_real_space_lowdim_cutoff = 100.d0/bohr, &
     param_dipole_rec_space_cutoff = 10.d0*bohr, &
     param_ewald_alpha = 0.3
+    param_mayer_scaling = 1.d0, &
 
 integer :: &
     param_mbd_nbody_max = 3, &
@@ -1762,7 +1763,7 @@ elemental function get_sigma_selfint(alpha) result(sigma)
     real(8), intent(in) :: alpha
     real(8) :: sigma
 
-    sigma = (sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
+    sigma = param_mayer_scaling*(sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
 end function
 
 

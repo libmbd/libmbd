@@ -1620,7 +1620,7 @@ function make_g_grid(n1, n2, n3) result(g_grid)
         call shift_cell (g_kpt,(/ 0, 0, 0 /), kpt_range-1)
         g_kpt_shifted = g_kpt
         where (2*g_kpt > kpt_range) g_kpt_shifted = g_kpt-kpt_range
-        g_grid(i_kpt, :) = real(g_kpt_shifted)/kpt_range
+        g_grid(i_kpt, :) = dble(g_kpt_shifted)/kpt_range
     end do
 end function make_g_grid
 

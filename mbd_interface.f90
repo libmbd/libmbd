@@ -7,11 +7,9 @@ implicit none
 private
 
 public :: &
-    sync_sum, broadcast, print_log, print_error, print_warning, pi, nan
+    sync_sum, broadcast, print_log, print_error, print_warning
 
-real(8), parameter :: &
-    pi = acos(-1.d0), &
-    nan = sqrt(-sin(0.d0))
+real(8), parameter, public :: pi = acos(-1.d0)
 
 interface sync_sum
     module procedure sync_sum_dble_

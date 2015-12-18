@@ -12,7 +12,7 @@ module mbd
 ! M: mute
 
 use mbd_interface, only: &
-    sync_sum, broadcast, print_error, print_warning, print_log, pi, nan
+    sync_sum, broadcast, print_error, print_warning, print_log, pi
 use mbd_helper, only: &
     is_in, blanked
 
@@ -851,7 +851,7 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     if (n_negative_eigs > 0) then
         call print_warning("CDM Hamiltonian has " &
             //trim(tostr(n_negative_eigs))//" negative eigenvalues")
-        ene = nan
+        ene = -99999999.d0
     else
         ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
     end if

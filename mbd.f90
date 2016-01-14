@@ -923,7 +923,7 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
         end do
     end do
     call ts(22)
-    if (my_task == 0) then
+    if (.not. is_parallel .or. my_task == 0) then
         if (get_eigenvectors) then
             call sdiagonalize('V', relay, eigs)
             modes = relay
@@ -993,11 +993,12 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         mute = ''
     end if
 
-
     alpha_ts = alpha_dynamic_ts_all('O', n_grid_omega, alpha_0, omega=omega)
     ene = 0.d0
-    mode_enes(:, :) = 0.d0
-    modes(:, :, :) = 0.d0
+    if (get_eigenvalues .and. get_eigenvectors) then
+        mode_enes(:, :) = 0.d0
+        modes(:, :, :) = 0.d0
+    end if
     do i_kpt = 1, size(k_grid, 1)
         ! MPI code begin
         if (is_parallel) then

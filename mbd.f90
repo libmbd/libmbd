@@ -1109,7 +1109,7 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
     real(8), intent(out), optional :: rpa_orders(20)
     real(8) :: ene
 
-    logical :: do_rpa
+    logical :: do_rpa, get_orders
     real(8) :: R_cell(3)
     integer :: i_atom, i
     integer :: i_cell
@@ -1117,10 +1117,11 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
 
     real(8), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
-        R_vdw_super(:), C6_super(:)
-    real(8) :: unit_cell_super(3, 3), alpha_ts(0:n_grid_omega, size(xyz, 1))
+        R_vdw_super(:), C6_super(:), alpha_ts_super(:, :)
+    real(8) :: unit_cell_super(3, 3)
 
     do_rpa = is_in('Q', mode)
+    get_orders = is_in('O', mode)
 
     n_cells = product(supercell)
     do i = 1, 3
@@ -1128,6 +1129,7 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
     end do
     allocate (xyz_super(n_cells*size(xyz, 1), 3))
     allocate (alpha_0_super(n_cells*size(alpha_0)))
+    allocate (alpha_ts_super(0:n_grid_omega, n_cells*size(alpha_0)))
     allocate (omega_super(n_cells*size(omega)))
     allocate (R_vdw_super(n_cells*size(R_vdw)))
     allocate (C6_super(n_cells*size(C6)))
@@ -1149,13 +1151,13 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
         end do
     end do
     if (do_rpa) then
-        alpha_ts = alpha_dynamic_ts_all( &
+        alpha_ts_super = alpha_dynamic_ts_all( &
             'O', n_grid_omega, alpha_0_super, omega=omega_super)
         ene = get_single_rpa_energy( &
             mode, &
             version, &
             xyz_super, &
-            alpha_ts, &
+            alpha_ts_super, &
             R_vdw=R_vdw_super, &
             beta=beta, &
             a=a, &
@@ -1177,11 +1179,12 @@ function get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
     end if
     deallocate (xyz_super)
     deallocate (alpha_0_super)
+    deallocate (alpha_ts_super)
     deallocate (omega_super)
     deallocate (R_vdw_super)
     deallocate (C6_super)
     ene = ene/n_cells
-    if (is_in('Q', mode)) then
+    if (get_orders) then
         rpa_orders = rpa_orders/n_cells
     end if
 end function get_supercell_mbd_energy
@@ -1294,6 +1297,7 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
         mute = ''
     end if
 
+    ene = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
         if (is_parallel) then

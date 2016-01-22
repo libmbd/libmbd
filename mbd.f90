@@ -703,7 +703,7 @@ subroutine init_grid(n)
     allocate (omega_grid_w(0:n))
     omega_grid(0) = 0.d0
     omega_grid_w(0) = 0.d0
-    call get_omega_grid(n, 10.d0, 2.d0, omega_grid(1:n), omega_grid_w(1:n))
+    call get_omega_grid(n, 0.6d0, omega_grid(1:n), omega_grid_w(1:n))
 end subroutine
 
 
@@ -1525,20 +1525,65 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
 end function contract_polarizability
 
 
-subroutine get_omega_grid(n, a, m, x, w)
+subroutine get_omega_grid(n, L, x, w)
     integer, intent(in) :: n
-    real(8), intent(in) :: a, m
+    real(8), intent(in) :: L
     real(8), intent(out) :: x(n), w(n)
 
-    integer :: i
-    real(8) :: j(n), v(n)
-
-    v = (/ (i, i = n, 1, -1) /)
-    v = cos((2.d0*v-1.d0)/(2.d0*n)*pi)
-    x = -a*log(1.d0-((1.d0+v)/2.d0)**m)
-    j = a*m/((1.d0+v)*((2.d0/(1.d0+v))**m-1.d0))
-    w = j*sqrt(1.d0-v**2)*pi/n
+    call gauss_legendre(n, x, w)
+    w = 2*L/(1-x)**2*w
+    x = L*(1+x)/(1-x)
+    w = w(n:1:-1)
+    x = x(n:1:-1)
 end subroutine get_omega_grid
+
+
+subroutine gauss_legendre(n, r, w)
+    integer, intent(in) :: n
+    real(8), intent(out) :: r(n), w(n)
+
+    integer, parameter :: q = 16
+    integer, parameter :: n_iter = 1000
+    real(q) :: x, f, df, dx
+    integer :: k, iter, i
+    real(q) :: Pk(0:n), Pk1(0:n-1), Pk2(0:n-2)
+
+    if (n > 60) then
+        call print_error( &
+            'Cannot construct accurate Gauss-Legendre quadrature grids for n > 60.')
+    end if
+    if (n == 1) then
+        r(1) = 0.d0
+        w(1) = 2.d0
+        return
+    end if
+    Pk2(0) = 1._q  ! k = 0
+    Pk1(0:1) = (/ 0._q, 1._q /)  ! k = 1
+    do k = 2, n
+        Pk(0:k) = ((2*k-1)*(/ 0.0_q, Pk1(0:k-1) /)-(k-1)*(/ Pk2(0:k-2), 0._q, 0._q /))/k
+        if (k < n) then
+            Pk2(0:k-1) = Pk1(0:k-1)
+            Pk1(0:k) = Pk(0:k)
+        end if
+    end do
+    ! now Pk contains k-th Legendre polynomial
+    do i = 1, n
+        x = cos(pi*(i-0.25_q)/(n+0.5_q))
+        do iter = 1, n_iter
+            df = 0._q
+            f = Pk(n)
+            do k = n-1, 0, -1
+                df = f + x*df
+                f = Pk(k) + x*f
+            end do
+            dx = f/df
+            x = x-dx
+            if (abs(dx) < 10*epsilon(dx)) exit
+        end do
+        r(i) = dble(x)
+        w(i) = dble(2/((1-x**2)*df**2))
+    end do
+end subroutine
 
 
 function alpha_dynamic_ts_all(mode, n, alpha_0, C6, omega) result(alpha_dyn)

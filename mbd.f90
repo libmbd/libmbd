@@ -1518,7 +1518,9 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
 
     do i_atom = 1, size(alpha_n)
         forall (i_xyz = 1:3, j_xyz = 1:3) alpha_3_3(i_xyz, j_xyz) &
-                = sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
+        ! TZ: What does the :: mean in a matrix ???
+        != sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
+                = sum(alpha_3n_3n(i_xyz:3, 3*(i_atom-1)+j_xyz))
         alpha_diag = sdiagonalized(alpha_3_3)
         alpha_n(i_atom) = sum(alpha_diag)/3
     end do

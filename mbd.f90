@@ -1513,14 +1513,17 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
     real(8), intent(in) :: alpha_3n_3n(:, :)
     real(8) :: alpha_n(size(alpha_3n_3n, 1)/3)
 
-    integer :: i_atom, i_xyz, j_xyz
+    integer :: i_atom, i_xyz, j_xyz, dim_alpha
     real(8) :: alpha_3_3(3, 3), alpha_diag(3)
+
+    dim_alpha = size(alpha_3n_3n(:,1))   ! TZ: to give the last elements of the
+                                         ! second column
 
     do i_atom = 1, size(alpha_n)
         forall (i_xyz = 1:3, j_xyz = 1:3) alpha_3_3(i_xyz, j_xyz) &
         ! TZ: What does the :: mean in a matrix ???
         != sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+j_xyz))
-                = sum(alpha_3n_3n(i_xyz:3, 3*(i_atom-1)+j_xyz))
+                = sum(alpha_3n_3n(i_xyz:dim_alpha:3, 3*(i_atom-1)+j_xyz))
         alpha_diag = sdiagonalized(alpha_3_3)
         alpha_n(i_atom) = sum(alpha_diag)/3
     end do

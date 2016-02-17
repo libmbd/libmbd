@@ -26,6 +26,8 @@ real(8) :: &
     param_mayer_scaling = 1.d0, &
     param_ewald_real_cutoff_scaling = 1.d0, &
     param_ewald_rec_cutoff_scaling = 1.d0
+logical :: &
+    param_ewald_on = .true.
 integer :: &
     param_mbd_nbody_max = 3, &
     param_rpa_order_max = 10
@@ -418,7 +420,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
         end if
     end if
     ! MPI code end
-    if (is_crystal .and. .not. is_low_dim .and. is_lrange) then
+    if (is_crystal .and. .not. is_low_dim .and. is_lrange .and. param_ewald_on) then
         call add_ewald_dipole_parts( &
             mode, xyz, unit_cell, ewald_alpha, k_point, &
             relay, relay_c)

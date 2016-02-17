@@ -442,7 +442,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
 
     logical :: is_parallel, is_reciprocal, mute, do_surface
     real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
-        k_sq, rec_space_cutoff, Tpp(3, 3)
+        k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
     complex(8) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
@@ -499,6 +499,10 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         end if
         k_sq = sum(k_total**2)
         if (sqrt(k_sq) > rec_space_cutoff) cycle
+        k_prefactor(:, :) = 4*pi/volume*exp(-k_sq/(4*alpha**2))
+        forall (i_xyz = 1:3, j_xyz = 1:3) &
+                k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
+                *k_total(i_xyz)*k_total(j_xyz)/k_sq
         do i_atom = 1, size(xyz, 1)
             ! MPI code begin
             if (parallel_mode == 'A') then
@@ -507,14 +511,11 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
             ! MPI code end
             do j_atom = 1, i_atom
                 r = xyz(i_atom, :)-xyz(j_atom, :)
-                Tpp(:, :) = 4*pi/volume*exp(-k_sq/(4*alpha**2))
-                forall (i_xyz = 1:3, j_xyz = 1:3) &
-                    Tpp(i_xyz, j_xyz) = Tpp(i_xyz, j_xyz) &
-                    *k_total(i_xyz)*k_total(j_xyz)/k_sq
                 if (is_reciprocal) then
-                    Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(G_vector, r))
+                    Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
+                        *dot_product(G_vector, r))
                 else
-                    Tpp = Tpp*cos(dot_product(G_vector, r))
+                    Tpp = k_prefactor*cos(dot_product(G_vector, r))
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
@@ -547,8 +548,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             if (is_reciprocal) then
-                relay_c(i, i) = relay_c(i, i) &
-                    -4*alpha**3/(3*sqrt(pi))
+                relay_c(i, i) = relay_c(i, i)-4*alpha**3/(3*sqrt(pi))
             else
                 relay(i, i) = relay(i, i)-4*alpha**3/(3*sqrt(pi))
             end if
@@ -565,19 +565,17 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                 do j_xyz = 1, 3
                     i = 3*(i_atom-1)+i_xyz
                     j = 3*(j_atom-1)+j_xyz
+                    elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
+                        *exp(-k_sq/(4*alpha**2))
                     if (is_reciprocal) then
-                        relay_c(i, j) = relay_c(i, j) &
-                            +4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                            *exp(-k_sq/(4*alpha**2))
+                        relay_c(i, j) = relay_c(i, j)+elem
                         if (i_atom /= j_atom) then
-                            relay_c(j, i) = relay_c(i, j)
+                            relay_c(j, i) = relay_c(j, i)+elem
                         end if
                     else
-                        relay(i, j) = relay(i, j) &
-                            +4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                            *exp(-k_sq/(4*alpha**2))
+                        relay(i, j) = relay(i, j)+elem
                         if (i_atom /= j_atom) then
-                            relay(j, i) = relay(i, j)
+                            relay(j, i) = relay(j, i)+elem
                         end if
                     end if ! is_reciprocal
                 end do ! j_xyz

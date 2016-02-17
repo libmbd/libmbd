@@ -704,7 +704,20 @@ subroutine init_grid(n)
     omega_grid(0) = 0.d0
     omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, omega_grid(1:n), omega_grid_w(1:n))
+    call print_log( &
+        "Initialized a radial integration grid of "//trim(tostr(n))//" points.")
+    call print_log( &
+        "Relative quadrature error in C6 of carbon atom: "// &
+        trim(tostr(test_frequency_grid())))
 end subroutine
+
+
+real(8) function test_frequency_grid() result(error)
+    real(8) :: alpha(0:n_grid_omega, 1)
+
+    alpha = alpha_dynamic_ts_all('C', n_grid_omega, (/ 21.d0 /), C6=(/ 99.5d0 /))
+    error = abs(get_total_C6_from_alpha(alpha)/99.5d0-1.d0)
+end function
 
 
 subroutine destroy_grid()

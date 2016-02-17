@@ -2030,7 +2030,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     deallocate (work_arr)
     if (error_flag /= 0) then
         call print_log( &
-            "Matrix diagonalization failed in module mbd with error code " &
+            "DSYEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
 end subroutine
@@ -2081,7 +2081,7 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
     deallocate (work_arr)
     if (error_flag /= 0) then
         call print_log( &
-            "Matrix diagonalization failed in module mbd with error code " &
+            "DGEEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
     eigs = cmplx(eigs_r, eigs_i, 8)
@@ -2134,7 +2134,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     deallocate (work)
     if (error_flag /= 0) then
         call print_error( &
-            "Matrix diagonalization failed in module mbd with error code" &
+            "ZHEEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
 end subroutine
@@ -2163,7 +2163,7 @@ subroutine diagonalize_ge_cmplx_(mode, A, eigs)
     deallocate (work)
     if (error_flag /= 0) then
         call print_log( &
-            "Matrix diagonalization failed in module mbd with error code " &
+            "ZGEEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
     A = vectors

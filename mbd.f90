@@ -777,6 +777,57 @@ function run_scs(mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
 end function run_scs
 
 
+function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
+        supercell, k_grid, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
+        potential_custom) result(ene)
+    character(len=*), intent(in) :: mode, version
+    real(8), intent(in) :: &
+        xyz(:, :), &
+        alpha_0(size(xyz, 1)), &
+        omega(size(xyz, 1)), &
+        k_grid(:, :), &
+        unit_cell(3, 3)
+    integer, intent(in) :: supercell(3)
+    real(8), intent(in), optional :: &
+        R_vdw(size(xyz, 1)), &
+        beta, a, &
+        overlap(size(xyz, 1), size(xyz, 1)), &
+        C6(size(xyz, 1)), &
+        damping_custom(size(xyz, 1), size(xyz, 1)), &
+        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    real(8) :: ene
+
+    logical :: is_parallel, do_rpa, is_reciprocal, is_crystal
+    real(8), allocatable :: alpha(:, :)
+
+    is_parallel = is_in('P', mode)
+    is_crystal = is_in('C', mode)
+    do_rpa = is_in('Q', mode)
+    is_reciprocal = is_in('R', mode)
+    if (.not. is_crystal) then
+        if (.not. do_rpa) then
+            ene = get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
+                beta, a, overlap, C6, damping_custom, potential_custom, unit_cell)
+        else
+            allocate (alpha(0:n_grid_omega, size(alpha_0)))
+            alpha = alpha_dynamic_ts_all(mode, n_grid_omega, alpha_0, C6, omega)
+            ene = get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
+                a, overlap, C6, damping_custom, potential_custom, unit_cell)
+            deallocate (alpha)
+        end if
+    else
+        if (is_reciprocal) then
+            ene = get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
+                k_grid, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
+                potential_custom)
+        else
+            ene = get_supercell_mbd_energy(mode, version, xyz, alpha_0, omega, &
+                unit_cell, supercell, R_vdw, beta, a, C6)
+        end if
+    end if
+end function get_mbd_energy
+
+
 function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
         beta, a, overlap, C6, damping_custom, potential_custom, unit_cell, &
         mode_enes, modes) result(ene)

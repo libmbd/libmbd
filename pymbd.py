@@ -6,15 +6,13 @@ from pathlib import Path
 from mbd import mbd
 import numpy as np
 
-
-bohr = 0.529177249
 ntasks = MPI.COMM_WORLD.Get_size()
 myid = MPI.COMM_WORLD.Get_rank()
-
-free_atom_db = json.load((Path(__file__).parent/'free_atoms.json').open())
-
 mbd.my_task = myid
 mbd.n_tasks = ntasks
+
+free_atom_db = json.load((Path(__file__).parent/'free_atoms.json').open())
+bohr = mbd.bohr
 
 
 def get_free_atom_data(species):
@@ -66,3 +64,26 @@ class ArrayEncoder(json.JSONEncoder):
             return obj.tolist()
         except AttributeError:
             return super().default(obj)
+
+
+def load_run_script(path):
+    import imp
+    script = imp.new_module('script')
+    try:
+        exec(compile(open(path).read(), path, 'exec'), script.__dict__)
+    except:
+        import traceback
+        traceback.print_exc()
+        printerr('There was an error while reading run script.')
+    return script
+
+
+if __name__ == '__main__':
+    class Context:
+        pass
+    script = load_run_script(sys.argv[1])
+    ctx = Context()
+    for key, value in dict(locals()).items():
+        if callable(value) and hasattr(value, '__module__') and value.__module__ == __name__:
+            setattr(ctx, key, value)
+    script.run(ctx, mbd)

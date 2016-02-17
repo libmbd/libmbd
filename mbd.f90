@@ -26,6 +26,8 @@ real(8) :: &
     param_mayer_scaling = 1.d0, &
     param_ewald_real_cutoff_scaling = 1.d0, &
     param_ewald_rec_cutoff_scaling = 1.d0
+logical :: &
+    param_ewald_on = .true.
 integer :: &
     param_mbd_nbody_max = 3, &
     param_rpa_order_max = 10
@@ -279,7 +281,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
         if (is_low_dim) then
             real_space_cutoff = param_dipole_low_dim_cutoff
         else
-            volume = max(product(dble(diagonalized(unit_cell))), 0.2d0)
+            volume = max(dble(product(diagonalized(unit_cell))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
             real_space_cutoff = 6.d0/ewald_alpha*param_ewald_real_cutoff_scaling
             call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
@@ -418,7 +420,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
         end if
     end if
     ! MPI code end
-    if (is_crystal .and. .not. is_low_dim .and. is_lrange) then
+    if (is_crystal .and. .not. is_low_dim .and. is_lrange .and. param_ewald_on) then
         call add_ewald_dipole_parts( &
             mode, xyz, unit_cell, ewald_alpha, k_point, &
             relay, relay_c)
@@ -440,7 +442,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
 
     logical :: is_parallel, is_reciprocal, mute, do_surface
     real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
-        k_sq, rec_space_cutoff, Tpp(3, 3)
+        k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
     complex(8) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
@@ -470,7 +472,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
     end if
     ! MPI code end
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
-    volume = product(dble(diagonalized(unit_cell)))
+    volume = dble(product(diagonalized(unit_cell)))
     rec_space_cutoff = 10.d0*alpha*param_ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(rec_unit_cell, rec_space_cutoff)
     call print_log('Ewald: using reciprocal cutoff = ' &
@@ -497,6 +499,10 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         end if
         k_sq = sum(k_total**2)
         if (sqrt(k_sq) > rec_space_cutoff) cycle
+        k_prefactor(:, :) = 4*pi/volume*exp(-k_sq/(4*alpha**2))
+        forall (i_xyz = 1:3, j_xyz = 1:3) &
+                k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
+                *k_total(i_xyz)*k_total(j_xyz)/k_sq
         do i_atom = 1, size(xyz, 1)
             ! MPI code begin
             if (parallel_mode == 'A') then
@@ -505,14 +511,11 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
             ! MPI code end
             do j_atom = 1, i_atom
                 r = xyz(i_atom, :)-xyz(j_atom, :)
-                Tpp(:, :) = 4*pi/volume*exp(-k_sq/(4*alpha**2))
-                forall (i_xyz = 1:3, j_xyz = 1:3) &
-                    Tpp(i_xyz, j_xyz) = Tpp(i_xyz, j_xyz) &
-                    *k_total(i_xyz)*k_total(j_xyz)/k_sq
                 if (is_reciprocal) then
-                    Tpp_c = Tpp*exp(cmplx(0.d0, 1.d0, 8)*dot_product(G_vector, r))
+                    Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
+                        *dot_product(G_vector, r))
                 else
-                    Tpp = Tpp*cos(dot_product(G_vector, r))
+                    Tpp = k_prefactor*cos(dot_product(G_vector, r))
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
@@ -545,8 +548,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             if (is_reciprocal) then
-                relay_c(i, i) = relay_c(i, i) &
-                    -4*alpha**3/(3*sqrt(pi))
+                relay_c(i, i) = relay_c(i, i)-4*alpha**3/(3*sqrt(pi))
             else
                 relay(i, i) = relay(i, i)-4*alpha**3/(3*sqrt(pi))
             end if
@@ -563,19 +565,17 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                 do j_xyz = 1, 3
                     i = 3*(i_atom-1)+i_xyz
                     j = 3*(j_atom-1)+j_xyz
+                    elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
+                        *exp(-k_sq/(4*alpha**2))
                     if (is_reciprocal) then
-                        relay_c(i, j) = relay_c(i, j) &
-                            +4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                            *exp(-k_sq/(4*alpha**2))
+                        relay_c(i, j) = relay_c(i, j)+elem
                         if (i_atom /= j_atom) then
-                            relay_c(j, i) = relay_c(i, j)
+                            relay_c(j, i) = relay_c(j, i)+elem
                         end if
                     else
-                        relay(i, j) = relay(i, j) &
-                            +4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                            *exp(-k_sq/(4*alpha**2))
+                        relay(i, j) = relay(i, j)+elem
                         if (i_atom /= j_atom) then
-                            relay(j, i) = relay(i, j)
+                            relay(j, i) = relay(j, i)+elem
                         end if
                     end if ! is_reciprocal
                 end do ! j_xyz
@@ -704,7 +704,20 @@ subroutine init_grid(n)
     omega_grid(0) = 0.d0
     omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, omega_grid(1:n), omega_grid_w(1:n))
+    call print_log( &
+        "Initialized a radial integration grid of "//trim(tostr(n))//" points.")
+    call print_log( &
+        "Relative quadrature error in C6 of carbon atom: "// &
+        trim(tostr(test_frequency_grid())))
 end subroutine
+
+
+real(8) function test_frequency_grid() result(error)
+    real(8) :: alpha(0:n_grid_omega, 1)
+
+    alpha = alpha_dynamic_ts_all('C', n_grid_omega, (/ 21.d0 /), C6=(/ 99.5d0 /))
+    error = abs(get_total_C6_from_alpha(alpha)/99.5d0-1.d0)
+end function
 
 
 subroutine destroy_grid()
@@ -1903,9 +1916,10 @@ function supercell_circum(uc, radius) result(sc)
     integer :: sc(3)
 
     real(8) :: ruc(3, 3), layer_sep(3)
+    integer :: i
 
     ruc = 2*pi*inverted(transpose(uc))
-    layer_sep = sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))
+    forall (i = 1:3) layer_sep(i) = sum(uc(i, :)*ruc(i, :)/sqrt(sum(ruc(i, :)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
     where (param_vacuum_axis) sc = 0
 end function
@@ -2034,7 +2048,7 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     deallocate (work_arr)
     if (error_flag /= 0) then
         call print_log( &
-            "Matrix diagonalization failed in module mbd with error code " &
+            "DSYEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
 end subroutine
@@ -2085,7 +2099,7 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
     deallocate (work_arr)
     if (error_flag /= 0) then
         call print_log( &
-            "Matrix diagonalization failed in module mbd with error code " &
+            "DGEEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
     eigs = cmplx(eigs_r, eigs_i, 8)
@@ -2138,7 +2152,7 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     deallocate (work)
     if (error_flag /= 0) then
         call print_error( &
-            "Matrix diagonalization failed in module mbd with error code" &
+            "ZHEEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
 end subroutine
@@ -2167,7 +2181,7 @@ subroutine diagonalize_ge_cmplx_(mode, A, eigs)
     deallocate (work)
     if (error_flag /= 0) then
         call print_log( &
-            "Matrix diagonalization failed in module mbd with error code " &
+            "ZGEEV failed in module mbd with error code " &
             //trim(tostr(error_flag)))
     endif
     A = vectors

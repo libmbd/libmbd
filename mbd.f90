@@ -1898,9 +1898,10 @@ function supercell_circum(uc, radius) result(sc)
     integer :: sc(3)
 
     real(8) :: ruc(3, 3), layer_sep(3)
+    integer :: i
 
     ruc = 2*pi*inverted(transpose(uc))
-    layer_sep = sqrt(sum((uc*(diag(1.d0/sqrt(sum(ruc**2, 2)))*ruc))**2, 2))
+    forall (i = 1:3) layer_sep(i) = sum(uc(i, :)*ruc(i, :)/sqrt(sum(ruc(i, :)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
     where (param_vacuum_axis) sc = 0
 end function

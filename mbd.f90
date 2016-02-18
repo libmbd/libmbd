@@ -892,7 +892,7 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
         end do
     end do
     call ts(21)
-    if (my_task == 0) then
+    if (.not. is_parallel .or. my_task == 0) then
         if (get_eigenvectors) then
             call sdiagonalize('V', relay, eigs)
             modes = relay

@@ -784,10 +784,11 @@ function get_mbd_energy(mode, version, xyz, alpha_0, omega, &
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
-        omega(size(xyz, 1)), &
+        omega(size(xyz, 1))
+    real(8), intent(in), optional :: &
         k_grid(:, :), &
         unit_cell(3, 3)
-    integer, intent(in) :: supercell(3)
+    integer, intent(in), optional :: supercell(3)
     real(8), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         beta, a, &

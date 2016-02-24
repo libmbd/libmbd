@@ -355,8 +355,10 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                         Tpp = damping_1mexp(r_norm, beta*R_vdw_ij, a)*T_bare(r)
                     case ("erf,dip")
                         Tpp = damping_erf(r_norm, beta*R_vdw_ij, a)*T_bare(r)
-                    case ("fermi,dip", "fermi@TS,dip", "fermi@rsSCS,dip")
+                    case ("fermi,dip")
                         Tpp = damping_fermi(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                    case ("fermi^2,dip")
+                        Tpp = damping_fermi(r_norm, beta*R_vdw_ij, a)**2*T_bare(r)
                     case ("overlap,dip")
                         Tpp = damping_overlap( &
                             r_norm, overlap_ij, C6_ij, beta, a)*T_bare(r)

@@ -84,6 +84,6 @@ if __name__ == '__main__':
     script = load_run_script(sys.argv[1])
     ctx = Context()
     for key, value in dict(locals()).items():
-        if callable(value) and hasattr(value, '__module__') and value.__module__ == __name__:
+        if not key.startswith('_'):
             setattr(ctx, key, value)
     script.run(ctx, mbd)

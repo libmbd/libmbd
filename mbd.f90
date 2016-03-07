@@ -701,6 +701,8 @@ subroutine init_grid(n)
     integer, intent(in) :: n
 
     n_grid_omega = n
+    if (allocated(omega_grid)) deallocate(omega_grid)
+    if (allocated(omega_grid_w)) deallocate(omega_grid_w)
     allocate (omega_grid(0:n))
     allocate (omega_grid_w(0:n))
     omega_grid(0) = 0.d0

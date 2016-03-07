@@ -1,6 +1,7 @@
 include system.mk
 blddir = build
 extern = mbd_interface.f90 mbd_helper.f90
+FFLAGS = -Og -fcheck=all
 
 all: mbd
 
@@ -13,7 +14,7 @@ mbd: $(addprefix ${blddir}/,${extern:.f90=.o})
 
 ${blddir}/%.o: %.f90
 	@mkdir -p ${blddir}
-	${FC} -c -fPIC -J ${blddir} -o $@ $^
+	${FC} -c -fPIC -J ${blddir} ${FFLAGS} -o $@ $^
 
 test:
 	@${MAKE} -C tests

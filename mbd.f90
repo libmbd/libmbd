@@ -1431,6 +1431,86 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
 end function get_single_rpa_energy
 
 
+function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) result(rho)
+    real(8), intent(in) :: &
+        pts(:, :), &
+        xyz(:, :), &
+        charges(size(xyz, 1)), &
+        masses(size(xyz, 1)), &
+        omegas(size(xyz, 1))
+    real(8) :: rho(size(pts, 1))
+
+    integer :: i_pt, i_atom, n_atoms
+    real(8), dimension(size(xyz, 1)) :: pre, kernel, rsq
+
+    pre = charges*(masses*omegas/pi)**(3.d0/2)
+    kernel = masses*omegas
+    n_atoms = size(xyz, 1)
+    rho(:) = 0.d0
+    do i_pt = 1, size(pts, 1)
+        if (my_task /= modulo(i_pt, n_tasks)) cycle
+        forall (i_atom = 1:n_atoms)
+            rsq(i_atom) = sum((pts(i_pt, :)-xyz(i_atom, :))**2)
+        end forall
+        rho(i_pt) = sum(pre*exp(-kernel*rsq))
+    end do
+    call sync_sum(rho)
+end function
+
+
+function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) result(rho)
+    real(8), intent(in) :: &
+        pts(:, :), &
+        xyz(:, :), &
+        charges(size(xyz, 1)), &
+        masses(size(xyz, 1)), &
+        omegas(3*size(xyz, 1)), &
+        modes(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8) :: rho(size(pts, 1))
+
+    integer :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
+    integer :: self(3), other(3*(size(xyz, 1)-1))
+    real(8) :: &
+        pre(size(xyz, 1)), &
+        factor(size(xyz, 1)), &
+        rdiffsq(3, 3), &
+        omegas_p(3*size(xyz, 1), 3*size(xyz, 1)), &
+        kernel(3, 3, size(xyz, 1)), &
+        rdiff(3)
+
+    omegas_p = matmul(matmul(modes, diag(omegas)), transpose(modes))
+    n_atoms = size(xyz, 1)
+    kernel(:, :, :) = 0.d0
+    pre(:) = 0.d0
+    do i_atom = 1, n_atoms
+        if (my_task /= modulo(i_atom, n_tasks)) cycle
+        self(:) = (/ (3*(i_atom-1)+i, i = 1, 3) /)
+        other(:) = (/ (i, i = 1, 3*(i_atom-1)),  (i, i = 3*i_atom+1, 3*n_atoms) /)
+        kernel(:, :, i_atom) = masses(i_atom) &
+            *(omegas_p(self, self) &
+                -matmul(matmul(omegas_p(self, other), inverted(omegas_p(other, other))), &
+                    omegas_p(other, self)))
+        pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2) &
+            *sqrt(product(omegas)/product(sdiagonalized(omegas_p(other, other))))
+    end do
+    call sync_sum(kernel)
+    call sync_sum(pre)
+    rho(:) = 0.d0
+    do i_pt = 1, size(pts, 1)
+        if (my_task /= modulo(i_pt, n_tasks)) cycle
+        do i_atom = 1, n_atoms
+            rdiff(:) = pts(i_pt, :)-xyz(i_atom, :)
+            forall (i_xyz = 1:3, j_xyz = 1:3)
+                rdiffsq(i_xyz, j_xyz) = rdiff(i_xyz)*rdiff(j_xyz)
+            end forall
+            factor(i_atom) = sum(kernel(:, :, i_atom)*rdiffsq(:, :))
+        end do
+        rho(i_pt) = sum(pre*exp(-factor))
+    end do
+    call sync_sum(rho)
+end function
+
+
 function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
         potential_custom, rpa_orders) result(ene)

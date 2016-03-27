@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
+import os
 import json
-from mpi4py import MPI
 import sys
-from pathlib import Path
-from mbd import mbd
 import numpy as np
+from mbd import mbd
 
-ntasks = MPI.COMM_WORLD.Get_size()
-myid = MPI.COMM_WORLD.Get_rank()
+try:
+    from mpi4py import MPI
+    ntasks = MPI.COMM_WORLD.Get_size()
+    myid = MPI.COMM_WORLD.Get_rank()
+except ImportError:
+    sys.stderr.write('warning: Install mpi4py for MPI support\n')
+    ntasks = 1
+    myid = 0
+
 mbd.my_task = myid
 mbd.n_tasks = ntasks
-
-free_atom_db = json.load((Path(__file__).parent/'free_atoms.json').open())
+with open(os.path.join(os.path.dirname(__file__), 'free_atoms.json')) as f:
+    free_atom_db = json.load(f)
 bohr = mbd.bohr
 
 

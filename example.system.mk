@@ -5,4 +5,4 @@ FFLAGS = $(addprefix -Wno-,${f_warnings_off})
 FVENDOR = gnu95
 CVENDOR = unix
 FC = mpifort
-LDFLAGS = -lscalapack
+LDFLAGS = -llapack

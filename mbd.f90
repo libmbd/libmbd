@@ -22,6 +22,7 @@ real(8), parameter :: bohr = 0.529177249d0
 
 real(8) :: &
     param_ts_energy_accuracy = 1.d-10, &
+    param_ts_cutoff_radius = 50.d0/bohr, &
     param_dipole_low_dim_cutoff = 100.d0/bohr, &
     param_mayer_scaling = 1.d0, &
     param_ewald_real_cutoff_scaling = 1.d0, &
@@ -172,6 +173,7 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
                     end if
                     r = xyz(i_atom, :)-xyz(j_atom, :)-R_cell
                     r_norm = sqrt(sum(r**2))
+                    if (r_norm > param_ts_cutoff_radius) cycle
                     if (r_norm >= i_shell*shell_thickness &
                         .or. r_norm < (i_shell-1)*shell_thickness) then
                         cycle

@@ -26,7 +26,8 @@ real(8) :: &
     param_dipole_low_dim_cutoff = 100.d0/bohr, &
     param_mayer_scaling = 1.d0, &
     param_ewald_real_cutoff_scaling = 1.d0, &
-    param_ewald_rec_cutoff_scaling = 1.d0
+    param_ewald_rec_cutoff_scaling = 1.d0, &
+    param_k_grid_shift = 0.5d0
 logical :: &
     param_ewald_on = .true.
 integer :: &
@@ -1617,15 +1618,18 @@ function make_g_grid(n1, n2, n3) result(g_grid)
     integer, intent(in) :: n1, n2, n3
     real(8) :: g_grid(n1*n2*n3, 3)
 
-    integer :: g_kpt(3), i_kpt, kpt_range(3), g_kpt_shifted(3)
+    integer :: g_kpt(3), i_kpt, kpt_range(3)
+    real(8) :: g_kpt_shifted(3)
 
     g_kpt = (/ 0, 0, -1 /)
     kpt_range = (/ n1, n2, n3 /)
     do i_kpt = 1, n1*n2*n3
         call shift_cell (g_kpt, (/ 0, 0, 0 /), kpt_range-1)
-        g_kpt_shifted = g_kpt
-        where (2*g_kpt > kpt_range) g_kpt_shifted = g_kpt-kpt_range
-        g_grid(i_kpt, :) = dble(g_kpt_shifted)/kpt_range
+        g_kpt_shifted = dble(g_kpt)+param_k_grid_shift
+        where (2*g_kpt_shifted > kpt_range)
+            g_kpt_shifted = g_kpt_shifted-dble(kpt_range)
+        end where
+        g_grid(i_kpt, :) = g_kpt_shifted/kpt_range
     end do
 end function make_g_grid
 

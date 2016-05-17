@@ -1406,7 +1406,12 @@ function get_single_rpa_energy(mode, version, xyz, alpha, R_vdw, beta, &
         call ts(23)
         call diagonalize('N', relay, eigs)
         call ts(-23)
-        n_negative_eigs = count(dble(eigs) < 0)
+        ! The count construct won't work here due to a bug in Cray compiler
+        ! Has to manually unroll the counting
+        n_negative_eigs = 0
+        do i = 1, size(eigs)
+           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
+        end do
         if (n_negative_eigs > 0) then
             call print_warning("1+AT matrix has " &
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
@@ -1585,7 +1590,12 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         call ts(25)
         call diagonalize('N', relay, eigs)
         call ts(-25)
-        n_negative_eigs = count(dble(eigs) < 0)
+        ! The count construct won't work here due to a bug in Cray compiler
+        ! Has to manually unroll the counting
+        n_negative_eigs = 0
+        do i = 1, size(eigs)
+           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
+        end do
         if (n_negative_eigs > 0) then
             call print_warning("1+AT matrix has " &
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")

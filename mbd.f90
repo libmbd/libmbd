@@ -24,6 +24,7 @@ real(8) :: &
     param_ts_energy_accuracy = 1.d-10, &
     param_ts_cutoff_radius = 50.d0/bohr, &
     param_dipole_low_dim_cutoff = 100.d0/bohr, &
+    param_dipole_cutoff = 400.d0/bohr, &  ! used only when Ewald is off
     param_mayer_scaling = 1.d0, &
     param_ewald_real_cutoff_scaling = 1.d0, &
     param_ewald_rec_cutoff_scaling = 1.d0, &
@@ -254,12 +255,13 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
     character(len=1) :: parallel_mode
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j
     logical :: is_crystal, is_parallel, is_reciprocal, is_low_dim, mute, &
-        is_lrange
+        do_ewald
 
     is_parallel = is_in('P', mode)
     is_reciprocal = is_in('R', mode)
     is_crystal = is_in('C', mode) .or. is_reciprocal
     is_low_dim = any(param_vacuum_axis)
+    do_ewald = .false.
     mute = is_in('M', mode)
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
@@ -283,12 +285,15 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
     if (is_crystal) then
         if (is_low_dim) then
             real_space_cutoff = param_dipole_low_dim_cutoff
-        else
-            volume = max(dble(product(diagonalized(unit_cell))), 0.2d0)
+        else if (param_ewald_on) then
+            do_ewald = .true.
+            volume = max(abs(dble(product(diagonalized(unit_cell)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
             real_space_cutoff = 6.d0/ewald_alpha*param_ewald_real_cutoff_scaling
             call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
                 //', real cutoff = '//trim(tostr(real_space_cutoff)), mute)
+        else
+            real_space_cutoff = param_dipole_cutoff
         end if
         range_cell = supercell_circum(unit_cell, real_space_cutoff)
     else
@@ -342,7 +347,6 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                         C6(i_atom), C6(j_atom), &
                         alpha(i_atom), alpha(j_atom))
                 end if
-                is_lrange = .true.
                 select case (version)
                     case ("bare")
                         Tpp = T_bare(r)
@@ -374,21 +378,21 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                     case ("1mexp,dip,gg")
                         Tpp = (1.d0-damping_1mexp(r_norm, beta*R_vdw_ij, a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
-                        is_lrange = .false.
+                        do_ewald = .false.
                     case ("erf,dip,gg")
                         Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
-                        is_lrange = .false.
+                        do_ewald = .false.
                     case ("fermi,dip,gg")
                         Tpp = (1.d0-damping_fermi(r_norm, beta*R_vdw_ij, a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
-                        is_lrange = .false.
+                        do_ewald = .false.
                     case ("custom,dip,gg")
                         Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
-                        is_lrange = .false.
+                        do_ewald = .false.
                 end select
-                if (is_crystal .and. .not. is_low_dim .and. is_lrange) then
+                if (do_ewald) then
                     Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
                 if (is_reciprocal) then
@@ -425,7 +429,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
         end if
     end if
     ! MPI code end
-    if (is_crystal .and. .not. is_low_dim .and. is_lrange .and. param_ewald_on) then
+    if (do_ewald) then
         call add_ewald_dipole_parts( &
             mode, xyz, unit_cell, ewald_alpha, k_point, &
             relay, relay_c)
@@ -477,7 +481,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
     end if
     ! MPI code end
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
-    volume = dble(product(diagonalized(unit_cell)))
+    volume = abs(dble(product(diagonalized(unit_cell))))
     rec_space_cutoff = 10.d0*alpha*param_ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(rec_unit_cell, rec_space_cutoff)
     call print_log('Ewald: using reciprocal cutoff = ' &

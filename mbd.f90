@@ -284,7 +284,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
             real_space_cutoff = param_dipole_low_dim_cutoff
         else if (param_ewald_on) then
             do_ewald = .true.
-            volume = max(dble(product(diagonalized(unit_cell))), 0.2d0)
+            volume = max(abs(dble(product(diagonalized(unit_cell)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
             real_space_cutoff = 6.d0/ewald_alpha*param_ewald_real_cutoff_scaling
             call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
@@ -478,7 +478,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
     end if
     ! MPI code end
     rec_unit_cell = 2*pi*inverted(transpose(unit_cell))
-    volume = dble(product(diagonalized(unit_cell)))
+    volume = abs(dble(product(diagonalized(unit_cell))))
     rec_space_cutoff = 10.d0*alpha*param_ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(rec_unit_cell, rec_space_cutoff)
     call print_log('Ewald: using reciprocal cutoff = ' &

@@ -49,19 +49,48 @@ def scale_hirsh(hirsh, alpha, C6, R_vdw):
             for q, factor in zip([alpha, C6, R_vdw], [1, 2, 1/3])]
 
 
-def mbd_rsscs(geom, alpha_0, C6, R_vdw, beta, a):
-    xyz = [a.xyz/bohr for a in geom]
+def mbd_rsscs(
+        coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None
+):
     mode = 'M' if ntasks > 1 else ''
+    alpha_0, C6, R_vdw = scale_hirsh(volumes, *get_free_atom_data(species))
+    if lattice is not None:
+        mode += 'C'
     alpha_scs_dyn = mbd.run_scs(
-        mode, 'fermi,dip,gg', xyz,
+        mode, 'fermi,dip,gg', coords,
         mbd.alpha_dynamic_ts_all('C', mbd.n_grid_omega, alpha_0, c6=C6),
-        r_vdw=R_vdw, beta=beta, a=a)
+        unit_cell=lattice,
+        r_vdw=R_vdw, beta=beta, a=6.
+    )
     C6_scs = mbd.get_c6_from_alpha(alpha_scs_dyn)
     R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
-    return mbd.get_single_mbd_energy(mode, 'fermi,dip', xyz,
-                                     alpha_scs_dyn[0],
-                                     mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
-                                     r_vdw=R_vdw_scs, beta=beta, a=a)[0]
+    if k_grid is not None:
+        mode = mode.replace('C', 'R')
+        ene = mbd.get_reciprocal_mbd_energy(
+            mode, 'fermi,dip', coords,
+            alpha_scs_dyn[0],
+            mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+            k_grid,
+            unit_cell=lattice,
+            r_vdw=R_vdw_scs, beta=beta, a=6.
+        )[0]
+    elif supercell is not None:
+        ene = mbd.get_supercell_mbd_energy(
+            mode, 'fermi,dip', coords,
+            alpha_scs_dyn[0],
+            mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+            unit_cell=lattice,
+            supercell=supercell,
+            r_vdw=R_vdw_scs, beta=beta, a=6.
+        )[0]
+    else:
+        ene = mbd.get_single_mbd_energy(
+            mode, 'fermi,dip', coords,
+            alpha_scs_dyn[0],
+            mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+            r_vdw=R_vdw_scs, beta=beta, a=6.
+        )[0]
+    return ene
 
 
 class ArrayEncoder(json.JSONEncoder):

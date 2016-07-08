@@ -1709,19 +1709,32 @@ end subroutine get_omega_grid
 
 
 subroutine gauss_legendre(n, r, w)
+    use mbd_interface, only: legendre_precision
+
     integer, intent(in) :: n
     real(8), intent(out) :: r(n), w(n)
 
-    integer, parameter :: q = 16
+    integer, parameter :: q = legendre_precision
     integer, parameter :: n_iter = 1000
     real(q) :: x, f, df, dx
     integer :: k, iter, i
     real(q) :: Pk(0:n), Pk1(0:n-1), Pk2(0:n-2)
 
-    if (n > 60) then
-        call print_error( &
-            'Cannot construct accurate Gauss-Legendre quadrature grids for n > 60.')
-    end if
+    select case (legendre_precision)
+    case (8)
+        if (n > 20) then
+            call print_error( &
+                'Cannot construct accurate Gauss-Legendre quadrature grids for n > 20.')
+        end if
+    case (16)
+        if (n > 60) then
+            call print_error( &
+                'Cannot construct accurate Gauss-Legendre quadrature grids for n > 60.')
+        end if
+    case default
+        call print_warning( &
+            'Gauss-Legendre grids: unknown precision')
+    end select
     if (n == 1) then
         r(1) = 0.d0
         w(1) = 2.d0

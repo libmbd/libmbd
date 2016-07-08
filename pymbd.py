@@ -66,6 +66,7 @@ def mbd_rsscs(
     R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
     if k_grid is not None:
         mode = mode.replace('C', 'R')
+        k_grid = mbd.make_k_grid(mbd.make_g_grid(*k_grid), lattice)
         ene = mbd.get_reciprocal_mbd_energy(
             mode, 'fermi,dip', coords,
             alpha_scs_dyn[0],
@@ -91,6 +92,39 @@ def mbd_rsscs(
             r_vdw=R_vdw_scs, beta=beta, a=6.
         )[0]
     return ene
+
+
+def mbd_rsscs_deriv(
+        coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None,
+        delta=1e-4
+):
+    forces = np.zeros(coords.shape)
+    for i_atom in range(coords.shape[0]):
+        for i_xyz in range(3):
+            ene = []
+            for step in [-1, 1]:
+                coords_diff = coords.copy()
+                coords_diff[i_atom, i_xyz] += step*delta
+                ene.append(mbd_rsscs(
+                    coords_diff, species, volumes, beta, lattice, k_grid, supercell
+                ))
+            forces[i_atom, i_xyz] = -(ene[1]-ene[0])/(2*delta)
+    if lattice is None:
+        return forces
+    stress = np.zeros((3, 3))
+    for i_xyz in range(3):
+        for j_xyz in range(3):
+            ene = []
+            for step in [-1, 1]:
+                strain = np.eye(3)
+                strain[i_xyz, j_xyz] += step*delta
+                coords_diff = coords@strain
+                lattice_diff = lattice@strain
+                ene.append(mbd_rsscs(
+                    coords_diff, species, volumes, beta, lattice_diff, k_grid, supercell
+                ))
+            stress[i_xyz, j_xyz] = -(ene[1]-ene[0])/(2*delta)
+    return forces, stress
 
 
 class ArrayEncoder(json.JSONEncoder):

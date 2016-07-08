@@ -8,4 +8,4 @@ Adapt `system.example.mk` for your system, save it as `system.mk` and make sure 
 
 ### Usage
 
-See the Jupyter notebook in `tests/tests.ipynb`.
+See the Jupyter notebook in `playground.ipynb`.

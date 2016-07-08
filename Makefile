@@ -17,9 +17,6 @@ ${blddir}/%.o: %.f90
 	@mkdir -p ${blddir}
 	${FC} -c -fPIC -J ${blddir} ${FFLAGS} -o $@ $^
 
-test:
-	@${MAKE} -C tests
-
 clean:
 	-rm *.mod
 	-rm -r build

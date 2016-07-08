@@ -18,8 +18,9 @@ ${blddir}/%.o: %.f90
 	${FC} -c -fPIC -J ${blddir} ${FFLAGS} -o $@ $^
 
 clean:
-	-rm *.mod
-	-rm -r build
+	rm -f *.mod
+	rm -rf build
 
 distclean: clean
-	-rm mbd.so
+	rm -f mbd.*so
+	rm -f mbd.*dSYM

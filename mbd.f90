@@ -716,10 +716,12 @@ subroutine init_grid(n)
     omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, omega_grid(1:n), omega_grid_w(1:n))
     call print_log( &
-        "Initialized a radial integration grid of "//trim(tostr(n))//" points.")
+        "Initialized a radial integration grid of "//trim(tostr(n))//" points." &
+    )
     call print_log( &
         "Relative quadrature error in C6 of carbon atom: "// &
-        trim(tostr(test_frequency_grid())))
+        trim(tostr(test_frequency_grid())) &
+    )
 end subroutine
 
 
@@ -1724,16 +1726,17 @@ subroutine gauss_legendre(n, r, w)
     case (8)
         if (n > 20) then
             call print_error( &
-                'Cannot construct accurate Gauss-Legendre quadrature grids for n > 20.')
+                'Cannot construct accurate Gauss-Legendre quadrature grids for n > 20.' &
+            )
         end if
     case (16)
         if (n > 60) then
             call print_error( &
-                'Cannot construct accurate Gauss-Legendre quadrature grids for n > 60.')
+                'Cannot construct accurate Gauss-Legendre quadrature grids for n > 60.' &
+            )
         end if
     case default
-        call print_warning( &
-            'Gauss-Legendre grids: unknown precision')
+        call print_warning('Gauss-Legendre grids: unknown precision')
     end select
     if (n == 1) then
         r(1) = 0.d0

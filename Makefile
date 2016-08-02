@@ -1,7 +1,7 @@
 include system.mk
 blddir = build
 extern = mbd_interface.f90 mbd_helper.f90
-FFLAGS = -Og -fcheck=all
+FFLAGS ?= -Og -fcheck=all
 F2PY ?= f2py
 
 all: mbd

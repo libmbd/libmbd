@@ -30,12 +30,15 @@ real(8) :: &
     param_ewald_rec_cutoff_scaling = 1.d0, &
     param_k_grid_shift = 0.5d0
 logical :: &
-    param_ewald_on = .true.
+    param_ewald_on = .true., &
+    param_zero_negative_eigs = .false.
 integer :: &
     param_mbd_nbody_max = 3, &
     param_rpa_order_max = 10
 logical :: &
     param_vacuum_axis(3) = (/ .false., .false., .false. /)
+logical :: &
+    mbd_negative_eigs_flag
 
 integer :: n_grid_omega
 real(8), allocatable :: omega_grid(:), omega_grid_w(:)
@@ -925,12 +928,19 @@ function get_single_mbd_energy(mode, version, xyz, alpha_0, omega, R_vdw, &
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        call print_warning("CDM Hamiltonian has " &
-            //trim(tostr(n_negative_eigs))//" negative eigenvalues")
-        ene = -99999999.d0
-    else
-        ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+        mbd_negative_eigs_flag = .true.
+        call print_warning( &
+            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
+            " negative eigenvalues" &
+        )
+        if (param_zero_negative_eigs) then
+            where (eigs < 0) eigs = 0.d0
+        else
+            ene = 0.d0
+            return
+        end if
     end if
+    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_single_mbd_energy
 
 
@@ -1018,12 +1028,19 @@ function get_single_reciprocal_mbd_ene(mode, version, xyz, alpha_0, omega, &
         mode_enes(:) = 0.d0
         where (eigs > 0) mode_enes = sqrt(eigs)
     end if
-    n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        call print_warning("CDM Hamiltonian has " &
-            //trim(tostr(n_negative_eigs))//" negative eigenvalues")
-    endif
-    where (eigs < 0) eigs = 0.d0
+        mbd_negative_eigs_flag = .true.
+        call print_warning( &
+            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
+            " negative eigenvalues" &
+        )
+        if (param_zero_negative_eigs) then
+            where (eigs < 0) eigs = 0.d0
+        else
+            ene = 0.d0
+            return
+        end if
+    end if
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_single_reciprocal_mbd_ene
 

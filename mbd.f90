@@ -307,8 +307,6 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
     end if
     call ts(11)
     idx_cell = (/ 0, 0, -1 /)
-    !$omp parallel private(r, r_norm, R_vdw_ij, sigma_ij, overlap_ij, C6_ij, &
-    !$omp    Tpp, i, j, Tpp_c)
     do i_cell = 1, product(1+2*range_cell)
         call shift_cell(idx_cell, -range_cell, range_cell)
         ! MPI code begin
@@ -327,7 +325,8 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                 if (my_task /= modulo(i_atom, n_tasks)) cycle
             end if
             ! MPI code end
-            !$omp do
+            !$omp parallel do private(r, r_norm, R_vdw_ij, sigma_ij, overlap_ij, C6_ij, &
+            !$omp    Tpp, i, j, Tpp_c)
             do j_atom = 1, i_atom
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
@@ -420,10 +419,9 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                     end if
                 end if
             end do ! j_atom
-            !$omp end do
+            !$omp end parallel do
         end do ! i_atom
     end do ! i_cell
-    !$omp end parallel
     call ts(-11)
     ! MPI code begin
     if (is_parallel) then

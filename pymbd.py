@@ -50,11 +50,17 @@ def scale_hirsh(hirsh, alpha, C6, R_vdw):
 
 
 def mbd_rsscs(
-        coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None, vacuum=None
+        coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None, vacuum=None,
+        custom_params=None
 ):
     mbd.param_vacuum_axis = [False]*3 if vacuum is None else vacuum
     mode = 'P' if ntasks > 1 else ''
-    alpha_0, C6, R_vdw = scale_hirsh(volumes, *get_free_atom_data(species))
+    params = get_free_atom_data(species)
+    if custom_params:
+        params = list(zip(*[param if specie not in custom_params else [
+            custom_params[specie][x] for x in ['alpha_0', 'C6', 'R_vdw']
+        ] for specie, *param in zip(species, *params)]))
+    alpha_0, C6, R_vdw = scale_hirsh(volumes, *params)
     if lattice is not None:
         mode += 'C'
     alpha_scs_dyn = mbd.run_scs(

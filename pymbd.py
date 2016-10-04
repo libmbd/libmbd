@@ -57,9 +57,10 @@ def mbd_rsscs(
     mode = 'P' if ntasks > 1 else ''
     params = get_free_atom_data(species)
     if custom_params:
-        params = list(zip(*[param if specie not in custom_params else [
-            custom_params[specie][x] for x in ['alpha_0', 'C6', 'R_vdw']
-        ] for specie, *param in zip(species, *params)]))
+        for i, specie in enumerate(species):
+            if specie in custom_params:
+                for j, paramname in enumerate(['alpha_0', 'C6', 'R_vdw']):
+                    params[j][i] = custom_params[specie][paramname]
     alpha_0, C6, R_vdw = scale_hirsh(volumes, *params)
     if lattice is not None:
         mode += 'C'
@@ -125,8 +126,8 @@ def mbd_rsscs_deriv(
             for step in [-1, 1]:
                 strain = np.eye(3)
                 strain[i_xyz, j_xyz] += step*delta
-                coords_diff = coords@strain
-                lattice_diff = lattice@strain
+                coords_diff = coords.dot(strain)
+                lattice_diff = lattice.dot(strain)
                 ene.append(mbd_rsscs(
                     coords_diff, species, volumes, beta, lattice_diff, k_grid, supercell
                 ))

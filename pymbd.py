@@ -156,11 +156,20 @@ def load_run_script(path):
 
 
 if __name__ == '__main__':
-    class Context:
-        pass
-    script = load_run_script(sys.argv[1])
-    ctx = Context()
-    for key, value in dict(locals()).items():
-        if not key.startswith('_'):
-            setattr(ctx, key, value)
-    script.run(ctx, mbd)
+    if len(sys.argv) > 1:
+        class Context:
+            pass
+        script = load_run_script(sys.argv[1])
+        ctx = Context()
+        for key, value in dict(locals()).items():
+            if not key.startswith('_'):
+                setattr(ctx, key, value)
+        script.run(ctx, mbd)
+    else:
+        mbd.init_grid(15)
+        print(mbd_rsscs(
+            [[0, 0, 0], [4.0/bohr, 0, 0]],
+            ['Ar', 'Ar'],
+            [1., 1.],
+            0.83
+        ))

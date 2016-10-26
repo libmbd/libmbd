@@ -50,10 +50,18 @@ def scale_hirsh(hirsh, alpha, C6, R_vdw):
 
 
 def mbd_rsscs(
-        coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None
+        coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None, vacuum=None,
+        custom_params=None
 ):
-    mode = 'M' if ntasks > 1 else ''
-    alpha_0, C6, R_vdw = scale_hirsh(volumes, *get_free_atom_data(species))
+    mbd.param_vacuum_axis = [False]*3 if vacuum is None else vacuum
+    mode = 'P' if ntasks > 1 else ''
+    params = get_free_atom_data(species)
+    if custom_params:
+        for i, specie in enumerate(species):
+            if specie in custom_params:
+                for j, paramname in enumerate(['alpha_0', 'C6', 'R_vdw']):
+                    params[j][i] = custom_params[specie][paramname]
+    alpha_0, C6, R_vdw = scale_hirsh(volumes, *params)
     if lattice is not None:
         mode += 'C'
     alpha_scs_dyn = mbd.run_scs(
@@ -118,8 +126,8 @@ def mbd_rsscs_deriv(
             for step in [-1, 1]:
                 strain = np.eye(3)
                 strain[i_xyz, j_xyz] += step*delta
-                coords_diff = coords@strain
-                lattice_diff = lattice@strain
+                coords_diff = coords.dot(strain)
+                lattice_diff = lattice.dot(strain)
                 ene.append(mbd_rsscs(
                     coords_diff, species, volumes, beta, lattice_diff, k_grid, supercell
                 ))
@@ -148,11 +156,20 @@ def load_run_script(path):
 
 
 if __name__ == '__main__':
-    class Context:
-        pass
-    script = load_run_script(sys.argv[1])
-    ctx = Context()
-    for key, value in dict(locals()).items():
-        if not key.startswith('_'):
-            setattr(ctx, key, value)
-    script.run(ctx, mbd)
+    if len(sys.argv) > 1:
+        class Context:
+            pass
+        script = load_run_script(sys.argv[1])
+        ctx = Context()
+        for key, value in dict(locals()).items():
+            if not key.startswith('_'):
+                setattr(ctx, key, value)
+        script.run(ctx, mbd)
+    else:
+        mbd.init_grid(15)
+        print(mbd_rsscs(
+            [[0, 0, 0], [4.0/bohr, 0, 0]],
+            ['Ar', 'Ar'],
+            [1., 1.],
+            0.83
+        ))

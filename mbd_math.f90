@@ -54,8 +54,8 @@ function dip_coulomb_coupled_gauss(R1, R2, K, coul) result(dip)
             matmul(K11, R1)+matmul(K12, R2), &
             matmul(K12, R1)+matmul(K22, R2) &
         )/s)*coul_u
-        ! print *, "u =", u(i)**2, "w =", w(i), "det(K+U2) =", det_K_plus_U2, &
-        !     "dot =", dot, "exp =", exp(-dot), "add =", coul_add
+        ! print *, "u =", u(i)**2, "w =", w(i), "1/sqrt(det(K+U2)) =", 1.d0/sqrt(det_K_plus_U2), &
+        !     "dot =", dot, "exp =", exp(-dot), "add =", coul_u
         if (present(coul)) coul = coul + coul_u
         dip = dip + dip_u
     end do

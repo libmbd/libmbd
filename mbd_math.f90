@@ -1,6 +1,6 @@
 module mbd_math
 
-use mbd, only: invert, pi
+use mbd, only: invert, pi, diag
 
 implicit none
 
@@ -81,6 +81,39 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
+real(8) function get_coulomb_energy_coupled_osc(R, q, m, w, C) result(ene)
+    real(8), intent(in) :: R(:, :)
+    real(8), intent(in) :: q(size(R, 1))
+    real(8), intent(in) :: m(size(R, 1))
+    real(8), intent(in) :: w(3*size(R, 1))
+    real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
+
+    real(8) :: O(size(C, 1), size(C, 1))
+    real(8) :: Opp(size(C, 1)-6, size(C, 1)-6)
+    real(8) :: OAB(6, 6)
+    integer :: N, A, B, Ai, Bi, i
+    integer :: AB(6), notAB(size(C, 1)-6)
+    real(8) :: ene_AB
+    real(8) :: prod_w, coul
+
+    O = matmul(matmul(C, diag(w)), transpose(C))
+    N = size(R, 1)
+    prod_w = product(w)
+    ene = 0.d0
+    do A = 1, N
+        ! Ai = 3*(A-1)+1
+        do B = A+1, N
+            ! Bi = 3*(B-1)+1
+            AB(:) = (/ (3*(A-1)+i, i = 1, 3),  (3*(B-1)+i, i = 1, 3) /)
+            notAB(:) = (/ (i, i = 1, 3*(A-1)),  (i, i = 3*A+1, 3*(B-1)), (i, i = 3*B+1, 3*N) /)
+            Opp(:, :) = O(notAB, notAB)
+            OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(O(notAB, notAB), O(notAB, AB)))
+            call calc_coulomb_coupled_gauss(R(A, :), R(B, :), OAB, coul=coul)
+            ene_AB = q(A)*q(B)*sqrt(prod_w/get_det(Opp))*coul
+            ene = ene + ene_AB
+        end do
+    end do
+end function
 
 real(8) function get_det(A) result(D)
     real(8), intent(in) :: A(:, :)
@@ -94,6 +127,16 @@ real(8) function get_det(A) result(D)
     call DGETRF(n, n, LU, n, ipiv, info)
     D = product((/ (LU(i, i), i = 1, n) /))
 end function
+
+subroutine swap_ints(a, b)
+    integer, intent(inout) :: a, b
+
+    integer :: c
+
+    c = a
+    a = b
+    b = c
+end subroutine
 
 function get_outer(a, b) result(C)
     real(8), intent(in) :: a(:), b(:)

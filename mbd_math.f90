@@ -5,7 +5,7 @@ use mbd, only: invert, pi
 implicit none
 
 integer, parameter :: n_pts_coulomb = 50
-real(8), parameter :: L_coulomb = 1.d0
+real(8), parameter :: L_coulomb = 10.d0
 
 contains
 

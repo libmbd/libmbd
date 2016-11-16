@@ -9,10 +9,9 @@ real(8), parameter :: L_coulomb = 10.d0
 
 contains
 
-function dip_coulomb_coupled_gauss(R1, R2, K, coul) result(dip)
+subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
     real(8), intent(in) :: R1(3), R2(3), K(6, 6)
-    real(8), intent(out), optional :: coul
-    real(8) :: dip(3, 3)
+    real(8), intent(out), optional :: dip(3, 3), coul
 
     real(8), dimension(n_pts_coulomb) :: u, w, x
     real(8) :: R(6), s
@@ -34,7 +33,7 @@ function dip_coulomb_coupled_gauss(R1, R2, K, coul) result(dip)
     R(1:3) = R1/sqrt(s)
     R(4:6) = R2/sqrt(s)
     if (present(coul)) coul = 0.d0
-    dip(:, :) = 0.d0
+    if (present(dip)) dip(:, :) = 0.d0
     do i = 1, n_pts_coulomb
         work = Ks
         call add_U2(work, u(i)**2)  ! work is K+U2
@@ -47,20 +46,22 @@ function dip_coulomb_coupled_gauss(R1, R2, K, coul) result(dip)
         ! call print_matrix('K-K*(K+U2)^-1*K', work)
         dot = dot_product(R, matmul(work, R))
         coul_u = 1.d0/sqrt(det_K_plus_U2)*exp(-dot)*w(i)
-        K11 = work(1:3, 1:3)
-        K12 = work(1:3, 4:6)
-        K22 = work(4:6, 4:6)
-        dip_u = (-2*K12+4*get_outer( &
-            matmul(K11, R1)+matmul(K12, R2), &
-            matmul(K12, R1)+matmul(K22, R2) &
-        )/s)*coul_u
+        if (present(coul)) coul = coul + coul_u
+        if (present(dip)) then
+            K11 = work(1:3, 1:3)
+            K12 = work(1:3, 4:6)
+            K22 = work(4:6, 4:6)
+            dip_u = (-2*K12+4*get_outer( &
+                matmul(K11, R1)+matmul(K12, R2), &
+                matmul(K12, R1)+matmul(K22, R2) &
+            )/s)*coul_u
+            dip = dip + dip_u
+        end if
         ! print *, "u =", u(i)**2, "w =", w(i), "1/sqrt(det(K+U2)) =", 1.d0/sqrt(det_K_plus_U2), &
         !     "dot =", dot, "exp =", exp(-dot), "add =", coul_u
-        if (present(coul)) coul = coul + coul_u
-        dip = dip + dip_u
     end do
-    coul = 2.d0/sqrt(pi)*coul/sqrt(s)
-    dip = 2.d0/sqrt(pi)*dip*s**(-3.d0/2)
+    if (present(coul)) coul = 2.d0/sqrt(pi)*coul/sqrt(s)
+    if (present(dip)) dip = 2.d0/sqrt(pi)*dip*s**(-3.d0/2)
 
     contains
 
@@ -78,7 +79,8 @@ function dip_coulomb_coupled_gauss(R1, R2, K, coul) result(dip)
         end forall
     end subroutine
 
-end function
+end subroutine
+
 
 real(8) function get_det(A) result(D)
     real(8), intent(in) :: A(:, :)

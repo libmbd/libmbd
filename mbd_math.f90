@@ -1,11 +1,12 @@
 module mbd_math
 
-use mbd, only: invert, pi, diag
+use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix
 
 implicit none
 
 integer, parameter :: n_pts_coulomb = 50
 real(8), parameter :: L_coulomb = 10.d0
+real(8), parameter :: point_charge = 100.d0
 
 contains
 
@@ -81,38 +82,78 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
-real(8) function get_coulomb_energy_coupled_osc(R, q, m, w, C) result(ene)
-    real(8), intent(in) :: R(:, :)
-    real(8), intent(in) :: q(size(R, 1))
-    real(8), intent(in) :: m(size(R, 1))
-    real(8), intent(in) :: w(3*size(R, 1))
+real(8) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
+    real(8), intent(in) :: R(:, :), q(size(R, 1)), m(size(R, 1)), w_t(3*size(R, 1))
     real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
 
     real(8) :: O(size(C, 1), size(C, 1))
     real(8) :: Opp(size(C, 1)-6, size(C, 1)-6)
-    real(8) :: OAB(6, 6)
-    integer :: N, A, B, Ai, Bi, i
+    real(8) :: OAB(6, 6), OABm(6, 6), K(6, 6)
+    real(8) :: RA(3), RB(3)
+    integer :: N, A, B, i, j
     integer :: AB(6), notAB(size(C, 1)-6)
-    real(8) :: ene_AB
-    real(8) :: prod_w, coul
+    real(8) :: ene_AB, ene_ABi(4)
+    real(8) :: prod_w_t, coul
+    integer :: i2A(6) = (/ 1, 1, 1, 2, 2, 2 /)
 
-    O = matmul(matmul(C, diag(w)), transpose(C))
+    O = matmul(matmul(C, diag(w_t)), transpose(C))
     N = size(R, 1)
-    prod_w = product(w)
+    prod_w_t = product(w_t)
     ene = 0.d0
     do A = 1, N
-        ! Ai = 3*(A-1)+1
         do B = A+1, N
-            ! Bi = 3*(B-1)+1
+            RA = R(A, :)
+            RB = R(B, :)
             AB(:) = (/ (3*(A-1)+i, i = 1, 3),  (3*(B-1)+i, i = 1, 3) /)
             notAB(:) = (/ (i, i = 1, 3*(A-1)),  (i, i = 3*A+1, 3*(B-1)), (i, i = 3*B+1, 3*N) /)
             Opp(:, :) = O(notAB, notAB)
-            OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(O(notAB, notAB), O(notAB, AB)))
-            call calc_coulomb_coupled_gauss(R(A, :), R(B, :), OAB, coul=coul)
-            ene_AB = q(A)*q(B)*sqrt(prod_w/get_det(Opp))*coul
+            OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(inverted(O(notAB, notAB)), O(notAB, AB)))
+            forall (i = 1:6, j = 1:6) OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
+            call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=coul)
+            ene_ABi(1) = 1.d0/sqrt(get_det(OAB))*coul
+            K(:, :) = 0.d0
+            K(1:3, 1:3) = point_charge*eye(3)
+            K(4:6, 4:6) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverted(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
+            call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
+            ene_ABi(2) = -1.d0/sqrt(get_det(OAB(1:3, 1:3))*get_det(K(4:6, 4:6))/m(B)**3)*coul
+            K(:, :) = 0.d0
+            K(1:3, 1:3) = m(A)*(OAB(1:3, 1:3)-matmul(OAB(1:3, 4:6), matmul(inverted(OAB(4:6, 4:6)), OAB(4:6, 1:3))))
+            K(4:6, 4:6) = point_charge*eye(3)
+            call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
+            ene_ABi(3) = -1.d0/sqrt(get_det(OAB(4:6, 4:6))*get_det(K(1:3, 1:3))/m(A)**3)*coul
+            K(:, :) = 0.d0
+            K(1:3, 1:3) = point_charge*eye(3)
+            K(4:6, 4:6) = point_charge*eye(3)
+            call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
+            ene_ABi(4) = 1.d0/sqrt(get_det(OAB))*coul
+            ene_AB = q(A)*q(B)*sqrt(prod_w_t)*sum(ene_ABi)
+            ! print *, q(A)*q(B)*sqrt(prod_w_t)*ene_ABi
             ene = ene + ene_AB
         end do
     end do
+end function
+
+real(8) function get_dipole_energy_coupled_osc(R, a0, w, w_t, C) result(ene)
+    real(8), intent(in) :: R(:, :), a0(size(R, 1)), w(size(R, 1)), w_t(3*size(R, 1))
+    real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
+
+    real(8) :: T(size(C, 1), size(C, 1))
+    integer :: A, B, i, j, N
+
+    T(:, :) = 0.d0
+    N = size(R, 1)
+    call add_dipole_matrix('', 'dip,gg', R, a0, w, relay=T)
+    do  A = 1, N
+        do B = 1, N
+            i = 3*(A-1)
+            j = 3*(B-1)
+            T(i+1:i+3, j+1:j+3) = w(A)*w(B)*sqrt(a0(A)*a0(B))*T(i+1:i+3, j+1:j+3)
+        end do
+    end do
+    ! call print_matrix('T', T)
+    T = matmul(matmul(transpose(C), T), C)
+    ! call print_matrix('T_t', T)
+    ene = sum(diag(T)/(4*w_t))
 end function
 
 real(8) function get_det(A) result(D)

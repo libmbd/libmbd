@@ -2148,6 +2148,7 @@ subroutine invert_ge_dble_(A)
     integer :: error_flag
 
     n = size(A, 1)
+    if (n == 0) return
     call DGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
         call print_error( &

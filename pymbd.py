@@ -22,8 +22,13 @@ bohr = mbd.bohr
 
 
 def get_free_atom_data(species):
-    return list(zip(*[(at['alpha_0'], at['C6'], at['R_vdw']) for at in
-                      [free_atom_db[sp] for sp in species]]))
+    return list(map(
+        list,
+        zip(*[
+            (at['alpha_0'], at['C6'], at['R_vdw']) for at in
+            [free_atom_db[sp] for sp in species]
+        ])
+    ))
 
 
 def printout(s, each=False):

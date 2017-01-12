@@ -1,3 +1,7 @@
+!\file mbd_math.f90
+!\author Jan Herman
+!\brief Some functions to calculate energies
+
 module mbd_math
 
 use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix

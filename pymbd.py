@@ -4,6 +4,7 @@ import json
 import sys
 import numpy as np
 from mbd import mbd
+from mbd_math import mbd_math
 
 try:
     from mpi4py import MPI
@@ -133,6 +134,35 @@ def mbd_rsscs_deriv(
                 ))
             stress[i_xyz, j_xyz] = -(ene[1]-ene[0])/(2*delta)
     return forces, stress
+
+
+def mbd_coul(coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None, vacuum=None, custom_params=None):
+    
+    mode = 'P'
+    mbd.param_vacuum_axis = [False]*3 if vacuum is None else vacuum
+    mode = 'P' if ntasks > 1 else ''
+    params = get_free_atom_data(species)
+    alpha_0, C6, R_vdw = scale_hirsh(volumes, *params)
+    alpha_scs_dyn = mbd.run_scs(
+                                mode, 'fermi,dip,gg', coords,
+                                mbd.alpha_dynamic_ts_all('C', mbd.n_grid_omega, alpha_0, c6=C6),
+                                unit_cell=lattice,
+                                r_vdw=R_vdw, beta=beta, a=6.
+                                )
+    C6_scs = mbd.get_c6_from_alpha(alpha_scs_dyn)
+    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
+    ene = mbd.get_single_mbd_energy(
+                                    mode, 'fermi,dip', coords,
+                                    alpha_scs_dyn[0],
+                                    mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+                                    r_vdw=R_vdw_scs, beta=beta, a=6.
+                                    )[0]
+    print('Test : '+str(ene))
+    
+
+#    ene = get_coulomb_energy_coupled_osc(R, q, m, w_t, C)
+    
+    return ene
 
 
 class ArrayEncoder(json.JSONEncoder):

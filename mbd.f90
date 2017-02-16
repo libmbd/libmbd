@@ -1084,6 +1084,9 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
         mode_enes(:, :) = 0.d0
         modes(:, :, :) = 0.d0
     end if
+    if (get_orders) then
+        rpa_orders(:, :) = 0.d0
+    end if
     do i_kpt = 1, size(k_grid, 1)
         ! MPI code begin
         if (is_parallel) then
@@ -1176,6 +1179,7 @@ function get_reciprocal_mbd_energy(mode, version, xyz, alpha_0, omega, &
     end if
     ! MPI code end
     ene = ene/size(k_grid, 1)
+    if (get_orders) rpa_orders = rpa_orders/size(k_grid, 1)
 end function get_reciprocal_mbd_energy
 
 
@@ -1566,13 +1570,16 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         mute = ''
     end if
 
+    ene = 0.d0
+    if (get_orders) rpa_orders(:) = 0.d0
+    rpa_orders(:) = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
         if (is_parallel) then
             if (my_task /= modulo(i_grid_omega, n_tasks)) cycle
         end if
         ! MPI code end
-        relay(:, :) = 0.d0
+        relay(:, :) = cmplx(0.d0, 0.d0, 8)
         call add_dipole_matrix( & ! relay = T
             blanked('P', mode)//mute, &
             version, &
@@ -1599,7 +1606,6 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         do i = 1, 3*size(xyz, 1)
             relay(i, i) = 1.d0+relay(i, i) ! relay = 1+alpha*T
         end do
-        relay = sqrt(relay*conjg(relay))
         call ts(25)
         call diagonalize('N', relay, eigs)
         call ts(-25)
@@ -1615,14 +1621,13 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
-            AT = 2*dble(AT)+AT*conjg(AT)
             call ts(26)
             call diagonalize('N', AT, eigs)
             call ts(-26)
             do n_order = 2, param_rpa_order_max
                 rpa_orders(n_order) = rpa_orders(n_order) &
-                    +(-1.d0/(2*pi)*(-1)**n_order &
-                    *sum(dble(eigs)**n_order)/n_order) &
+                    +(-1.d0)/(2*pi)*(-1)**n_order &
+                    *dble(sum(eigs**n_order))/n_order &
                     *omega_grid_w(i_grid_omega)
             end do
         end if

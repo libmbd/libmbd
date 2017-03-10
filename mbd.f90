@@ -521,6 +521,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                 if (my_task /= modulo(i_atom, n_tasks)) cycle
             end if
             ! MPI code end
+            !$omp parallel do private(r, Tpp, i, j, Tpp_c)
             do j_atom = 1, i_atom
                 r = xyz(i_atom, :)-xyz(j_atom, :)
                 if (is_reciprocal) then
@@ -545,6 +546,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     end if
                 end if
             end do ! j_atom
+            !$omp end parallel do
         end do ! i_atom
     end do ! i_G_vector
     ! MPI code begin

@@ -1599,7 +1599,7 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
         do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz
-                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :) 
+                relay(i, :) = alpha(i_grid_omega+1, i_atom)*relay(i, :)
                 ! relay = alpha*T
             end do
         end do
@@ -1620,7 +1620,7 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
             call print_warning("1+AT matrix has " &
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
-        ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*omega_grid_w(i_grid_omega)
+        ene = ene+1.d0/(2*pi)*dble(sum(log(eigs)))*omega_grid_w(i_grid_omega)
         if (get_orders) then
             call ts(26)
             call diagonalize('N', AT, eigs)

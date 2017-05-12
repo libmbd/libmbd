@@ -408,7 +408,7 @@ subroutine add_dipole_matrix(mode, version, xyz, alpha, R_vdw, beta, a, &
                         +Tpp_c
                     if (i_atom /= j_atom) then
                         relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp_c)
+                            +conjg(transpose(Tpp_c))
                     end if
                 else
                     relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3) &
@@ -536,7 +536,7 @@ subroutine add_ewald_dipole_parts(mode, xyz, unit_cell, alpha, &
                     relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3)+Tpp_c
                     if (i_atom /= j_atom) then
                         relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp_c)
+                            +conjg(transpose(Tpp_c))
                     end if
                 else
                     relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3)+Tpp

@@ -1573,7 +1573,6 @@ function get_single_reciprocal_rpa_ene(mode, version, xyz, alpha, k_point, &
 
     ene = 0.d0
     if (get_orders) rpa_orders(:) = 0.d0
-    rpa_orders(:) = 0.d0
     do i_grid_omega = 0, n_grid_omega
         ! MPI code begin
         if (is_parallel) then

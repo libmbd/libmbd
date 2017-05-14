@@ -730,6 +730,26 @@ subroutine init_grid(n)
 end subroutine
 
 
+subroutine init_eqi_grid(n, a, b)
+    integer, intent(in) :: n
+    real(8), intent(in) :: a, b
+
+    real(8) :: delta
+    integer :: i
+
+    n_grid_omega = n
+    if (allocated(omega_grid)) deallocate(omega_grid)
+    if (allocated(omega_grid_w)) deallocate(omega_grid_w)
+    allocate (omega_grid(0:n))
+    allocate (omega_grid_w(0:n))
+    omega_grid(0) = 0.d0
+    omega_grid_w(0) = 0.d0
+    delta = (b-a)/n
+    omega_grid(1:n) = (/ (a+delta/2+i*delta, i = 0, n-1) /)
+    omega_grid_w(1:n) = delta
+end subroutine
+
+
 real(8) function test_frequency_grid() result(error)
     real(8) :: alpha(0:n_grid_omega, 1)
 

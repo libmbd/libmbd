@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-import os
 import json
 import sys
 import numpy as np
 from mbd import mbd
+
+from .vdw_param import vdw_param as free_atom_db
 
 try:
     from mpi4py import MPI
@@ -16,8 +17,7 @@ except ImportError:
 
 mbd.my_task = myid
 mbd.n_tasks = ntasks
-with open(os.path.join(os.path.dirname(__file__), 'free_atoms.json')) as f:
-    free_atom_db = json.load(f)
+
 bohr = mbd.bohr
 
 

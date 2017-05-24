@@ -1,3 +1,6 @@
+# Any copyright is dedicated to the Public Domain.
+# http://creativecommons.org/publicdomain/zero/1.0/
+
 vdw_param = {
     "H": {"alpha_0": 4.5, "C6": 6.5, "R_vdw": 3.1},
     "He": {"alpha_0": 1.38, "C6": 1.46, "R_vdw": 2.65},

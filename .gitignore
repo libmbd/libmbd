@@ -1,6 +1,3 @@
 /build
-/*.mod
-/*.so
-/*.dSYM
-/system.mk
+/mbd/lib.*
 *.pyc

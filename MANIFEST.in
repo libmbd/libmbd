@@ -1,0 +1,3 @@
+include setup.py
+include pymbd/*.py
+include src/*.f90

@@ -46,7 +46,7 @@ try:
         return _find_executables(self)
     FCompiler.find_executables = find_executables
 except ImportError:
-    mbdlib_args['libraries'][0][1]['sources'].append('src/mpi_stubs.f90')
+    mbdlib_args['libraries'][0][1]['sources'].insert(0, 'src/mpi_stubs.f90')
 
 
 setup(

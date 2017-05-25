@@ -14,7 +14,7 @@ class build_ext(_build_ext):  # noqa
 
 
 mbdlib_args = dict(
-    name='mbd.lib',
+    name='pymbd.lib',
     sources=['src/mbd.f90'],
     libraries=[
         ('mbdlib', dict(
@@ -50,14 +50,14 @@ except ImportError:
 
 
 setup(
-    name="mbd",
-    version="0.2",
+    name='pymbd',
+    version='0.2',
     description='Many-body dispersion method',
     long_description='See README.md for details.',
     author='Jan Hermann',
     author_email='dev@hermann.in',
     url='https://github.com/azag0/mbd',
-    packages=['mbd'],
+    packages=['pymbd'],
     ext_modules=[Extension(**mbdlib_args)],
     classifiers=[
         'Development Status :: 4 - Beta',

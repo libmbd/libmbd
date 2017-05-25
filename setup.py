@@ -13,7 +13,25 @@ class build_ext(_build_ext):  # noqa
         _build_ext.build_extension(self, ext)
 
 
-mbdlib_sources = ['src/mbd_interface.f90', 'src/mbd_helper.f90']
+mbdlib_args = dict(
+    name='mbd.lib',
+    sources=['src/mbd.f90'],
+    libraries=[
+        ('mbdlib', dict(
+            sources=[
+                'src/mbd_interface.f90',
+                'src/mbd_helper.f90'
+            ],
+            language='f90',
+        ))
+    ],
+)
+
+for arg, val in get_info('lapack_opt', 2).items():
+    if arg == 'libraries':
+        mbdlib_args['libraries'].extend(val)
+    else:
+        mbdlib_args[arg] = val
 
 try:
     import mpi4py
@@ -28,7 +46,7 @@ try:
         return _find_executables(self)
     FCompiler.find_executables = find_executables
 except ImportError:
-    mbdlib_sources.append('src/mpi_stubs.f90')
+    mbdlib_args['libraries'][0][1]['sources'].append('src/mpi_stubs.f90')
 
 
 setup(
@@ -40,16 +58,7 @@ setup(
     author_email='dev@hermann.in',
     url='https://github.com/azag0/mbd',
     packages=['mbd'],
-    ext_modules=[
-        Extension(
-            name='mbd.lib',
-            sources=['src/mbd.f90'],
-            libraries=[
-                ('mbdlib', {'sources': mbdlib_sources, 'language': 'f90'})
-            ],
-            **get_info('lapack_opt', 2)
-        )
-    ],
+    ext_modules=[Extension(**mbdlib_args)],
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',

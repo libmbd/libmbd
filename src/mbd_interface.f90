@@ -13,7 +13,7 @@ public :: &
     sync_sum, broadcast, print_log, print_error, print_warning
 
 real(8), parameter, public :: pi = acos(-1.d0)
-integer, parameter, public :: legendre_precision = 16
+integer, parameter, public :: legendre_precision = 8
 
 interface sync_sum
     module procedure sync_sum_dble_

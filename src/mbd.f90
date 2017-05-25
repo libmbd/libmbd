@@ -223,6 +223,7 @@ function get_ts_energy( mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         end if
         ! MPI code end
         ene = ene+ene_shell
+        if (.not. is_crystal) exit
         if (i_shell > 1 .and. abs(ene_shell) < param_ts_energy_accuracy) then
             call print_log("Periodic TS converged in " &
                 //trim(tostr(i_shell))//" shells, " &

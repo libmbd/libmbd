@@ -1,30 +1,40 @@
 from numpy.distutils.core import setup
 from numpy.distutils.extension import Extension
 from numpy.distutils.system_info import get_info
-from numpy.distutils.command.build_ext import build_ext as _build_ext
-from numpy.distutils.fcompiler import FCompiler
-from functools import wraps
-import mpi4py
 
 
-# patch find_executables to insert the MPI compiler before FC or --f90exec is
-# checked
-_find_executables = FCompiler.find_executables
-@wraps(FCompiler.find_executables)   # noqa
-def find_executables(self):
-    self.executables['compiler_f90'][0] = mpi4py.get_config()['mpif90']
-    return _find_executables(self)
-FCompiler.find_executables = find_executables  # noqa
+def patch_fcompiler():
+    # patch find_executables to insert the MPI compiler before FC or --f90exec
+    # is checked
+    from numpy.distutils.fcompiler import FCompiler
+    import mpi4py
+    from functools import wraps
+
+    _find_executables = FCompiler.find_executables
+
+    @wraps(FCompiler.find_executables)
+    def find_executables(self):
+        self.executables['compiler_f90'][0] = mpi4py.get_config()['mpif90']
+        return _find_executables(self)
+    FCompiler.find_executables = find_executables
 
 
-# patch build_ext to include the temporary build directory to include_dirs so
-# that the module files from building mbdlib are seen when building the
-# extension
-class build_ext(_build_ext):
-    def build_extension(self, ext):
-        ext.include_dirs.append(self.build_temp)
-        _build_ext.build_extension(self, ext)
+def patch_build_ext():
+    # patch build_ext to include the temporary build directory to include_dirs so
+    # that the module files from building mbdlib are seen when building the
+    # extension
+    from numpy.distutils.command.build_ext import build_ext as _build_ext
 
+    global build_ext
+
+    class build_ext(_build_ext):
+        def build_extension(self, ext):
+            ext.include_dirs.append(self.build_temp)
+            _build_ext.build_extension(self, ext)
+
+
+patch_fcompiler()
+patch_build_ext()
 
 setup(
     name="mbd",

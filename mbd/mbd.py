@@ -4,13 +4,17 @@
 import json
 import sys
 import numpy as np
-from mpi4py import MPI
 
 from .lib import mbd as lib
 from .vdw_param import vdw_param as free_atom_db
 
-ntasks = MPI.COMM_WORLD.Get_size()
-myid = MPI.COMM_WORLD.Get_rank()
+try:
+    from mpi4py import MPI
+    ntasks = MPI.COMM_WORLD.Get_size()
+    myid = MPI.COMM_WORLD.Get_rank()
+except ImportError:
+    ntasks = 1
+    myid = 0
 
 lib.my_task = myid
 lib.n_tasks = ntasks

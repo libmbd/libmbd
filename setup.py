@@ -11,7 +11,7 @@ def get_setup():
         long_description='See README.md for details.',
         author='Jan Hermann',
         author_email='dev@hermann.in',
-        url='https://github.com/azag0/mbd',
+        url='https://github.com/azag0/pymbd',
         packages=['pymbd'],
         ext_modules=[Extension(**get_mbdlib())],
         classifiers=[

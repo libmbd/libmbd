@@ -53,4 +53,4 @@ And finally test with
 
 Pymbd doesn't have any input files, it is called directly from Python scripts. 
 
-For documentation, see the [basic examples](http://nbviewer.jupyter.org/github/azag0/mbd/blob/master/doc/examples.ipynb) or the [more advanced use](http://nbviewer.jupyter.org/github/azag0/mbd/blob/master/doc/playground.ipynb).
+For documentation, see the [basic examples](http://nbviewer.jupyter.org/github/azag0/mbd/blob/master/examples/basic.ipynb) or the [more advanced use](http://nbviewer.jupyter.org/github/azag0/mbd/blob/master/examples/advanced.ipynb).

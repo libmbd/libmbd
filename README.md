@@ -17,7 +17,7 @@ python/python3 -m pip install numpy
 This can be followed with
 
 ```
-python/python3 -m pip install git+https://github.com/azag0/mbd.git
+python/python3 -m pip install git+https://github.com/azag0/pymbd.git
 ```
 
 You can run tests with
@@ -38,7 +38,7 @@ bash Miniconda3-latest-Linux-x86_64.sh
 To install Pymbd, run
 
 ```
-<path to anaconda>/bin/pip install git+https://github.com/azag0/mbd.git
+<path to anaconda>/bin/pip install git+https://github.com/azag0/pymbd.git
 ```
 
 And finally test with

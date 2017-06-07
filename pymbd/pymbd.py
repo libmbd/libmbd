@@ -57,7 +57,7 @@ def scale_hirsh(hirsh, alpha, C6, R_vdw):
 
 def mbd_rsscs(
         coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None, vacuum=None,
-        custom_params=None
+        custom_params=None, get_spectrum=False
 ):
     lib.param_vacuum_axis = [False]*3 if vacuum is None else vacuum
     mode = 'P' if ntasks > 1 else ''
@@ -78,33 +78,37 @@ def mbd_rsscs(
     )
     C6_scs = lib.get_c6_from_alpha(alpha_scs_dyn)
     R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
+    if get_spectrum:
+        mode += 'EV'
     if k_grid is not None:
         mode = mode.replace('C', 'R')
         k_grid = lib.make_k_grid(lib.make_g_grid(*k_grid), lattice)
-        ene = lib.get_reciprocal_mbd_energy(
+        ene, *spectrum = lib.get_reciprocal_mbd_energy(
             mode, 'fermi,dip', coords,
             alpha_scs_dyn[0],
             lib.omega_eff(C6_scs, alpha_scs_dyn[0]),
             k_grid,
             unit_cell=lattice,
             r_vdw=R_vdw_scs, beta=beta, a=6.
-        )[0]
+        )
     elif supercell is not None:
-        ene = lib.get_supercell_mbd_energy(
+        ene, *spectrum = lib.get_supercell_mbd_energy(
             mode, 'fermi,dip', coords,
             alpha_scs_dyn[0],
             lib.omega_eff(C6_scs, alpha_scs_dyn[0]),
             unit_cell=lattice,
             supercell=supercell,
             r_vdw=R_vdw_scs, beta=beta, a=6.
-        )[0]
+        )
     else:
-        ene = lib.get_single_mbd_energy(
+        ene, *spectrum = lib.get_single_mbd_energy(
             mode, 'fermi,dip', coords,
             alpha_scs_dyn[0],
             lib.omega_eff(C6_scs, alpha_scs_dyn[0]),
             r_vdw=R_vdw_scs, beta=beta, a=6.
-        )[0]
+        )
+    if get_spectrum:
+        return (ene, *spectrum)
     return ene
 
 

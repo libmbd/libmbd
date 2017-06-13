@@ -145,6 +145,30 @@ def mbd_rsscs_deriv(
     return forces, stress
 
 
+def mbd_coul(coords, species, volumes, beta, lattice=None, k_grid=None,
+             supercell=None, vacuum=None, custom_params=None):
+    mode = 'P'
+    _mbd.param_vacuum_axis = [False]*3 if vacuum is None else vacuum
+    mode = 'P' if ntasks > 1 else ''
+    params = get_free_atom_data(species)
+    alpha_0, C6, R_vdw = scale_hirsh(volumes, *params)
+    alpha_scs_dyn = _mbd.run_scs(
+        mode, 'fermi,dip,gg', coords,
+        _mbd.alpha_dynamic_ts_all('C', _mbd.n_grid_omega, alpha_0, c6=C6),
+        unit_cell=lattice,
+        r_vdw=R_vdw, beta=beta, a=6.
+    )
+    C6_scs = _mbd.get_c6_from_alpha(alpha_scs_dyn)
+    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
+    ene = _mbd.get_single_mbd_energy(
+        mode, 'fermi,dip', coords,
+        alpha_scs_dyn[0],
+        _mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+        r_vdw=R_vdw_scs, beta=beta, a=6.
+    )[0]
+    return ene
+
+
 class ArrayEncoder(json.JSONEncoder):
     def default(self, obj):
         try:

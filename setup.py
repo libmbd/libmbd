@@ -42,12 +42,20 @@ def get_setup():
 
 
 def get_mbd_extension():
-    sources = ['src/mbd_interface.f90', 'src/mbd_helper.f90']
+    sources = [
+        'src/mbd_interface.f90',
+        'src/mbd_helper.f90',
+        'src/mbd_helper_dev.f90',
+    ]
     if MPI_STUBS:
         sources.insert(0, MPI_STUBS)
     kwargs = dict(
         name='pymbd.lib',
-        sources=['src/mbd.f90', 'src/mbd_math.f90'],
+        sources=[
+            'src/mbd.f90',
+            'src/mbd_math.f90',
+            'src/mbd_repulsion.f90'
+        ],
         libraries=[
             ('mbdlib', dict(
                 sources=sources,

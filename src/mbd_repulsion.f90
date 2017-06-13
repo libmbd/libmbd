@@ -185,31 +185,5 @@ TempU2 = matrix_embed(3, -i_matrix(3),6,1, 4)
 BigU2= BigU2+ TempU2
 BigU2= (u**2)*BigU2
 end subroutine U2
-!
-! Jan Herman's Dipole energy code 
-! copied as it is
-double precision function get_dipole_energy_coupled_osc(R, m, w, w_t, C) result(ene)
-double precision, intent(in) :: R(:, :), m(size(R, 1)), w(size(R, 1)), w_t(3*size(R, 1))
-double precision, intent(in) :: C(3*size(R, 1), 3*size(R, 1))
-
-double precision :: T(size(C, 1), size(C, 1)), a0(size(R, 1))
-integer :: A, B, i, j, N
-
-a0 = 1.d0/(m*w*w)
-T(:, :) = 0.d0
-N = size(R, 1)
-call add_dipole_matrix('', 'dip,gg', R, a0, w, relay=T)
-do  A = 1, N
-do B = 1, N
-i = 3*(A-1)
-j = 3*(B-1)
-T(i+1:i+3, j+1:j+3) = w(A)*w(B)*sqrt(a0(A)*a0(B))*T(i+1:i+3, j+1:j+3)
-end do
-end do
-! call print_matrix('T', T)
-T = matmul(matmul(transpose(C), T), C)
-! call print_matrix('T_t', T)
-ene = sum(diag(T)/(4*w_t))
-end function
 
 end module mbd_repulsion

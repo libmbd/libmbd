@@ -3,13 +3,11 @@
 !\todo Write the whole goddamn code!
 
 module mbd_repulsion
-use matrix_util
-use quadratures
-use ios
+use mbd_helper_dev
 use mbd
 contains
 subroutine E1_twobody(BigOmAB, RA, RB, Coul_en_2b)
-use constants
+use mbd_interface, only: pi
 implicit none
 double precision, dimension(6, 6), intent(in) :: BigOmAB
 double precision, dimension(3), intent(in) :: RA, RB
@@ -45,12 +43,12 @@ do i = 1, ninteg
  coul_en_2b = coul_en_2b + w(i)*2.d0*dexp(-exponent)/(dsqrt(dt)*(1.d0+x(i))**2)
  end do
 deallocate(x, w)
-coul_en_2b = coul_en_2b*2.d0/sqrt(pi())
+coul_en_2b = coul_en_2b*2.d0/sqrt(pi)
 print*, "Coulomb 2-body = ",coul_en_2b
 end subroutine E1_twobody
 !
 subroutine E1_onebody(BigOmA, RA, RB, Coul_en_1b)
-use constants
+use mbd_interface, only: pi
 implicit none
 double precision, dimension(3, 3), intent(in) :: BigOmA
 double precision, dimension(3), intent(in) :: RA, RB
@@ -84,7 +82,7 @@ Bigmat = Matrix_invert(BigMat)
 HugeOmega= matrix_embed(3, BigOmA, 6, 1, 1)+matrix_embed(3,(u**2)*i_matrix(3), 6, 4, 4)
 HugeOmega = HugeOmega - matmul(om_u_matrix, matmul(BigMat, transpose(om_u_matrix)))
 exponent= dot_product(RAB,matmul(HugeOmega, RAB))
-coul_en_1b = coul_en_1b + (2.d0/sqrt(pi()))*w(i)*2.d0*(dexp(-exponent)/dsqrt(dt))/(1.d0+x(i))**2
+coul_en_1b = coul_en_1b + (2.d0/sqrt(pi))*w(i)*2.d0*(dexp(-exponent)/dsqrt(dt))/(1.d0+x(i))**2
 end do
 deallocate(x, w)
 print*, "Coulomb 1-body = ",coul_en_1b

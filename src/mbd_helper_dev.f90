@@ -1,8 +1,94 @@
-!\file matrix_utils.f90
+!\file mbd_helper_dev.f90
 !\author M. Sadhukhan
-!\brief provides non-standard matrix operations
-module matrix_util
+module mbd_helper_dev
+
+use mbd_interface, only: pi
+
 contains
+
+recursive function legendre(n, x)result(res)
+! Provides P_n(x)
+implicit none
+integer, intent(in):: n
+double precision, intent(in) :: x
+double precision :: res
+integer :: i
+
+if (n == 0) then
+ res = 1.d0
+else if (n == 1) then
+ res = x
+else
+ res = ((2.d0*n-1.d0)*x*legendre(n-1, x)-(n-1)*legendre(n-2, x))/(n*1.d0)
+end if
+!
+end function legendre
+! 
+recursive function derivlegendre(n, x)result(res)
+! Provides first derivative of P_n(x) wrt x
+implicit none
+integer, intent(in):: n
+double precision, intent(in) :: x
+double precision :: res
+integer :: i
+
+if (n == 0) then
+res = 0.d0
+else if (n == 1) then
+res = 1.d0
+else
+res = ((2.d0*n-1.d0)*legendre(n-1, x)+ (2.d0*n-1.d0)*x*derivlegendre(n-1, x)-(n-1)*derivlegendre(n-2, x))/(n*1.d0)
+end if
+!
+end function derivlegendre
+!
+subroutine gl_points(n, x, w)
+implicit none
+! provides Gauss-Legendre abcissa and weights
+integer, parameter ::  m = 10
+integer, intent(in) :: n
+double precision, dimension(n), intent(out) :: x, w
+integer :: i
+do i = 1, n
+ x(i) = root_Legendre(n, i)
+ w(i) = 2.d0/((1.d0-x(i)**2)*(derivlegendre(n,x(i)))**2)
+end do
+end subroutine gl_points
+!
+function root_Legendre(n, k)result(res)
+! provides the kth root for P_n(n)
+implicit none
+double precision, parameter :: lim_err=1.d-12
+integer, intent(in) :: n, k
+double precision :: err, res,root_guess_l,root_guess_u, x
+
+err = 1.d0
+! guess from A&S 22.16.6
+root_guess_l= cos(pi*(2*k-1)/(2.d0*n+1))
+root_guess_u= cos((pi*2*k)/(2.d0*n+1))
+! Newton-Raphson
+x =root_guess_u
+!print*, "Guess", x
+do while (err >= dabs(lim_err))
+!print*, "P = ",legendre(n, x),"P' = ",derivlegendre(n, x)
+x = x - legendre(n, x)/derivlegendre(n, x)
+!Print*, "err = ", abs(legendre(n, x))
+err =abs(legendre(n, x))
+end do
+!
+res = x
+end function root_Legendre
+integer recursive function factorial(n)result(res)
+implicit none
+integer :: n
+
+if (n == 0)then
+ res = 1
+else
+ res= n*factorial(n-1)
+end if
+end function factorial
+
 subroutine diag_double(vector, matrix)
 ! provides matrix with the diagonal containing vector
 ! suitable for double precision
@@ -129,4 +215,24 @@ vAB = 0.d0
 vAB(1:na) = vA
 vAB(na+1:nb+na) = vB
 end function combine_vector
-end module matrix_util
+
+
+subroutine printmat(A, message)
+implicit none
+double precision, dimension(:, :), intent(in) :: A
+character(len=*), optional :: message
+character(len=20) :: fmt
+integer :: i, n
+
+if(present(message))print*, message
+n = size(A, 1)
+write (fmt, *) n
+fmt = "(1x,"//trim(adjustl(fmt))//"f8.4)"
+!print*, fmt
+!stop
+do i = 1, n
+ write(*, trim(fmt)) A(i, :)
+end do
+end subroutine printmat
+
+end module

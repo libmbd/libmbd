@@ -37,7 +37,7 @@ class TestMBD(unittest.TestCase):
 
 
 class TestCoulomb(unittest.TestCase):
-    def test_basis(self):
+    def test_basic(self):
         a = 1/sqrt(2)
         C = np.array([
             [ 0,  0, -a,  0, -a,  0],  # noqa

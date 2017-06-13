@@ -17,7 +17,7 @@ if (n == 0) then
 else if (n == 1) then
  res = x
 else
- res = ((2*n-1)*x*legendre(n-1, x)-(n-1)*legendre(n-2, x))/(n*1.d0)
+ res = ((2.d0*n-1.d0)*x*legendre(n-1, x)-(n-1)*legendre(n-2, x))/(n*1.d0)
 end if
 !
 end function legendre
@@ -35,7 +35,7 @@ res = 0.d0
 else if (n == 1) then
 res = 1.d0
 else
-res = ((2*n-1)*legendre(n-1, x)+ (2*n-1)*x*derivlegendre(n-1, x)-(n-1)*derivlegendre(n-2, x))/(n*1.d0)
+res = ((2.d0*n-1.d0)*legendre(n-1, x)+ (2.d0*n-1.d0)*x*derivlegendre(n-1, x)-(n-1)*derivlegendre(n-2, x))/(n*1.d0)
 end if
 !
 end function derivlegendre

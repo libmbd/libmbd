@@ -1,6 +1,8 @@
 import numpy as np
-import pymbd
+from numpy import sqrt
 import unittest
+
+import pymbd
 
 
 class TestFreqGrid(unittest.TestCase):
@@ -32,3 +34,24 @@ class TestMBD(unittest.TestCase):
 
     def tearDown(self):
         pymbd.lib.destroy_grid()
+
+
+class TestCoulomb(unittest.TestCase):
+    def test_basis(self):
+        a = 1/sqrt(2)
+        C = np.array([
+            [ 0,  0, -a,  0, -a,  0],  # noqa
+            [ 0,  a,  0,  a,  0,  0],  # noqa
+            [-a,  0,  0,  0,  0, -a],  # noqa
+            [ 0,  0,  a,  0, -a,  0],  # noqa
+            [ 0, -a,  0,  a,  0,  0],  # noqa
+            [-a,  0,  0,  0,  0,  a],  # noqa
+        ], dtype=float)
+        coords = [[0, 0, 0], [0, 0, 1.1]]
+        n = len(coords)
+        e1, eatt, erep = pymbd.lib_coul.fullcoulomb(
+            C, coords, n*[1], n*[1], 3*n*[2], n*[2]
+        )
+        self.assertAlmostEqual(e1, -0.058346493647401076, 10)
+        self.assertAlmostEqual(eatt, 1.767623829681647, 10)
+        self.assertAlmostEqual(erep, 0.800186426943337, 10)

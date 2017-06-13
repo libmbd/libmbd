@@ -1,6 +1,6 @@
 /build
-/*.mod
-/*.so
-/*.dSYM
-/system.mk
+/dist
+/pymbd/lib*
+/MANIFEST
+*.egg-info
 *.pyc

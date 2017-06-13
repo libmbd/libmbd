@@ -59,7 +59,7 @@ root_guess_u= cos((pi()*2*k)/(2.d0*n+1))
 ! Newton-Raphson
 x =root_guess_u
 !print*, "Guess", x
-do while (err >= lim_err)
+do while (err >= dabs(lim_err))
 !print*, "P = ",legendre(n, x),"P' = ",derivlegendre(n, x)
 x = x - legendre(n, x)/derivlegendre(n, x)
 !Print*, "err = ", abs(legendre(n, x))

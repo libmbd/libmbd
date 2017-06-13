@@ -47,7 +47,7 @@ def get_mbd_extension():
         sources.insert(0, MPI_STUBS)
     kwargs = dict(
         name='pymbd.lib',
-        sources=['src/mbd.f90'],
+        sources=['src/mbd.f90', 'src/mbd_math.f90'],
         libraries=[
             ('mbdlib', dict(
                 sources=sources,

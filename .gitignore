@@ -1,6 +1,6 @@
 /build
 /dist
-/pymbd/lib.*
+/pymbd/lib*
 /MANIFEST
 *.egg-info
 *.pyc

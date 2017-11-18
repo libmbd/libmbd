@@ -68,15 +68,17 @@ def get_mbd_extension():
 
 
 def get_build_ext():
-    # patch build_ext to compile everything in the top-level temporary directory
-    from numpy.distutils.command.build_ext import build_ext
+    # patch build_ext to include the temporary build directory to include_dirs
+    # so that the module files from building mbdlib are seen when building the
+    # extension
+    from numpy.distutils.command.build_ext import build_ext as _build_ext
 
-    class my_build_ext(build_ext):
-        def get_ext_filename(self, ext_name):
-            filename = build_ext.get_ext_filename(self, ext_name)
-            return filename.split('/')[-1]
+    class build_ext(_build_ext):
+        def build_extension(self, ext):
+            ext.include_dirs.append(self.build_temp)
+            _build_ext.build_extension(self, ext)
 
-    return my_build_ext
+    return build_ext
 
 
 def mod_lapack(kwargs):

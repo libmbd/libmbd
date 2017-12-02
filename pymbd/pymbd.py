@@ -52,7 +52,7 @@ def get_damping(xc):
 def scale_hirsh(hirsh, alpha, C6, R_vdw):
     hirsh = np.array(hirsh)
     return [np.array(q)*hirsh**factor
-            for q, factor in zip([alpha, C6, R_vdw], [1, 2, 1/3])]
+            for q, factor in zip([alpha, C6, R_vdw], [1, 2, 1./3])]
 
 
 def mbd_rsscs(
@@ -77,7 +77,7 @@ def mbd_rsscs(
         r_vdw=R_vdw, beta=beta, a=6.
     )
     C6_scs = _mbd.get_c6_from_alpha(alpha_scs_dyn)
-    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
+    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1./3)
     if get_spectrum:
         mode += 'EV'
     if k_grid is not None:
@@ -159,7 +159,7 @@ def mbd_coul(coords, species, volumes, beta, lattice=None, k_grid=None,
         r_vdw=R_vdw, beta=beta, a=6.
     )
     C6_scs = _mbd.get_c6_from_alpha(alpha_scs_dyn)
-    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1/3)
+    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1./3)
     ene = _mbd.get_single_mbd_energy(
         mode, 'fermi,dip', coords,
         alpha_scs_dyn[0],

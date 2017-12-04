@@ -14,7 +14,9 @@ add_library(mbd SHARED
     src/mbd_helper.f90
     src/mbd_interface.f90
     src/mbd_repulsion.f90)
+
 target_link_libraries(mbd ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
+
 if(${MPI_Fortran_FOUND})
     set_source_files_properties(src/mbd_interface.f90
         PROPERTIES COMPILE_FLAGS "${MPI_Fortran_COMPILE_FLAGS}")

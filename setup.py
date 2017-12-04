@@ -27,8 +27,10 @@ metadata = dict(
         'Topic :: Scientific/Engineering :: Physics',
     ],
     license='Mozilla Public License 2.0',
-    install_requires=['numpy'],
     test_suite='pymbd.tests',
+    install_requires=['numpy', 'cffi>=1.0.0'],
+    install_requires=['numpy', 'cffi>=1.0.0'],
+    cffi_modules=['package/foo_build.py:ffibuilder'],
 )
 
 

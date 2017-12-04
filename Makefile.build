@@ -1,0 +1,28 @@
+LIBNAME = libmbd.so
+
+all: $(LIBNAME)
+
+$(LIBNAME): $(FOBJS)
+	@echo Linking shared lib...
+	@$(FC) -shared -o $@ $^ $(LDFLAGS)
+
+$(FOBJS): fcompile ;
+
+fcompile: | fcompile.py
+	python3 $| $(FCOMPILEOPTS) <fcompile.json
+
+fcompile.py:
+	curl -k https://raw.githubusercontent.com/azag0/fcompile/master/$@ >$@
+
+install: $(LIBDIR)/$(LIBNAME)
+
+$(LIBDIR)/$(LIBNAME): $(LIBNAME)
+	-@cp $^ $@
+	@echo Installed "$(LIBNAME)" to $(LIBDIR).
+
+clean:
+	-rm -f *.mod *.o *.c write_version_stamp.f90 aims.x
+	-rm -f _fcompile_cache.json
+
+distclean:
+	rm -rf $(CURDIR)

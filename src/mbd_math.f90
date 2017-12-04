@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_math
 
-use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix
+use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix, mbd_calc
 
 implicit none
 
@@ -136,7 +136,8 @@ real(8) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
     end do
 end function
 
-real(8) function get_dipole_energy_coupled_osc(R, a0, w, w_t, C) result(ene)
+real(8) function get_dipole_energy_coupled_osc(calc, R, a0, w, w_t, C) result(ene)
+    type(mbd_calc), intent(inout) :: calc
     real(8), intent(in) :: R(:, :), a0(size(R, 1)), w(size(R, 1)), w_t(3*size(R, 1))
     real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
 
@@ -145,7 +146,7 @@ real(8) function get_dipole_energy_coupled_osc(R, a0, w, w_t, C) result(ene)
 
     T(:, :) = 0.d0
     N = size(R, 1)
-    call add_dipole_matrix('', 'dip,gg', R, a0, w, relay=T)
+    call add_dipole_matrix(calc, '', 'dip,gg', R, a0, w, relay=T)
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

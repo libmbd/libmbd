@@ -1,6 +1,6 @@
 module mbd_c_api
 
-use iso_c_binding
+use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc
 use mbd, only: mbd_calc, mbd_damping, get_mbd_energy, init_grid, destroy_grid
 
 implicit none

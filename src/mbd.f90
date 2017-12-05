@@ -105,8 +105,8 @@ interface tostr
     module procedure tostr_dble_
 end interface
 
-! external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-!     ZGEEV, ZGEEB
+external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
+    ZGEEV, ZGEEB
 
 contains
 

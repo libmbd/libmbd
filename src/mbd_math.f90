@@ -12,6 +12,8 @@ integer, parameter :: n_pts_coulomb = 50
 real(8), parameter :: L_coulomb = 10.d0
 real(8), parameter :: point_charge = 100.d0
 
+external :: DGETRF
+
 contains
 
 subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)

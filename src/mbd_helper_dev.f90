@@ -4,6 +4,8 @@ module mbd_helper_dev
 
 use mbd_interface, only: pi
 
+external :: DGETRI, DGETRF
+
 contains
 
 recursive function legendre(n, x)result(res)
@@ -12,7 +14,6 @@ implicit none
 integer, intent(in):: n
 double precision, intent(in) :: x
 double precision :: res
-integer :: i
 
 if (n == 0) then
  res = 1.d0
@@ -30,7 +31,6 @@ implicit none
 integer, intent(in):: n
 double precision, intent(in) :: x
 double precision :: res
-integer :: i
 
 if (n == 0) then
 res = 0.d0
@@ -45,7 +45,6 @@ end function derivlegendre
 subroutine gl_points(n, x, w)
 implicit none
 ! provides Gauss-Legendre abcissa and weights
-integer, parameter ::  m = 10
 integer, intent(in) :: n
 double precision, dimension(n), intent(out) :: x, w
 integer :: i
@@ -140,7 +139,6 @@ function i_matrix(n) result(matrix)
 implicit none
 integer, intent(in) :: n
 double precision, dimension(n, n) :: matrix
-integer :: i
 double precision, dimension(n) :: diag1
 diag1 = 1.d0
 call diag_double(diag1, matrix)
@@ -177,7 +175,7 @@ implicit none
 double precision, dimension(:,:), intent(in) :: A
 double precision, dimension(size(A, 1),size(A, 1)):: Ainv
 
-integer :: n, info, i
+integer :: n, info
 integer, dimension(size(A,1)) :: ipiv
 double precision, dimension(size(A,1)**2) :: work
 ipiv= 1
@@ -197,13 +195,13 @@ end if
 
 end function Matrix_invert
 !
-function repeat(n, number)result(vector)
+function my_repeat(n, number)result(vector)
 implicit none
 integer, intent(in) :: n
 double precision,intent(in) :: number
 double precision, dimension(n) :: vector
 vector = number
-end function repeat
+end function my_repeat
 !
 function combine_vector(nA, vA, nB, vB)result(vAB)
 implicit none

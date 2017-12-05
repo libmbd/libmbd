@@ -3,8 +3,8 @@
 !\todo Write the whole goddamn code!
 
 module mbd_repulsion
-use mbd_helper_dev
-use mbd
+use mbd_helper_dev, only: my_repeat, i_matrix, matrix_embed, diag_double, det, &
+    matrix_invert, combine_vector, gl_points, matrix_combine
 contains
 subroutine E1_twobody(BigOmAB, RA, RB, Coul_en_2b)
 use mbd_interface, only: pi
@@ -96,8 +96,8 @@ double precision, dimension(3*natom, 3*natom), intent(in) :: C
 double precision, dimension(3*natom), intent(in) :: omega
 double precision, dimension(natom,3) :: coords
 double precision, intent(out) :: e1, eatt, erep
-integer :: i, j, A, B
-double precision :: ninv, coul_en_2b, coul_en_1b, coul_en, DetMBD, dt1b, dt2b,e11, e12
+integer :: i, A, B
+double precision :: coul_en_2b, coul_en_1b, coul_en, DetMBD, dt1b, dt2b
 integer, dimension(6) :: AB
 integer, dimension(:),allocatable :: notAB
 double precision, dimension(3*natom, 3*natom) :: BigOmega
@@ -138,13 +138,13 @@ call det(BigOmega(notAB, notAB), dt2b)
 BigOmAB = BigOmega(AB, AB)
 dt2b = 1.d0
   end if
-call diag_double(combine_vector(3,repeat(3, dsqrt(mass(A))), 3, repeat(3, dsqrt(mass(B)))), m_matrix)
+call diag_double(combine_vector(3,my_repeat(3, dsqrt(mass(A))), 3, my_repeat(3, dsqrt(mass(B)))), m_matrix)
 BigOmAB=matmul(transpose(m_matrix), matmul(BigOmAB, m_matrix))
 call E1_twobody(BigOmAB, RA, RB, coul_en_2b)
 coul_en = coul_en + coul_en_2b*charge(A)*charge(B)*dsqrt(DetMBD/dt2b)*(mass(A)*mass(B))**1.5d0
 erep = coul_en_2b*charge(A)*charge(B)*dsqrt(DetMBD/dt2b)*(mass(A)*mass(B))**1.5d0+erep
 coul_en_2b = 0.d0
-call diag_double(repeat(3, sqrt(mass(A))), m1_matrix)
+call diag_double(my_repeat(3, sqrt(mass(A))), m1_matrix)
 BigomA=BigomA*sqrt(mass(A))
 !matmul(transpose(m1_matrix),matmul(BigomA, m1_matrix))
 call E1_onebody(BigOmA, RA, RB, coul_en_1b)
@@ -169,7 +169,6 @@ double precision, intent(in) :: u
 !double precision, dimension(3, 3) :: matA, matB
 double precision, dimension(6, 6), intent(out) :: BigU2
 double precision, dimension(6, 6) :: TempU2
-integer :: i
 TempU2 = 0.d0
 BigU2=0.d0
 TempU2 = matrix_embed(3, i_matrix(3),6,1, 1)

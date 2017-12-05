@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_interface
 
-use mpi
+use mpi, only: MPI_COMM_WORLD, MPI_COMPLEX16, MPI_DOUBLE_PRECISION, MPI_SUM
 
 implicit none
 
@@ -37,9 +37,7 @@ interface broadcast
     module procedure broadcast_matrix_cmplx_
 end interface
 
-! external :: &
-!     MPI_COMM_WORLD, MPI_DOUBLE_PRECISION, MPI_COMPLEX16, MPI_SUM, &
-!     MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
+external :: MPI_COMM_RANK, MPI_BCAST, MPI_ALLREDUCE
 
 contains
 

@@ -16,8 +16,6 @@ module mbd
 
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
-use mbd_helper, only: &
-    is_in, blanked
 
 implicit none
 
@@ -241,6 +239,24 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
             exit
         endif
     end do ! i_shell
+
+    contains
+
+    function is_in(c, str) result(is)
+        character(len=1), intent(in) :: c
+        character(len=*), intent(in) :: str
+        logical :: is
+
+        integer :: i
+
+        is = .false.
+        do i = 1, len(str)
+            if (c == str(i:i)) then
+                is = .true.
+                exit
+            end if
+        end do
+    end function is_in
 end function get_ts_energy
 
 

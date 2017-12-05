@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_math
 
-use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix, mbd_calc, &
+use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix, mbd_system, &
     mbd_damping, mbd_relay
 
 implicit none
@@ -139,17 +139,17 @@ real(8) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
     end do
 end function
 
-real(8) function get_dipole_energy_coupled_osc(calc, R, a0, w, w_t, C) result(ene)
-    type(mbd_calc), intent(inout) :: calc
-    real(8), intent(in) :: R(:, :), a0(size(R, 1)), w(size(R, 1)), w_t(3*size(R, 1))
-    real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
+real(8) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
+    type(mbd_system), intent(inout) :: sys
+    real(8), intent(in) :: a0(size(sys%coords, 1)), w(size(sys%coords, 1)), w_t(3*size(sys%coords, 1))
+    real(8), intent(in) :: C(3*size(sys%coords, 1), 3*size(sys%coords, 1))
 
     real(8), target :: T(size(C, 1), size(C, 1))
     integer :: A, B, i, j, N
 
     T(:, :) = 0.d0
-    N = size(R, 1)
-    call add_dipole_matrix(calc, '', R, mbd_damping('dip,gg', alpha=a0), relay=mbd_relay(re=T))
+    N = size(sys%coords, 1)
+    call add_dipole_matrix(sys, mbd_damping('dip,gg', alpha=a0), mbd_relay(re=T))
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

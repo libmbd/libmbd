@@ -1,7 +1,7 @@
 module mbd_c_api
 
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc
-use mbd, only: mbd_calc, mbd_damping, get_mbd_energy, init_grid, destroy_grid
+use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, destroy_grid
 
 implicit none
 
@@ -62,12 +62,13 @@ subroutine mbd_calculate(calc_p, n_atoms, coords, alpha_0, omega, damping_p, ene
     type(c_ptr), intent(in), value :: damping_p
     real(c_double), intent(out) :: energy
 
-    type(mbd_calc), pointer :: calc
+    type(mbd_system) :: sys
     type(mbd_damping), pointer :: damping
 
-    call c_f_pointer(calc_p, calc)
+    call c_f_pointer(calc_p, sys%calc)
     call c_f_pointer(damping_p, damping)
-    energy = get_mbd_energy(calc, '', coords, alpha_0, omega, damp=damping)
+    sys%coords = coords
+    energy = get_mbd_energy(sys, alpha_0, omega, damping)
 end subroutine mbd_calculate
 
 end module mbd_c_api

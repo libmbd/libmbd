@@ -4,7 +4,7 @@
 module mbd_math
 
 use mbd, only: invert, pi, diag, eye, inverted, add_dipole_matrix, mbd_calc, &
-    mbd_damping
+    mbd_damping, mbd_relay
 
 implicit none
 
@@ -144,12 +144,12 @@ real(8) function get_dipole_energy_coupled_osc(calc, R, a0, w, w_t, C) result(en
     real(8), intent(in) :: R(:, :), a0(size(R, 1)), w(size(R, 1)), w_t(3*size(R, 1))
     real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
 
-    real(8) :: T(size(C, 1), size(C, 1))
+    real(8), target :: T(size(C, 1), size(C, 1))
     integer :: A, B, i, j, N
 
     T(:, :) = 0.d0
     N = size(R, 1)
-    call add_dipole_matrix(calc, '', R, mbd_damping('dip,gg', alpha=a0), relay=T)
+    call add_dipole_matrix(calc, '', R, mbd_damping('dip,gg', alpha=a0), relay=mbd_relay(re=T))
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

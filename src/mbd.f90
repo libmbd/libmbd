@@ -67,6 +67,11 @@ type mbd_damping
     real(8), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
 
+type mbd_relay
+    real(8), pointer :: re(:, :) => null()
+    complex(8), pointer :: cplx(:, :) => null()
+end type mbd_relay
+
 interface operator(.cprod.)
     module procedure cart_prod_
 end interface
@@ -227,8 +232,7 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
 end function get_ts_energy
 
 
-subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, &
-        relay, relay_c)
+subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, relay)
     type(mbd_calc), intent(inout) :: calc
     character(len=*), intent(in) :: mode
     real(8), intent(in) :: xyz(:, :)
@@ -236,9 +240,7 @@ subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, &
     real(8), intent(in), optional :: &
         unit_cell(3, 3), &
         k_point(3)
-    real(8), intent(inout), optional :: relay(3*size(xyz, 1), 3*size(xyz, 1))
-    complex(8), intent(inout), optional :: &
-        relay_c(3*size(xyz, 1), 3*size(xyz, 1))
+    type(mbd_relay), intent(in) :: relay
 
     real(8) :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
         overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff
@@ -267,9 +269,9 @@ subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, &
     if (is_parallel) then
         ! will be restored by syncing at the end
         if (is_reciprocal) then
-            relay_c = relay_c/calc%n_tasks
+            relay%cplx = relay%cplx/calc%n_tasks
         else
-            relay = relay/calc%n_tasks
+            relay%re = relay%re/calc%n_tasks
         end if
     end if
     ! MPI code end
@@ -395,17 +397,17 @@ subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, &
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
                 if (is_reciprocal) then
-                    relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3) &
+                    relay%cplx(i+1:i+3, j+1:j+3) = relay%cplx(i+1:i+3, j+1:j+3) &
                         +Tpp_c
                     if (i_atom /= j_atom) then
-                        relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
+                        relay%cplx(j+1:j+3, i+1:i+3) = relay%cplx(j+1:j+3, i+1:i+3) &
                             +conjg(transpose(Tpp_c))
                     end if
                 else
-                    relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3) &
+                    relay%re(i+1:i+3, j+1:j+3) = relay%re(i+1:i+3, j+1:j+3) &
                         +Tpp
                     if (i_atom /= j_atom) then
-                        relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3) &
+                        relay%re(j+1:j+3, i+1:i+3) = relay%re(j+1:j+3, i+1:i+3) &
                             +transpose(Tpp)
                     end if
                 end if
@@ -417,22 +419,20 @@ subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, &
     ! MPI code begin
     if (is_parallel) then
         if (is_reciprocal) then
-            call sync_sum(relay_c)
+            call sync_sum(relay%cplx)
         else
-            call sync_sum(relay)
+            call sync_sum(relay%re)
         end if
     end if
     ! MPI code end
     if (do_ewald) then
         call add_ewald_dipole_parts( &
-            calc, mode, xyz, unit_cell, ewald_alpha, k_point, &
-            relay, relay_c)
+            calc, mode, xyz, unit_cell, ewald_alpha, k_point, relay)
     end if
 end subroutine add_dipole_matrix
 
 
-subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
-        k_point, relay, relay_c)
+subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, k_point, relay)
     type(mbd_calc), intent(inout) :: calc
     character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
@@ -440,9 +440,7 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
         unit_cell(3, 3), &
         alpha
     real(8), intent(in), optional :: k_point(3)
-    real(8), intent(inout), optional :: relay(3*size(xyz, 1), 3*size(xyz, 1))
-    complex(8), intent(inout), optional :: &
-        relay_c(3*size(xyz, 1), 3*size(xyz, 1))
+    type(mbd_relay), intent(in) :: relay
 
     logical :: is_parallel, is_reciprocal, mute, do_surface
     real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
@@ -469,9 +467,9 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
     if (is_parallel) then
         ! will be restored by syncing at the end
         if (is_reciprocal) then
-            relay_c = relay_c/calc%n_tasks
+            relay%cplx = relay%cplx/calc%n_tasks
         else
-            relay = relay/calc%n_tasks
+            relay%re = relay%re/calc%n_tasks
         end if
     end if
     ! MPI code end
@@ -525,15 +523,15 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
                 if (is_reciprocal) then
-                    relay_c(i+1:i+3, j+1:j+3) = relay_c(i+1:i+3, j+1:j+3)+Tpp_c
+                    relay%cplx(i+1:i+3, j+1:j+3) = relay%cplx(i+1:i+3, j+1:j+3)+Tpp_c
                     if (i_atom /= j_atom) then
-                        relay_c(j+1:j+3, i+1:i+3) = relay_c(j+1:j+3, i+1:i+3) &
+                        relay%cplx(j+1:j+3, i+1:i+3) = relay%cplx(j+1:j+3, i+1:i+3) &
                             +conjg(transpose(Tpp_c))
                     end if
                 else
-                    relay(i+1:i+3, j+1:j+3) = relay(i+1:i+3, j+1:j+3)+Tpp
+                    relay%re(i+1:i+3, j+1:j+3) = relay%re(i+1:i+3, j+1:j+3)+Tpp
                     if (i_atom /= j_atom) then
-                        relay(j+1:j+3, i+1:i+3) = relay(j+1:j+3, i+1:i+3) &
+                        relay%re(j+1:j+3, i+1:i+3) = relay%re(j+1:j+3, i+1:i+3) &
                             +transpose(Tpp)
                     end if
                 end if
@@ -544,9 +542,9 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
     ! MPI code begin
     if (is_parallel) then
         if (is_reciprocal) then
-            call sync_sum(relay_c)
+            call sync_sum(relay%cplx)
         else
-            call sync_sum(relay)
+            call sync_sum(relay%re)
         end if
     end if
     ! MPI code end
@@ -554,9 +552,9 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             if (is_reciprocal) then
-                relay_c(i, i) = relay_c(i, i)-4*alpha**3/(3*sqrt(pi))
+                relay%cplx(i, i) = relay%cplx(i, i)-4*alpha**3/(3*sqrt(pi))
             else
-                relay(i, i) = relay(i, i)-4*alpha**3/(3*sqrt(pi))
+                relay%re(i, i) = relay%re(i, i)-4*alpha**3/(3*sqrt(pi))
             end if
         end do
     end do
@@ -574,14 +572,14 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
                         *exp(-k_sq/(4*alpha**2))
                     if (is_reciprocal) then
-                        relay_c(i, j) = relay_c(i, j)+elem
+                        relay%cplx(i, j) = relay%cplx(i, j)+elem
                         if (i_atom /= j_atom) then
-                            relay_c(j, i) = relay_c(j, i)+elem
+                            relay%cplx(j, i) = relay%cplx(j, i)+elem
                         end if
                     else
-                        relay(i, j) = relay(i, j)+elem
+                        relay%re(i, j) = relay%re(i, j)+elem
                         if (i_atom /= j_atom) then
-                            relay(j, i) = relay(j, i)+elem
+                            relay%re(j, i) = relay%re(j, i)+elem
                         end if
                     end if ! is_reciprocal
                 end do ! j_xyz
@@ -597,11 +595,11 @@ subroutine add_ewald_dipole_parts(calc, mode, xyz, unit_cell, alpha, &
                 i = 3*(i_atom-1)+i_xyz
                 j = 3*(j_atom-1)+i_xyz
                 if (is_reciprocal) then
-                    relay_c(i, j) = relay_c(i, j)+4*pi/(3*volume)
-                    relay_c(j, i) = relay_c(i, j)
+                    relay%cplx(i, j) = relay%cplx(i, j)+4*pi/(3*volume)
+                    relay%cplx(j, i) = relay%cplx(i, j)
                 else
-                    relay(i, j) = relay(i, j)+4*pi/(3*volume)
-                    relay(j, i) = relay(i, j)
+                    relay%re(i, j) = relay%re(i, j)+4*pi/(3*volume)
+                    relay%re(j, i) = relay%re(i, j)
                 end if
             end do ! i_xyz
         end do ! j_atom
@@ -776,8 +774,7 @@ function run_scs(calc, mode, xyz, alpha, damp, unit_cell) result(alpha_scs)
 end function run_scs
 
 
-function do_scs(calc, mode, xyz, alpha, damp, lam, unit_cell) & 
-        result(alpha_full)
+function do_scs(calc, mode, xyz, alpha, damp, lam, unit_cell) result(alpha_full)
     type(mbd_calc), intent(inout) :: calc
     character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
@@ -787,7 +784,7 @@ function do_scs(calc, mode, xyz, alpha, damp, lam, unit_cell) &
     real(8), intent(in), optional :: &
         unit_cell(3, 3), &
         lam
-    real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8), target :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
 
     logical :: scale_lambda
     integer :: i_atom, i_xyz, i
@@ -801,7 +798,7 @@ function do_scs(calc, mode, xyz, alpha, damp, lam, unit_cell) &
         xyz, &
         damp, &
         unit_cell=unit_cell, &
-        relay=alpha_full)
+        relay=mbd_relay(re=alpha_full))
     if (scale_lambda) then
         alpha_full = lam*alpha_full
     end if
@@ -828,7 +825,7 @@ function do_scs_k_point(calc, mode, xyz, alpha, k_point, damp, lam, unit_cell) r
     real(8), intent(in), optional :: &
         unit_cell(3, 3), &
         lam
-    complex(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
+    complex(8), target :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
 
     logical :: scale_lambda
     integer :: i_atom, i_xyz, i
@@ -843,7 +840,7 @@ function do_scs_k_point(calc, mode, xyz, alpha, k_point, damp, lam, unit_cell) r
         damp, &
         unit_cell=unit_cell, &
         k_point=k_point, &
-        relay_c=alpha_full)
+        relay=mbd_relay(cplx=alpha_full))
     if (scale_lambda) then
         alpha_full = lam*alpha_full
     end if
@@ -1008,7 +1005,7 @@ function get_single_mbd_energy(calc, mode, xyz, alpha_0, omega, damp, unit_cell,
         modes(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: ene
 
-    real(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+    real(8), target :: relay(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
@@ -1019,18 +1016,18 @@ function get_single_mbd_energy(calc, mode, xyz, alpha_0, omega, damp, unit_cell,
     is_parallel = is_in('P', mode)
 
     relay(:, :) = 0.d0
-    call add_dipole_matrix( & ! relay = T
+    call add_dipole_matrix( & ! relay%re = T
         calc, &
         mode, &
         xyz, &
         damp, &
         unit_cell=unit_cell, &
-        relay=relay)
+        relay=mbd_relay(re=relay))
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
-            relay(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
+            relay(i+1:i+3, j+1:j+3) = & ! relay%re = sqrt(a*a)*w*w*T
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
                 relay(i+1:i+3, j+1:j+3)
@@ -1040,7 +1037,7 @@ function get_single_mbd_energy(calc, mode, xyz, alpha_0, omega, damp, unit_cell,
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
             relay(i, i) = relay(i, i)+omega(i_atom)**2
-            ! relay = w^2+sqrt(a*a)*w*w*T
+            ! relay%re = w^2+sqrt(a*a)*w*w*T
         end do
     end do
     call ts(calc, 21)
@@ -1206,7 +1203,7 @@ function get_single_reciprocal_mbd_ene(calc, mode, xyz, alpha_0, omega, &
     complex(8), intent(out), optional :: modes(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: ene
 
-    complex(8) :: relay(3*size(xyz, 1), 3*size(xyz, 1))
+    type(mbd_relay) :: relay
     real(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
@@ -1216,44 +1213,44 @@ function get_single_reciprocal_mbd_ene(calc, mode, xyz, alpha_0, omega, &
     get_eigenvectors = is_in('V', mode)
     is_parallel = is_in('P', mode)
 
-    relay(:, :) = cmplx(0.d0, 0.d0, 8)
-    call add_dipole_matrix( & ! relay = T
+    relay%cplx(:, :) = cmplx(0.d0, 0.d0, 8)
+    call add_dipole_matrix( & ! relay%re = T
         calc, &
         mode, &
         xyz, &
         damp, &
         unit_cell=unit_cell, &
         k_point=k_point, &
-        relay_c=relay)
+        relay=relay)
     do i_atom = 1, size(xyz, 1)
         do j_atom = 1, size(xyz, 1)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
-            relay(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
+            relay%re(i+1:i+3, j+1:j+3) = & ! relay%re = sqrt(a*a)*w*w*T
                 omega(i_atom)*omega(j_atom) &
                 *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
-                relay(i+1:i+3, j+1:j+3)
+                relay%re(i+1:i+3, j+1:j+3)
         end do
     end do
     do i_atom = 1, size(xyz, 1)
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
-            relay(i, i) = relay(i, i)+omega(i_atom)**2
-            ! relay = w^2+sqrt(a*a)*w*w*T
+            relay%re(i, i) = relay%re(i, i)+omega(i_atom)**2
+            ! relay%re = w^2+sqrt(a*a)*w*w*T
         end do
     end do
     call ts(calc, 22)
     if (.not. is_parallel .or. calc%my_task == 0) then
         if (get_eigenvectors) then
-            call sdiagonalize('V', relay, eigs)
-            modes = relay
+            call sdiagonalize('V', relay%re, eigs)
+            modes = relay%re
         else
-            call sdiagonalize('N', relay, eigs)
+            call sdiagonalize('N', relay%re, eigs)
         end if
     end if
     ! MPI code begin
     if (is_parallel) then
-        call broadcast(relay)
+        call broadcast(relay%re)
         call broadcast(eigs)
     end if
     ! MPI code end
@@ -1287,7 +1284,7 @@ function get_single_rpa_energy(calc, mode, xyz, alpha, damp, unit_cell, &
     real(8), intent(out), optional :: rpa_orders(20)
     real(8) :: ene
 
-    real(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
+    real(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)), target :: relay, AT
     complex(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
@@ -1313,13 +1310,13 @@ function get_single_rpa_energy(calc, mode, xyz, alpha, damp, unit_cell, &
         ! MPI code end
         relay(:, :) = 0.d0
         damp_alpha%alpha = alpha(i_grid_omega+1, :)
-        call add_dipole_matrix( & ! relay = T
+        call add_dipole_matrix( & ! relay%re = T
             calc, &
             blanked('P', mode)//mute, &
             xyz, &
             damp_alpha, &
             unit_cell=unit_cell, &
-            relay=relay)
+            relay=mbd_relay(re=relay))
         do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz
@@ -1380,7 +1377,7 @@ function get_single_reciprocal_rpa_ene(calc, mode, xyz, alpha, k_point, &
     real(8), intent(out), optional :: rpa_orders(20)
     real(8) :: ene
 
-    complex(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)) :: relay, AT
+    complex(8), dimension(3*size(xyz, 1), 3*size(xyz, 1)), target :: relay, AT
     complex(8) :: eigs(3*size(xyz, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
@@ -1414,7 +1411,7 @@ function get_single_reciprocal_rpa_ene(calc, mode, xyz, alpha, k_point, &
             damp_alpha, &
             k_point=k_point, &
             unit_cell=unit_cell, &
-            relay_c=relay)
+            relay=mbd_relay(cplx=relay))
         do i_atom = 1, size(xyz, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz

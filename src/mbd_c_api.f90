@@ -36,6 +36,7 @@ type(c_ptr) function mbd_init_damping(n_atoms, r_vdw, beta, a) bind(c)
     type(mbd_damping), pointer :: damping
 
     allocate (damping)
+    damping%version = 'fermi,dip'
     damping%r_vdw = r_vdw
     damping%beta = beta
     damping%a = a
@@ -66,10 +67,7 @@ subroutine mbd_calculate(calc_p, n_atoms, coords, alpha_0, omega, damping_p, ene
 
     call c_f_pointer(calc_p, calc)
     call c_f_pointer(damping_p, damping)
-    energy = get_mbd_energy( &
-        calc, '', 'fermi,dip', coords, alpha_0, omega, &
-        r_vdw=damping%r_vdw, beta=damping%beta, a=damping%a &
-    )
+    energy = get_mbd_energy(calc, '', coords, alpha_0, omega, damp=damping)
 end subroutine mbd_calculate
 
 end module mbd_c_api

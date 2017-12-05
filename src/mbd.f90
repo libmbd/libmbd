@@ -56,9 +56,15 @@ type mbd_calc
 end type mbd_calc
 
 type mbd_damping
-    real(8) :: beta
-    real(8) :: a
+    character(len=20) :: version
+    real(8) :: beta = 0.d0
+    real(8) :: a = 0.d0
     real(8), allocatable :: r_vdw(:)
+    real(8), allocatable :: alpha(:)
+    real(8), allocatable :: overlap(:, :)
+    real(8), allocatable :: C6(:)
+    real(8), allocatable :: damping_custom(:, :)
+    real(8), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
 
 interface operator(.cprod.)
@@ -221,20 +227,13 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
 end function get_ts_energy
 
 
-subroutine add_dipole_matrix(calc, mode, version, xyz, alpha, R_vdw, beta, a, &
-        overlap, C6, damping_custom, potential_custom, unit_cell, k_point, &
+subroutine add_dipole_matrix(calc, mode, xyz, damp, unit_cell, k_point, &
         relay, relay_c)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: xyz(:, :)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: &
-        alpha(size(xyz, 1)), &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3), &
         k_point(3)
     real(8), intent(inout), optional :: relay(3*size(xyz, 1), 3*size(xyz, 1))
@@ -326,63 +325,63 @@ subroutine add_dipole_matrix(calc, mode, version, xyz, alpha, R_vdw, beta, a, &
                 r = xyz(i_atom, :)-xyz(j_atom, :)-R_cell
                 r_norm = sqrt(sum(r**2))
                 if (is_crystal .and. r_norm > real_space_cutoff) cycle
-                if (present(R_vdw)) then
-                    R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
+                if (allocated(damp%R_vdw)) then
+                    R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
                 end if
-                if (present(alpha)) then
+                if (allocated(damp%alpha)) then
                     sigma_ij = sqrt(sum(get_sigma_selfint( &
-                        calc, alpha((/ i_atom , j_atom /)))**2))
+                        calc, damp%alpha((/ i_atom , j_atom /)))**2))
                 end if
-                if (present(overlap)) then
-                    overlap_ij = overlap(i_atom, j_atom)
+                if (allocated(damp%overlap)) then
+                    overlap_ij = damp%overlap(i_atom, j_atom)
                 end if
-                if (present(C6)) then
+                if (allocated(damp%C6)) then
                     C6_ij = combine_C6( &
-                        C6(i_atom), C6(j_atom), &
-                        alpha(i_atom), alpha(j_atom))
+                        damp%C6(i_atom), damp%C6(j_atom), &
+                        damp%alpha(i_atom), damp%alpha(j_atom))
                 end if
-                select case (version)
+                select case (damp%version)
                     case ("bare")
                         Tpp = T_bare(r)
                     case ("dip,1mexp")
-                        Tpp = T_1mexp_coulomb(r, beta*R_vdw_ij, a)
+                        Tpp = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,erf")
-                        Tpp = T_erf_coulomb(r, beta*R_vdw_ij, a)
+                        Tpp = T_erf_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,fermi")
-                        Tpp = T_fermi_coulomb(r, beta*R_vdw_ij, a)
+                        Tpp = T_fermi_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,overlap")
-                        Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, beta, a)
+                        Tpp = T_overlap_coulomb(r, overlap_ij, C6_ij, damp%beta, damp%a)
                     case ("1mexp,dip")
-                        Tpp = damping_1mexp(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                        Tpp = damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("erf,dip")
-                        Tpp = damping_erf(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                        Tpp = damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("fermi,dip")
-                        Tpp = damping_fermi(r_norm, beta*R_vdw_ij, a)*T_bare(r)
+                        Tpp = damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("fermi^2,dip")
-                        Tpp = damping_fermi(r_norm, beta*R_vdw_ij, a)**2*T_bare(r)
+                        Tpp = damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)**2*T_bare(r)
                     case ("overlap,dip")
                         Tpp = damping_overlap( &
-                            r_norm, overlap_ij, C6_ij, beta, a)*T_bare(r)
+                            r_norm, overlap_ij, C6_ij, damp%beta, damp%a)*T_bare(r)
                     case ("custom,dip")
-                        Tpp = damping_custom(i_atom, j_atom)*T_bare(r)
+                        Tpp = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
-                        Tpp = potential_custom(i_atom, j_atom, :, :)
+                        Tpp = damp%potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
                         Tpp = T_erf_coulomb(r, sigma_ij, 1.d0)
                     case ("1mexp,dip,gg")
-                        Tpp = (1.d0-damping_1mexp(r_norm, beta*R_vdw_ij, a)) &
+                        Tpp = (1.d0-damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                     case ("erf,dip,gg")
-                        Tpp = (1.d0-damping_erf(r_norm, beta*R_vdw_ij, a)) & 
+                        Tpp = (1.d0-damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)) & 
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                     case ("fermi,dip,gg")
-                        Tpp = (1.d0-damping_fermi(r_norm, beta*R_vdw_ij, a)) &
+                        Tpp = (1.d0-damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                     case ("custom,dip,gg")
-                        Tpp = (1.d0-damping_custom(i_atom, j_atom)) &
+                        Tpp = (1.d0-damp%damping_custom(i_atom, j_atom)) &
                             *T_erf_coulomb(r, sigma_ij, 1.d0)
                         do_ewald = .false.
                 end select
@@ -729,16 +728,14 @@ subroutine init_eqi_grid(calc, n, a, b)
 end subroutine
 
 
-function run_scs(calc, mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) & 
-        result(alpha_scs)
+function run_scs(calc, mode, xyz, alpha, damp, unit_cell) result(alpha_scs)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:, :)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
         unit_cell(3, 3)
     real(8) :: alpha_scs(size(alpha, 1), size(alpha, 2))
 
@@ -764,12 +761,9 @@ function run_scs(calc, mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
         alpha_full = do_scs( &
             calc, &
             blanked('P', mode)//mute, &
-            version, &
             xyz, &
-            alpha=alpha(i_grid_omega+1, :), &
-            R_vdw=R_vdw, &
-            beta=beta, &
-            a=a, &
+            alpha(i_grid_omega+1, :), &
+            damp, &
             unit_cell=unit_cell)
         alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
         mute = 'M'
@@ -782,16 +776,15 @@ function run_scs(calc, mode, version, xyz, alpha, R_vdw, beta, a, unit_cell) &
 end function run_scs
 
 
-function do_scs(calc, mode, version, xyz, alpha, R_vdw, beta, a, lam, unit_cell) & 
+function do_scs(calc, mode, xyz, alpha, damp, lam, unit_cell) & 
         result(alpha_full)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
         unit_cell(3, 3), &
         lam
     real(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
@@ -805,12 +798,8 @@ function do_scs(calc, mode, version, xyz, alpha, R_vdw, beta, a, lam, unit_cell)
     call add_dipole_matrix( &
         calc, &
         mode, &
-        version, &
-        xyz=xyz, &
-        alpha=alpha, &
-        R_vdw=R_vdw, &
-        beta=beta, &
-        a=a, &
+        xyz, &
+        damp, &
         unit_cell=unit_cell, &
         relay=alpha_full)
     if (scale_lambda) then
@@ -828,17 +817,15 @@ function do_scs(calc, mode, version, xyz, alpha, R_vdw, beta, a, lam, unit_cell)
 end function do_scs
 
 
-function do_scs_k_point(calc, mode, version, xyz, alpha, k_point, R_vdw, &
-        beta, a, lam, unit_cell) result(alpha_full)
+function do_scs_k_point(calc, mode, xyz, alpha, k_point, damp, lam, unit_cell) result(alpha_full)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:), &
         k_point(3)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
         unit_cell(3, 3), &
         lam
     complex(8) :: alpha_full(3*size(xyz, 1), 3*size(xyz, 1))
@@ -852,12 +839,8 @@ function do_scs_k_point(calc, mode, version, xyz, alpha, k_point, R_vdw, &
     call add_dipole_matrix( &
         calc, &
         mode//'R', &
-        version, &
-        xyz=xyz, &
-        alpha=alpha, &
-        R_vdw=R_vdw, &
-        beta=beta, &
-        a=a, &
+        xyz, &
+        damp, &
         unit_cell=unit_cell, &
         k_point=k_point, &
         relay_c=alpha_full)
@@ -876,11 +859,10 @@ function do_scs_k_point(calc, mode, version, xyz, alpha, k_point, R_vdw, &
 end function 
 
 
-function get_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
-        supercell, k_grid, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
-        potential_custom) result(ene)
+function get_mbd_energy(calc, mode, xyz, alpha_0, omega, &
+        supercell, k_grid, unit_cell, damp) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
@@ -889,13 +871,7 @@ function get_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
     real(8), intent(in), optional :: &
         k_grid(:, :), &
         unit_cell(3, 3)
-    real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    type(mbd_damping), intent(in) :: damp
     real(8) :: ene
 
     logical :: is_parallel, do_rpa, is_reciprocal, is_crystal
@@ -907,42 +883,36 @@ function get_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
     is_reciprocal = is_in('R', mode)
     if (.not. is_crystal) then
         if (.not. do_rpa) then
-            ene = get_single_mbd_energy(calc, mode, version, xyz, alpha_0, omega, R_vdw, &
-                beta, a, overlap, C6, damping_custom, potential_custom, unit_cell)
+            ene = get_single_mbd_energy(calc, mode, xyz, alpha_0, omega, damp, unit_cell)
         else
             allocate (alpha(0:size(calc%omega_grid)-1, size(alpha_0)))
-            alpha = alpha_dynamic_ts_all(calc, mode, size(calc%omega_grid)-1, alpha_0, C6, omega)
-            ene = get_single_rpa_energy(calc, mode, version, xyz, alpha, R_vdw, beta, &
-                a, overlap, C6, damping_custom, potential_custom, unit_cell)
+            alpha = alpha_dynamic_ts_all(calc, 'O', size(calc%omega_grid)-1, alpha_0, omega=omega)
+            ene = get_single_rpa_energy(calc, mode, xyz, alpha, damp, unit_cell)
             deallocate (alpha)
         end if
     else
         if (is_reciprocal) then
-            ene = get_reciprocal_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
-                k_grid, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
-                potential_custom)
+            ene = get_reciprocal_mbd_energy(calc, mode, xyz, alpha_0, omega, &
+                k_grid, unit_cell, damp)
         else
-            ene = get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
-                unit_cell, supercell, R_vdw, beta, a, C6)
+            ene = get_supercell_mbd_energy(calc, mode, xyz, alpha_0, omega, &
+                unit_cell, supercell, damp)
         end if
     end if
 end function get_mbd_energy
 
 
-function get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
-        unit_cell, supercell, R_vdw, beta, a, C6, rpa_orders) result(ene)
+function get_supercell_mbd_energy(calc, mode, xyz, alpha_0, omega, &
+        unit_cell, supercell, damp, rpa_orders) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         unit_cell(3, 3)
     integer, intent(in) :: supercell(3)
-    real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        C6(size(xyz, 1))
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(out), optional :: rpa_orders(20)
     real(8) :: ene
 
@@ -956,6 +926,7 @@ function get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
         R_vdw_super(:), C6_super(:), alpha_ts_super(:, :)
     real(8) :: unit_cell_super(3, 3)
+    type(mbd_damping) :: damp_super
 
     do_rpa = is_in('Q', mode)
     get_orders = is_in('O', mode)
@@ -968,8 +939,8 @@ function get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
     allocate (alpha_0_super(n_cells*size(alpha_0)))
     allocate (alpha_ts_super(0:size(calc%omega_grid)-1, n_cells*size(alpha_0)))
     allocate (omega_super(n_cells*size(omega)))
-    allocate (R_vdw_super(n_cells*size(R_vdw)))
-    allocate (C6_super(n_cells*size(C6)))
+    if (allocated(damp%r_vdw)) allocate (damp_super%r_vdw(n_cells*size(damp%r_vdw)))
+    if (allocated(damp%C6)) allocate (damp_super%C6(n_cells*size(damp%C6)))
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), supercell-1)
@@ -979,11 +950,11 @@ function get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
             xyz_super(i, :) = xyz(i_atom, :)+R_cell
             alpha_0_super(i) = alpha_0(i_atom)
             omega_super(i) = omega(i_atom)
-            if (present(R_vdw)) then
-                R_vdw_super(i) = R_vdw(i_atom)
+            if (allocated(damp%R_vdw)) then
+                damp_super%R_vdw(i) = damp%R_vdw(i_atom)
             end if
-            if (present(C6)) then
-                C6_super(i) = C6(i_atom)
+            if (allocated(damp%C6)) then
+                damp_super%C6(i) = damp%C6(i_atom)
             end if
         end do
     end do
@@ -993,27 +964,19 @@ function get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
         ene = get_single_rpa_energy( &
             calc, &
             mode, &
-            version, &
             xyz_super, &
             alpha_ts_super, &
-            R_vdw=R_vdw_super, &
-            beta=beta, &
-            a=a, &
-            C6=C6_super, &
+            damp_super, &
             unit_cell=unit_cell_super, &
             rpa_orders=rpa_orders)
     else
         ene = get_single_mbd_energy( &
             calc, &
             mode, &
-            version, &
             xyz_super, &
             alpha_0_super, &
             omega_super, &
-            R_vdw=R_vdw_super, &
-            beta=beta, &
-            a=a, &
-            C6=C6_super, &
+            damp_super, &
             unit_cell=unit_cell_super)
     end if
     deallocate (xyz_super)
@@ -1029,22 +992,16 @@ function get_supercell_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
 end function get_supercell_mbd_energy
     
 
-function get_single_mbd_energy(calc, mode, version, xyz, alpha_0, omega, R_vdw, &
-        beta, a, overlap, C6, damping_custom, potential_custom, unit_cell, &
+function get_single_mbd_energy(calc, mode, xyz, alpha_0, omega, damp, unit_cell, &
         mode_enes, modes) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1))
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3)
     real(8), intent(out), optional :: &
         mode_enes(3*size(xyz, 1)), &
@@ -1065,16 +1022,8 @@ function get_single_mbd_energy(calc, mode, version, xyz, alpha_0, omega, R_vdw, 
     call add_dipole_matrix( & ! relay = T
         calc, &
         mode, &
-        version, &
         xyz, &
-        alpha=alpha_0, &
-        R_vdw=R_vdw, &
-        beta=beta, &
-        a=a, &
-        overlap=overlap, &
-        C6=C6, &
-        damping_custom=damping_custom, &
-        potential_custom=potential_custom, &
+        damp, &
         unit_cell=unit_cell, &
         relay=relay)
     do i_atom = 1, size(xyz, 1)
@@ -1126,24 +1075,17 @@ function get_single_mbd_energy(calc, mode, version, xyz, alpha_0, omega, R_vdw, 
 end function get_single_mbd_energy
 
 
-function get_reciprocal_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
-        k_grid, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
-        potential_custom, mode_enes, modes, rpa_orders) result(ene)
+function get_reciprocal_mbd_energy(calc, mode, xyz, alpha_0, omega, &
+        k_grid, unit_cell, damp, mode_enes, modes, rpa_orders) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         k_grid(:, :), &
         unit_cell(3, 3)
-    real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(out), optional :: &
         mode_enes(size(k_grid, 1), 3*size(xyz, 1)), &
         rpa_orders(size(k_grid, 1), 20)
@@ -1189,73 +1131,45 @@ function get_reciprocal_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
                 ene = ene+get_single_reciprocal_rpa_ene( &
                     calc, &
                     blanked('P', mode)//mute, &
-                    version, &
                     xyz, &
                     alpha_ts, &
                     k_point, &
                     unit_cell, &
-                    R_vdw=R_vdw, &
-                    beta=beta, &
-                    a=a, &
-                    overlap=overlap, &
-                    C6=C6, &
-                    damping_custom=damping_custom, &
-                    potential_custom=potential_custom, &
+                    damp, &
                     rpa_orders=rpa_orders(i_kpt, :))
             else
                 ene = ene+get_single_reciprocal_rpa_ene( &
                     calc, &
                     blanked('P', mode)//mute, &
-                    version, &
                     xyz, &
                     alpha_ts, &
                     k_point, &
                     unit_cell, &
-                    R_vdw=R_vdw, &
-                    beta=beta, &
-                    a=a, &
-                    overlap=overlap, &
-                    C6=C6, &
-                    damping_custom=damping_custom, &
-                    potential_custom=potential_custom)
+                    damp)
             end if
         else
             if (get_eigenvalues .and. get_eigenvectors) then
                 ene = ene+get_single_reciprocal_mbd_ene( &
                     calc, &
                     blanked('P', mode)//mute, &
-                    version, &
                     xyz, &
                     alpha_0, &
                     omega, &
                     k_point, &
                     unit_cell, &
-                    R_vdw=R_vdw, &
-                    beta=beta, &
-                    a=a, &
-                    overlap=overlap, &
-                    C6=C6, &
-                    damping_custom=damping_custom, &
-                    potential_custom=potential_custom, &
+                    damp, &
                     mode_enes=mode_enes(i_kpt, :), &
                     modes=modes(i_kpt, :, :))
             else
                 ene = ene+get_single_reciprocal_mbd_ene( &
                     calc, &
                     blanked('P', mode)//mute, &
-                    version, &
                     xyz, &
                     alpha_0, &
                     omega, &
                     k_point, &
                     unit_cell, &
-                    R_vdw=R_vdw, &
-                    beta=beta, &
-                    a=a, &
-                    overlap=overlap, &
-                    C6=C6, &
-                    damping_custom=damping_custom, &
-                    potential_custom=potential_custom)
+                    damp)
             end if
         end if
         mute = 'M'
@@ -1277,24 +1191,17 @@ function get_reciprocal_mbd_energy(calc, mode, version, xyz, alpha_0, omega, &
 end function get_reciprocal_mbd_energy
 
 
-function get_single_reciprocal_mbd_ene(calc, mode, version, xyz, alpha_0, omega, &
-        k_point, unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
-        potential_custom, mode_enes, modes) result(ene)
+function get_single_reciprocal_mbd_ene(calc, mode, xyz, alpha_0, omega, &
+        k_point, unit_cell, damp, mode_enes, modes) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha_0(size(xyz, 1)), &
         omega(size(xyz, 1)), &
         k_point(3), &
         unit_cell(3, 3)
-    real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(out), optional :: mode_enes(3*size(xyz, 1))
     complex(8), intent(out), optional :: modes(3*size(xyz, 1), 3*size(xyz, 1))
     real(8) :: ene
@@ -1313,16 +1220,8 @@ function get_single_reciprocal_mbd_ene(calc, mode, version, xyz, alpha_0, omega,
     call add_dipole_matrix( & ! relay = T
         calc, &
         mode, &
-        version, &
         xyz, &
-        alpha=alpha_0, &
-        R_vdw=R_vdw, &
-        beta=beta, &
-        a=a, &
-        overlap=overlap, &
-        C6=C6, &
-        damping_custom=damping_custom, &
-        potential_custom=potential_custom, &
+        damp, &
         unit_cell=unit_cell, &
         k_point=k_point, &
         relay_c=relay)
@@ -1375,21 +1274,15 @@ function get_single_reciprocal_mbd_ene(calc, mode, version, xyz, alpha_0, omega,
 end function get_single_reciprocal_mbd_ene
 
 
-function get_single_rpa_energy(calc, mode, version, xyz, alpha, R_vdw, beta, &
-        a, overlap, C6, damping_custom, potential_custom, unit_cell, &
+function get_single_rpa_energy(calc, mode, xyz, alpha, damp, unit_cell, &
         rpa_orders) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:, :)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3), &
         unit_cell(3, 3)
     real(8), intent(out), optional :: rpa_orders(20)
     real(8) :: ene
@@ -1400,6 +1293,7 @@ function get_single_rpa_energy(calc, mode, version, xyz, alpha, R_vdw, beta, &
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
     character(len=1) :: mute
+    type(mbd_damping) :: damp_alpha
 
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
@@ -1410,6 +1304,7 @@ function get_single_rpa_energy(calc, mode, version, xyz, alpha, R_vdw, beta, &
     end if
 
     ene = 0.d0
+    damp_alpha = damp
     do i_grid_omega = 0,size(calc%omega_grid)-1
         ! MPI code begin
         if (is_parallel) then
@@ -1417,19 +1312,12 @@ function get_single_rpa_energy(calc, mode, version, xyz, alpha, R_vdw, beta, &
         end if
         ! MPI code end
         relay(:, :) = 0.d0
+        damp_alpha%alpha = alpha(i_grid_omega+1, :)
         call add_dipole_matrix( & ! relay = T
             calc, &
             blanked('P', mode)//mute, &
-            version, &
             xyz, &
-            alpha=alpha(i_grid_omega+1, :), &
-            R_vdw=R_vdw, &
-            beta=beta, &
-            a=a, &
-            overlap=overlap, &
-            C6=C6, &
-            damping_custom=damping_custom, &
-            potential_custom=potential_custom, &
+            damp_alpha, &
             unit_cell=unit_cell, &
             relay=relay)
         do i_atom = 1, size(xyz, 1)
@@ -1479,23 +1367,16 @@ function get_single_rpa_energy(calc, mode, version, xyz, alpha, R_vdw, beta, &
 end function get_single_rpa_energy
 
 
-function get_single_reciprocal_rpa_ene(calc, mode, version, xyz, alpha, k_point, &
-        unit_cell, R_vdw, beta, a, overlap, C6, damping_custom, &
-        potential_custom, rpa_orders) result(ene)
+function get_single_reciprocal_rpa_ene(calc, mode, xyz, alpha, k_point, &
+        unit_cell, damp, rpa_orders) result(ene)
     type(mbd_calc), intent(inout) :: calc
-    character(len=*), intent(in) :: mode, version
+    character(len=*), intent(in) :: mode
     real(8), intent(in) :: &
         xyz(:, :), &
         alpha(:, :), &
         k_point(3), &
         unit_cell(3, 3)
-    real(8), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        beta, a, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        C6(size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        potential_custom(size(xyz, 1), size(xyz, 1), 3, 3)
+    type(mbd_damping), intent(in) :: damp
     real(8), intent(out), optional :: rpa_orders(20)
     real(8) :: ene
 
@@ -1505,6 +1386,7 @@ function get_single_reciprocal_rpa_ene(calc, mode, version, xyz, alpha, k_point,
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, get_orders
     character(len=1) :: mute
+    type(mbd_damping) :: damp_alpha
 
     is_parallel = is_in('P', mode)
     get_orders = is_in('O', mode)
@@ -1516,6 +1398,7 @@ function get_single_reciprocal_rpa_ene(calc, mode, version, xyz, alpha, k_point,
 
     ene = 0.d0
     if (get_orders) rpa_orders(:) = 0.d0
+    damp_alpha = damp
     do i_grid_omega = 0, size(calc%omega_grid)-1
         ! MPI code begin
         if (is_parallel) then
@@ -1523,19 +1406,12 @@ function get_single_reciprocal_rpa_ene(calc, mode, version, xyz, alpha, k_point,
         end if
         ! MPI code end
         relay(:, :) = cmplx(0.d0, 0.d0, 8)
+        damp_alpha%alpha = alpha(i_grid_omega+1, :)
         call add_dipole_matrix( & ! relay = T
             calc, &
             blanked('P', mode)//mute, &
-            version, &
             xyz, &
-            alpha=alpha(i_grid_omega+1, :), &
-            R_vdw=R_vdw, &
-            beta=beta, &
-            a=a, &
-            overlap=overlap, &
-            C6=C6, &
-            damping_custom=damping_custom, &
-            potential_custom=potential_custom, &
+            damp_alpha, &
             k_point=k_point, &
             unit_cell=unit_cell, &
             relay_c=relay)

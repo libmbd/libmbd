@@ -12,6 +12,8 @@ set(SRCS
     src/mbd_helper_dev.f90
     src/mbd_math.f90
     src/mbd_interface.f90
+    src/mbd_common.f90
+    src/mbd_linalg.f90
     src/mbd_repulsion.f90)
 if(NOT ${MPI_Fortran_FOUND})
     list(APPEND SRCS

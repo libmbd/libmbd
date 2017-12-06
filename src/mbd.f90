@@ -44,6 +44,7 @@ end type mbd_timing
 type mbd_calc
     type(mbd_param) :: param
     type(mbd_timing) :: tm
+    integer :: n_freq
     real(8), allocatable :: omega_grid(:)
     real(8), allocatable :: omega_grid_w(:)
     logical :: parallel = .false.
@@ -603,6 +604,7 @@ subroutine init_grid(calc, n)
     if (allocated(calc%omega_grid_w)) deallocate(calc%omega_grid_w)
     allocate (calc%omega_grid(0:n))
     allocate (calc%omega_grid_w(0:n))
+    calc%n_freq = n
     calc%omega_grid(0) = 0.d0
     calc%omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, calc%omega_grid(1:n), calc%omega_grid_w(1:n))
@@ -618,9 +620,9 @@ end subroutine
 
 real(8) function test_frequency_grid(calc) result(error)
     type(mbd_calc), intent(in) :: calc
-    real(8) :: alpha(0:size(calc%omega_grid)-1, 1)
+    real(8) :: alpha(0:calc%n_freq, 1)
 
-    alpha = alpha_dynamic_ts_all(calc, 'C', size(calc%omega_grid)-1, (/ 21.d0 /), C6=(/ 99.5d0 /))
+    alpha = alpha_dynamic_ts(calc, (/ 21.d0 /), omega_eff((/ 99.5d0 /), (/ 21.d0 /)))
     error = abs(get_total_C6_from_alpha(calc, alpha)/99.5d0-1.d0)
 end function
 
@@ -729,7 +731,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     sys%calc%mute = .true.
 
     alpha_scs(:, :) = 0.d0
-    do i_grid_omega = 0, size(sys%calc%omega_grid)-1
+    do i_grid_omega = 0, sys%calc%n_freq
         ! MPI code begin
         if (is_parallel) then
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
@@ -816,10 +818,8 @@ function get_mbd_energy(sys, alpha_0, omega, damp) result(ene)
         if (.not. do_rpa) then
             ene = get_single_mbd_energy(sys, alpha_0, omega, damp)
         else
-            allocate (alpha(0:size(sys%calc%omega_grid)-1, size(alpha_0)))
-            alpha = alpha_dynamic_ts_all( &
-                sys%calc, 'O', size(sys%calc%omega_grid)-1, alpha_0, omega=omega &
-            )
+            allocate (alpha(0:sys%calc%n_freq, size(alpha_0)))
+            alpha = alpha_dynamic_ts(sys%calc, alpha_0, omega)
             ene = get_single_rpa_energy(sys, alpha, damp)
             deallocate (alpha)
         end if
@@ -861,7 +861,7 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     end do
     allocate (sys_super%coords(n_cells*size(sys%coords, 1), 3))
     allocate (alpha_0_super(n_cells*size(alpha_0)))
-    allocate (alpha_ts_super(0:size(sys%calc%omega_grid)-1, n_cells*size(alpha_0)))
+    allocate (alpha_ts_super(0:sys%calc%n_freq, n_cells*size(alpha_0)))
     allocate (omega_super(n_cells*size(omega)))
     if (allocated(damp%r_vdw)) allocate (damp_super%r_vdw(n_cells*size(damp%r_vdw)))
     if (allocated(damp%C6)) allocate (damp_super%C6(n_cells*size(damp%C6)))
@@ -883,8 +883,7 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
         end do
     end do
     if (do_rpa) then
-        alpha_ts_super = alpha_dynamic_ts_all( &
-            sys%calc, 'O', size(sys%calc%omega_grid)-1, alpha_0_super, omega=omega_super)
+        alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, omega_super)
         ene = get_single_rpa_energy( &
             sys_super, alpha_ts_super, damp_super &
         )
@@ -981,7 +980,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
     logical :: &
         is_parallel, do_rpa, mute
     integer :: i_kpt, n_kpts, n_atoms
-    real(8) :: k_point(3), alpha_ts(0:size(sys%calc%omega_grid)-1, size(sys%coords, 1))
+    real(8) :: k_point(3), alpha_ts(0:sys%calc%n_freq, size(sys%coords, 1))
 
     n_atoms = size(sys%coords, 1)
     n_kpts = size(sys%k_pts, 1)
@@ -992,7 +991,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
     sys%calc%parallel = .false.
     sys%calc%mute = .true.
 
-    alpha_ts = alpha_dynamic_ts_all(sys%calc, 'O', size(sys%calc%omega_grid)-1, alpha_0, omega=omega)
+    alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, omega)
     ene = 0.d0
     if (sys%work%get_eigs) &
         allocate (sys%work%mode_enes_k(n_kpts, 3*n_atoms), source=0.d0)
@@ -1117,7 +1116,7 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 
     ene = 0.d0
     damp_alpha = damp
-    do i_grid_omega = 0,size(sys%calc%omega_grid)-1
+    do i_grid_omega = 0,sys%calc%n_freq
         ! MPI code begin
         if (is_parallel) then
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
@@ -1195,7 +1194,7 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
 
     ene = 0.d0
     damp_alpha = damp
-    do i_grid_omega = 0, size(sys%calc%omega_grid)-1
+    do i_grid_omega = 0, sys%calc%n_freq
         ! MPI code begin
         if (is_parallel) then
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
@@ -1653,35 +1652,16 @@ elemental function terf(r, r0, a)
 end function
 
 
-function alpha_dynamic_ts_all(calc, mode, n, alpha_0, C6, omega) result(alpha_dyn)
+function alpha_dynamic_ts(calc, alpha_0, omega) result(alpha)
     type(mbd_calc), intent(in) :: calc
-    character(len=1), intent(in) :: mode
-    integer, intent(in) :: n
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
-    real(8) :: alpha_dyn(0:n, size(alpha_0))
+    real(8), intent(in) :: omega(:)
+    real(8) :: alpha(0:calc%n_freq, size(alpha_0))
 
-    integer :: i_grid_omega
+    integer :: i_freq
 
-    do i_grid_omega = 0, size(calc%omega_grid)-1
-        alpha_dyn(i_grid_omega, :) = alpha_dynamic_ts( &
-            mode, alpha_0, calc%omega_grid(i_grid_omega), C6, omega)
-    end do
-end function alpha_dynamic_ts_all
-
-
-function alpha_dynamic_ts(mode, alpha_0, u, C6, omega) result(alpha)
-    character(len=1), intent(in) :: mode
-    real(8), intent(in) :: alpha_0(:), u
-    real(8), intent(in), optional :: C6(size(alpha_0)), omega(size(alpha_0))
-    real(8) :: alpha(size(alpha_0))
-
-    select case (mode)
-        case  ('O')
-            alpha(:) = alpha_osc(alpha_0, omega, u)
-        case ('C')
-            alpha(:) = alpha_osc(alpha_0, omega_eff(C6, alpha_0), u)
-    end select
+    forall (i_freq = 0:calc%n_freq) &
+        alpha(i_freq, :) = alpha_osc(alpha_0, omega, calc%omega_grid(i_freq))
 end function
 
 
@@ -1709,9 +1689,9 @@ elemental function V_to_R(V) result(R)
 end function
 
 
-function omega_eff(C6, alpha) result(omega)
-    real(8), intent(in) :: C6(:), alpha(size(C6))
-    real(8) :: omega(size(C6))
+elemental function omega_eff(C6, alpha) result(omega)
+    real(8), intent(in) :: C6, alpha
+    real(8) :: omega
 
     omega = 4.d0/3*C6/alpha**2
 end function

@@ -67,14 +67,29 @@ type mbd_damping
     real(8), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
 
+type mbd_work
+    logical :: get_eigs = .false.
+    logical :: get_modes = .false.
+    logical :: get_rpa_orders = .false.
+    integer :: i_kpt = 0
+    real(8), allocatable :: mode_enes(:)
+    real(8), allocatable :: modes(:, :)
+    real(8), allocatable :: rpa_orders(:)
+    real(8), allocatable :: mode_enes_k(:, :)
+    complex(8), allocatable :: modes_k(:, :, :)
+    real(8), allocatable :: rpa_orders_k(:, :)
+end type
+
 type mbd_system
     type(mbd_calc), pointer :: calc
+    type(mbd_work) :: work
     real(8), allocatable :: coords(:, :)
     logical :: periodic = .false.
     real(8) :: lattice(3, 3)
     real(8), allocatable :: k_pts(:, :)
     integer :: supercell(3)
     logical :: do_rpa = .false.
+    logical :: do_reciprocal = .true.
 end type mbd_system
 
 type mbd_relay
@@ -866,13 +881,11 @@ function get_mbd_energy(sys, alpha_0, omega, damp) result(ene)
 end function get_mbd_energy
 
 
-function get_supercell_mbd_energy(sys, alpha_0, omega, damp, rpa_orders) result(ene)
+real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(size(sys%coords, 1))
     real(8), intent(in) :: omega(size(sys%coords, 1))
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(out), optional :: rpa_orders(20)
-    real(8) :: ene
 
     logical :: do_rpa, get_orders
     real(8) :: R_cell(3)
@@ -887,9 +900,9 @@ function get_supercell_mbd_energy(sys, alpha_0, omega, damp, rpa_orders) result(
     type(mbd_damping) :: damp_super
 
     do_rpa = sys%do_rpa
-    get_orders = present(rpa_orders)
 
     sys_super%calc = sys%calc
+    sys_super%work = sys%work
     n_cells = product(sys%supercell)
     do i = 1, 3
         sys_super%lattice(i, :) = sys%lattice(i, :)*sys%supercell(i)
@@ -921,7 +934,7 @@ function get_supercell_mbd_energy(sys, alpha_0, omega, damp, rpa_orders) result(
         alpha_ts_super = alpha_dynamic_ts_all( &
             sys%calc, 'O', size(sys%calc%omega_grid)-1, alpha_0_super, omega=omega_super)
         ene = get_single_rpa_energy( &
-            sys_super, alpha_ts_super, damp_super, rpa_orders &
+            sys_super, alpha_ts_super, damp_super &
         )
     else
         ene = get_single_mbd_energy( &
@@ -936,20 +949,16 @@ function get_supercell_mbd_energy(sys, alpha_0, omega, damp, rpa_orders) result(
     deallocate (C6_super)
     ene = ene/n_cells
     if (get_orders) then
-        rpa_orders = rpa_orders/n_cells
+        sys%work%rpa_orders =sys_super%work%rpa_orders/n_cells
     end if
 end function get_supercell_mbd_energy
     
 
-function get_single_mbd_energy(sys, alpha_0, omega, damp, mode_enes, modes) result(ene)
+real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(size(sys%coords, 1))
     real(8), intent(in) :: omega(size(sys%coords, 1))
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(out), optional :: &
-        mode_enes(3*size(sys%coords, 1)), &
-        modes(3*size(sys%coords, 1), 3*size(sys%coords, 1))
-    real(8) :: ene
 
     real(8), target :: relay(3*size(sys%coords, 1), 3*size(sys%coords, 1))
     real(8) :: eigs(3*size(sys%coords, 1))
@@ -957,8 +966,6 @@ function get_single_mbd_energy(sys, alpha_0, omega, damp, mode_enes, modes) resu
     integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
 
-    get_eigenvalues = present(mode_enes)
-    get_eigenvectors = present(modes)
     is_parallel = sys%calc%parallel
 
     relay(:, :) = 0.d0
@@ -983,9 +990,9 @@ function get_single_mbd_energy(sys, alpha_0, omega, damp, mode_enes, modes) resu
     end do
     call ts(sys%calc, 21)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
-        if (get_eigenvectors) then
+        if (sys%work%get_modes) then
             call sdiagonalize('V', relay, eigs)
-            modes = relay
+            sys%work%modes = relay
         else
             call sdiagonalize('N', relay, eigs)
         end if
@@ -997,9 +1004,9 @@ function get_single_mbd_energy(sys, alpha_0, omega, damp, mode_enes, modes) resu
     end if
     ! MPI code end
     call ts(sys%calc, -21)
-    if (get_eigenvalues) then
-        mode_enes(:) = 0.d0
-        where (eigs > 0) mode_enes = sqrt(eigs)
+    if (sys%work%get_eigs) then
+        sys%work%mode_enes = sqrt(eigs)
+        where (eigs < 0) sys%work%mode_enes = 0.d0
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
@@ -1013,29 +1020,21 @@ function get_single_mbd_energy(sys, alpha_0, omega, damp, mode_enes, modes) resu
 end function get_single_mbd_energy
 
 
-function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp, &
-        mode_enes, modes, rpa_orders) result(ene)
+real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(size(sys%coords, 1))
     real(8), intent(in) :: omega(size(sys%coords, 1))
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(out), optional :: &
-        mode_enes(size(sys%k_pts, 1), 3*size(sys%coords, 1)), &
-        rpa_orders(size(sys%k_pts, 1), 20)
-    complex(8), intent(out), optional :: &
-        modes(size(sys%k_pts, 1), 3*size(sys%coords, 1), 3*size(sys%coords, 1))
-    real(8) :: ene
 
     logical :: &
         is_parallel, do_rpa, get_orders, get_eigenvalues, get_eigenvectors, mute
-    integer :: i_kpt
+    integer :: i_kpt, n_kpts, n_atoms
     real(8) :: k_point(3), alpha_ts(0:size(sys%calc%omega_grid)-1, size(sys%coords, 1))
 
+    n_atoms = size(sys%coords, 1)
+    n_kpts = size(sys%k_pts, 1)
     is_parallel = sys%calc%parallel
     do_rpa = sys%do_rpa
-    get_eigenvalues = present(mode_enes)
-    get_eigenvectors = present(modes)
-    get_orders = present(rpa_orders)
     mute = sys%calc%mute
 
     sys%calc%parallel = .false.
@@ -1043,73 +1042,48 @@ function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp, &
 
     alpha_ts = alpha_dynamic_ts_all(sys%calc, 'O', size(sys%calc%omega_grid)-1, alpha_0, omega=omega)
     ene = 0.d0
-    if (get_eigenvalues .and. get_eigenvectors) then
-        mode_enes(:, :) = 0.d0
-        modes(:, :, :) = 0.d0
-    end if
-    if (get_orders) then
-        rpa_orders(:, :) = 0.d0
-    end if
-    do i_kpt = 1, size(sys%k_pts, 1)
+    if (sys%work%get_eigs) &
+        allocate (sys%work%mode_enes_k(n_kpts, 3*n_atoms), source=0.d0)
+    if (sys%work%get_modes) &
+        allocate (sys%work%modes_k(n_kpts, 3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
+    if (sys%work%get_rpa_orders) &
+        allocate (sys%work%rpa_orders_k(n_kpts, sys%calc%param%rpa_order_max), source=0.d0)
+    do i_kpt = 1, n_kpts
         ! MPI code begin
         if (is_parallel) then
             if (sys%calc%my_task /= modulo(i_kpt, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
         k_point = sys%k_pts(i_kpt, :)
+        sys%work%i_kpt = i_kpt
         if (do_rpa) then
-            if (get_orders) then
-                ene = ene+get_single_reciprocal_rpa_ene( &
-                    sys, alpha_ts, k_point, damp, rpa_orders(i_kpt, :) &
-                )
-            else
-                ene = ene+get_single_reciprocal_rpa_ene( &
-                    sys, alpha_ts, k_point, damp &
-                )
-            end if
+            ene = ene + get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp)
         else
-            if (get_eigenvalues .and. get_eigenvectors) then
-                ene = ene+get_single_reciprocal_mbd_ene( &
-                    sys, alpha_0, omega, k_point, damp, &
-                    mode_enes(i_kpt, :), modes(i_kpt, :, :) &
-                )
-            else
-                ene = ene+get_single_reciprocal_mbd_ene( &
-                    sys, alpha_0, omega, k_point, damp &
-                )
-            end if
+            ene = ene + get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, damp)
         end if
     end do ! k_point loop
     ! MPI code begin
     if (is_parallel) then
         call sync_sum(ene)
-        if (get_eigenvalues .and. get_eigenvectors) then
-            call sync_sum(mode_enes)
-            call sync_sum(modes)
-        end if
-        if (get_orders) then
-            call sync_sum(rpa_orders)
-        end if
+        if (sys%work%get_eigs) call sync_sum(sys%work%mode_enes_k)
+        if (sys%work%get_modes) call sync_sum(sys%work%modes_k)
+        if (sys%work%get_rpa_orders) call sync_sum(sys%work%rpa_orders_k)
     end if
     ! MPI code end
     ene = ene/size(sys%k_pts, 1)
-    if (get_orders) rpa_orders = rpa_orders/size(sys%k_pts, 1)
+    if (sys%work%get_rpa_orders) sys%work%rpa_orders = sys%work%rpa_orders/n_kpts
 
     sys%calc%parallel = is_parallel
     sys%calc%mute = mute
 end function get_reciprocal_mbd_energy
 
 
-function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, &
-        k_point, damp, mode_enes, modes) result(ene)
+real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(size(sys%coords, 1))
     real(8), intent(in) :: omega(size(sys%coords, 1))
     real(8), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(out), optional :: mode_enes(3*size(sys%coords, 1))
-    complex(8), intent(out), optional :: modes(3*size(sys%coords, 1), 3*size(sys%coords, 1))
-    real(8) :: ene
 
     complex(8), target :: relay(3*size(sys%coords, 1), 3*size(sys%coords, 1))
     real(8) :: eigs(3*size(sys%coords, 1))
@@ -1117,8 +1091,6 @@ function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, &
     integer :: n_negative_eigs
     logical :: get_eigenvalues, get_eigenvectors, is_parallel
 
-    get_eigenvalues = present(mode_enes)
-    get_eigenvectors = present(modes)
     is_parallel = sys%calc%parallel
 
     relay(:, :) = cmplx(0.d0, 0.d0, 8)
@@ -1143,9 +1115,9 @@ function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, &
     end do
     call ts(sys%calc, 22)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
-        if (get_eigenvectors) then
+        if (sys%work%get_modes) then
             call sdiagonalize('V', relay, eigs)
-            modes = relay
+            sys%work%modes_k(sys%work%i_kpt, :, :) = relay
         else
             call sdiagonalize('N', relay, eigs)
         end if
@@ -1157,9 +1129,9 @@ function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, &
     end if
     ! MPI code end
     call ts(sys%calc, -22)
-    if (get_eigenvalues) then
-        mode_enes(:) = 0.d0
-        where (eigs > 0) mode_enes = sqrt(eigs)
+    if (sys%work%get_eigs) then
+        sys%work%mode_enes = sqrt(eigs)
+        where (eigs < 0) sys%work%mode_enes = 0.d0
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
@@ -1173,12 +1145,10 @@ function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, &
 end function get_single_reciprocal_mbd_ene
 
 
-function get_single_rpa_energy(sys, alpha, damp, rpa_orders) result(ene)
+real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha(:, :)
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(out), optional :: rpa_orders(20)
-    real(8) :: ene
 
     real(8), dimension(3*size(sys%coords, 1), 3*size(sys%coords, 1)), target :: relay, AT
     complex(8) :: eigs(3*size(sys%coords, 1))
@@ -1189,7 +1159,6 @@ function get_single_rpa_energy(sys, alpha, damp, rpa_orders) result(ene)
 
     is_parallel = sys%calc%parallel
     mute = sys%calc%mute
-    get_orders = present(rpa_orders)
 
     sys%calc%parallel = .false.
     sys%calc%mute = .true.
@@ -1231,12 +1200,13 @@ function get_single_rpa_energy(sys, alpha, damp, rpa_orders) result(ene)
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
-        if (get_orders) then
+        if (sys%work%get_rpa_orders) then
             call ts(sys%calc, 24)
             call diagonalize('N', AT, eigs)
             call ts(sys%calc, -24)
+            allocate (sys%work%rpa_orders(sys%calc%param%rpa_order_max))
             do n_order = 2, sys%calc%param%rpa_order_max
-                rpa_orders(n_order) = rpa_orders(n_order) &
+                sys%work%rpa_orders(n_order) = sys%work%rpa_orders(n_order) &
                     +(-1.d0/(2*pi)*(-1)**n_order &
                     *sum(dble(eigs)**n_order)/n_order) &
                     *sys%calc%omega_grid_w(i_grid_omega)
@@ -1245,20 +1215,18 @@ function get_single_rpa_energy(sys, alpha, damp, rpa_orders) result(ene)
     end do
     if (is_parallel) then
         call sync_sum(ene)
-        if (get_orders) then
-            call sync_sum(rpa_orders)
+        if (sys%work%get_rpa_orders) then
+            call sync_sum(sys%work%rpa_orders)
         end if
     end if
 end function get_single_rpa_energy
 
 
-function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, rpa_orders) result(ene)
+real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha(:, :)
     real(8), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(out), optional :: rpa_orders(20)
-    real(8) :: ene
 
     complex(8), dimension(3*size(sys%coords, 1), 3*size(sys%coords, 1)), target :: relay, AT
     complex(8) :: eigs(3*size(sys%coords, 1))
@@ -1269,13 +1237,11 @@ function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, rpa_orders) re
 
     is_parallel = sys%calc%parallel
     mute = sys%calc%mute
-    get_orders = present(rpa_orders)
 
     sys%calc%parallel = .false.
     sys%calc%mute = .true.
 
     ene = 0.d0
-    if (get_orders) rpa_orders(:) = 0.d0
     damp_alpha = damp
     do i_grid_omega = 0, size(sys%calc%omega_grid)-1
         ! MPI code begin
@@ -1317,7 +1283,8 @@ function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, rpa_orders) re
             call diagonalize('N', AT, eigs)
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
-                rpa_orders(n_order) = rpa_orders(n_order) &
+                sys%work%rpa_orders_k(sys%work%i_kpt, n_order) = &
+                    sys%work%rpa_orders_k(sys%work%i_kpt, n_order) &
                     +(-1.d0)/(2*pi)*(-1)**n_order &
                     *dble(sum(eigs**n_order))/n_order &
                     *sys%calc%omega_grid_w(i_grid_omega)
@@ -1327,7 +1294,7 @@ function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, rpa_orders) re
     if (is_parallel) then
         call sync_sum(ene)
         if (get_orders) then
-            call sync_sum(rpa_orders)
+            call sync_sum(sys%work%rpa_orders_k(sys%work%i_kpt, :))
         end if
     end if
 

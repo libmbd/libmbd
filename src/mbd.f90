@@ -3,17 +3,6 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd
 
-! modes:
-! P: parallel (MPI)
-! C: crystal
-! R: reciprocal
-! Q: do RPA
-! E: get eigenvalues
-! V: get eigenvectors
-! O: get RPA orders
-! L: scale dipole with lambda
-! M: mute
-
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
 
@@ -286,18 +275,13 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j
-    logical :: is_crystal, is_parallel, is_reciprocal, is_low_dim, mute, &
-        do_ewald
+    logical :: mute, do_ewald
 
-    is_parallel = sys%calc%parallel
-    is_reciprocal = present(k_point)
-    is_crystal = sys%periodic
-    is_low_dim = any(sys%calc%param%vacuum_axis)
     do_ewald = .false.
     mute = sys%calc%mute
-    if (is_parallel) then
+    if (sys%calc%parallel) then
         parallel_mode = 'A' ! atoms
-        if (is_crystal .and. size(sys%coords, 1) < sys%calc%n_tasks) then
+        if (sys%periodic .and. size(sys%coords, 1) < sys%calc%n_tasks) then
             parallel_mode = 'C' ! cells
         end if
     else
@@ -305,17 +289,17 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
     end if
 
     ! MPI code begin
-    if (is_parallel) then
+    if (sys%calc%parallel) then
         ! will be restored by syncing at the end
-        if (is_reciprocal) then
+        if (present(k_point)) then
             relay%cplx = relay%cplx/sys%calc%n_tasks
         else
             relay%re = relay%re/sys%calc%n_tasks
         end if
     end if
     ! MPI code end
-    if (is_crystal) then
-        if (is_low_dim) then
+    if (sys%periodic) then
+        if (any(sys%calc%param%vacuum_axis)) then
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
             do_ewald = .true.
@@ -331,7 +315,7 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
     else
         range_cell(:) = 0
     end if
-    if (is_crystal) then
+    if (sys%periodic) then
         call print_log('Ewald: summing real part in cell vector range of ' &
             //trim(tostr(1+2*range_cell(1)))//'x' &
             //trim(tostr(1+2*range_cell(2)))//'x' &
@@ -346,7 +330,7 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
             if (sys%calc%my_task /= modulo(i_cell, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        if (is_crystal) then
+        if (sys%periodic) then
             R_cell = matmul(idx_cell, sys%lattice)
         else
             R_cell(:) = 0.d0
@@ -365,7 +349,7 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                 end if
                 r = sys%coords(i_atom, :)-sys%coords(j_atom, :)-R_cell
                 r_norm = sqrt(sum(r**2))
-                if (is_crystal .and. r_norm > real_space_cutoff) cycle
+                if (sys%periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
                     R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
                 end if
@@ -429,13 +413,13 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                 if (do_ewald) then
                     Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
-                if (is_reciprocal) then
+                if (present(k_point)) then
                     Tpp_c = Tpp*exp(-cmplx(0.d0, 1.d0, 8)*( &
                         dot_product(k_point, r)))
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
-                if (is_reciprocal) then
+                if (present(k_point)) then
                     relay%cplx(i+1:i+3, j+1:j+3) = relay%cplx(i+1:i+3, j+1:j+3) &
                         +Tpp_c
                     if (i_atom /= j_atom) then
@@ -456,8 +440,8 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
     end do ! i_cell
     call ts(sys%calc, -11)
     ! MPI code begin
-    if (is_parallel) then
-        if (is_reciprocal) then
+    if (sys%calc%parallel) then
+        if (present(k_point)) then
             call sync_sum(relay%cplx)
         else
             call sync_sum(relay%re)
@@ -476,7 +460,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
     real(8), intent(in), optional :: k_point(3)
     type(mbd_relay), intent(in) :: relay
 
-    logical :: is_parallel, is_reciprocal, mute, do_surface
+    logical :: is_parallel, mute, do_surface
     real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
         k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
     complex(8) :: Tpp_c(3, 3)
@@ -486,7 +470,6 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
     character(len=1) :: parallel_mode
 
     is_parallel = sys%calc%parallel
-    is_reciprocal = present(k_point)
     mute = sys%calc%mute
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
@@ -500,7 +483,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
     ! MPI code begin
     if (is_parallel) then
         ! will be restored by syncing at the end
-        if (is_reciprocal) then
+        if (present(k_point)) then
             relay%cplx = relay%cplx/sys%calc%n_tasks
         else
             relay%re = relay%re/sys%calc%n_tasks
@@ -528,7 +511,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
         end if
         ! MPI code end
         G_vector = matmul(idx_G_vector, rec_unit_cell)
-        if (is_reciprocal) then
+        if (present(k_point)) then
             k_total = k_point+G_vector
         else
             k_total = G_vector
@@ -548,7 +531,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
             !$omp parallel do private(r, Tpp, i, j, Tpp_c)
             do j_atom = 1, i_atom
                 r = sys%coords(i_atom, :)-sys%coords(j_atom, :)
-                if (is_reciprocal) then
+                if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
                         *dot_product(G_vector, r))
                 else
@@ -556,7 +539,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
                 end if
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
-                if (is_reciprocal) then
+                if (present(k_point)) then
                     relay%cplx(i+1:i+3, j+1:j+3) = relay%cplx(i+1:i+3, j+1:j+3)+Tpp_c
                     if (i_atom /= j_atom) then
                         relay%cplx(j+1:j+3, i+1:i+3) = relay%cplx(j+1:j+3, i+1:i+3) &
@@ -575,7 +558,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
     end do ! i_G_vector
     ! MPI code begin
     if (is_parallel) then
-        if (is_reciprocal) then
+        if (present(k_point)) then
             call sync_sum(relay%cplx)
         else
             call sync_sum(relay%re)
@@ -585,7 +568,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
     do i_atom = 1, size(sys%coords, 1) ! self energy
         do i_xyz = 1, 3
             i = 3*(i_atom-1)+i_xyz
-            if (is_reciprocal) then
+            if (present(k_point)) then
                 relay%cplx(i, i) = relay%cplx(i, i)-4*alpha**3/(3*sqrt(pi))
             else
                 relay%re(i, i) = relay%re(i, i)-4*alpha**3/(3*sqrt(pi))
@@ -605,7 +588,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
                     j = 3*(j_atom-1)+j_xyz
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
                         *exp(-k_sq/(4*alpha**2))
-                    if (is_reciprocal) then
+                    if (present(k_point)) then
                         relay%cplx(i, j) = relay%cplx(i, j)+elem
                         if (i_atom /= j_atom) then
                             relay%cplx(j, i) = relay%cplx(j, i)+elem
@@ -615,7 +598,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
                         if (i_atom /= j_atom) then
                             relay%re(j, i) = relay%re(j, i)+elem
                         end if
-                    end if ! is_reciprocal
+                    end if ! present(k_point)
                 end do ! j_xyz
                 end do ! i_xyz
             end do ! j_atom
@@ -628,7 +611,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
             do i_xyz = 1, 3
                 i = 3*(i_atom-1)+i_xyz
                 j = 3*(j_atom-1)+i_xyz
-                if (is_reciprocal) then
+                if (present(k_point)) then
                     relay%cplx(i, j) = relay%cplx(i, j)+4*pi/(3*volume)
                     relay%cplx(j, i) = relay%cplx(i, j)
                 else
@@ -964,7 +947,7 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     real(8) :: eigs(3*size(sys%coords, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
-    logical :: get_eigenvalues, get_eigenvectors, is_parallel
+    logical :: is_parallel
 
     is_parallel = sys%calc%parallel
 
@@ -1027,7 +1010,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
     type(mbd_damping), intent(in) :: damp
 
     logical :: &
-        is_parallel, do_rpa, get_orders, get_eigenvalues, get_eigenvectors, mute
+        is_parallel, do_rpa, mute
     integer :: i_kpt, n_kpts, n_atoms
     real(8) :: k_point(3), alpha_ts(0:size(sys%calc%omega_grid)-1, size(sys%coords, 1))
 
@@ -1089,7 +1072,7 @@ real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, dam
     real(8) :: eigs(3*size(sys%coords, 1))
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
-    logical :: get_eigenvalues, get_eigenvectors, is_parallel
+    logical :: is_parallel
 
     is_parallel = sys%calc%parallel
 
@@ -1154,7 +1137,7 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     complex(8) :: eigs(3*size(sys%coords, 1))
     integer :: i_atom, i_xyz, i_grid_omega, i
     integer :: n_order, n_negative_eigs
-    logical :: is_parallel, get_orders, mute
+    logical :: is_parallel, mute
     type(mbd_damping) :: damp_alpha
 
     is_parallel = sys%calc%parallel

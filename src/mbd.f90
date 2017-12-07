@@ -33,6 +33,7 @@ type mbd_param
     logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
     integer :: mbd_nbody_max = 3
     integer :: rpa_order_max = 10
+    integer :: n_frequency_grid = 15
 end type
 
 type mbd_timing
@@ -622,12 +623,12 @@ subroutine add_ewald_dipole_parts(sys, alpha, relay, k_point)
 end subroutine
 
 
-subroutine init_grid(calc, n)
+subroutine init_grid(calc)
     type(mbd_calc), intent(inout) :: calc
-    integer, intent(in) :: n
 
-    if (allocated(calc%omega_grid)) deallocate(calc%omega_grid)
-    if (allocated(calc%omega_grid_w)) deallocate(calc%omega_grid_w)
+    integer :: n
+
+    n = calc%param%n_frequency_grid
     allocate (calc%omega_grid(0:n))
     allocate (calc%omega_grid_w(0:n))
     calc%n_freq = n

@@ -1,6 +1,6 @@
 // vim: set ft=c:
 
-struct MBD_calc* mbd_init_calc(int n_grid);
+struct MBD_calc* mbd_init_calc(void);
 
 void mbd_destroy_calc(struct MBD_calc* calc);
 

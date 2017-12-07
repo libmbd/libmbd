@@ -8,13 +8,11 @@ implicit none
 
 contains
 
-type(c_ptr) function mbd_init_calc(n_grid) bind(c)
-    integer(c_int), intent(in), value :: n_grid
-
+type(c_ptr) function mbd_init_calc() bind(c)
     type(mbd_calc), pointer :: calc
 
     allocate (calc)
-    call init_grid(calc, n_grid)
+    call init_grid(calc)
     mbd_init_calc = c_loc(calc)
 end function mbd_init_calc
 

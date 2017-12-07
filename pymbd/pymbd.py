@@ -37,7 +37,7 @@ def mbd_energy(coords, alpha_0, omega, R_vdw, beta,
         lattice = np.array(lattice, dtype=float, order='F')
         k_grid = np.array(k_grid, dtype='i4')
     n_atoms = len(coords)
-    calc = _lib.mbd_init_calc(15)
+    calc = _lib.mbd_init_calc()
     system = _lib.mbd_init_system(
         calc,
         n_atoms,

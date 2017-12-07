@@ -785,9 +785,12 @@ function do_scs(sys, alpha, damp, lam) result(alpha_full)
     real(8), target :: alpha_full(3*size(sys%coords, 1), 3*size(sys%coords, 1))
 
     integer :: i_atom, i_xyz, i
+    type(mbd_damping) :: damp_local
 
     alpha_full(:, :) = 0.d0
-    call add_dipole_matrix(sys, damp, mbd_relay(re=alpha_full))
+    damp_local = damp
+    damp_local%alpha = alpha
+    call add_dipole_matrix(sys, damp_local, mbd_relay(re=alpha_full))
     if (present(lam)) alpha_full = lam*alpha_full
     do i_atom = 1, size(sys%coords, 1)
         do i_xyz = 1, 3

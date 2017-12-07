@@ -5,8 +5,8 @@ from __future__ import print_function
 from ._libmbd import ffi as _ffi, lib as _lib
 import numpy as np
 import pkg_resources
+import sys
 import csv
-import io
 from mpi4py import MPI
 MPI.COMM_WORLD
 
@@ -66,10 +66,10 @@ def mbd_energy_species(coords, species, volumes, beta, a=6., func='calc_mbd_rssc
 
 
 def _get_vdw_params():
-    csvfile = pkg_resources.resource_stream(__name__, 'vdw-params.csv')
-    reader = csv.DictReader(
-        io.TextIOWrapper(csvfile), delimiter=';', quoting=csv.QUOTE_NONNUMERIC
-    )
+    csv_lines = pkg_resources.resource_string(__name__, 'vdw-params.csv').split(b'\n')
+    if sys.version_info[0] > 2:
+        csv_lines = [l.decode() for l in csv_lines]
+    reader = csv.DictReader(csv_lines, delimiter=';', quoting=csv.QUOTE_NONNUMERIC)
     vdw_params = {}
     for row in reader:
         vdw_params[row.pop('species')] = row

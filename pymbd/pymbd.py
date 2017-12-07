@@ -2,13 +2,14 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import print_function
-from ._libmbd import ffi as _ffi, lib as _lib
 import numpy as np
 import pkg_resources
 import sys
 import csv
 from mpi4py import MPI
 MPI.COMM_WORLD
+
+from ._libmbd import ffi as _ffi, lib as _lib
 
 ang = 1/0.529177249
 
@@ -25,54 +26,63 @@ def _ndarray(ptr, shape=None, dtype='float'):
     )
 
 
-def mbd_energy(coords, alpha_0, omega, R_vdw, beta,
-               lattice=None, k_grid=None,
-               a=6., func='calc_mbd_rsscs_energy'):
-    coords = np.array(coords, dtype=float, order='F')
-    alpha_0 = np.array(alpha_0, dtype=float)
-    omega = np.array(omega, dtype=float)
-    R_vdw = np.array(R_vdw, dtype=float)
-    periodic = lattice is not None
-    if periodic:
-        lattice = np.array(lattice, dtype=float, order='F')
-        k_grid = np.array(k_grid, dtype='i4')
-    n_atoms = len(coords)
-    calc = _lib.mbd_init_calc()
-    system = _lib.mbd_init_system(
-        calc,
-        n_atoms,
-        _ffi.cast('double*', coords.ctypes.data),
-        periodic,
-        _ffi.cast('double*', lattice.ctypes.data) if periodic else _ffi.NULL,
-        _ffi.cast('int*', k_grid.ctypes.data) if periodic else _ffi.NULL,
-    )
-    damping = _lib.mbd_init_damping(
-        n_atoms, _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
-    )
-    ene = getattr(_lib, func)(
-        system,
-        n_atoms,
-        _ffi.cast('double*', alpha_0.ctypes.data),
-        _ffi.cast('double*', omega.ctypes.data),
-        damping
-    )
-    _lib.mbd_destroy_damping(damping)
-    _lib.mbd_destroy_system(system)
-    _lib.mbd_destroy_calc(calc)
-    return ene
+class MBDCalc(object):
+    def __init__(self):
+        self._calc = None
 
+    def __enter__(self):
+        self._calc = _lib.mbd_init_calc()
+        return self
 
-def mbd_energy_species(coords, species, volumes, beta, **kwargs):
-    alpha_0, C6, R_vdw = (
-        np.array([vdw_params[sp][param] for sp in species])
-        for param in ['alpha_0', 'C6', 'R_vdw']
-    )
-    volumes = np.array(volumes)
-    alpha_0 *= volumes
-    C6 *= volumes**2
-    R_vdw *= volumes**(1./3)
-    omega = 4./3*C6/alpha_0**2
-    return mbd_energy(coords, alpha_0, omega, R_vdw, beta, **kwargs)
+    def __exit__(self, exc_type, exc_value, traceback):
+        _lib.mbd_destroy_calc(self._calc)
+        self._calc = None
+
+    def mbd_energy(self, coords, alpha_0, omega, R_vdw, beta,
+                   lattice=None, k_grid=None,
+                   a=6., func='calc_mbd_rsscs_energy'):
+        coords = np.array(coords, dtype=float, order='F')
+        alpha_0 = np.array(alpha_0, dtype=float)
+        omega = np.array(omega, dtype=float)
+        R_vdw = np.array(R_vdw, dtype=float)
+        periodic = lattice is not None
+        if periodic:
+            lattice = np.array(lattice, dtype=float, order='F')
+            k_grid = np.array(k_grid, dtype='i4')
+        n_atoms = len(coords)
+        system = _lib.mbd_init_system(
+            self._calc,
+            n_atoms,
+            _ffi.cast('double*', coords.ctypes.data),
+            periodic,
+            _ffi.cast('double*', lattice.ctypes.data) if periodic else _ffi.NULL,
+            _ffi.cast('int*', k_grid.ctypes.data) if periodic else _ffi.NULL,
+        )
+        damping = _lib.mbd_init_damping(
+            n_atoms, _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
+        )
+        ene = getattr(_lib, func)(
+            system,
+            n_atoms,
+            _ffi.cast('double*', alpha_0.ctypes.data),
+            _ffi.cast('double*', omega.ctypes.data),
+            damping
+        )
+        _lib.mbd_destroy_damping(damping)
+        _lib.mbd_destroy_system(system)
+        return ene
+
+    def mbd_energy_species(self, coords, species, volumes, beta, **kwargs):
+        alpha_0, C6, R_vdw = (
+            np.array([vdw_params[sp][param] for sp in species])
+            for param in ['alpha_0', 'C6', 'R_vdw']
+        )
+        volumes = np.array(volumes)
+        alpha_0 *= volumes
+        C6 *= volumes**2
+        R_vdw *= volumes**(1./3)
+        omega = 4./3*C6/alpha_0**2
+        return self.mbd_energy(coords, alpha_0, omega, R_vdw, beta, **kwargs)
 
 
 def _get_vdw_params():

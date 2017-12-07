@@ -2,10 +2,10 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import numpy as np
+import pytest
 from pytest import approx
 
-import pymbd
-from pymbd import ang
+from pymbd import ang, MBDCalc
 
 benzene_dimer = [(
     np.array([
@@ -60,36 +60,41 @@ ethylcarbamate = [(
      0.824, 0.974, 0.896]
 )]
 
+@pytest.fixture(scope='module')
+def calc():
+    with MBDCalc() as calc:
+        yield calc
 
-def test_argon_dimer_plain():
-    ene = pymbd.mbd_energy(
+
+def test_argon_dimer_plain(calc):
+    ene = calc.mbd_energy(
         [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [0.7, 0.7], [3.55, 3.55], 0.83,
         func='calc_mbd_energy'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
 
-def test_argon_dimer_rsscs():
-    ene = pymbd.mbd_energy_species(
+def test_argon_dimer_rsscs(calc):
+    ene = calc.mbd_energy_species(
         [(0, 0, 0), (0, 0, 4*ang)], ['Ar', 'Ar'], [1, 1], 0.83
     )
     assert ene == approx(-0.0002462647623815428, rel=1e-10)
 
 
-def test_benzene_dimer():
+def test_benzene_dimer(calc):
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        pymbd.mbd_energy_species(coords, species, vols, 0.83)
+        calc.mbd_energy_species(coords, species, vols, 0.83)
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
-def test_ethylcarbamate():
+def test_ethylcarbamate(calc):
     enes = [
-        pymbd.mbd_energy_species(
+        calc.mbd_energy_species(
             coords, species, vols, 0.83,
             lattice=lattice, k_grid=k_grid
         )

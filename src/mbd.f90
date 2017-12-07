@@ -70,6 +70,7 @@ type mbd_work
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
     integer :: i_kpt = 0
+    real(8), allocatable :: k_pts(:, :)
     real(8), allocatable :: mode_enes(:)
     real(8), allocatable :: modes(:, :)
     real(8), allocatable :: rpa_orders(:)
@@ -84,7 +85,7 @@ type mbd_system
     real(8), allocatable :: coords(:, :)
     logical :: periodic = .false.
     real(8) :: lattice(3, 3)
-    real(8), allocatable :: k_pts(:, :)
+    integer :: k_grid(3)
     integer :: supercell(3)
     logical :: do_rpa = .false.
     logical :: do_reciprocal = .true.
@@ -813,7 +814,7 @@ function get_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     is_parallel = sys%calc%parallel
     is_crystal = sys%periodic
     do_rpa = sys%do_rpa
-    is_reciprocal = allocated(sys%k_pts)
+    is_reciprocal = sys%do_reciprocal
     if (.not. is_crystal) then
         if (.not. do_rpa) then
             ene = get_single_mbd_energy(sys, alpha_0, omega, damp)
@@ -983,7 +984,10 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
     real(8) :: k_point(3), alpha_ts(0:sys%calc%n_freq, size(sys%coords, 1))
 
     n_atoms = size(sys%coords, 1)
-    n_kpts = size(sys%k_pts, 1)
+    sys%work%k_pts = make_k_grid( &
+        make_g_grid(sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3)), sys%lattice &
+    )
+    n_kpts = size(sys%work%k_pts, 1)
     is_parallel = sys%calc%parallel
     do_rpa = sys%do_rpa
     mute = sys%calc%mute
@@ -1005,7 +1009,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
             if (sys%calc%my_task /= modulo(i_kpt, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        k_point = sys%k_pts(i_kpt, :)
+        k_point = sys%work%k_pts(i_kpt, :)
         sys%work%i_kpt = i_kpt
         if (do_rpa) then
             ene = ene + get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp)
@@ -1021,7 +1025,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
         if (sys%work%get_rpa_orders) call sync_sum(sys%work%rpa_orders_k)
     end if
     ! MPI code end
-    ene = ene/size(sys%k_pts, 1)
+    ene = ene/size(sys%work%k_pts, 1)
     if (sys%work%get_rpa_orders) sys%work%rpa_orders = sys%work%rpa_orders/n_kpts
 
     sys%calc%parallel = is_parallel

@@ -13,7 +13,17 @@ struct MBD_damping* mbd_init_damping(
 
 void mbd_destroy_damping(struct MBD_damping* damping);
 
-void mbd_calculate(
+void calc_mbd_energy(
+    struct MBD_calc* calc,
+    int n_atoms,
+    double* coords,
+    double* alpha_0,
+    double* omega,
+    struct MBD_damping* damping,
+    double* energy
+);
+
+void calc_mbd_rsscs_energy(
     struct MBD_calc* calc,
     int n_atoms,
     double* coords,

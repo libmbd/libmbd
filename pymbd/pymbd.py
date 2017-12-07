@@ -32,7 +32,7 @@ def mbd_energy(coords, alpha_0, omega, R_vdw, beta, a=6., func='calc_mbd_rsscs_e
     R_vdw = np.array(R_vdw, dtype=float)
     energy = np.zeros(())
     n_atoms = len(coords)
-    calc = _lib.mbd_init_calc(17)
+    calc = _lib.mbd_init_calc(15)
     damping = _lib.mbd_init_damping(
         n_atoms,
         _ffi.cast('double *', R_vdw.ctypes.data),

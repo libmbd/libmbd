@@ -25,34 +25,44 @@ def _ndarray(ptr, shape=None, dtype='float'):
     )
 
 
-def mbd_energy(coords, alpha_0, omega, R_vdw, beta, a=6., func='calc_mbd_rsscs_energy'):
+def mbd_energy(coords, alpha_0, omega, R_vdw, beta,
+               lattice=None, k_grid=None,
+               a=6., func='calc_mbd_rsscs_energy'):
     coords = np.array(coords, dtype=float, order='F')
     alpha_0 = np.array(alpha_0, dtype=float)
     omega = np.array(omega, dtype=float)
     R_vdw = np.array(R_vdw, dtype=float)
-    energy = np.zeros(())
+    periodic = lattice is not None
+    if periodic:
+        lattice = np.array(lattice, dtype=float, order='F')
+        k_grid = np.array(k_grid, dtype='i4')
     n_atoms = len(coords)
     calc = _lib.mbd_init_calc(15)
-    damping = _lib.mbd_init_damping(
-        n_atoms,
-        _ffi.cast('double *', R_vdw.ctypes.data),
-        beta,
-        a)
-    getattr(_lib, func)(
+    system = _lib.mbd_init_system(
         calc,
         n_atoms,
-        _ffi.cast('double *', coords.ctypes.data),
-        _ffi.cast('double *', alpha_0.ctypes.data),
-        _ffi.cast('double *', omega.ctypes.data),
-        damping,
-        _ffi.cast('double *', energy.ctypes.data),
+        _ffi.cast('double*', coords.ctypes.data),
+        periodic,
+        _ffi.cast('double*', lattice.ctypes.data) if periodic else _ffi.NULL,
+        _ffi.cast('int*', k_grid.ctypes.data) if periodic else _ffi.NULL,
+    )
+    damping = _lib.mbd_init_damping(
+        n_atoms, _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
+    )
+    ene = getattr(_lib, func)(
+        system,
+        n_atoms,
+        _ffi.cast('double*', alpha_0.ctypes.data),
+        _ffi.cast('double*', omega.ctypes.data),
+        damping
     )
     _lib.mbd_destroy_damping(damping)
+    _lib.mbd_destroy_system(system)
     _lib.mbd_destroy_calc(calc)
-    return float(energy)
+    return ene
 
 
-def mbd_energy_species(coords, species, volumes, beta, a=6., func='calc_mbd_rsscs_energy'):
+def mbd_energy_species(coords, species, volumes, beta, **kwargs):
     alpha_0, C6, R_vdw = (
         np.array([vdw_params[sp][param] for sp in species])
         for param in ['alpha_0', 'C6', 'R_vdw']
@@ -62,7 +72,7 @@ def mbd_energy_species(coords, species, volumes, beta, a=6., func='calc_mbd_rssc
     C6 *= volumes**2
     R_vdw *= volumes**(1./3)
     omega = 4./3*C6/alpha_0**2
-    return mbd_energy(coords, alpha_0, omega, R_vdw, beta, a, func)
+    return mbd_energy(coords, alpha_0, omega, R_vdw, beta, **kwargs)
 
 
 def _get_vdw_params():

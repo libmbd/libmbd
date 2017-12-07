@@ -14,7 +14,7 @@ implicit none
 
 private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, mbd_relay, &
-    init_grid, destroy_grid, get_mbd_energy, add_dipole_matrix, mbd_rsscs_energy
+    init_grid, get_mbd_energy, add_dipole_matrix, mbd_rsscs_energy
 
 real(8), parameter :: bohr = 0.529177249d0
 integer, parameter :: n_timestamps = 100
@@ -709,14 +709,6 @@ subroutine gauss_legendre(n, r, w)
         r(i) = dble(x)
         w(i) = dble(2/((1-x**2)*df**2))
     end do
-end subroutine
-
-
-subroutine destroy_grid(calc)
-    type(mbd_calc), intent(inout) :: calc
-
-    deallocate (calc%omega_grid)
-    deallocate (calc%omega_grid_w)
 end subroutine
 
 

@@ -2,7 +2,7 @@ module mbd_c_api
 
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
-    destroy_grid, mbd_rsscs_energy
+    mbd_rsscs_energy
 
 implicit none
 
@@ -24,7 +24,6 @@ subroutine mbd_destroy_calc(calc_p) bind(c)
     type(mbd_calc), pointer :: calc
 
     call c_f_pointer(calc_p, calc)
-    call destroy_grid(calc)
     deallocate (calc)
 end subroutine mbd_destroy_calc
 

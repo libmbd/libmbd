@@ -6,7 +6,9 @@ module mbd_common
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix
+public :: tostr, diff3, diff5, print_matrix, nan
+
+real(8), parameter :: nan = transfer(-2251799813685248_8, 1d0)
 
 interface tostr
     module procedure tostr_int_

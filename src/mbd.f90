@@ -5,7 +5,7 @@ module mbd
 
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
-use mbd_common, only: tostr
+use mbd_common, only: tostr, nan
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted
@@ -104,7 +104,12 @@ end type mbd_relay
 
 type dip33
     real(8) :: val(3, 3)
-    real(8) :: der(3, 3, 3)  ! dT_{ab}/dR_c
+    real(8) :: der(3, 3, 3)  ! dval_{ab}/dR_c
+end type
+
+type scalar
+    real(8) :: val
+    real(8) :: der(3)  ! dval/dR_c
 end type
 
 contains
@@ -305,7 +310,8 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
     real(8), intent(in), optional :: k_point(3)
 
     real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
-        overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff, zeta_ij, f_ij
+        overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
+    type(scalar) :: zeta_ij
     type(dip33) :: Tpp
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
@@ -391,7 +397,11 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                 if (allocated(damp%alpha)) then
                     sigma_ij = sqrt(sum(get_sigma_selfint( &
                         sys%calc, damp%alpha((/ i_atom , j_atom /)))**2))
-                    zeta_ij = r_norm/sigma_ij
+                    zeta_ij%val = r_norm/sigma_ij
+                    if (sys%do_force) then
+                        ! TODO add second term (alpha)
+                        zeta_ij%der = r/(r_norm*sigma_ij)
+                    end if
                 end if
                 if (allocated(damp%overlap)) then
                     overlap_ij = damp%overlap(i_atom, j_atom)
@@ -401,14 +411,15 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                         damp%C6(i_atom), damp%C6(j_atom), &
                         damp%alpha(i_atom), damp%alpha(j_atom))
                 end if
+                Tpp%der = nan
                 select case (damp%version)
                     case ("bare")
                         Tpp%val = T_bare(r)
                     case ("dip,1mexp")
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,erf")
-                        zeta_ij = (damp%beta*R_vdw_ij)**damp%a
-                        Tpp = T_erf_coulomb(sys, r, zeta_ij)
+                        zeta_ij%val = (r_norm/(damp%beta*R_vdw_ij))**damp%a
+                        Tpp = T_erf_coulomb(r, zeta_ij, .false.)
                     case ("dip,fermi")
                         Tpp%val = T_fermi_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,overlap")
@@ -429,25 +440,25 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                     case ("dip,custom")
                         Tpp%val = damp%potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(sys, r, zeta_ij)
+                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
                     case ("1mexp,dip,gg")
                         f_ij = 1.d0-damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)
-                        Tpp = T_erf_coulomb(sys, r, zeta_ij)
+                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                     case ("erf,dip,gg")
                         f_ij = 1.d0-damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)
-                        Tpp = T_erf_coulomb(sys, r, zeta_ij)
+                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                     case ("fermi,dip,gg")
                         f_ij = 1.d0-damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)
-                        Tpp = T_erf_coulomb(sys, r, zeta_ij)
+                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         f_ij = 1.d0-damp%damping_custom(i_atom, j_atom)
-                        Tpp = T_erf_coulomb(sys, r, zeta_ij)
+                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                 end select
@@ -1682,17 +1693,29 @@ function T_fermi_coulomb(rxyz, sigma, a) result(T)
 end function
 
 
-type(dip33) function T_erf_coulomb(sys, r, zeta) result(T)
-    type(mbd_system), intent(in) :: sys
+type(dip33) function T_erf_coulomb(r, zeta, deriv) result(T)
     real(8), intent(in) :: r(3)
-    real(8), intent(in) :: zeta
+    type(scalar), intent(in) :: zeta
+    logical, intent(in) :: deriv
 
-    real(8) :: theta
+    real(8) :: theta, erf_theta, r_5
     type(dip33) :: bare
+    real(8) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
+    integer :: a, c
 
-    bare = T_bare_v2(r, sys%do_force)
-    theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
-    T%val = (erf(zeta)-theta)*bare%val + 2*zeta**2*theta*(r.cprod.r)/sqrt(sum(r**2))**5
+    bare = T_bare_v2(r, deriv)
+    r_5 = sqrt(sum(r**2))**5
+    rr_r5 = (r.cprod.r)/r_5
+    theta = 2*zeta%val/sqrt(pi)*exp(-zeta%val**2)
+    erf_theta = erf(zeta%val)-theta
+    T%val = erf_theta*bare%val+2*(zeta%val**2)*theta*rr_r5
+    if (deriv) then
+        tmp33 = 2*zeta%val*theta*(bare%val+(3-2*zeta%val**2)*rr_r5)
+        forall (c = 1:3) T%der(:, :, c) = tmp33*zeta%der(c)
+        tmp333 = bare%der/3
+        forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
+        T%der = T%der + erf_theta*bare%der-2*(zeta%val**2)*theta*tmp333
+    end if
 end function
 
 
@@ -1940,6 +1963,7 @@ subroutine run_tests()
     integer :: code = 0
 
     call exec_test('T_bare deriv', test_T_bare_deriv)
+    call exec_test('T_GG deriv', test_T_GG_deriv)
     if (code /= 0) stop 1
 
     contains
@@ -1994,6 +2018,43 @@ subroutine run_tests()
             end if
         end do
     end subroutine test_T_bare_deriv
+
+    subroutine test_T_GG_deriv()
+        real(8) :: r(3), r_diff(3)
+        type(dip33) :: T
+        real(8) :: diff(3, 3)
+        real(8) :: T_diff_anl(3, 3, 3)
+        real(8) :: T_diff_num(3, 3, -2:2)
+        integer :: a, b, c, i_step
+        real(8) :: delta
+        type(scalar) :: zeta, zeta_diff
+
+        delta = 1d-3
+        r = (/ 1.02d0, -2.22d0, 0.15d0 /)
+        zeta = scalar(1.2d0, (/ 0.6d0, -0.2d0, 0.8d0 /))
+        T = T_erf_coulomb(r, zeta, deriv=.true.)
+        T_diff_anl = T%der
+        do c = 1, 3
+            do i_step = -2, 2
+                if (i_step == 0) continue
+                r_diff = r
+                r_diff(c) = r_diff(c)+i_step*delta
+                zeta_diff%val = zeta%val+i_step*delta*zeta%der(c)
+                T = T_erf_coulomb(r_diff, zeta_diff, deriv=.false.)
+                T_diff_num(:, :, i_step) = T%val
+            end do
+            forall (a = 1:3, b = 1:3)
+                T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+            end forall
+            diff = T_diff_num(:, :, 0)-T_diff_anl(:, :, c)
+            if (any(abs(diff) > 1d-12)) then
+                call failed()
+                call print_matrix('delta dTGG(:, :, ' // trim(tostr(c)) // ')', diff)
+                return
+            end if
+        end do
+    end subroutine test_T_GG_deriv
+
 end subroutine run_tests
 
 end module mbd

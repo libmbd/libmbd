@@ -112,6 +112,53 @@ def mbd_rsscs(
     return ene
 
 
+def mbd_scs(
+        coords, species, volumes, a, lattice=None, k_grid=None, vacuum=None,
+        custom_params=None, get_spectrum=False
+):
+    _mbd.param_vacuum_axis = [False]*3 if vacuum is None else vacuum
+    mode = 'P' if ntasks > 1 else ''
+    params = get_free_atom_data(species)
+    if custom_params:
+        for i, specie in enumerate(species):
+            if specie in custom_params:
+                for j, paramname in enumerate(['alpha_0', 'C6', 'R_vdw']):
+                    params[j][i] = custom_params[specie][paramname]
+    alpha_0, C6, R_vdw = scale_hirsh(volumes, *params)
+    if lattice is not None:
+        mode += 'C'
+    alpha_scs_dyn = _mbd.run_scs(
+        mode, 'dip,gg', coords,
+        _mbd.alpha_dynamic_ts_all('C', _mbd.n_grid_omega, alpha_0, c6=C6),
+        unit_cell=lattice
+    )
+    C6_scs = _mbd.get_c6_from_alpha(alpha_scs_dyn)
+    R_vdw_scs = R_vdw*(alpha_scs_dyn[0]/alpha_0)**(1./3)
+    if get_spectrum:
+        mode += 'EV'
+    if k_grid is not None:
+        mode = mode.replace('C', 'R')
+        k_grid = _mbd.make_k_grid(_mbd.make_g_grid(*k_grid), lattice)
+        ene, *spectrum = _mbd.get_reciprocal_mbd_energy(
+            mode, '1mexp,dip', coords,
+            alpha_scs_dyn[0],
+            _mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+            k_grid,
+            unit_cell=lattice,
+            r_vdw=R_vdw_scs, beta=1, a=a
+        )
+    else:
+        ene, *spectrum = _mbd.get_single_mbd_energy(
+            mode, '1mexp,dip', coords,
+            alpha_scs_dyn[0],
+            _mbd.omega_eff(C6_scs, alpha_scs_dyn[0]),
+            r_vdw=R_vdw_scs, beta=1, a=a
+        )
+    if get_spectrum:
+        return (ene, *spectrum)
+    return ene
+
+
 def mbd_rsscs_deriv(
         coords, species, volumes, beta, lattice=None, k_grid=None, supercell=None,
         delta=1e-4

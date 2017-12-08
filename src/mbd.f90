@@ -14,7 +14,7 @@ implicit none
 
 private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, mbd_relay, &
-    init_grid, get_mbd_energy, add_dipole_matrix, mbd_rsscs_energy
+    init_grid, get_mbd_energy, add_dipole_matrix, mbd_rsscs_energy, mbd_scs_energy
 
 real(8), parameter :: bohr = 0.529177249d0
 integer, parameter :: n_timestamps = 100
@@ -125,6 +125,33 @@ real(8) function mbd_rsscs_energy(sys, alpha_0, omega, damp)
     omega_rsscs = omega_eff(C6_rsscs, alpha_dyn_rsscs(0, :))
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0, :), omega_rsscs, damp_mbd)
 end function mbd_rsscs_energy
+
+
+real(8) function mbd_scs_energy(sys, alpha_0, omega, damp)
+    type(mbd_system), intent(inout) :: sys
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
+    type(mbd_damping), intent(in) :: damp
+
+    real(8), allocatable :: alpha_dyn(:, :)
+    real(8), allocatable :: alpha_dyn_scs(:, :)
+    real(8), allocatable :: C6_scs(:)
+    real(8), allocatable :: R_vdw_scs(:)
+    real(8), allocatable :: omega_scs(:)
+    type(mbd_damping) :: damp_scs, damp_mbd
+
+    allocate (alpha_dyn(0:sys%calc%n_freq, size(sys%coords, 1)))
+    allocate (alpha_dyn_scs(0:sys%calc%n_freq, size(sys%coords, 1)))
+    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, omega)
+    damp_scs = damp
+    damp_scs%version = 'dip,gg'
+    alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
+    C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
+    R_vdw_scs = damp%R_vdw*(alpha_dyn_scs(0, :)/alpha_dyn(0, :))**(1.d0/3)
+    damp_mbd = mbd_damping('1mexp,dip', r_vdw=R_vdw_scs, beta=1.d0, a=damp%a)
+    omega_scs = omega_eff(C6_scs, alpha_dyn_scs(0, :))
+    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0, :), omega_scs, damp_mbd)
+end function mbd_scs_energy
 
 
 function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &

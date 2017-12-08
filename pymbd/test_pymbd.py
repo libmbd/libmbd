@@ -60,6 +60,7 @@ ethylcarbamate = [(
      0.824, 0.974, 0.896]
 )]
 
+
 @pytest.fixture(scope='module')
 def calc():
     with MBDCalc() as calc:
@@ -92,6 +93,17 @@ def test_benzene_dimer(calc):
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
+def test_benzene_dimer_scs(calc):
+    mon1, mon2 = benzene_dimer
+    dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
+    enes = [
+        calc.mbd_energy_species(coords, species, vols, 1, a=2.56, func='calc_mbd_scs_energy')
+        for coords, species, vols in (mon1, mon2, dim)
+    ]
+    ene_int = enes[2]-enes[1]-enes[0]
+    assert ene_int == approx(-0.004517208661233951, rel=1e-10)
+
+
 def test_ethylcarbamate(calc):
     enes = [
         calc.mbd_energy_species(
@@ -102,3 +114,16 @@ def test_ethylcarbamate(calc):
     ]
     ene_int = enes[0]-2*enes[1]
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
+
+
+def test_ethylcarbamate_scs(calc):
+    enes = [
+        calc.mbd_energy_species(
+            coords, species, vols, 1, a=2.56,
+            lattice=lattice, k_grid=k_grid,
+            func='calc_mbd_scs_energy'
+        )
+        for coords, lattice, k_grid, species, vols in ethylcarbamate
+    ]
+    ene_int = enes[0]-2*enes[1]
+    assert ene_int == approx(-0.03185124226203406, rel=1e-10)

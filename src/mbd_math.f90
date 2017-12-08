@@ -196,22 +196,4 @@ function get_outer(a, b) result(C)
     forall (i = 1:size(a), j = 1:size(b)) C(i, j) = a(i)*b(j)
 end function
 
-subroutine print_matrix(label, A)
-    character(len=*), intent(in) :: label
-    real(8), intent(in) :: A(:, :)
-
-    integer :: m, n, i, j
-
-    m = size(A, 1)
-    n = size(A, 2)
-
-    write (6, '(A,":")') label
-    do i = 1, m
-        do j = 1, n
-            write (6, "(g10.3)", advance="no") A(i, j)
-        end do
-        write (6, *)
-    end do
-end subroutine
-
 end module

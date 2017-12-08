@@ -14,7 +14,8 @@ implicit none
 
 private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, mbd_relay, &
-    init_grid, get_mbd_energy, add_dipole_matrix, mbd_rsscs_energy, mbd_scs_energy
+    init_grid, get_mbd_energy, add_dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
+    run_tests
 
 real(8), parameter :: bohr = 0.529177249d0
 integer, parameter :: n_timestamps = 100
@@ -1870,5 +1871,37 @@ function clock_rate() result(rate)
 
     call system_clock(cnt, rate, cnt_max) 
 end function clock_rate
+
+
+!!! tests !!!
+
+subroutine run_tests()
+    use mbd_common, only: diff3, print_matrix, tostr, diff5
+
+    character(len=50) :: current_test
+    integer :: code = 0
+
+    if (code /= 0) stop 1
+
+    contains
+
+    subroutine exec_test(test_name, test_routine)
+        character(len=*), intent(in) :: test_name
+        interface
+            subroutine test_routine()
+            end subroutine
+        end interface
+
+        current_test = test_name
+        write (6, '(A,A,A)', advance='no') 'Executing test "', test_name, '"... '
+        call test_routine()
+        if (code == 0) write (6, *) 'OK'
+    end subroutine
+
+    subroutine failed()
+        code = 1
+        write (6, *) 'FAILED!'
+    end subroutine
+end subroutine run_tests
 
 end module mbd

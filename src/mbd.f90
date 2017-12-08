@@ -776,7 +776,6 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     mute = sys%calc%mute
 
     sys%calc%parallel = .false.
-    sys%calc%mute = .true.
 
     alpha_scs(:, :) = 0.d0
     do i_grid_omega = 0, sys%calc%n_freq
@@ -787,6 +786,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
         ! MPI code end
         alpha_full = do_scs(sys, alpha(i_grid_omega+1, :), damp)
         alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full)
+        sys%calc%mute = .true.
     end do
     ! MPI code begin
     if (is_parallel) then
@@ -1043,7 +1043,6 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
     mute = sys%calc%mute
 
     sys%calc%parallel = .false.
-    sys%calc%mute = .true.
 
     alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, omega)
     ene = 0.d0
@@ -1066,6 +1065,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
         else
             ene = ene + get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, damp)
         end if
+        sys%calc%mute = .true.
     end do ! k_point loop
     ! MPI code begin
     if (is_parallel) then
@@ -1166,7 +1166,6 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     mute = sys%calc%mute
 
     sys%calc%parallel = .false.
-    sys%calc%mute = .true.
 
     ene = 0.d0
     damp_alpha = damp
@@ -1217,6 +1216,7 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
                     *sys%calc%omega_grid_w(i_grid_omega)
             end do
         end if
+        sys%calc%mute = .true.
     end do
     if (is_parallel) then
         call sync_sum(ene)
@@ -1244,7 +1244,6 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
     mute = sys%calc%mute
 
     sys%calc%parallel = .false.
-    sys%calc%mute = .true.
 
     ene = 0.d0
     damp_alpha = damp
@@ -1295,6 +1294,7 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
                     *sys%calc%omega_grid_w(i_grid_omega)
             end do
         end if
+        sys%calc%mute = .true.
     end do
     if (is_parallel) then
         call sync_sum(ene)

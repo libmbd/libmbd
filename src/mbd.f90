@@ -268,7 +268,7 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
     real(8), intent(in), optional :: k_point(3)
 
     real(8) :: Tpp(3, 3), R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
-        overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff
+        overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff, zeta_ij
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j
@@ -353,6 +353,7 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                 if (allocated(damp%alpha)) then
                     sigma_ij = sqrt(sum(get_sigma_selfint( &
                         sys%calc, damp%alpha((/ i_atom , j_atom /)))**2))
+                    zeta_ij = r_norm/sigma_ij
                 end if
                 if (allocated(damp%overlap)) then
                     overlap_ij = damp%overlap(i_atom, j_atom)
@@ -368,7 +369,8 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                     case ("dip,1mexp")
                         Tpp = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,erf")
-                        Tpp = T_erf_coulomb(r, damp%beta*R_vdw_ij, damp%a)
+                        zeta_ij = (damp%beta*R_vdw_ij)**damp%a
+                        Tpp = T_erf_coulomb(r, zeta_ij)
                     case ("dip,fermi")
                         Tpp = T_fermi_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("dip,overlap")
@@ -389,22 +391,22 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                     case ("dip,custom")
                         Tpp = damp%potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, sigma_ij, 1.d0)
+                        Tpp = T_erf_coulomb(r, zeta_ij)
                     case ("1mexp,dip,gg")
                         Tpp = (1.d0-damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)) &
-                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                            *T_erf_coulomb(r, zeta_ij)
                         do_ewald = .false.
                     case ("erf,dip,gg")
                         Tpp = (1.d0-damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)) & 
-                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                            *T_erf_coulomb(r, zeta_ij)
                         do_ewald = .false.
                     case ("fermi,dip,gg")
                         Tpp = (1.d0-damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)) &
-                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                            *T_erf_coulomb(r, zeta_ij)
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         Tpp = (1.d0-damp%damping_custom(i_atom, j_atom)) &
-                            *T_erf_coulomb(r, sigma_ij, 1.d0)
+                            *T_erf_coulomb(r, zeta_ij)
                         do_ewald = .false.
                 end select
                 if (do_ewald) then
@@ -1596,17 +1598,15 @@ function T_fermi_coulomb(rxyz, sigma, a) result(T)
 end function
 
 
-function T_erf_coulomb(rxyz, sigma, a) result(T)
-    real(8), intent(in) :: rxyz(3), sigma, a
+function T_erf_coulomb(r, zeta) result(T)
+    real(8), intent(in) :: r(3)
+    real(8), intent(in) :: zeta
     real(8) :: T(3, 3)
 
-    real(8) :: r_sigma, zeta_1, zeta_2
+    real(8) :: theta
 
-    r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
-    zeta_1 = erf(r_sigma)-2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2)
-    zeta_2 = -2.d0/sqrt(pi)*a*r_sigma*exp(-r_sigma**2) &
-        *(1.d0+a*(-1.d0+2.d0*r_sigma**2))
-    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
+    theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
+    T = (erf(zeta)-theta)*T_bare(r) + 2*zeta**2*theta*(r.cprod.r)/sqrt(sum(r**2))**5
 end function
 
 

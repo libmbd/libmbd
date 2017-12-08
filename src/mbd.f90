@@ -186,8 +186,9 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         unit_cell(3, 3)
     real(8) :: ene
 
-    real(8) :: C6_ij, r(3), r_norm, f_damp, R_vdw_ij, overlap_ij, &
+    real(8) :: C6_ij, r(3), r_norm, R_vdw_ij, overlap_ij, &
         ene_shell, ene_pair, R_cell(3)
+    type(scalar) :: f_damp, eta
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
@@ -246,20 +247,23 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
                     end if
                     select case (version)
                         case ("fermi")
-                            f_damp = damping_fermi(r_norm, s_R*R_vdw_ij, d)
+                            eta%val = r_norm/(s_R*R_vdw_ij)
+                            f_damp = damping_fermi(eta, d, .false.)
                         case ("fermi2")
-                            f_damp = damping_fermi(r_norm, s_R*R_vdw_ij, d)**2
+                            eta%val = r_norm/(s_R*R_vdw_ij)
+                            f_damp = damping_fermi(eta, d, .false.)
+                            f_damp%val = f_damp%val**2
                         case ("erf")
-                            f_damp = damping_erf(r_norm, s_R*R_vdw_ij, d)
+                            f_damp%val = damping_erf(r_norm, s_R*R_vdw_ij, d)
                         case ("1mexp")
-                            f_damp = damping_1mexp(r_norm, s_R*R_vdw_ij, d)
+                            f_damp%val = damping_1mexp(r_norm, s_R*R_vdw_ij, d)
                         case ("overlap")
-                            f_damp = damping_overlap( &
+                            f_damp%val = damping_overlap( &
                                 r_norm, overlap_ij, C6_ij, s_R, d)
                         case ("custom")
-                            f_damp = damping_custom(i_atom, j_atom)
+                            f_damp%val = damping_custom(i_atom, j_atom)
                     end select
-                    ene_pair = -C6_ij*f_damp/r_norm**6
+                    ene_pair = -C6_ij*f_damp%val/r_norm**6
                     if (i_atom == j_atom) then
                         ene_shell = ene_shell+ene_pair/2
                     else
@@ -311,7 +315,7 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
 
     real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
         overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
-    type(scalar) :: zeta_ij
+    type(scalar) :: zeta_ij, eta_ij
     type(dip33) :: Tpp
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
@@ -393,6 +397,11 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                 if (sys%periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
                     R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
+                    eta_ij%val = r_norm/(damp%beta*R_vdw_ij)
+                    if (sys%do_force) then
+                        ! TODO add second term (R_vdw)
+                        eta_ij%der = r/(r_norm*damp%beta*R_vdw_ij)
+                    end if
                 end if
                 if (allocated(damp%alpha)) then
                     sigma_ij = sqrt(sum(get_sigma_selfint( &
@@ -429,9 +438,12 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                     case ("erf,dip")
                         Tpp%val = damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("fermi,dip")
-                        Tpp%val = damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
-                    case ("fermi^2,dip")
-                        Tpp%val = damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)**2*T_bare(r)
+                        Tpp = T_damped( &
+                            sys, &
+                            damping_fermi(eta_ij, damp%a, sys%do_force), &
+                            T_bare_v2(r, sys%do_force), &
+                            .false. &
+                        )
                     case ("overlap,dip")
                         Tpp%val = damping_overlap( &
                             r_norm, overlap_ij, C6_ij, damp%beta, damp%a)*T_bare(r)
@@ -452,9 +464,12 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                     case ("fermi,dip,gg")
-                        f_ij = 1.d0-damping_fermi(r_norm, damp%beta*R_vdw_ij, damp%a)
-                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
-                        Tpp%val = f_ij*Tpp%val
+                        Tpp = T_damped( &
+                            sys, &
+                            damping_fermi(eta_ij, damp%a, sys%do_force), &
+                            T_erf_coulomb(r, zeta_ij, sys%do_force), &
+                            .true. &
+                        )
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         f_ij = 1.d0-damp%damping_custom(i_atom, j_atom)
@@ -1619,11 +1634,37 @@ function T_erfc(rxyz, alpha) result(T)
 end function
 
 
-function damping_fermi(r, sigma, a) result(f)
-    real(8), intent(in) :: r, sigma, a
-    real(8) :: f
+type(scalar) function damping_fermi(eta, a, deriv) result(f)
+    type(scalar), intent(in) :: eta
+    real(8), intent(in) :: a
+    logical, intent(in) :: deriv
 
-    f = 1.d0/(1+exp(-a*(r/sigma-1)))
+    f%val = 1.d0/(1+exp(-a*(eta%val-1)))
+    if (deriv) f%der = a/(2+2*cosh(a-a*eta%val))*eta%val
+end function
+
+
+type(dip33) function T_damped(sys, f, T, sr)
+    type(mbd_system), intent(in) :: sys
+    type(scalar), intent(in) :: f
+    type(dip33), intent(in) :: T
+    logical, intent(in) :: sr  ! true: f, false: 1-f
+
+    real(8) :: pre
+    integer :: sgn, c
+
+    if (sr) then
+        pre = 1-f%val
+        sgn = -1
+    else
+        pre = f%val
+        sgn = 1
+    end if
+    T_damped%val = pre*T%val
+    if (sys%do_force) then
+        forall (c = 1:3) T_damped%der(:, :, c) = f%der(c)*T%val
+        T_damped%der = T_damped%der + f%val*T%der
+    end if
 end function
 
 

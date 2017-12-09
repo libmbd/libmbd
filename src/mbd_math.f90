@@ -5,7 +5,7 @@ module mbd_math
 
 use mbd_interface, only: pi
 use mbd_linalg, only: eye, inverted, diag, invert
-use mbd, only: add_dipole_matrix, mbd_system, mbd_damping, mbd_relay
+use mbd, only: dipole_matrix, mbd_system, mbd_damping, mbd_relay
 
 implicit none
 
@@ -145,23 +145,22 @@ real(8) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
     real(8), intent(in) :: a0(size(sys%coords, 1)), w(size(sys%coords, 1)), w_t(3*size(sys%coords, 1))
     real(8), intent(in) :: C(3*size(sys%coords, 1), 3*size(sys%coords, 1))
 
-    real(8), target :: T(size(C, 1), size(C, 1))
     integer :: A, B, i, j, N
+    type(mbd_relay) :: T
 
-    T(:, :) = 0.d0
     N = size(sys%coords, 1)
-    call add_dipole_matrix(sys, mbd_damping('dip,gg', alpha=a0), mbd_relay(re=T))
+    T = dipole_matrix(sys, mbd_damping('dip,gg', alpha=a0))
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)
             j = 3*(B-1)
-            T(i+1:i+3, j+1:j+3) = w(A)*w(B)*sqrt(a0(A)*a0(B))*T(i+1:i+3, j+1:j+3)
+            T%re(i+1:i+3, j+1:j+3) = w(A)*w(B)*sqrt(a0(A)*a0(B))*T%re(i+1:i+3, j+1:j+3)
         end do
     end do
     ! call print_matrix('T', T)
-    T = matmul(matmul(transpose(C), T), C)
+    T%re = matmul(matmul(transpose(C), T%re), C)
     ! call print_matrix('T_t', T)
-    ene = sum(diag(T)/(4*w_t))
+    ene = sum(diag(T%re)/(4*w_t))
 end function
 
 real(8) function get_det(A) result(D)

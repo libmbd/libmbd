@@ -486,18 +486,22 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
                 if (present(k_point)) then
-                    dipmat%cplx(i+1:i+3, j+1:j+3) = dipmat%cplx(i+1:i+3, j+1:j+3) &
-                        +Tpp_c
+                    associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
+                        T = T + Tpp_c
+                    end associate
                     if (i_atom /= j_atom) then
-                        dipmat%cplx(j+1:j+3, i+1:i+3) = dipmat%cplx(j+1:j+3, i+1:i+3) &
-                            +conjg(transpose(Tpp_c))
+                        associate (T => dipmat%cplx(j+1:j+3, i+1:i+3))
+                            T = T + conjg(transpose(Tpp_c))
+                        end associate
                     end if
                 else
-                    dipmat%re(i+1:i+3, j+1:j+3) = dipmat%re(i+1:i+3, j+1:j+3) &
-                        +Tpp%val
+                    associate (T => dipmat%re(i+1:i+3, j+1:j+3))
+                        T = T + Tpp%val
+                    end associate
                     if (i_atom /= j_atom) then
-                        dipmat%re(j+1:j+3, i+1:i+3) = dipmat%re(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp%val)
+                        associate (T => dipmat%re(j+1:j+3, i+1:i+3))
+                            T = T + transpose(Tpp%val)
+                        end associate
                     end if
                 end if
             end do ! j_atom
@@ -606,16 +610,22 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
                 i = 3*(i_atom-1)
                 j = 3*(j_atom-1)
                 if (present(k_point)) then
-                    dipmat%cplx(i+1:i+3, j+1:j+3) = dipmat%cplx(i+1:i+3, j+1:j+3)+Tpp_c
+                    associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
+                        T = T + Tpp_c
+                    end associate
                     if (i_atom /= j_atom) then
-                        dipmat%cplx(j+1:j+3, i+1:i+3) = dipmat%cplx(j+1:j+3, i+1:i+3) &
-                            +conjg(transpose(Tpp_c))
+                        associate (T => dipmat%cplx(j+1:j+3, i+1:i+3))
+                            T = T + conjg(transpose(Tpp_c))
+                        end associate
                     end if
                 else
-                    dipmat%re(i+1:i+3, j+1:j+3) = dipmat%re(i+1:i+3, j+1:j+3)+Tpp
+                    associate (T => dipmat%re(i+1:i+3, j+1:j+3))
+                        T = T + Tpp
+                    end associate
                     if (i_atom /= j_atom) then
-                        dipmat%re(j+1:j+3, i+1:i+3) = dipmat%re(j+1:j+3, i+1:i+3) &
-                            +transpose(Tpp)
+                        associate (T => dipmat%re(j+1:j+3, i+1:i+3))
+                            T = T + transpose(Tpp)
+                        end associate
                     end if
                 end if
             end do ! j_atom

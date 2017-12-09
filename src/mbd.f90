@@ -804,9 +804,9 @@ end subroutine
 
 function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(:, :)
+    real(8), intent(in) :: alpha(0:, :)
     type(mbd_damping), intent(in) :: damp
-    real(8) :: alpha_scs(size(alpha, 1), size(alpha, 2))
+    real(8) :: alpha_scs(0:ubound(alpha, 1), size(alpha, 2))
 
     type(mbd_relay) :: alpha_full
     integer :: i_grid_omega
@@ -823,8 +823,8 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        alpha_full = screened_alpha(sys, alpha(i_grid_omega+1, :), damp)
-        alpha_scs(i_grid_omega+1, :) = contract_polarizability(alpha_full%re)
+        alpha_full = screened_alpha(sys, alpha(i_grid_omega, :), damp)
+        alpha_scs(i_grid_omega, :) = contract_polarizability(alpha_full%re)
         sys%calc%mute = .true.
     end do
     ! MPI code begin
@@ -1187,7 +1187,7 @@ end function get_single_reciprocal_mbd_ene
 
 real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(:, :)
+    real(8), intent(in) :: alpha(0:, :)
     type(mbd_damping), intent(in) :: damp
 
     type(mbd_relay) :: relay, AT
@@ -1205,19 +1205,19 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     ene = 0.d0
     damp_alpha = damp
     allocate (eigs(3*size(sys%coords, 1)))
-    do i_grid_omega = 0,sys%calc%n_freq
+    do i_grid_omega = 0, sys%calc%n_freq
         ! MPI code begin
         if (is_parallel) then
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%alpha = alpha(i_grid_omega+1, :)
+        damp_alpha%alpha = alpha(i_grid_omega, :)
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
         do i_atom = 1, size(sys%coords, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz
-                relay%re(i, :) = alpha(i_grid_omega+1, i_atom)*relay%re(i, :)
+                relay%re(i, :) = alpha(i_grid_omega, i_atom)*relay%re(i, :)
                 ! relay = alpha*T
             end do
         end do
@@ -1264,7 +1264,7 @@ end function get_single_rpa_energy
 
 real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(:, :)
+    real(8), intent(in) :: alpha(0:, :)
     real(8), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
@@ -1289,13 +1289,13 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%alpha = alpha(i_grid_omega+1, :)
+        damp_alpha%alpha = alpha(i_grid_omega, :)
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
         do i_atom = 1, size(sys%coords, 1)
             do i_xyz = 1, 3
                 i = (i_atom-1)*3+i_xyz
-                relay%cplx(i, :) = alpha(i_grid_omega+1, i_atom)*relay%cplx(i, :)
+                relay%cplx(i, :) = alpha(i_grid_omega, i_atom)*relay%cplx(i, :)
                 ! relay = alpha*T
             end do
         end do

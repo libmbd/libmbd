@@ -104,12 +104,16 @@ end type mbd_relay
 
 type dip33
     real(8) :: val(3, 3)
-    real(8) :: der(3, 3, 3)  ! dval_{ab}/dR_c
+    ! explicit derivative, [abc] ~ dval_{ab}/dR_c
+    real(8) :: dere(3, 3, 3)
+    ! implicit derivative, [ab...] ~ dval_{ab}/dR_{...}
+    real(8), allocatable :: deri(:, :, :, :)
 end type
 
 type scalar
     real(8) :: val
-    real(8) :: der(3)  ! dval/dR_c
+    real(8) :: dere(3)  ! explicit derivative
+    real(8), allocatable :: deri(:, :)  ! implicit derivative, [...] ~ dval/dR_{...}
 end type
 
 contains
@@ -399,8 +403,8 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                     R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
                     eta_ij%val = r_norm/(damp%beta*R_vdw_ij)
                     if (sys%do_force) then
-                        ! TODO add second term (R_vdw)
-                        eta_ij%der = r/(r_norm*damp%beta*R_vdw_ij)
+                        eta_ij%dere = r/(r_norm*damp%beta*R_vdw_ij)
+                        ! TODO add implicit term
                     end if
                 end if
                 if (allocated(damp%alpha)) then
@@ -408,8 +412,8 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                         sys%calc, damp%alpha((/ i_atom , j_atom /)))**2))
                     zeta_ij%val = r_norm/sigma_ij
                     if (sys%do_force) then
-                        ! TODO add second term (alpha)
-                        zeta_ij%der = r/(r_norm*sigma_ij)
+                        zeta_ij%dere = r/(r_norm*sigma_ij)
+                        ! TODO add implicit term
                     end if
                 end if
                 if (allocated(damp%overlap)) then
@@ -420,7 +424,6 @@ subroutine add_dipole_matrix(sys, damp, relay, k_point)
                         damp%C6(i_atom), damp%C6(j_atom), &
                         damp%alpha(i_atom), damp%alpha(j_atom))
                 end if
-                Tpp%der = nan
                 select case (damp%version)
                     case ("bare")
                         Tpp%val = T_bare(r)
@@ -1578,21 +1581,21 @@ type(dip33) function T_bare_v2(r, deriv) result(T)
     if (deriv) then
         r_7 = r_1**7
         forall (a = 1:3)
-            T%der(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
+            T%dere(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
             forall (b = a+1:3)
-                T%der(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
-                T%der(a, b, a) = T%der(a, a, b)
-                T%der(b, a, a) = T%der(a, a, b)
-                T%der(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
-                T%der(b, a, b) = T%der(b, b, a)
-                T%der(a, b, b) = T%der(b, b, a)
+                T%dere(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
+                T%dere(a, b, a) = T%dere(a, a, b)
+                T%dere(b, a, a) = T%dere(a, a, b)
+                T%dere(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
+                T%dere(b, a, b) = T%dere(b, b, a)
+                T%dere(a, b, b) = T%dere(b, b, a)
                 forall (c = b+1:3)
-                    T%der(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
-                    T%der(a, c, b) = T%der(a, b, c)
-                    T%der(b, a, c) = T%der(a, b, c)
-                    T%der(b, c, a) = T%der(a, b, c)
-                    T%der(c, a, b) = T%der(a, b, c)
-                    T%der(c, b, a) = T%der(a, b, c)
+                    T%dere(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
+                    T%dere(a, c, b) = T%dere(a, b, c)
+                    T%dere(b, a, c) = T%dere(a, b, c)
+                    T%dere(b, c, a) = T%dere(a, b, c)
+                    T%dere(c, a, b) = T%dere(a, b, c)
+                    T%dere(c, b, a) = T%dere(a, b, c)
                 end forall
             end forall
         end forall
@@ -1639,8 +1642,14 @@ type(scalar) function damping_fermi(eta, a, deriv) result(f)
     real(8), intent(in) :: a
     logical, intent(in) :: deriv
 
+    real(8) :: pre
+
     f%val = 1.d0/(1+exp(-a*(eta%val-1)))
-    if (deriv) f%der = a/(2+2*cosh(a-a*eta%val))*eta%val
+    pre = a/(2+2*cosh(a-a*eta%val))
+    if (deriv) then
+        f%dere = pre*eta%dere
+        f%deri = pre*eta%deri
+    end if
 end function
 
 
@@ -1651,7 +1660,7 @@ type(dip33) function T_damped(sys, f, T, sr)
     logical, intent(in) :: sr  ! true: f, false: 1-f
 
     real(8) :: pre
-    integer :: sgn, c
+    integer :: sgn, a, b, c
 
     if (sr) then
         pre = 1-f%val
@@ -1662,8 +1671,19 @@ type(dip33) function T_damped(sys, f, T, sr)
     end if
     T_damped%val = pre*T%val
     if (sys%do_force) then
-        forall (c = 1:3) T_damped%der(:, :, c) = f%der(c)*T%val
-        T_damped%der = T_damped%der + f%val*T%der
+        forall (c = 1:3) T_damped%dere(:, :, c) = sgn*f%dere(c)*T%val
+        T_damped%dere = T_damped%dere + pre*T%dere
+        if (allocated(f%deri)) then
+            allocate (T_damped%deri(3, 3, size(f%deri, 1), size(f%deri, 2)))
+            forall (a = 1:3, b = 1:3) T_damped%deri(a, b, :, :) = sgn*f%deri*T%val(a, b)
+        end if
+        if (allocated(T%deri)) then
+            if (.not. allocated(T_damped%deri)) then
+                T_damped%deri = pre*T%deri
+            else
+                T_damped%deri = T_damped%deri + pre*T%deri
+            end if
+        end if
     end if
 end function
 
@@ -1742,7 +1762,7 @@ type(dip33) function T_erf_coulomb(r, zeta, deriv) result(T)
     real(8) :: theta, erf_theta, r_5
     type(dip33) :: bare
     real(8) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
-    integer :: a, c
+    integer :: a, b, c
 
     bare = T_bare_v2(r, deriv)
     r_5 = sqrt(sum(r**2))**5
@@ -1752,10 +1772,14 @@ type(dip33) function T_erf_coulomb(r, zeta, deriv) result(T)
     T%val = erf_theta*bare%val+2*(zeta%val**2)*theta*rr_r5
     if (deriv) then
         tmp33 = 2*zeta%val*theta*(bare%val+(3-2*zeta%val**2)*rr_r5)
-        forall (c = 1:3) T%der(:, :, c) = tmp33*zeta%der(c)
-        tmp333 = bare%der/3
+        forall (c = 1:3) T%dere(:, :, c) = tmp33*zeta%dere(c)
+        tmp333 = bare%dere/3
         forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
-        T%der = T%der + erf_theta*bare%der-2*(zeta%val**2)*theta*tmp333
+        T%dere = T%dere + erf_theta*bare%dere-2*(zeta%val**2)*theta*tmp333
+        if (allocated(zeta%deri)) then
+            allocate(T%deri(3, 3, size(zeta%deri, 1), size(zeta%deri, 2)))
+            forall (a = 1:3, b = 1:3) T%deri(a, b, :, :) = tmp33(a, b)*zeta%deri
+        end if
     end if
 end function
 
@@ -2000,12 +2024,15 @@ end function clock_rate
 subroutine run_tests()
     use mbd_common, only: diff3, print_matrix, tostr, diff5
 
-    character(len=50) :: current_test
-    integer :: code = 0
+    integer :: n_failed, n_all
 
-    call exec_test('T_bare deriv', test_T_bare_deriv)
-    call exec_test('T_GG deriv', test_T_GG_deriv)
-    if (code /= 0) stop 1
+    n_failed = 0
+    n_all = 0
+    call exec_test('T_bare derivative', test_T_bare_deriv)
+    call exec_test('T_GG derivative explicit', test_T_GG_deriv_expl)
+    call exec_test('T_GG derivative implicit', test_T_GG_deriv_impl)
+    print *, trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
+    if (n_failed /= 0) stop 1
 
     contains
 
@@ -2016,14 +2043,17 @@ subroutine run_tests()
             end subroutine
         end interface
 
-        current_test = test_name
+        integer :: n_failed_in
+
         write (6, '(A,A,A)', advance='no') 'Executing test "', test_name, '"... '
+        n_failed_in = n_failed
         call test_routine()
-        if (code == 0) write (6, *) 'OK'
+        n_all = n_all + 1
+        if (n_failed == n_failed_in) write (6, *) 'OK'
     end subroutine
 
     subroutine failed()
-        code = 1
+        n_failed = n_failed + 1
         write (6, *) 'FAILED!'
     end subroutine
 
@@ -2037,9 +2067,9 @@ subroutine run_tests()
         real(8) :: delta
 
         delta = 1d-3
-        r = (/ 1.12d0, -2.12d0, 0.12d0 /)
+        r = [1.12d0, -2.12d0, 0.12d0]
         T = T_bare_v2(r, deriv=.true.)
-        T_diff_anl = T%der
+        T_diff_anl = T%dere(:, :, :)
         do c = 1, 3
             do i_step = -2, 2
                 if (i_step == 0) continue
@@ -2060,7 +2090,7 @@ subroutine run_tests()
         end do
     end subroutine test_T_bare_deriv
 
-    subroutine test_T_GG_deriv()
+    subroutine test_T_GG_deriv_expl()
         real(8) :: r(3), r_diff(3)
         type(dip33) :: T
         real(8) :: diff(3, 3)
@@ -2071,16 +2101,16 @@ subroutine run_tests()
         type(scalar) :: zeta, zeta_diff
 
         delta = 1d-3
-        r = (/ 1.02d0, -2.22d0, 0.15d0 /)
-        zeta = scalar(1.2d0, (/ 0.6d0, -0.2d0, 0.8d0 /))
+        r = [1.02d0, -2.22d0, 0.15d0]
+        zeta = scalar(1.2d0, [1.1d0, -0.3d0, 0.6d0])
         T = T_erf_coulomb(r, zeta, deriv=.true.)
-        T_diff_anl = T%der
+        T_diff_anl = T%dere
         do c = 1, 3
             do i_step = -2, 2
                 if (i_step == 0) continue
                 r_diff = r
                 r_diff(c) = r_diff(c)+i_step*delta
-                zeta_diff%val = zeta%val+i_step*delta*zeta%der(c)
+                zeta_diff%val = zeta%val+i_step*delta*zeta%dere(c)
                 T = T_erf_coulomb(r_diff, zeta_diff, deriv=.false.)
                 T_diff_num(:, :, i_step) = T%val
             end do
@@ -2090,12 +2120,47 @@ subroutine run_tests()
             diff = T_diff_num(:, :, 0)-T_diff_anl(:, :, c)
             if (any(abs(diff) > 1d-12)) then
                 call failed()
-                call print_matrix('delta dTGG(:, :, ' // trim(tostr(c)) // ')', diff)
+                call print_matrix('delta dTGG_{ab,' // trim(tostr(c)) // '}', diff)
                 return
             end if
         end do
-    end subroutine test_T_GG_deriv
+    end subroutine test_T_GG_deriv_expl
 
+    subroutine test_T_GG_deriv_impl()
+        real(8) :: r(3), r_diff(3)
+        type(dip33) :: T
+        real(8) :: diff(3, 3)
+        real(8) :: T_diff_anl(3, 3)
+        real(8) :: T_diff_num(3, 3, -2:2)
+        integer :: a, b, i_step
+        real(8) :: delta
+        type(scalar) :: zeta, zeta_diff
+
+        delta = 1d-3
+        r = [1.02d0, -2.22d0, 0.15d0]
+        zeta = scalar( &
+            1.2d0, &
+            0d0, &
+            reshape([1.3d0], [1, 1]) &
+        )
+        T = T_erf_coulomb(r, zeta, deriv=.true.)
+        T_diff_anl = T%deri(:, :, 1, 1)
+        do i_step = -2, 2
+            if (i_step == 0) continue
+            zeta_diff%val = zeta%val+i_step*delta*zeta%deri(1, 1)
+            T = T_erf_coulomb(r_diff, zeta_diff, deriv=.false.)
+            T_diff_num(:, :, i_step) = T%val
+        end do
+        forall (a = 1:3, b = 1:3)
+            T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+        end forall
+        diff = T_diff_num(:, :, 0)-T_diff_anl(:, :)
+        if (any(abs(diff) > 1d-12)) then
+            call failed()
+            call print_matrix('delta dTGG', diff)
+            return
+        end if
+    end subroutine test_T_GG_deriv_impl
 end subroutine run_tests
 
 end module mbd

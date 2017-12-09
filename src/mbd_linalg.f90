@@ -10,7 +10,7 @@ implicit none
 
 private
 public :: diag, invert, inverted, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, solve_lin_sys, eye, operator(.cprod.)
+    sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert
 
 interface operator(.cprod.)
     module procedure cart_prod_
@@ -25,6 +25,11 @@ end interface
 interface invert
     module procedure invert_ge_dble_
     module procedure invert_ge_cmplx_
+end interface
+
+interface sinvert
+    module procedure invert_sym_dble_
+    ! module procedure invert_he_cmplx_
 end interface
 
 interface diagonalize
@@ -46,7 +51,7 @@ interface sdiagonalized
 end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-    ZGEEV, ZGEEB
+    ZGEEV, ZGEEB, DSYTRI, DSYTRF
 
 contains
 
@@ -115,6 +120,38 @@ subroutine invert_ge_cmplx_(A)
     allocate (work_arr(n_work_arr))
     call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
+    if (error_flag /= 0) then
+        call print_error( &
+            "Matrix inversion failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
+    endif
+end subroutine
+
+
+subroutine invert_sym_dble_(A)
+    real(8), intent(inout) :: A(:, :)
+
+    integer :: i_pivot(size(A, 1))
+    real(8), allocatable :: work_arr(:)
+    integer :: n
+    integer :: n_work_arr
+    real(8) :: n_work_arr_optim
+    integer :: error_flag
+
+    n = size(A, 1)
+    if (n == 0) return
+    call DSYTRF('U', n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
+    n_work_arr = nint(n_work_arr_optim)
+    allocate (work_arr(n_work_arr))
+    call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
+    if (error_flag /= 0) then
+        call print_error( &
+            "Matrix inversion failed in module mbd with error code " &
+            //trim(tostr(error_flag)))
+    endif
+    deallocate (work_arr)
+    allocate (work_arr(n))
+    call DSYTRI('U', n, A, n, i_pivot, work_arr, error_flag)
     if (error_flag /= 0) then
         call print_error( &
             "Matrix inversion failed in module mbd with error code " &

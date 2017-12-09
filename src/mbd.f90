@@ -5,10 +5,10 @@ module mbd
 
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
-use mbd_common, only: tostr, nan
+use mbd_common, only: tostr, nan, print_matrix
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, inverted
+    sdiagonalized, inverted, sinvert
 
 implicit none
 
@@ -388,7 +388,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
             ! MPI code end
             !$omp parallel do private(r, r_norm, R_vdw_ij, sigma_ij, overlap_ij, C6_ij, &
             !$omp    Tpp, i, j, Tpp_c)
-            do j_atom = 1, i_atom
+            do j_atom = i_atom, n_atoms
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
@@ -489,20 +489,10 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                         T = T + Tpp_c
                     end associate
-                    if (i_atom /= j_atom) then
-                        associate (T => dipmat%cplx(j+1:j+3, i+1:i+3))
-                            T = T + conjg(transpose(Tpp_c))
-                        end associate
-                    end if
                 else
                     associate (T => dipmat%re(i+1:i+3, j+1:j+3))
                         T = T + Tpp%val
                     end associate
-                    if (i_atom /= j_atom) then
-                        associate (T => dipmat%re(j+1:j+3, i+1:i+3))
-                            T = T + transpose(Tpp%val)
-                        end associate
-                    end if
                 end if
             end do ! j_atom
             !$omp end parallel do
@@ -599,7 +589,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
             end if
             ! MPI code end
             !$omp parallel do private(r, Tpp, i, j, Tpp_c)
-            do j_atom = 1, i_atom
+            do j_atom = i_atom, size(sys%coords, 1)
                 r = sys%coords(i_atom, :)-sys%coords(j_atom, :)
                 if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
@@ -613,20 +603,10 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
                     associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                         T = T + Tpp_c
                     end associate
-                    if (i_atom /= j_atom) then
-                        associate (T => dipmat%cplx(j+1:j+3, i+1:i+3))
-                            T = T + conjg(transpose(Tpp_c))
-                        end associate
-                    end if
                 else
                     associate (T => dipmat%re(i+1:i+3, j+1:j+3))
                         T = T + Tpp
                     end associate
-                    if (i_atom /= j_atom) then
-                        associate (T => dipmat%re(j+1:j+3, i+1:i+3))
-                            T = T + transpose(Tpp)
-                        end associate
-                    end if
                 end if
             end do ! j_atom
             !$omp end parallel do
@@ -657,7 +637,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         if (sqrt(k_sq) > 1.d-15) then
             do_surface = .false.
             do i_atom = 1, size(sys%coords, 1)
-            do j_atom = 1, i_atom
+            do j_atom = i_atom, size(sys%coords, 1)
                 do i_xyz = 1, 3
                 do j_xyz = 1, 3
                     i = 3*(i_atom-1)+i_xyz
@@ -665,15 +645,9 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
                         *exp(-k_sq/(4*alpha**2))
                     if (present(k_point)) then
-                        dipmat%cplx(i, j) = dipmat%cplx(i, j)+elem
-                        if (i_atom /= j_atom) then
-                            dipmat%cplx(j, i) = dipmat%cplx(j, i)+elem
-                        end if
+                        dipmat%cplx(i, j) = dipmat%cplx(i, j) + elem
                     else
-                        dipmat%re(i, j) = dipmat%re(i, j)+elem
-                        if (i_atom /= j_atom) then
-                            dipmat%re(j, i) = dipmat%re(j, i)+elem
-                        end if
+                        dipmat%re(i, j) = dipmat%re(i, j) + elem
                     end if ! present(k_point)
                 end do ! j_xyz
                 end do ! i_xyz
@@ -683,16 +657,14 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     end if ! k_point present
     if (do_surface) then ! surface energy
         do i_atom = 1, size(sys%coords, 1)
-        do j_atom = 1, i_atom
+        do j_atom = i_atom, size(sys%coords, 1)
             do i_xyz = 1, 3
                 i = 3*(i_atom-1)+i_xyz
                 j = 3*(j_atom-1)+i_xyz
                 if (present(k_point)) then
-                    dipmat%cplx(i, j) = dipmat%cplx(i, j)+4*pi/(3*volume)
-                    dipmat%cplx(j, i) = dipmat%cplx(i, j)
+                    dipmat%cplx(i, j) = dipmat%cplx(i, j) + 4*pi/(3*volume)
                 else
-                    dipmat%re(i, j) = dipmat%re(i, j)+4*pi/(3*volume)
-                    dipmat%re(j, i) = dipmat%re(i, j)
+                    dipmat%re(i, j) = dipmat%re(i, j) + 4*pi/(3*volume)
                 end if
             end do ! i_xyz
         end do ! j_atom
@@ -887,9 +859,10 @@ type(mbd_relay) function screened_alpha(sys, alpha, damp, k_point, lam)
     end if
     call ts(sys%calc, 32)
     if (present(k_point)) then
+        ! TODO this needs to be implemented in linalg and switched
         call invert(screened_alpha%cplx)
     else
-        call invert(screened_alpha%re)
+        call sinvert(screened_alpha%re)
     end if
     call ts(sys%calc, -32)
 end function
@@ -1018,7 +991,7 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     ! relay%re = T
     relay = dipole_matrix(sys, damp)
     do i_atom = 1, size(sys%coords, 1)
-        do j_atom = 1, size(sys%coords, 1)
+        do j_atom = i_atom, size(sys%coords, 1)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
             relay%re(i+1:i+3, j+1:j+3) = & ! relay%re = sqrt(a*a)*w*w*T
@@ -1147,7 +1120,7 @@ real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, dam
     ! relay = T
     relay = dipole_matrix(sys, damp, k_point)
     do i_atom = 1, size(sys%coords, 1)
-        do j_atom = 1, size(sys%coords, 1)
+        do j_atom = i_atom, size(sys%coords, 1)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
             relay%cplx(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
@@ -1202,7 +1175,7 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 
     type(mbd_relay) :: relay, AT
     complex(8), allocatable :: eigs(:)
-    integer :: i_atom, i_xyz, i_grid_omega, i
+    integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, mute
     type(mbd_damping) :: damp_alpha
@@ -1225,13 +1198,17 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
         do i_atom = 1, size(sys%coords, 1)
-            do i_xyz = 1, 3
-                i = (i_atom-1)*3+i_xyz
-                relay%re(i, :) = alpha(i_grid_omega, i_atom)*relay%re(i, :)
-                ! relay = alpha*T
-            end do
+            i = 3*(i_atom-1)
+            relay%re(i+1:i+3, :i) = &
+                alpha(i_grid_omega, i_atom)*transpose(relay%re(:i, i+1:i+3))
         end do
-        AT = relay
+        do i_atom = 1, size(sys%coords, 1)
+            i = 3*(i_atom-1)
+            relay%re(i+1:i+3, i+1:) = &
+                alpha(i_grid_omega, i_atom)*relay%re(i+1:i+3, i+1:)
+        end do
+        ! relay = alpha*T
+        if (sys%work%get_rpa_orders) AT = relay
         do i = 1, 3*size(sys%coords, 1)
             relay%re(i, i) = 1.d0+relay%re(i, i) ! relay = 1+alpha*T
         end do
@@ -1280,9 +1257,9 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
 
     type(mbd_relay) :: relay, AT
     complex(8), allocatable :: eigs(:)
-    integer :: i_atom, i_xyz, i_grid_omega, i
+    integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
-    logical :: is_parallel, get_orders, mute
+    logical :: is_parallel, mute
     type(mbd_damping) :: damp_alpha
 
     is_parallel = sys%calc%parallel
@@ -1303,13 +1280,17 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
         do i_atom = 1, size(sys%coords, 1)
-            do i_xyz = 1, 3
-                i = (i_atom-1)*3+i_xyz
-                relay%cplx(i, :) = alpha(i_grid_omega, i_atom)*relay%cplx(i, :)
-                ! relay = alpha*T
-            end do
+            i = 3*(i_atom-1)
+            relay%cplx(i+1:i+3, :i) = &
+                alpha(i_grid_omega, i_atom)*conjg(transpose(relay%cplx(:i, i+1:i+3)))
         end do
-        if (get_orders) AT = relay
+        do i_atom = 1, size(sys%coords, 1)
+            i = 3*(i_atom-1)
+            relay%cplx(i+1:i+3, i+1:) = &
+                alpha(i_grid_omega, i_atom)*relay%cplx(i+1:i+3, i+1:)
+        end do
+        ! relay = alpha*T
+        if (sys%work%get_rpa_orders) AT = relay
         do i = 1, 3*size(sys%coords, 1)
             relay%cplx(i, i) = 1.d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
@@ -1327,7 +1308,7 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
         ene = ene+1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
-        if (get_orders) then
+        if (sys%work%get_rpa_orders) then
             call ts(sys%calc, 26)
             call diagonalize('N', AT%cplx, eigs)
             call ts(sys%calc, -26)
@@ -1343,7 +1324,7 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
     end do
     if (is_parallel) then
         call sync_sum(ene)
-        if (get_orders) then
+        if (sys%work%get_rpa_orders) then
             call sync_sum(sys%work%rpa_orders_k(sys%work%i_kpt, :))
         end if
     end if
@@ -1529,16 +1510,21 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
     real(8), intent(in) :: alpha_3n_3n(:, :)
     real(8) :: alpha_n(size(alpha_3n_3n, 1)/3)
 
-    integer :: i_atom, i_xyz, j_xyz, dim_3n
-    real(8) :: alpha_3_3(3, 3), alpha_diag(3)
+    integer :: i_atom, i_xyz, dim_3n
 
     dim_3n = size(alpha_3n_3n, 1)
+    alpha_n(:) = 0.d0
     do i_atom = 1, size(alpha_n)
-        forall (i_xyz = 1:3, j_xyz = 1:3) alpha_3_3(i_xyz, j_xyz) &
-                = sum(alpha_3n_3n(i_xyz:dim_3n:3, 3*(i_atom-1)+j_xyz))
-        alpha_diag = sdiagonalized(alpha_3_3)
-        alpha_n(i_atom) = sum(alpha_diag)/3
+        associate (A => alpha_n(i_atom))
+            do i_xyz = 1, 3
+                ! this convoluted contraction is necessary because alpha_3n_3n is
+                ! calucated as upper triangular
+                A = A + sum(alpha_3n_3n(i_xyz:3*i_atom:3, 3*(i_atom-1)+i_xyz))
+                A = A + sum(alpha_3n_3n(3*(i_atom-1)+i_xyz, 3*i_atom+i_xyz:dim_3n:3))
+            end do
+        end associate
     end do
+    alpha_n = alpha_n/3
 end function contract_polarizability
 
 
@@ -2023,7 +2009,7 @@ end function clock_rate
 !!! tests !!!
 
 subroutine run_tests()
-    use mbd_common, only: diff3, print_matrix, tostr, diff5
+    use mbd_common, only: diff3, tostr, diff5
 
     integer :: n_failed, n_all
 

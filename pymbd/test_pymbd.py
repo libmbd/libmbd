@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from pymbd import ang, MBDCalc
+from pymbd import ang, MBDCalc, vdw_params
 
 benzene_dimer = [(
     np.array([
@@ -75,6 +75,14 @@ def test_argon_dimer_plain(calc):
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
 
+def test_argon_dimer_rpa(calc):
+    ene = calc.mbd_energy(
+        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [0.7, 0.7], [3.55, 3.55], 0.83,
+        func='calc_rpa_energy'
+    )
+    assert ene == approx(-0.00024329110270970844, rel=1e-10)
+
+
 def test_argon_dimer_rsscs(calc):
     ene = calc.mbd_energy_species(
         [(0, 0, 0), (0, 0, 4*ang)], ['Ar', 'Ar'], [1, 1], 0.83
@@ -102,6 +110,36 @@ def test_benzene_dimer_scs(calc):
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.004517208661233951, rel=1e-10)
+
+
+def test_benzene(calc):
+    coords, species, vols = benzene_dimer[0]
+    alpha_0, C6, R_vdw = (
+        np.array([vdw_params[sp][param] for sp in species])
+        for param in ['alpha_0', 'C6', 'R_vdw']
+    )
+    vols = np.array(vols)
+    alpha_0 *= vols
+    C6 *= vols**2
+    R_vdw *= vols**(1./3)
+    omega = 4./3*C6/alpha_0**2
+    ene = calc.mbd_energy(coords, alpha_0, omega, R_vdw, 0.83, func='calc_mbd_energy')
+    assert ene == approx(-0.007002398506090302, rel=1e-10)
+
+
+def test_benzene_rpa(calc):
+    coords, species, vols = benzene_dimer[0]
+    alpha_0, C6, R_vdw = (
+        np.array([vdw_params[sp][param] for sp in species])
+        for param in ['alpha_0', 'C6', 'R_vdw']
+    )
+    vols = np.array(vols)
+    alpha_0 *= vols
+    C6 *= vols**2
+    R_vdw *= vols**(1./3)
+    omega = 4./3*C6/alpha_0**2
+    ene = calc.mbd_energy(coords, alpha_0, omega, R_vdw, 0.83, func='calc_rpa_energy')
+    assert ene == approx(-0.007002398506090302, rel=1e-10)
 
 
 def test_ethylcarbamate(calc):

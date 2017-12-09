@@ -32,6 +32,14 @@ double calc_mbd_energy(
     struct MBD_damping* damping
 );
 
+double calc_rpa_energy(
+    struct MBD_system* sys,
+    int n_atoms,
+    double* alpha_0,
+    double* omega,
+    struct MBD_damping* damping
+);
+
 double calc_mbd_rsscs_energy(
     struct MBD_system* sys,
     int n_atoms,

@@ -1987,7 +1987,7 @@ subroutine run_tests()
     end subroutine test_T_GG_deriv_expl
 
     subroutine test_T_GG_deriv_impl()
-        real(8) :: r(3), r_diff(3)
+        real(8) :: r(3)
         type(dip33) :: T
         real(8) :: diff(3, 3)
         real(8) :: T_diff_anl(3, 3)
@@ -2001,17 +2001,17 @@ subroutine run_tests()
         sigma = 1.2d0
         dsigma_dr = -0.3d0
         T = T_erf_coulomb(r, sigma, deriv=.true.)
-        T_diff_anl = T%dsigma(:, :)
+        T_diff_anl = T%dsigma(:, :)*dsigma_dr
         do i_step = -2, 2
             if (i_step == 0) continue
             sigma_diff = sigma+i_step*delta*dsigma_dr
-            T = T_erf_coulomb(r_diff, sigma_diff, deriv=.false.)
+            T = T_erf_coulomb(r, sigma_diff, deriv=.false.)
             T_diff_num(:, :, i_step) = T%val
         end do
         forall (a = 1:3, b = 1:3)
             T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
         end forall
-        diff = T_diff_num(:, :, 0)-T_diff_anl(:, :)
+        diff = T_diff_num(:, :, 0)-T_diff_anl
         if (any(abs(diff) > 1d-12)) then
             call failed()
             call print_matrix('delta dTGG', diff)

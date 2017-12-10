@@ -196,7 +196,7 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
 
     real(8) :: C6_ij, r(3), r_norm, R_vdw_ij, overlap_ij, &
         ene_shell, ene_pair, R_cell(3)
-    type(scalar) :: f_damp, eta
+    type(scalar) :: f_damp
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(8), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
@@ -255,11 +255,9 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
                     end if
                     select case (version)
                         case ("fermi")
-                            eta%val = r_norm/(s_R*R_vdw_ij)
-                            f_damp = damping_fermi(eta, d, .false.)
+                            f_damp = damping_fermi(r, s_R*R_vdw_ij, d, .false.)
                         case ("fermi2")
-                            eta%val = r_norm/(s_R*R_vdw_ij)
-                            f_damp = damping_fermi(eta, d, .false.)
+                            f_damp = damping_fermi(r, s_R*R_vdw_ij, d, .false.)
                             f_damp%val = f_damp%val**2
                         case ("custom")
                             f_damp%val = damping_custom(i_atom, j_atom)
@@ -315,7 +313,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
 
     real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
-    type(scalar) :: zeta_ij, eta_ij
+    type(scalar) :: eta_ij
     type(dip33) :: Tpp
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
@@ -394,20 +392,10 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 if (sys%periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
                     R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
-                    eta_ij%val = r_norm/(damp%beta*R_vdw_ij)
-                    if (sys%do_force) then
-                        eta_ij%dere = r/(r_norm*damp%beta*R_vdw_ij)
-                        ! TODO add implicit term
-                    end if
                 end if
                 if (allocated(damp%alpha)) then
                     sigma_ij = sqrt(sum(get_sigma_selfint( &
                         sys%calc, damp%alpha((/ i_atom , j_atom /)))**2))
-                    zeta_ij%val = r_norm/sigma_ij
-                    if (sys%do_force) then
-                        zeta_ij%dere = r/(r_norm*sigma_ij)
-                        ! TODO add implicit term
-                    end if
                 end if
                 select case (damp%version)
                     case ("bare")
@@ -417,7 +405,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     case ("fermi,dip")
                         Tpp = T_damped( &
                             sys, &
-                            damping_fermi(eta_ij, damp%a, sys%do_force), &
+                            damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
                             T_bare_v2(r, sys%do_force), &
                             .false. &
                         )
@@ -426,18 +414,18 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     case ("dip,custom")
                         Tpp%val = damp%potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
+                        Tpp = T_erf_coulomb(r, sigma_ij, sys%do_force)
                     case ("fermi,dip,gg")
                         Tpp = T_damped( &
                             sys, &
-                            damping_fermi(eta_ij, damp%a, sys%do_force), &
-                            T_erf_coulomb(r, zeta_ij, sys%do_force), &
+                            damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
+                            T_erf_coulomb(r, sigma_ij, sys%do_force), &
                             .true. &
                         )
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         f_ij = 1.d0-damp%damping_custom(i_atom, j_atom)
-                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
+                        Tpp = T_erf_coulomb(r, sigma_ij, sys%do_force)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                 end select
@@ -1584,18 +1572,20 @@ function T_erfc(rxyz, alpha) result(T)
 end function
 
 
-type(scalar) function damping_fermi(eta, a, deriv) result(f)
-    type(scalar), intent(in) :: eta
-    real(8), intent(in) :: a
+type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
+    real(8), intent(in) :: r(3)
+    real(8), intent(in) :: s_vdw
+    real(8), intent(in) :: d
     logical, intent(in) :: deriv
 
-    real(8) :: pre
+    real(8) :: pre, eta, r_1
 
-    f%val = 1.d0/(1+exp(-a*(eta%val-1)))
-    pre = a/(2+2*cosh(a-a*eta%val))
+    eta = sqrt(sum(r**2))/s_vdw
+    f%val = 1.d0/(1+exp(-d*(eta-1)))
+    pre = d/(2+2*cosh(d-d*eta))
     if (deriv) then
-        f%dere = pre*eta%dere
-        f%dervdw = pre*eta%dervdw
+        f%dere = pre*r/(r_1*s_vdw)
+        f%dervdw = -pre*r_1/s_vdw**2
     end if
 end function
 
@@ -1630,30 +1620,32 @@ type(dip33) function T_damped(sys, f, T, sr)
 end function
 
 
-type(dip33) function T_erf_coulomb(r, zeta, deriv) result(T)
+type(dip33) function T_erf_coulomb(r, sigma, deriv) result(T)
     real(8), intent(in) :: r(3)
-    type(scalar), intent(in) :: zeta
+    real(8), intent(in) :: sigma
     logical, intent(in) :: deriv
 
-    real(8) :: theta, erf_theta, r_5
+    real(8) :: theta, erf_theta, r_5, r_1, zeta
     type(dip33) :: bare
     real(8) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
     integer :: a, c
 
     bare = T_bare_v2(r, deriv)
-    r_5 = sqrt(sum(r**2))**5
+    r_1 = sqrt(sum(r**2))
+    r_5 = r_1**5
     rr_r5 = (r.cprod.r)/r_5
-    theta = 2*zeta%val/sqrt(pi)*exp(-zeta%val**2)
-    erf_theta = erf(zeta%val)-theta
-    T%val = erf_theta*bare%val+2*(zeta%val**2)*theta*rr_r5
+    zeta = r_1/sigma
+    theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
+    erf_theta = erf(zeta)-theta
+    T%val = erf_theta*bare%val+2*(zeta**2)*theta*rr_r5
     if (deriv) then
-        tmp33 = 2*zeta%val*theta*(bare%val+(3-2*zeta%val**2)*rr_r5)
-        forall (c = 1:3) T%dere(:, :, c) = tmp33*zeta%dere(c)
+        tmp33 = 2*zeta*theta*(bare%val+(3-2*zeta**2)*rr_r5)
+        forall (c = 1:3) T%dere(:, :, c) = tmp33*r(c)/(r_1*sigma)
         tmp333 = bare%dere/3
         forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
-        T%dere = T%dere + erf_theta*bare%dere-2*(zeta%val**2)*theta*tmp333
+        T%dere = T%dere + erf_theta*bare%dere-2*(zeta**2)*theta*tmp333
         T%has_sigma = .true.
-        T%dersigma = tmp33*zeta%dersigma
+        T%dersigma = -tmp33*r_1/sigma**2
     end if
 end function
 
@@ -1973,21 +1965,19 @@ subroutine run_tests()
         real(8) :: T_diff_num(3, 3, -2:2)
         integer :: a, b, c, i_step
         real(8) :: delta
-        type(scalar) :: zeta, zeta_diff
+        real(8) :: sigma
 
         delta = 1d-3
         r = [1.02d0, -2.22d0, 0.15d0]
-        zeta%val = 1.2d0
-        zeta%dere = [1.1d0, -0.3d0, 0.6d0]
-        T = T_erf_coulomb(r, zeta, deriv=.true.)
+        sigma = 1.2d0
+        T = T_erf_coulomb(r, sigma, deriv=.true.)
         T_diff_anl = T%dere
         do c = 1, 3
             do i_step = -2, 2
                 if (i_step == 0) continue
                 r_diff = r
                 r_diff(c) = r_diff(c)+i_step*delta
-                zeta_diff%val = zeta%val+i_step*delta*zeta%dere(c)
-                T = T_erf_coulomb(r_diff, zeta_diff, deriv=.false.)
+                T = T_erf_coulomb(r_diff, sigma, deriv=.false.)
                 T_diff_num(:, :, i_step) = T%val
             end do
             forall (a = 1:3, b = 1:3)
@@ -2010,18 +2000,18 @@ subroutine run_tests()
         real(8) :: T_diff_num(3, 3, -2:2)
         integer :: a, b, i_step
         real(8) :: delta
-        type(scalar) :: zeta, zeta_diff
+        real(8) :: sigma, dsigma_dr, sigma_diff
 
         delta = 1d-3
         r = [1.02d0, -2.22d0, 0.15d0]
-        zeta%val = 1.2d0
-        zeta%dersigma = -0.3d0
-        T = T_erf_coulomb(r, zeta, deriv=.true.)
+        sigma = 1.2d0
+        dsigma_dr = -0.3d0
+        T = T_erf_coulomb(r, sigma, deriv=.true.)
         T_diff_anl = T%dersigma(:, :)
         do i_step = -2, 2
             if (i_step == 0) continue
-            zeta_diff%val = zeta%val+i_step*delta*zeta%dersigma
-            T = T_erf_coulomb(r_diff, zeta_diff, deriv=.false.)
+            sigma_diff = sigma+i_step*delta*dsigma_dr
+            T = T_erf_coulomb(r_diff, sigma_diff, deriv=.false.)
             T_diff_num(:, :, i_step) = T%val
         end do
         forall (a = 1:3, b = 1:3)

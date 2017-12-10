@@ -261,13 +261,6 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
                             eta%val = r_norm/(s_R*R_vdw_ij)
                             f_damp = damping_fermi(eta, d, .false.)
                             f_damp%val = f_damp%val**2
-                        case ("erf")
-                            f_damp%val = damping_erf(r_norm, s_R*R_vdw_ij, d)
-                        case ("1mexp")
-                            f_damp%val = damping_1mexp(r_norm, s_R*R_vdw_ij, d)
-                        case ("overlap")
-                            f_damp%val = damping_overlap( &
-                                r_norm, overlap_ij, C6_ij, s_R, d)
                         case ("custom")
                             f_damp%val = damping_custom(i_atom, j_atom)
                     end select
@@ -421,15 +414,6 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp%val = T_bare(r)
                     case ("dip,1mexp")
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
-                    case ("dip,erf")
-                        zeta_ij%val = (r_norm/(damp%beta*R_vdw_ij))**damp%a
-                        Tpp = T_erf_coulomb(r, zeta_ij, .false.)
-                    case ("dip,fermi")
-                        Tpp%val = T_fermi_coulomb(r, damp%beta*R_vdw_ij, damp%a)
-                    case ("1mexp,dip")
-                        Tpp%val = damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
-                    case ("erf,dip")
-                        Tpp%val = damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("fermi,dip")
                         Tpp = T_damped( &
                             sys, &
@@ -443,16 +427,6 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp%val = damp%potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
                         Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
-                    case ("1mexp,dip,gg")
-                        f_ij = 1.d0-damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)
-                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
-                        Tpp%val = f_ij*Tpp%val
-                        do_ewald = .false.
-                    case ("erf,dip,gg")
-                        f_ij = 1.d0-damping_erf(r_norm, damp%beta*R_vdw_ij, damp%a)
-                        Tpp = T_erf_coulomb(r, zeta_ij, sys%do_force)
-                        Tpp%val = f_ij*Tpp%val
-                        do_ewald = .false.
                     case ("fermi,dip,gg")
                         Tpp = T_damped( &
                             sys, &
@@ -1653,72 +1627,6 @@ type(dip33) function T_damped(sys, f, T, sr)
             T_damped%has_alpha = .true.
         end if
     end if
-end function
-
-
-function damping_erf(r, sigma, a) result(f)
-    real(8), intent(in) :: r, sigma, a
-    real(8) :: f
-
-    f = erf((r/sigma)**a)
-end function
-
-
-function damping_1mexp(r, sigma, a) result(f)
-    real(8), intent(in) :: r, sigma, a
-    real(8) :: f
-
-    f = 1-exp(-(r/sigma)**a)
-end function
-
-
-function damping_overlap(r, overlap, C6, beta, a) result(f)
-    real(8), intent(in) :: r, overlap, C6, beta, a
-    real(8) :: f
-
-    f = 1.d0-terf(-overlap/(erf(r/6)**6*C6/r**6), beta, a)
-end function
-
-
-function T_overlap_coulomb(rxyz, overlap, C6, beta, a) result(T)
-    real(8), intent(in) :: rxyz(3), overlap, C6, beta, a
-    real(8) :: T(3, 3)
-
-    real(8) :: zeta_1, zeta_2
-    real(8) :: r, erff, exp36, qene, qenep, qenepp
-
-    r = sqrt(sum(rxyz**2))
-    erff = erf(r/6)
-    exp36 = exp(r**2/36)
-    qene = overlap*r**6/(C6*erff**6)
-    qenep = 2.d0*overlap*r**5*(-(1.d0/exp36)*r/sqrt(pi)+3.d0*erff)/(C6*erff**7)
-    qenepp = (1.d0/exp36**2)*overlap*r**4/(9*C6*pi*erff**8) &
-        *(42*r**2+exp36*sqrt(pi)*r*(-216+r**2)*erff & 
-        +270.d0*exp36**2*pi*erff**2)
-    zeta_1 = 1.d0/2*(2.d0-erf(a*(beta-qene))+erf(a*(beta+qene)) &
-        +2*a*r*qenep/sqrt(pi)*(-exp(-a**2*(beta-qene)**2) &
-        -exp(-a**2*(beta+qene)**2)))
-    zeta_2 = 1.d0/sqrt(pi)*a*exp(-a**2*(beta+qene)**2)*r**2 &
-        *(2*a**2*qenep**2*(beta*(-1.d0+exp(4*a**2*beta*qene)) &
-        -qene*(1.d0+exp(4*a**2*beta*qene))) &
-        +qenepp*(1.d0+exp(4*a**2*beta*qene)))
-    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
-end function
-
-
-function T_fermi_coulomb(rxyz, sigma, a) result(T)
-    real(8), intent(in) :: rxyz(3), sigma, a
-    real(8) :: T(3, 3)
-
-    real(8) :: r_sigma, d_r_sigma_m_1, zeta_1, zeta_2
-
-    r_sigma = sqrt(sum(rxyz**2))/sigma
-    d_r_sigma_m_1 = a*(r_sigma-1)
-    zeta_1 = 1.d0/(1.d0+exp(-d_r_sigma_m_1)) &
-        -a/2.d0*r_sigma/(1.d0+cosh(-d_r_sigma_m_1))
-    zeta_2 = 2.d0*a**2*r_sigma**2/sinh(-d_r_sigma_m_1)**3 &
-        *sinh(-d_r_sigma_m_1/2.d0)**4
-    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
 end function
 
 

@@ -171,7 +171,7 @@ real(8) function mbd_scs_energy(sys, alpha_0, omega, damp)
     alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
     R_vdw_scs = damp%R_vdw*(alpha_dyn_scs(0, :)/alpha_dyn(0, :))**(1.d0/3)
-    damp_mbd = mbd_damping('1mexp,dip', r_vdw=R_vdw_scs, beta=1.d0, a=damp%a)
+    damp_mbd = mbd_damping('dip,1mexp', r_vdw=R_vdw_scs, beta=1.d0, a=damp%a)
     omega_scs = omega_eff(C6_scs, alpha_dyn_scs(0, :))
     mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0, :), omega_scs, damp_mbd)
 end function mbd_scs_energy

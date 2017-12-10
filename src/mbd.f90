@@ -15,7 +15,7 @@ implicit none
 private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, mbd_relay, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
-    run_tests
+    run_tests, get_sigma_selfint
 
 real(8), parameter :: bohr = 0.529177249d0
 integer, parameter :: n_timestamps = 100
@@ -60,7 +60,7 @@ type mbd_damping
     real(8) :: beta = 0.d0
     real(8) :: a = 6.d0
     real(8), allocatable :: r_vdw(:)
-    real(8), allocatable :: alpha(:)
+    real(8), allocatable :: sigma(:)
     real(8), allocatable :: damping_custom(:, :)
     real(8), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
@@ -103,21 +103,17 @@ end type mbd_relay
 type dip33
     real(8) :: val(3, 3)
     ! explicit derivative, [abc] ~ dval_{ab}/dR_c
-    real(8) :: dere(3, 3, 3)
+    real(8) :: dr(3, 3, 3)
     logical :: has_vdw = .false.
-    real(8) :: dervdw(3, 3)
-    logical :: has_alpha = .false.
-    real(8) :: deralpha(3, 3)
+    real(8) :: dvdw(3, 3)
     logical :: has_sigma = .false.
-    real(8) :: dersigma(3, 3)
+    real(8) :: dsigma(3, 3)
 end type
 
 type scalar
     real(8) :: val
-    real(8) :: dere(3)  ! explicit derivative
-    real(8) :: dervdw
-    real(8) :: deralpha
-    real(8) :: dersigma
+    real(8) :: dr(3)  ! explicit derivative
+    real(8) :: dvdw
 end type
 
 contains
@@ -313,7 +309,6 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
 
     real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
-    type(scalar) :: eta_ij
     type(dip33) :: Tpp
     complex(8) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
@@ -393,9 +388,8 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 if (allocated(damp%R_vdw)) then
                     R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
                 end if
-                if (allocated(damp%alpha)) then
-                    sigma_ij = sqrt(sum(get_sigma_selfint( &
-                        sys%calc, damp%alpha((/ i_atom , j_atom /)))**2))
+                if (allocated(damp%sigma)) then
+                    sigma_ij = sqrt(sum(damp%sigma([i_atom, j_atom])**2))
                 end if
                 select case (damp%version)
                     case ("bare")
@@ -784,7 +778,7 @@ type(mbd_relay) function screened_alpha(sys, alpha, damp, k_point, lam)
     type(mbd_damping) :: damp_local
 
     damp_local = damp
-    damp_local%alpha = alpha
+    damp_local%sigma = get_sigma_selfint(sys%calc, alpha)
     screened_alpha = dipole_matrix(sys, damp_local, k_point)
     if (present(lam)) then
         if (present(k_point)) then
@@ -1142,7 +1136,7 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%alpha = alpha(i_grid_omega, :)
+        damp_alpha%sigma = get_sigma_selfint(sys%calc, alpha(i_grid_omega, :))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
         do i_atom = 1, size(sys%coords, 1)
@@ -1224,7 +1218,7 @@ real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%alpha = alpha(i_grid_omega, :)
+        damp_alpha%sigma = get_sigma_selfint(sys%calc, alpha(i_grid_omega, :))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
         do i_atom = 1, size(sys%coords, 1)
@@ -1516,21 +1510,21 @@ type(dip33) function T_bare_v2(r, deriv) result(T)
     if (deriv) then
         r_7 = r_1**7
         forall (a = 1:3)
-            T%dere(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
+            T%dr(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
             forall (b = a+1:3)
-                T%dere(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
-                T%dere(a, b, a) = T%dere(a, a, b)
-                T%dere(b, a, a) = T%dere(a, a, b)
-                T%dere(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
-                T%dere(b, a, b) = T%dere(b, b, a)
-                T%dere(a, b, b) = T%dere(b, b, a)
+                T%dr(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
+                T%dr(a, b, a) = T%dr(a, a, b)
+                T%dr(b, a, a) = T%dr(a, a, b)
+                T%dr(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
+                T%dr(b, a, b) = T%dr(b, b, a)
+                T%dr(a, b, b) = T%dr(b, b, a)
                 forall (c = b+1:3)
-                    T%dere(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
-                    T%dere(a, c, b) = T%dere(a, b, c)
-                    T%dere(b, a, c) = T%dere(a, b, c)
-                    T%dere(b, c, a) = T%dere(a, b, c)
-                    T%dere(c, a, b) = T%dere(a, b, c)
-                    T%dere(c, b, a) = T%dere(a, b, c)
+                    T%dr(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
+                    T%dr(a, c, b) = T%dr(a, b, c)
+                    T%dr(b, a, c) = T%dr(a, b, c)
+                    T%dr(b, c, a) = T%dr(a, b, c)
+                    T%dr(c, a, b) = T%dr(a, b, c)
+                    T%dr(c, b, a) = T%dr(a, b, c)
                 end forall
             end forall
         end forall
@@ -1584,8 +1578,8 @@ type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
     f%val = 1.d0/(1+exp(-d*(eta-1)))
     pre = d/(2+2*cosh(d-d*eta))
     if (deriv) then
-        f%dere = pre*r/(r_1*s_vdw)
-        f%dervdw = -pre*r_1/s_vdw**2
+        f%dr = pre*r/(r_1*s_vdw)
+        f%dvdw = -pre*r_1/s_vdw**2
     end if
 end function
 
@@ -1608,13 +1602,13 @@ type(dip33) function T_damped(sys, f, T, sr)
     end if
     T_damped%val = pre*T%val
     if (sys%do_force) then
-        forall (c = 1:3) T_damped%dere(:, :, c) = sgn*f%dere(c)*T%val
-        T_damped%dere = T_damped%dere + pre*T%dere
-        T_damped%dervdw = sgn*f%dervdw*T%val
+        forall (c = 1:3) T_damped%dr(:, :, c) = sgn*f%dr(c)*T%val
+        T_damped%dr = T_damped%dr + pre*T%dr
+        T_damped%dvdw = sgn*f%dvdw*T%val
         T_damped%has_vdw = .true.
-        if (T%has_alpha) then
-            T_damped%deralpha = pre*T%deralpha
-            T_damped%has_alpha = .true.
+        if (T%has_sigma) then
+            T_damped%dsigma = pre*T%dsigma
+            T_damped%has_sigma = .true.
         end if
     end if
 end function
@@ -1640,12 +1634,12 @@ type(dip33) function T_erf_coulomb(r, sigma, deriv) result(T)
     T%val = erf_theta*bare%val+2*(zeta**2)*theta*rr_r5
     if (deriv) then
         tmp33 = 2*zeta*theta*(bare%val+(3-2*zeta**2)*rr_r5)
-        forall (c = 1:3) T%dere(:, :, c) = tmp33*r(c)/(r_1*sigma)
-        tmp333 = bare%dere/3
+        forall (c = 1:3) T%dr(:, :, c) = tmp33*r(c)/(r_1*sigma)
+        tmp333 = bare%dr/3
         forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
-        T%dere = T%dere + erf_theta*bare%dere-2*(zeta**2)*theta*tmp333
+        T%dr = T%dr + erf_theta*bare%dr-2*(zeta**2)*theta*tmp333
         T%has_sigma = .true.
-        T%dersigma = -tmp33*r_1/sigma**2
+        T%dsigma = -tmp33*r_1/sigma**2
     end if
 end function
 
@@ -1936,7 +1930,7 @@ subroutine run_tests()
         delta = 1d-3
         r = [1.12d0, -2.12d0, 0.12d0]
         T = T_bare_v2(r, deriv=.true.)
-        T_diff_anl = T%dere(:, :, :)
+        T_diff_anl = T%dr(:, :, :)
         do c = 1, 3
             do i_step = -2, 2
                 if (i_step == 0) continue
@@ -1971,7 +1965,7 @@ subroutine run_tests()
         r = [1.02d0, -2.22d0, 0.15d0]
         sigma = 1.2d0
         T = T_erf_coulomb(r, sigma, deriv=.true.)
-        T_diff_anl = T%dere
+        T_diff_anl = T%dr
         do c = 1, 3
             do i_step = -2, 2
                 if (i_step == 0) continue
@@ -2007,7 +2001,7 @@ subroutine run_tests()
         sigma = 1.2d0
         dsigma_dr = -0.3d0
         T = T_erf_coulomb(r, sigma, deriv=.true.)
-        T_diff_anl = T%dersigma(:, :)
+        T_diff_anl = T%dsigma(:, :)
         do i_step = -2, 2
             if (i_step == 0) continue
             sigma_diff = sigma+i_step*delta*dsigma_dr

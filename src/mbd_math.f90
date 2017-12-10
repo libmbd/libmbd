@@ -5,7 +5,7 @@ module mbd_math
 
 use mbd_interface, only: pi
 use mbd_linalg, only: eye, inverted, diag, invert
-use mbd, only: dipole_matrix, mbd_system, mbd_damping, mbd_relay
+use mbd, only: dipole_matrix, mbd_system, mbd_damping, mbd_relay, get_sigma_selfint
 
 implicit none
 
@@ -149,7 +149,7 @@ real(8) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
     type(mbd_relay) :: T
 
     N = size(sys%coords, 1)
-    T = dipole_matrix(sys, mbd_damping('dip,gg', alpha=a0))
+    T = dipole_matrix(sys, mbd_damping('dip,gg', sigma=get_sigma_selfint(sys%calc, a0)))
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

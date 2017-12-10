@@ -147,9 +147,12 @@ real(8) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
 
     integer :: A, B, i, j, N
     type(mbd_relay) :: T
+    type(mbd_damping) :: damp
 
     N = size(sys%coords, 1)
-    T = dipole_matrix(sys, mbd_damping('dip,gg', sigma=get_sigma_selfint(sys%calc, a0)))
+    damp%version = 'dip,gg'
+    damp%sigma = get_sigma_selfint(sys%calc, a0)
+    T = dipole_matrix(sys, damp)
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

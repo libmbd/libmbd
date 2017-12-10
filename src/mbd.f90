@@ -61,8 +61,6 @@ type mbd_damping
     real(8) :: a = 6.d0
     real(8), allocatable :: r_vdw(:)
     real(8), allocatable :: alpha(:)
-    real(8), allocatable :: overlap(:, :)
-    real(8), allocatable :: C6(:)
     real(8), allocatable :: damping_custom(:, :)
     real(8), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
@@ -322,8 +320,8 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
     type(mbd_damping), intent(in) :: damp
     real(8), intent(in), optional :: k_point(3)
 
-    real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, C6_ij, &
-        overlap_ij, sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
+    real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
+        sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
     type(scalar) :: zeta_ij, eta_ij
     type(dip33) :: Tpp
     complex(8) :: Tpp_c(3, 3)
@@ -418,14 +416,6 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         ! TODO add implicit term
                     end if
                 end if
-                if (allocated(damp%overlap)) then
-                    overlap_ij = damp%overlap(i_atom, j_atom)
-                end if
-                if (allocated(damp%C6)) then
-                    C6_ij = combine_C6( &
-                        damp%C6(i_atom), damp%C6(j_atom), &
-                        damp%alpha(i_atom), damp%alpha(j_atom))
-                end if
                 select case (damp%version)
                     case ("bare")
                         Tpp%val = T_bare(r)
@@ -436,8 +426,6 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp = T_erf_coulomb(r, zeta_ij, .false.)
                     case ("dip,fermi")
                         Tpp%val = T_fermi_coulomb(r, damp%beta*R_vdw_ij, damp%a)
-                    case ("dip,overlap")
-                        Tpp%val = T_overlap_coulomb(r, overlap_ij, C6_ij, damp%beta, damp%a)
                     case ("1mexp,dip")
                         Tpp%val = damping_1mexp(r_norm, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("erf,dip")
@@ -449,9 +437,6 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                             T_bare_v2(r, sys%do_force), &
                             .false. &
                         )
-                    case ("overlap,dip")
-                        Tpp%val = damping_overlap( &
-                            r_norm, overlap_ij, C6_ij, damp%beta, damp%a)*T_bare(r)
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
@@ -921,7 +906,7 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
 
     real(8), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), omega_super(:), &
-        R_vdw_super(:), C6_super(:), alpha_ts_super(:, :)
+        R_vdw_super(:), alpha_ts_super(:, :)
     type(mbd_system) :: sys_super
     type(mbd_damping) :: damp_super
 
@@ -938,7 +923,6 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     allocate (alpha_ts_super(0:sys%calc%n_freq, n_cells*size(alpha_0)))
     allocate (omega_super(n_cells*size(omega)))
     if (allocated(damp%r_vdw)) allocate (damp_super%r_vdw(n_cells*size(damp%r_vdw)))
-    if (allocated(damp%C6)) allocate (damp_super%C6(n_cells*size(damp%C6)))
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
@@ -950,9 +934,6 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
             omega_super(i) = omega(i_atom)
             if (allocated(damp%R_vdw)) then
                 damp_super%R_vdw(i) = damp%R_vdw(i_atom)
-            end if
-            if (allocated(damp%C6)) then
-                damp_super%C6(i) = damp%C6(i_atom)
             end if
         end do
     end do
@@ -971,7 +952,6 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     deallocate (alpha_ts_super)
     deallocate (omega_super)
     deallocate (R_vdw_super)
-    deallocate (C6_super)
     ene = ene/n_cells
     if (get_orders) then
         sys%work%rpa_orders =sys_super%work%rpa_orders/n_cells

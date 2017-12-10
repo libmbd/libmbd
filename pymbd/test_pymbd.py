@@ -139,7 +139,7 @@ def test_benzene_rpa(calc):
     R_vdw *= vols**(1./3)
     omega = 4./3*C6/alpha_0**2
     ene = calc.mbd_energy(coords, alpha_0, omega, R_vdw, 0.83, func='calc_rpa_energy')
-    assert ene == approx(-0.007002398506090302, rel=1e-10)
+    assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
 def test_ethylcarbamate(calc):

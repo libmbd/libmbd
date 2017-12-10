@@ -1,0 +1,30 @@
+language: generic
+matrix:
+  include:
+    - os: linux
+      env:
+        - PYTHON=python
+    - os: osx
+      env:
+        - PYTHON=python3
+addons:
+  apt:
+    packages:
+    - gfortran
+    - liblapack3
+    - mpi-default-dev
+    - python-mpi4py
+before_install:
+  - >
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      rm -rf /usr/local/include/c++
+      brew update
+    fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install python3 gcc mpich; fi
+install:
+  - mkdir build && cd build && cmake .. && make && cd ..
+  - $PYTHON -m pip install --user -r requirements.txt
+  - $PYTHON setup.py build_ext -i
+script:
+  - make -C build check
+  - $PYTHON -m pytest -v --durations=3

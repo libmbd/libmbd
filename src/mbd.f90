@@ -95,6 +95,7 @@ end type mbd_system
 type mbd_relay
     real(8), allocatable :: re(:, :)
     complex(8), allocatable :: cplx(:, :)
+    real(8), allocatable :: re_dr(:, :, :)
 end type mbd_relay
 
 ! the following types are internal and serve for simultaneous passing of
@@ -336,6 +337,9 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
         allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
     else
         allocate (dipmat%re(3*n_atoms, 3*n_atoms), source=0.d0)
+        if (sys%do_force) then
+            allocate (dipmat%re_dr(3*n_atoms, 3*n_atoms, 3), source=0.d0)
+        end if
     end if
     ! MPI code end
     if (sys%periodic) then
@@ -445,6 +449,11 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     associate (T => dipmat%re(i+1:i+3, j+1:j+3))
                         T = T + Tpp%val
                     end associate
+                    if (sys%do_force) then
+                        associate (T => dipmat%re_dr(i+1:i+3, j+1:j+3, :))
+                            T = T + Tpp%dr
+                        end associate
+                    end if
                 end if
             end do ! j_atom
             !$omp end parallel do

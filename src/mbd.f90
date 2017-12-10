@@ -106,14 +106,20 @@ type dip33
     real(8) :: val(3, 3)
     ! explicit derivative, [abc] ~ dval_{ab}/dR_c
     real(8) :: dere(3, 3, 3)
-    ! implicit derivative, [ab...] ~ dval_{ab}/dR_{...}
-    real(8), allocatable :: deri(:, :, :, :)
+    logical :: has_vdw = .false.
+    real(8) :: dervdw(3, 3)
+    logical :: has_alpha = .false.
+    real(8) :: deralpha(3, 3)
+    logical :: has_sigma = .false.
+    real(8) :: dersigma(3, 3)
 end type
 
 type scalar
     real(8) :: val
     real(8) :: dere(3)  ! explicit derivative
-    real(8), allocatable :: deri(:, :)  ! implicit derivative, [...] ~ dval/dR_{...}
+    real(8) :: dervdw
+    real(8) :: deralpha
+    real(8) :: dersigma
 end type
 
 contains
@@ -1635,7 +1641,7 @@ type(scalar) function damping_fermi(eta, a, deriv) result(f)
     pre = a/(2+2*cosh(a-a*eta%val))
     if (deriv) then
         f%dere = pre*eta%dere
-        f%deri = pre*eta%deri
+        f%dervdw = pre*eta%dervdw
     end if
 end function
 
@@ -1647,7 +1653,7 @@ type(dip33) function T_damped(sys, f, T, sr)
     logical, intent(in) :: sr  ! true: f, false: 1-f
 
     real(8) :: pre
-    integer :: sgn, a, b, c
+    integer :: sgn, c
 
     if (sr) then
         pre = 1-f%val
@@ -1660,16 +1666,11 @@ type(dip33) function T_damped(sys, f, T, sr)
     if (sys%do_force) then
         forall (c = 1:3) T_damped%dere(:, :, c) = sgn*f%dere(c)*T%val
         T_damped%dere = T_damped%dere + pre*T%dere
-        if (allocated(f%deri)) then
-            allocate (T_damped%deri(3, 3, size(f%deri, 1), size(f%deri, 2)))
-            forall (a = 1:3, b = 1:3) T_damped%deri(a, b, :, :) = sgn*f%deri*T%val(a, b)
-        end if
-        if (allocated(T%deri)) then
-            if (.not. allocated(T_damped%deri)) then
-                T_damped%deri = pre*T%deri
-            else
-                T_damped%deri = T_damped%deri + pre*T%deri
-            end if
+        T_damped%dervdw = sgn*f%dervdw*T%val
+        T_damped%has_vdw = .true.
+        if (T%has_alpha) then
+            T_damped%deralpha = pre*T%deralpha
+            T_damped%has_alpha = .true.
         end if
     end if
 end function
@@ -1749,7 +1750,7 @@ type(dip33) function T_erf_coulomb(r, zeta, deriv) result(T)
     real(8) :: theta, erf_theta, r_5
     type(dip33) :: bare
     real(8) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
-    integer :: a, b, c
+    integer :: a, c
 
     bare = T_bare_v2(r, deriv)
     r_5 = sqrt(sum(r**2))**5
@@ -1763,10 +1764,8 @@ type(dip33) function T_erf_coulomb(r, zeta, deriv) result(T)
         tmp333 = bare%dere/3
         forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
         T%dere = T%dere + erf_theta*bare%dere-2*(zeta%val**2)*theta*tmp333
-        if (allocated(zeta%deri)) then
-            allocate(T%deri(3, 3, size(zeta%deri, 1), size(zeta%deri, 2)))
-            forall (a = 1:3, b = 1:3) T%deri(a, b, :, :) = tmp33(a, b)*zeta%deri
-        end if
+        T%has_sigma = .true.
+        T%dersigma = tmp33*zeta%dersigma
     end if
 end function
 
@@ -2090,7 +2089,8 @@ subroutine run_tests()
 
         delta = 1d-3
         r = [1.02d0, -2.22d0, 0.15d0]
-        zeta = scalar(1.2d0, [1.1d0, -0.3d0, 0.6d0])
+        zeta%val = 1.2d0
+        zeta%dere = [1.1d0, -0.3d0, 0.6d0]
         T = T_erf_coulomb(r, zeta, deriv=.true.)
         T_diff_anl = T%dere
         do c = 1, 3
@@ -2126,16 +2126,13 @@ subroutine run_tests()
 
         delta = 1d-3
         r = [1.02d0, -2.22d0, 0.15d0]
-        zeta = scalar( &
-            1.2d0, &
-            0d0, &
-            reshape([1.3d0], [1, 1]) &
-        )
+        zeta%val = 1.2d0
+        zeta%dersigma = -0.3d0
         T = T_erf_coulomb(r, zeta, deriv=.true.)
-        T_diff_anl = T%deri(:, :, 1, 1)
+        T_diff_anl = T%dersigma(:, :)
         do i_step = -2, 2
             if (i_step == 0) continue
-            zeta_diff%val = zeta%val+i_step*delta*zeta%deri(1, 1)
+            zeta_diff%val = zeta%val+i_step*delta*zeta%dersigma
             T = T_erf_coulomb(r_diff, zeta_diff, deriv=.false.)
             T_diff_num(:, :, i_step) = T%val
         end do

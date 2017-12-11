@@ -6,8 +6,11 @@ import numpy as np
 import pkg_resources
 import sys
 import csv
-from mpi4py import MPI
-MPI.COMM_WORLD
+try:
+    from mpi4py import MPI
+    MPI.COMM_WORLD
+except ImportError:
+    pass
 
 from ._libmbd import ffi as _ffi, lib as _lib
 

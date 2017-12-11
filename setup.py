@@ -7,7 +7,6 @@ from setuptools import setup
 
 library_dirs = ['build'] if os.path.exists('build') else []
 sources = [
-    'src/mpi_stubs.f90',
     'src/mbd_common.f90',
     'src/mbd_interface.f90',
     'src/mbd_linalg.f90',
@@ -42,6 +41,24 @@ def libmbd_exists():
         shutil.rmtree(tmpdir)
 
 
+def setup_mpi():
+    try:
+        import mpi4py
+    except ImportError:
+        sources.insert(0, 'src/mpi_stubs.f90')
+        return
+    # patch find_executables to insert the MPI compiler before FC or
+    # --f90exec is checked
+    from numpy.distutils.fcompiler import FCompiler
+    from functools import wraps
+    _find_executables = FCompiler.find_executables
+    @wraps(FCompiler.find_executables)  # noqa
+    def find_executables(self):
+        self.executables['compiler_f90'][0] = mpi4py.get_config()['mpif90']
+        return _find_executables(self)
+    FCompiler.find_executables = find_executables
+
+
 if libmbd_exists():
     kwargs = {'libraries': ['mbd']}
     if sys.platform == 'darwin':
@@ -51,6 +68,7 @@ if libmbd_exists():
 else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info
+    setup_mpi()
     kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
     for arg, val in get_info('lapack_opt', 2).items():
         if arg == 'libraries':
@@ -73,7 +91,7 @@ with open('src/mbd.h') as f:
 
 setup(
     name='pymbd',
-    version='0.3.1',
+    version='0.3.2',
     description='Many-body dispersion method',
     author='Jan Hermann',
     author_email='dev@hermann.in',

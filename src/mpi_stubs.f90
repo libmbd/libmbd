@@ -9,10 +9,23 @@ module mpi
     integer, parameter :: MPI_SUCCESS = 0
 end module
 
+subroutine MPI_INIT(err)
+    integer :: err
+
+    err = MPI_SUCCESS
+end subroutine
+
+subroutine MPI_FINALIZE(err)
+    integer :: err
+
+    err = MPI_SUCCESS
+end subroutine
+
 subroutine MPI_COMM_RANK(comm, rank, err)
     integer :: comm, rank, err
 
     rank = 0
+    err = MPI_SUCCESS
 end subroutine
 
 subroutine MPI_ALLREDUCE(sendbuf, recvbuf, cnt, datatype, op, comm, err)
@@ -37,6 +50,7 @@ subroutine MPI_ALLREDUCE_COMPLEX16(sendbuf, recvbuf, cnt, datatype, op, comm, er
     complex(8) :: sendbuf(cnt), recvbuf(cnt)
 
     recvbuf(:) = sendbuf(:)
+    err = MPI_SUCCESS
 end subroutine
 
 subroutine MPI_BCAST(buffer, cnt, datatype, root, comm, err)

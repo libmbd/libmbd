@@ -7,6 +7,12 @@ use mbd, only: run_tests
 
 implicit none
 
+integer :: err
+
+external :: MPI_INIT, MPI_FINALIZE
+
+call MPI_INIT(err)
 call run_tests()
+call MPI_FINALIZE(err)
 
 end program

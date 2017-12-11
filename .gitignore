@@ -1,7 +1,7 @@
 /build
 /dist
-/pymbd/_libmbd.*so
-/MANIFEST
 /.cache/
 /*.egg-info/
 *.pyc
+*.so
+*.so.dSYM

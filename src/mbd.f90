@@ -405,7 +405,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 end if
                 select case (damp%version)
                     case ("bare")
-                        Tpp%val = T_bare(r)
+                        Tpp = T_bare_v2(r, sys%do_force)
                     case ("dip,1mexp")
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")

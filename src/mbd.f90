@@ -80,6 +80,7 @@ type mbd_work
     real(8), allocatable :: mode_enes_k(:, :)
     complex(8), allocatable :: modes_k(:, :, :)
     real(8), allocatable :: rpa_orders_k(:, :)
+    real(8), allocatable :: forces(:, :)
 end type
 
 type mbd_system
@@ -940,21 +941,24 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
 
     type(mbd_relay) :: relay
     real(8), allocatable :: eigs(:)
-    integer :: n_negative_eigs
     integer :: i_xyz, i
+    integer :: n_negative_eigs, n_atoms
     logical :: is_parallel
+    real(8), allocatable :: c_lambda12i_c(:, :)
+    real(8), allocatable :: c_lambda14i(:, :)
 
     is_parallel = sys%calc%parallel
 
-    allocate (eigs(3*size(sys%coords, 1)))
+    n_atoms = size(sys%coords, 1)
+    allocate (eigs(3*n_atoms))
     ! relay%re = T
     relay = dipole_matrix(sys, damp)
     call form_mbd_matrix(relay, alpha_0, omega)
     call ts(sys%calc, 21)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
-        if (sys%work%get_modes) then
+        if (sys%work%get_modes .or. sys%do_force) then
             call sdiagonalize('V', relay%re, eigs)
-            sys%work%modes = relay%re
+            call move_alloc(relay%re, sys%work%modes)
         else
             call sdiagonalize('N', relay%re, eigs)
         end if
@@ -979,6 +983,20 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+    if (sys%do_force) then
+        allocate (c_lambda14i(3*n_atoms, 3*n_atoms))
+        allocate (sys%work%forces(n_atoms, 3))
+        forall (i = 1:3*n_atoms)
+            c_lambda14i(:, i) = eigs(i)**(-1.d0/4)*sys%work%modes(:, i)
+        end forall
+        c_lambda12i_c = matmul(c_lambda14i, transpose(c_lambda14i))
+        do i_xyz = 1, 3
+            relay%re = -relay%re_dr(:, :, i_xyz)
+            call form_mbd_matrix(relay, alpha_0, omega)
+            relay%re = relay%re-transpose(relay%re)
+            sys%work%forces(:, i_xyz) = 1.d0/2*contract_forces(c_lambda12i_c*relay%re)
+        end do
+    end if
 end function get_single_mbd_energy
 
 
@@ -1931,12 +1949,15 @@ subroutine run_tests()
     use mbd_common, only: diff3, tostr, diff5
 
     integer :: n_failed, n_all
+    type(mbd_calc), target :: calc
 
+    call init_grid(calc)
     n_failed = 0
     n_all = 0
     call exec_test('T_bare derivative', test_T_bare_deriv)
     call exec_test('T_GG derivative explicit', test_T_GG_deriv_expl)
     call exec_test('T_GG derivative implicit', test_T_GG_deriv_impl)
+    call exec_test('MBD derivative explicit', test_mbd_deriv_expl)
     write (6, *) &
         trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
     if (n_failed /= 0) stop 1
@@ -1992,7 +2013,6 @@ subroutine run_tests()
             if (any(abs(diff) > 1d-12)) then
                 call failed()
                 call print_matrix('delta dT(:, :, ' // trim(tostr(c)) // ')', diff)
-                return
             end if
         end do
     end subroutine test_T_bare_deriv
@@ -2027,7 +2047,6 @@ subroutine run_tests()
             if (any(abs(diff) > 1d-12)) then
                 call failed()
                 call print_matrix('delta dTGG_{ab,' // trim(tostr(c)) // '}', diff)
-                return
             end if
         end do
     end subroutine test_T_GG_deriv_expl
@@ -2061,9 +2080,47 @@ subroutine run_tests()
         if (any(abs(diff) > 1d-12)) then
             call failed()
             call print_matrix('delta dTGG', diff)
-            return
         end if
     end subroutine test_T_GG_deriv_impl
+
+    subroutine test_mbd_deriv_expl()
+        real(8) :: delta
+        type(mbd_system) :: sys
+        type(mbd_damping) :: damp
+        real(8), allocatable :: coords(:, :)
+        real(8), allocatable :: forces(:, :)
+        real(8), allocatable :: diff(:, :)
+        real(8) :: ene(-2:2)
+        integer :: i_atom, n_atoms, i_xyz, i_step
+
+        delta = 1d-3
+        n_atoms = 2
+        allocate (coords(n_atoms, 3), source=0.d0)
+        allocate (forces(n_atoms, 3))
+        coords(2, 1) = 4.d0*ang
+        sys%calc => calc
+        sys%coords = coords
+        sys%do_force = .true.
+        damp%version = 'bare'
+        ene(0) = get_single_mbd_energy(sys, [11d0, 11d0], [0.7d0, 0.7d0], damp)
+        sys%do_force = .false.
+        do i_atom = 1, n_atoms
+            do i_xyz = 1, 3
+                do i_step = -2, 2
+                    if (i_step == 0) continue
+                    sys%coords = coords
+                    sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                    ene(i_step) = get_single_mbd_energy(sys, [11d0, 11d0], [0.7d0, 0.7d0], damp)
+                end do
+                forces(i_atom, i_xyz) = diff5(ene, delta)
+            end do
+        end do
+        diff = forces-sys%work%forces
+        if (any(abs(diff) > 1d-12)) then
+            call failed()
+            call print_matrix('delta forces', diff)
+        end if
+    end subroutine test_mbd_deriv_expl
 end subroutine run_tests
 
 end module mbd

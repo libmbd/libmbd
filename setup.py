@@ -1,4 +1,22 @@
+import sys
+import cffi
 from setuptools import setup
+
+ffibuilder = cffi.FFI()
+if sys.platform == 'darwin':
+    kwargs = {'extra_link_args': ['-rpath', 'build']}
+else:
+    kwargs = {'runtime_library_dirs': ['build']}
+ffibuilder.set_source(
+    'pymbd._libmbd',
+    '#include "mbd.h"',
+    libraries=['mbd'],
+    include_dirs=['src'],
+    library_dirs=['build'],
+    **kwargs
+)
+with open('src/mbd.h') as f:
+    ffibuilder.cdef(f.read())
 
 setup(
     name='pymbd',
@@ -17,12 +35,12 @@ setup(
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX :: Linux',
         'Programming Language :: Fortran',
+        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Topic :: Scientific/Engineering :: Chemistry',
         'Topic :: Scientific/Engineering :: Physics',
     ],
     license='Mozilla Public License 2.0',
-    setup_requires=['cffi>=1.0.0'],
-    install_requires=['cffi>=1.0.0'],
-    cffi_modules=['pymbd_build.py:ffibuilder'],
+    install_requires=['cffi', 'numpy'],
+    ext_modules=[ffibuilder.distutils_extension()]
 )

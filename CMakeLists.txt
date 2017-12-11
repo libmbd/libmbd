@@ -31,6 +31,9 @@ if(${MPI_Fortran_FOUND})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
 endif()
 
+install(TARGETS mbd
+    LIBRARY DESTINATION lib)
+
 enable_testing()
 set(CMAKE_CTEST_COMMAND ctest -V)
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})

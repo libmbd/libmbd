@@ -26,6 +26,7 @@ setup(
     author_email='dev@hermann.in',
     url='https://github.com/azag0/pymbd',
     packages=['pymbd'],
+    package_data={'pymbd': ['vdw-params.csv']},
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',

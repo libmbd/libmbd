@@ -88,10 +88,10 @@ deallocate(x, w)
 print*, "Coulomb 1-body = ",coul_en_1b
 end subroutine E1_onebody
 !
-subroutine fullcoulomb(natom, C, coords, charge, mass, omega, omzero, e1, eatt, erep)
+subroutine fullcoulomb(natom, C, coords, charge, mass, omega, e1, eatt, erep)
 implicit none
 integer, intent(in) :: natom
-double precision, dimension(natom), intent(in) :: charge, mass, omzero
+double precision, dimension(natom), intent(in) :: charge, mass
 double precision, dimension(3*natom, 3*natom), intent(in) :: C
 double precision, dimension(3*natom), intent(in) :: omega
 double precision, dimension(natom,3) :: coords

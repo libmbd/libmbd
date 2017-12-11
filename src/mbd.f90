@@ -16,6 +16,9 @@ private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, mbd_relay, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
     run_tests, get_sigma_selfint
+public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
+    eval_mbd_int_density, nbody_coeffs, get_damping_parameters, v_to_r, &
+    clock_rate
 
 real(8), parameter :: bohr = 0.529177249d0
 integer, parameter :: n_timestamps = 100
@@ -831,8 +834,8 @@ end function
 
 function get_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(size(sys%coords, 1))
-    real(8), intent(in) :: omega(size(sys%coords, 1))
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
     type(mbd_damping), intent(in) :: damp
     real(8) :: ene
 
@@ -864,11 +867,11 @@ end function get_mbd_energy
 
 real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(size(sys%coords, 1))
-    real(8), intent(in) :: omega(size(sys%coords, 1))
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
     type(mbd_damping), intent(in) :: damp
 
-    logical :: do_rpa, get_orders
+    logical :: do_rpa
     real(8) :: R_cell(3)
     integer :: i_atom, i
     integer :: i_cell
@@ -923,7 +926,7 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     deallocate (omega_super)
     deallocate (R_vdw_super)
     ene = ene/n_cells
-    if (get_orders) then
+    if (sys%work%get_rpa_orders) then
         sys%work%rpa_orders =sys_super%work%rpa_orders/n_cells
     end if
 end function get_supercell_mbd_energy
@@ -931,8 +934,8 @@ end function get_supercell_mbd_energy
 
 real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(size(sys%coords, 1))
-    real(8), intent(in) :: omega(size(sys%coords, 1))
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
     type(mbd_damping), intent(in) :: damp
 
     type(mbd_relay) :: relay
@@ -997,8 +1000,8 @@ end function get_single_mbd_energy
 
 real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(size(sys%coords, 1))
-    real(8), intent(in) :: omega(size(sys%coords, 1))
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
     type(mbd_damping), intent(in) :: damp
 
     logical :: &
@@ -1058,8 +1061,8 @@ end function get_reciprocal_mbd_energy
 
 real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(size(sys%coords, 1))
-    real(8), intent(in) :: omega(size(sys%coords, 1))
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
     real(8), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
@@ -1369,9 +1372,9 @@ function eval_mbd_nonint_density(calc, pts, xyz, charges, masses, omegas) result
     real(8), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
-        charges(size(xyz, 1)), &
-        masses(size(xyz, 1)), &
-        omegas(size(xyz, 1))
+        charges(:), &
+        masses(:), &
+        omegas(:)
     real(8) :: rho(size(pts, 1))
 
     integer :: i_pt, i_atom, n_atoms
@@ -1397,10 +1400,10 @@ function eval_mbd_int_density(calc, pts, xyz, charges, masses, omegas, modes) re
     real(8), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
-        charges(size(xyz, 1)), &
-        masses(size(xyz, 1)), &
-        omegas(3*size(xyz, 1)), &
-        modes(3*size(xyz, 1), 3*size(xyz, 1))
+        charges(:), &
+        masses(:), &
+        omegas(:), &
+        modes(:, :)
     real(8) :: rho(size(pts, 1))
 
     integer :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
@@ -1588,7 +1591,8 @@ type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
 
     real(8) :: pre, eta, r_1
 
-    eta = sqrt(sum(r**2))/s_vdw
+    r_1 = sqrt(sum(r**2))
+    eta = r_1/s_vdw
     f%val = 1.d0/(1+exp(-d*(eta-1)))
     pre = d/(2+2*cosh(d-d*eta))
     if (deriv) then

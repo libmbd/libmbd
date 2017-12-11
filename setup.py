@@ -32,6 +32,7 @@ def libmbd_exists():
             'test',
             libraries=['mbd'],
             library_dirs=library_dirs,
+            output_dir=tmpdir
         )
     except LinkError:
         return False

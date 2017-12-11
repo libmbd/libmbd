@@ -20,14 +20,14 @@ public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
     eval_mbd_int_density, nbody_coeffs, get_damping_parameters, v_to_r, &
     clock_rate
 
-real(8), parameter :: bohr = 0.529177249d0
+real(8), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
 
 type mbd_param
     real(8) :: ts_energy_accuracy = 1.d-10
-    real(8) :: ts_cutoff_radius = 50.d0/bohr
-    real(8) :: dipole_low_dim_cutoff = 100.d0/bohr
-    real(8) :: dipole_cutoff = 400.d0/bohr  ! used only when Ewald is off
+    real(8) :: ts_cutoff_radius = 50.d0*ang
+    real(8) :: dipole_low_dim_cutoff = 100.d0*ang
+    real(8) :: dipole_cutoff = 400.d0*ang  ! used only when Ewald is off
     real(8) :: mayer_scaling = 1.d0
     real(8) :: ewald_real_cutoff_scaling = 1.d0
     real(8) :: ewald_rec_cutoff_scaling = 1.d0
@@ -286,7 +286,7 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         if (i_shell > 1 .and. abs(ene_shell) < calc%param%ts_energy_accuracy) then
             call print_log("Periodic TS converged in " &
                 //trim(tostr(i_shell))//" shells, " &
-                //trim(tostr(i_shell*shell_thickness*bohr))//" angstroms")
+                //trim(tostr(i_shell*shell_thickness/ang))//" angstroms")
             exit
         endif
     end do ! i_shell

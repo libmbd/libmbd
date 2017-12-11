@@ -92,7 +92,7 @@ def _get_vdw_params():
     csv_lines = pkg_resources.resource_string(__name__, 'vdw-params.csv').split(b'\n')
     if sys.version_info[0] > 2:
         csv_lines = [l.decode() for l in csv_lines]
-    reader = csv.DictReader(csv_lines, delimiter=';', quoting=csv.QUOTE_NONNUMERIC)
+    reader = csv.DictReader(csv_lines, quoting=csv.QUOTE_NONNUMERIC)
     vdw_params = {}
     for row in reader:
         vdw_params[row.pop('species')] = row

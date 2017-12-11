@@ -940,8 +940,8 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
 
     type(mbd_relay) :: relay
     real(8), allocatable :: eigs(:)
-    integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
+    integer :: i_xyz, i
     logical :: is_parallel
 
     is_parallel = sys%calc%parallel
@@ -949,23 +949,7 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     allocate (eigs(3*size(sys%coords, 1)))
     ! relay%re = T
     relay = dipole_matrix(sys, damp)
-    do i_atom = 1, size(sys%coords, 1)
-        do j_atom = i_atom, size(sys%coords, 1)
-            i = 3*(i_atom-1)
-            j = 3*(j_atom-1)
-            relay%re(i+1:i+3, j+1:j+3) = & ! relay%re = sqrt(a*a)*w*w*T
-                omega(i_atom)*omega(j_atom) &
-                *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
-                relay%re(i+1:i+3, j+1:j+3)
-        end do
-    end do
-    do i_atom = 1, size(sys%coords, 1)
-        do i_xyz = 1, 3
-            i = 3*(i_atom-1)+i_xyz
-            relay%re(i, i) = relay%re(i, i)+omega(i_atom)**2
-            ! relay%re = w^2+sqrt(a*a)*w*w*T
-        end do
-    end do
+    call form_mbd_matrix(relay, alpha_0, omega)
     call ts(sys%calc, 21)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%work%get_modes) then
@@ -996,6 +980,33 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     end if
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
 end function get_single_mbd_energy
+
+
+subroutine form_mbd_matrix(T, alpha_0, omega)
+    type(mbd_relay), intent(inout) :: T
+    real(8), intent(in) :: alpha_0(:)
+    real(8), intent(in) :: omega(:)
+
+    integer :: n_atoms, i_atom, j_atom, i, j, i_xyz
+
+    n_atoms = size(alpha_0)
+    do i_atom = 1, n_atoms
+        do j_atom = i_atom, n_atoms
+            i = 3*(i_atom-1)
+            j = 3*(j_atom-1)
+            T%re(i+1:i+3, j+1:j+3) = &
+                omega(i_atom)*omega(j_atom) &
+                *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
+                T%re(i+1:i+3, j+1:j+3)
+        end do
+    end do
+    do i_atom = 1, n_atoms
+        do i_xyz = 1, 3
+            i = 3*(i_atom-1)+i_xyz
+            T%re(i, i) = T%re(i, i)+omega(i_atom)**2
+        end do
+    end do
+end subroutine form_mbd_matrix
 
 
 real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene)
@@ -1469,9 +1480,8 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
     real(8), intent(in) :: alpha_3n_3n(:, :)
     real(8) :: alpha_n(size(alpha_3n_3n, 1)/3)
 
-    integer :: i_atom, i_xyz, dim_3n
+    integer :: i_atom, i_xyz
 
-    dim_3n = size(alpha_3n_3n, 1)
     alpha_n(:) = 0.d0
     do i_atom = 1, size(alpha_n)
         associate (A => alpha_n(i_atom))
@@ -1479,12 +1489,30 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
                 ! this convoluted contraction is necessary because alpha_3n_3n is
                 ! calucated as upper triangular
                 A = A + sum(alpha_3n_3n(i_xyz:3*i_atom:3, 3*(i_atom-1)+i_xyz))
-                A = A + sum(alpha_3n_3n(3*(i_atom-1)+i_xyz, 3*i_atom+i_xyz:dim_3n:3))
+                A = A + sum(alpha_3n_3n(3*(i_atom-1)+i_xyz, 3*i_atom+i_xyz::3))
             end do
         end associate
     end do
     alpha_n = alpha_n/3
 end function contract_polarizability
+
+
+function contract_forces(relay) result(atomvec)
+    real(8), intent(in) :: relay(:, :)
+    real(8) :: atomvec(size(relay, 1)/3)
+
+    integer :: i_atom, i_xyz
+
+    atomvec(:) = 0.d0
+    do i_atom = 1, size(atomvec)
+        associate (A => atomvec(i_atom))
+            do i_xyz = 1, 3
+                A = A + sum(relay(i_xyz::3, 3*(i_atom-1)+i_xyz))
+            end do
+        end associate
+    end do
+    atomvec = atomvec
+end function contract_forces
 
 
 function T_bare(rxyz) result(T)

@@ -2088,19 +2088,26 @@ subroutine run_tests()
         real(8), allocatable :: coords(:, :)
         real(8), allocatable :: forces(:, :)
         real(8), allocatable :: diff(:, :)
+        real(8), allocatable :: alpha_0(:)
+        real(8), allocatable :: omega(:)
         real(8) :: ene(-2:2)
         integer :: i_atom, n_atoms, i_xyz, i_step
 
         delta = 1d-3
-        n_atoms = 2
+        n_atoms = 3
         allocate (coords(n_atoms, 3), source=0.d0)
         allocate (forces(n_atoms, 3))
         coords(2, 1) = 4.d0*ang
+        coords(3, 2) = 4.d0*ang
         sys%calc => calc
         sys%coords = coords
         sys%do_force = .true.
-        damp%version = 'bare'
-        ene(0) = get_single_mbd_energy(sys, [11d0, 11d0], [0.7d0, 0.7d0], damp)
+        damp%version = 'fermi,dip'
+        damp%r_vdw = [3.55d0, 3.55d0, 3.55d0]
+        damp%beta = 0.83
+        alpha_0 = [11.d0, 11.d0, 11.d0]
+        omega = [0.7d0, 0.7d0, 0.7d0]
+        ene(0) = get_single_mbd_energy(sys, alpha_0, omega, damp)
         sys%do_force = .false.
         do i_atom = 1, n_atoms
             do i_xyz = 1, 3
@@ -2108,7 +2115,7 @@ subroutine run_tests()
                     if (i_step == 0) continue
                     sys%coords = coords
                     sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
-                    ene(i_step) = get_single_mbd_energy(sys, [11d0, 11d0], [0.7d0, 0.7d0], damp)
+                    ene(i_step) = get_single_mbd_energy(sys, alpha_0, omega, damp)
                 end do
                 forces(i_atom, i_xyz) = diff5(ene, delta)
             end do

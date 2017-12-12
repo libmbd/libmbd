@@ -1,33 +1,62 @@
 language: generic
 matrix:
   include:
-  - os: linux
-    env:
-    - PYTHON=python
+  - env: WITH_CMAKE=1 PYTHON=python
+    addons: &nompi
+      apt:
+        packages: &aptnompi
+        - gfortran
+        - libblas-dev
+        - liblapack-dev
+  - env: WITH_PIP=1 PYTHON=python
+    addons: *nompi
+  - env: WITH_CMAKE=1 WITH_MPI4PY=1 PYTHON=python
+    addons: &mpi
+      apt:
+        packages:
+        - *aptnompi
+        - mpi-default-dev
+        - mpi-default-bin
+  - env: WITH_PIP=1 WITH_MPI4PY=1 PYTHON=python
+    addons: *mpi
   - os: osx
     env:
-    - PYTHON=python3
-addons:
-  apt:
-    packages:
-    - gfortran
-    - liblapack3
-    - mpi-default-dev
-    - python-mpi4py
+    - WITH_CMAKE=1 WITH_MPI4PY=1 PYTHON=python3
 before_install:
 - |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     rm -rf /usr/local/include/c++
     brew update
+    brew install python3 gcc mpich
   fi
-- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install python3 gcc mpich; fi
 install:
-- mkdir build && cd build && cmake .. && make && cd ..
-- "$PYTHON -m pip install --user -r requirements.txt"
-- "$PYTHON setup.py build_ext -i"
+- |
+  if [[ "$WITH_CMAKE" ]]; then
+    mkdir build && pushd build && cmake .. && make && popd
+    if [[ "$WITH_MPI4PY" ]]; then
+      $PYTHON -m pip install --user -r requirements.txt
+    else
+      $PYTHON -m pip install --user -r <(grep -v mpi4py requirements.txt)
+    fi
+    $PYTHON setup.py build_ext -i
+  fi
+- |
+  if [[ "$WITH_PIP" ]]; then
+    $PYTHON -m pip install --user cffi numpy pytest
+    [[ "$WITH_MPI4PY" ]] && $PYTHON -m pip install --user mpi4py
+    $PYTHON -m pip install --user .
+  fi
 script:
-- make -C build check
-- "$PYTHON -m pytest -v --durations=3"
+- |
+  if [[ "$WITH_CMAKE" ]]; then
+    make -C build check
+    $PYTHON -m pytest -v --durations=3
+  fi
+- |
+  if [[ "$WITH_PIP" ]]; then
+    cd
+    $PYTHON -m pytest --pyargs pymbd -v --durations=3
+  fi
 notifications:
   pushover:
     api_key:

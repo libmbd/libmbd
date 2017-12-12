@@ -60,6 +60,14 @@ def setup_mpi():
     FCompiler.find_executables = find_executables
 
 
+def update_dict(dct, update):
+    for key, val in update.items():
+        if key in dct:
+            dct[key].extend(val)
+        else:
+            dct[key] = val
+
+
 if libmbd_exists():
     kwargs = {'libraries': ['mbd']}
     if sys.platform == 'darwin':
@@ -71,19 +79,17 @@ else:
     from numpy.distutils.system_info import get_info
     setup_mpi()
     kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
-    for arg, val in get_info('lapack_opt', 2).items():
-        if arg == 'libraries':
-            kwargs['libraries'].extend(val)
-        else:
-            kwargs[arg] = val
+    update_dict(kwargs, get_info('lapack_opt', 2))
 
 
+update_dict(kwargs, {
+    'include_dirs': ['src'],
+    'library_dirs': library_dirs
+})
 ffibuilder = cffi.FFI()
 ffibuilder.set_source(
     'pymbd._libmbd',
     '#include "mbd.h"',
-    include_dirs=['src'],
-    library_dirs=library_dirs,
     **kwargs
 )
 with open('src/mbd.h') as f:

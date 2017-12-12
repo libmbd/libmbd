@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from pymbd import ang, MBDCalc, vdw_params
+from pymbd import ang, MBDCalc, vdw_params, numerical_forces
 
 benzene_dimer = [(
     np.array([
@@ -99,6 +99,20 @@ def test_benzene_dimer(calc):
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
+
+
+def test_benzene_forces_plain(calc):
+    coords, species, vols = benzene_dimer[0]
+    ene, forces = calc.mbd_energy_species(
+        coords, species, vols, 0.83,
+        func='calc_mbd_energy', force=True
+    )
+    num_forces = numerical_forces(
+        calc.mbd_energy_species, coords, species, vols, 0.83,
+        func='calc_mbd_energy'
+    )
+    for i in range(len(coords)):
+        assert forces[i] == approx(num_forces[i], rel=1e-10, abs=1e-10)
 
 
 def test_benzene_dimer_scs(calc):

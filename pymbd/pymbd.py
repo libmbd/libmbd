@@ -31,7 +31,7 @@ class MBDCalc(object):
 
     def mbd_energy(self, coords, alpha_0, omega, R_vdw, beta,
                    lattice=None, k_grid=None,
-                   a=6., func='calc_mbd_rsscs_energy'):
+                   a=6., func='calc_mbd_rsscs_energy', force=False):
         if not self._calc:
             raise RuntimeError('MBDCalc must be used as a context manager')
         coords = np.array(coords, dtype=float, order='F')
@@ -51,6 +51,8 @@ class MBDCalc(object):
             _ffi.cast('double*', lattice.ctypes.data) if periodic else _ffi.NULL,
             _ffi.cast('int*', k_grid.ctypes.data) if periodic else _ffi.NULL,
         )
+        if force:
+            system.do_force[0] = True
         damping = _lib.mbd_init_damping(
             n_atoms, _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
         )
@@ -61,9 +63,13 @@ class MBDCalc(object):
             _ffi.cast('double*', omega.ctypes.data),
             damping
         )
+        if force:
+            ret_val = ene, _ndarray(system.forces, (n_atoms, 3)).copy()
+        else:
+            ret_val = ene
         _lib.mbd_destroy_damping(damping)
         _lib.mbd_destroy_system(system)
-        return ene
+        return ret_val
 
     def mbd_energy_species(self, coords, species, volumes, beta, **kwargs):
         alpha_0, C6, R_vdw = (

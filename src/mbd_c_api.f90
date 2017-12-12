@@ -3,11 +3,18 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_c_api
 
-use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool
+use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
+    c_null_ptr
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
     mbd_rsscs_energy, mbd_scs_energy
 
 implicit none
+
+type, bind(c) :: mbd_system_c
+    type(c_ptr) :: forces = c_null_ptr
+    type(c_ptr) :: do_force = c_null_ptr
+    type(c_ptr) :: mbd_system_f = c_null_ptr
+end type
 
 contains
 
@@ -38,6 +45,7 @@ type(c_ptr) function mbd_init_system(calc_p, n_atoms, coords, periodic, lattice,
 
     type(mbd_calc), pointer :: calc
     type(mbd_system), pointer :: sys
+    type(mbd_system_c), pointer :: sys_c
 
     call c_f_pointer(calc_p, calc)
     allocate (sys)
@@ -48,16 +56,22 @@ type(c_ptr) function mbd_init_system(calc_p, n_atoms, coords, periodic, lattice,
         sys%lattice = lattice
         sys%k_grid = k_grid
     end if
-    mbd_init_system = c_loc(sys)
+    allocate (sys_c)
+    sys_c%mbd_system_f = c_loc(sys)
+    sys_c%do_force = c_loc(sys%do_force)
+    mbd_init_system = c_loc(sys_c)
 end function mbd_init_system
 
-subroutine mbd_destroy_system(sys_p) bind(c)
-    type(c_ptr), value :: sys_p
+subroutine mbd_destroy_system(sys_cp) bind(c)
+    type(c_ptr), value :: sys_cp
 
+    type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
 
-    call c_f_pointer(sys_p, sys)
+    call c_f_pointer(sys_cp, sys_c)
+    call c_f_pointer(sys_c%mbd_system_f, sys)
     deallocate (sys)
+    deallocate (sys_c)
 end subroutine mbd_destroy_system
 
 type(c_ptr) function mbd_init_damping(n_atoms, r_vdw, beta, a) bind(c)
@@ -86,23 +100,36 @@ subroutine mbd_destroy_damping(damping_p) bind(c)
     deallocate (damping)
 end subroutine mbd_destroy_damping
 
-real(c_double) function calc_mbd_energy(sys_p, n_atoms, alpha_0, omega, damping_p) bind(c)
-    type(c_ptr), intent(in), value :: sys_p
+function get_mbd_system(sys_cp)
+    type(c_ptr), intent(in), value :: sys_cp
+    type(mbd_system), pointer :: get_mbd_system
+
+    type(mbd_system_c), pointer :: sys_c
+
+    call c_f_pointer(sys_cp, sys_c)
+    call c_f_pointer(sys_c%mbd_system_f, get_mbd_system)
+end function
+
+real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, omega, damping_p) bind(c)
+    type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: omega(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
 
+    type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
 
-    call c_f_pointer(sys_p, sys)
+    call c_f_pointer(sys_cp, sys_c)
+    call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
     calc_mbd_energy = get_mbd_energy(sys, alpha_0, omega, damping)
+    if (sys%do_force) sys_c%forces = c_loc(sys%work%forces)
 end function calc_mbd_energy
 
-real(c_double) function calc_rpa_energy(sys_p, n_atoms, alpha_0, omega, damping_p) bind(c)
-    type(c_ptr), intent(in), value :: sys_p
+real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, omega, damping_p) bind(c)
+    type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: omega(n_atoms)
@@ -112,15 +139,15 @@ real(c_double) function calc_rpa_energy(sys_p, n_atoms, alpha_0, omega, damping_
     type(mbd_system) :: sys2
     type(mbd_damping), pointer :: damping
 
-    call c_f_pointer(sys_p, sys)
+    sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
     sys2 = sys
     sys2%do_rpa = .true.
     calc_rpa_energy = get_mbd_energy(sys2, alpha_0, omega, damping)
 end function calc_rpa_energy
 
-real(c_double) function calc_mbd_rsscs_energy(sys_p, n_atoms, alpha_0, omega, damping_p) bind(c)
-    type(c_ptr), intent(in), value :: sys_p
+real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, omega, damping_p) bind(c)
+    type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: omega(n_atoms)
@@ -129,13 +156,13 @@ real(c_double) function calc_mbd_rsscs_energy(sys_p, n_atoms, alpha_0, omega, da
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
 
-    call c_f_pointer(sys_p, sys)
+    sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
     calc_mbd_rsscs_energy = mbd_rsscs_energy(sys, alpha_0, omega, damping)
 end function calc_mbd_rsscs_energy
 
-real(c_double) function calc_mbd_scs_energy(sys_p, n_atoms, alpha_0, omega, damping_p) bind(c)
-    type(c_ptr), intent(in), value :: sys_p
+real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, omega, damping_p) bind(c)
+    type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: omega(n_atoms)
@@ -144,7 +171,7 @@ real(c_double) function calc_mbd_scs_energy(sys_p, n_atoms, alpha_0, omega, damp
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
 
-    call c_f_pointer(sys_p, sys)
+    sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
     calc_mbd_scs_energy = mbd_scs_energy(sys, alpha_0, omega, damping)
 end function calc_mbd_scs_energy

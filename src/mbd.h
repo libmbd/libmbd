@@ -4,6 +4,11 @@ struct MBD_calc* mbd_init_calc(void);
 
 void mbd_destroy_calc(struct MBD_calc* calc);
 
+struct MBD_system {
+    double* forces;
+    _Bool* do_force;
+};
+
 struct MBD_system* mbd_init_system(
     struct MBD_calc* calc,
     int n_atoms,

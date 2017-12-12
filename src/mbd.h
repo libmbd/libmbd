@@ -22,6 +22,7 @@ void mbd_destroy_system(struct MBD_system* sys);
 
 struct MBD_damping* mbd_init_damping(
     int n_atoms,
+    char* version,
     double* R_vdw,
     double beta,
     double a

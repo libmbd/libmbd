@@ -31,7 +31,8 @@ class MBDCalc(object):
 
     def mbd_energy(self, coords, alpha_0, omega, R_vdw, beta,
                    lattice=None, k_grid=None,
-                   a=6., func='calc_mbd_rsscs_energy', force=False):
+                   a=6., func='calc_mbd_rsscs_energy', force=False,
+                   damping='fermi,dip'):
         if not self._calc:
             raise RuntimeError('MBDCalc must be used as a context manager')
         coords = np.array(coords, dtype=float, order='F')
@@ -54,7 +55,7 @@ class MBDCalc(object):
         if force:
             system.do_force[0] = True
         damping = _lib.mbd_init_damping(
-            n_atoms, _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
+            n_atoms, damping.encode(), _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
         )
         ene = getattr(_lib, func)(
             system,

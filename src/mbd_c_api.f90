@@ -4,7 +4,7 @@
 module mbd_c_api
 
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
-    c_null_ptr
+    c_null_ptr, c_null_char, c_char
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
     mbd_rsscs_energy, mbd_scs_energy
 
@@ -74,8 +74,9 @@ subroutine mbd_destroy_system(sys_cp) bind(c)
     deallocate (sys_c)
 end subroutine mbd_destroy_system
 
-type(c_ptr) function mbd_init_damping(n_atoms, r_vdw, beta, a) bind(c)
+type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, beta, a) bind(c)
     integer(c_int), intent(in), value :: n_atoms
+    character(kind=c_char), intent(in) :: version_c(*)
     real(c_double), intent(in) :: r_vdw(n_atoms)
     real(c_double), intent(in), value :: beta
     real(c_double), intent(in), value :: a
@@ -83,7 +84,7 @@ type(c_ptr) function mbd_init_damping(n_atoms, r_vdw, beta, a) bind(c)
     type(mbd_damping), pointer :: damping
 
     allocate (damping)
-    damping%version = 'fermi,dip'
+    damping%version = f_string(version_c)
     damping%r_vdw = r_vdw
     damping%beta = beta
     damping%a = a
@@ -175,5 +176,19 @@ real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, omega, dam
     call c_f_pointer(damping_p, damping)
     calc_mbd_scs_energy = mbd_scs_energy(sys, alpha_0, omega, damping)
 end function calc_mbd_scs_energy
+
+function f_string(str_c) result(str_f)
+    character(kind=c_char), intent(in) :: str_c(*)
+    character(len=:), allocatable :: str_f
+
+    integer :: i
+    i = 0
+    do
+        if (str_c(i+1) == c_null_char) exit
+        i = i + 1
+    end do
+    allocate (character(len=i) :: str_f)
+    str_f = transfer(str_c(1:i), str_f)
+end function f_string
 
 end module mbd_c_api

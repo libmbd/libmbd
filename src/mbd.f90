@@ -23,7 +23,7 @@ public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
 real(8), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
 
-type mbd_param
+type :: mbd_param
     real(8) :: ts_energy_accuracy = 1.d-10
     real(8) :: ts_cutoff_radius = 50.d0*ang
     real(8) :: dipole_low_dim_cutoff = 100.d0*ang
@@ -40,13 +40,13 @@ type mbd_param
     integer :: n_frequency_grid = 15
 end type
 
-type mbd_timing
+type :: mbd_timing
     logical :: measure_time = .true.
     integer :: timestamps(n_timestamps), ts_counts(n_timestamps)
     integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 end type mbd_timing
 
-type mbd_calc
+type :: mbd_calc
     type(mbd_param) :: param
     type(mbd_timing) :: tm
     integer :: n_freq
@@ -58,7 +58,7 @@ type mbd_calc
     logical :: mute = .false.
 end type mbd_calc
 
-type mbd_damping
+type :: mbd_damping
     character(len=20) :: version
     real(8) :: beta = 0.d0
     real(8) :: a = 6.d0
@@ -68,7 +68,7 @@ type mbd_damping
     real(8), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
 
-type mbd_work
+type :: mbd_work
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
@@ -83,7 +83,7 @@ type mbd_work
     real(8), allocatable :: forces(:, :)
 end type
 
-type mbd_system
+type :: mbd_system
     type(mbd_calc), pointer :: calc
     type(mbd_work) :: work
     real(8), allocatable :: coords(:, :)
@@ -96,7 +96,7 @@ type mbd_system
     logical :: do_force = .false.
 end type mbd_system
 
-type mbd_relay
+type :: mbd_relay
     real(8), allocatable :: re(:, :)
     complex(8), allocatable :: cplx(:, :)
     real(8), allocatable :: re_dr(:, :, :)
@@ -105,7 +105,7 @@ end type mbd_relay
 ! the following types are internal and serve for simultaneous passing of
 ! quantities and their force derivatives between functions
 
-type dip33
+type :: dip33
     real(8) :: val(3, 3)
     ! explicit derivative, [abc] ~ dval_{ab}/dR_c
     real(8) :: dr(3, 3, 3)
@@ -115,7 +115,7 @@ type dip33
     real(8) :: dsigma(3, 3)
 end type
 
-type scalar
+type :: scalar
     real(8) :: val
     real(8) :: dr(3)  ! explicit derivative
     real(8) :: dvdw

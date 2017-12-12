@@ -17,18 +17,6 @@ from ._libmbd import ffi as _ffi, lib as _lib
 ang = 1/0.529177249
 
 
-def _ndarray(ptr, shape=None, dtype='float'):
-    return np.ndarray(
-        buffer=_ffi.buffer(
-            ptr,
-            (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
-        ),
-        shape=shape,
-        dtype=dtype,
-        order='F'
-    )
-
-
 class MBDCalc(object):
     def __init__(self):
         self._calc = None
@@ -44,6 +32,8 @@ class MBDCalc(object):
     def mbd_energy(self, coords, alpha_0, omega, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy'):
+        if not self._calc:
+            raise RuntimeError('MBDCalc must be used as a context manager')
         coords = np.array(coords, dtype=float, order='F')
         alpha_0 = np.array(alpha_0, dtype=float)
         omega = np.array(omega, dtype=float)
@@ -102,58 +92,13 @@ def _get_vdw_params():
 vdw_params = _get_vdw_params()
 
 
-# class Settings(object):
-#     _fields = {
-#         'econv_thr': {},
-#         'n_quad_pts': {'dtype': 'intc'},
-#         'verbosity': {'dtype': 'intc'},
-#         'ewald': {'dtype': 'bool'},
-#         'timing': {'dtype': 'bool'},
-#         'low_dim': {'dtype': 'bool'},
-#         'vacuum': {'shape': (3,), 'dtype': 'bool'}
-#     }
-#
-#     def __init__(self):
-#         self._c_sett = ffi.new('struct Settings *')
-#         mbdvdw.c_init_settings(self._c_sett)
-#         self._sett = {key: get_ndarray(
-#             getattr(self._c_sett, key),
-#             **self._fields[key]
-#         ) for key in self.keys()}
-#
-#     def keys(self):
-#         return dir(self._c_sett)
-#
-#     def __getitem__(self, key):
-#         return self._sett[key]
-#
-#     def __setitem__(self, key, value):
-#         if 'shape' in self._fields[key]:
-#             self._sett[key][:] = value
-#         else:
-#             self._sett[key][()] = value
-#
-#     def __repr__(self):
-#         return pformat(self._sett)
-#
-#
-# settings = Settings()
-#
-#
-# if __name__ == '__main__':
-#     print(calculate(
-#         [[0, 0, 0], [4*ang, 0, 0]],
-#         ['Ar', 'Ar'],
-#         [1, 1],
-#         0.85,
-#         get_forces=True
-#     ))
-#     print(calculate(
-#         [[0, 0, 0]],
-#         ['Ar'],
-#         [1],
-#         0.85,
-#         lattice=4*ang*np.eye(3),
-#         k_grid=[4, 4, 4],
-#         get_forces=True
-#     ))
+def _ndarray(ptr, shape=None, dtype='float'):
+    return np.ndarray(
+        buffer=_ffi.buffer(
+            ptr,
+            (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
+        ),
+        shape=shape,
+        dtype=dtype,
+        order='F'
+    )

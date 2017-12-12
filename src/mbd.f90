@@ -1519,14 +1519,12 @@ function contract_forces(relay) result(atomvec)
     real(8), intent(in) :: relay(:, :)
     real(8) :: atomvec(size(relay, 1)/3)
 
-    integer :: i_atom, i_xyz
+    integer :: i_atom
 
     atomvec(:) = 0.d0
     do i_atom = 1, size(atomvec)
-        associate (A => atomvec(i_atom))
-            do i_xyz = 1, 3
-                A = A + sum(relay(i_xyz::3, 3*(i_atom-1)+i_xyz))
-            end do
+        associate (A => atomvec(i_atom), i => 3*(i_atom-1))
+            A = A + sum(relay(:, i+1:i+3))
         end associate
     end do
     atomvec = atomvec

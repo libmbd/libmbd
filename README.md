@@ -16,7 +16,6 @@ On Ubuntu:
 
 ```bash
 apt-get install gfortran libblas-dev liblapack-dev [mpi-default-dev mpi-default-bin]
-pip install cffi numpy [mpi4py]
 ```
 
 On macOS:
@@ -28,6 +27,7 @@ brew install gcc [mpich]
 ### Using pip
 
 ```
+pip install cffi numpy [mpi4py]
 pip install git+https://github.com/azag0/pymbd.git
 ```
 
@@ -42,7 +42,7 @@ pytest --pyargs pymbd -v --durations=3
 This is the recommended way for developing or if installing via pip runs into problems.
 
 ```
-git clone https://github.com/azag0/pymbd.git
+git clone https://github.com/azag0/pymbd.git && cd pymbd
 mkdir build && pushd build && cmake .. && make && popd
 pip install -r requirements.txt
 python setup.py build_ext -i

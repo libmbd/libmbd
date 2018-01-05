@@ -101,7 +101,7 @@ setup(
     version='0.3.2',
     description='Many-body dispersion method',
     author='Jan Hermann',
-    author_email='dev@hermann.in',
+    author_email='dev@janhermann.cz',
     url='https://github.com/azag0/pymbd',
     packages=['pymbd'],
     package_data={'pymbd': ['vdw-params.csv']},

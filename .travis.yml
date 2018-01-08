@@ -1,7 +1,7 @@
 language: generic
 matrix:
   include:
-  - env: WITH_CMAKE=1 PYTHON=python
+  - env: WITH_CMAKE=1 PYTHON=python COVERAGE=1
     addons: &nompi
       apt:
         packages: &aptnompi
@@ -31,8 +31,17 @@ before_install:
   fi
 install:
 - |
+- |
   if [[ "$WITH_CMAKE" ]]; then
-    mkdir build && pushd build && cmake .. && make && popd
+    mkdir build
+    pushd build
+    if [[ "$COVERAGE" ]]; then
+      cmake .. -DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"
+    else
+      cmake ..
+    fi
+    make
+    popd
     if [[ "$WITH_MPI4PY" ]]; then
       $PYTHON -m pip install --user -r requirements.txt
     else
@@ -51,6 +60,10 @@ script:
   if [[ "$WITH_CMAKE" ]]; then
     make -C build check
     $PYTHON -m pytest -v --durations=3
+    if [[ "$COVERAGE" ]]; then
+      cp build/CMakeFiles/mbd.dir/src/*.f90.gc?? src/
+      bash <(curl -s https://codecov.io/bash) -F pytest
+    fi
   fi
 - |
   if [[ "$WITH_PIP" ]]; then

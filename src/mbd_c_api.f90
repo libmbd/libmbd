@@ -10,6 +10,10 @@ use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
 
 implicit none
 
+type, bind(c) :: mbd_calc_c
+    type(c_ptr) :: mbd_calc_f = c_null_ptr
+end type
+
 type, bind(c) :: mbd_system_c
     type(c_ptr) :: forces = c_null_ptr
     type(c_ptr) :: do_force = c_null_ptr
@@ -20,23 +24,42 @@ contains
 
 type(c_ptr) function mbd_init_calc() bind(c)
     type(mbd_calc), pointer :: calc
+    type(mbd_calc_c), pointer :: calc_c
 
     allocate (calc)
     call init_grid(calc)
-    mbd_init_calc = c_loc(calc)
+    allocate (calc_c)
+    calc_c%mbd_calc_f = c_loc(calc)
+    mbd_init_calc = c_loc(calc_c)
 end function mbd_init_calc
 
-subroutine mbd_destroy_calc(calc_p) bind(c)
-    type(c_ptr), value :: calc_p
+subroutine mbd_set_parallel(calc_cp, rank, n_proc) bind(c)
+    type(c_ptr), value :: calc_cp
+    integer(c_int), intent(in), value :: rank
+    integer(c_int), intent(in), value :: n_proc
 
     type(mbd_calc), pointer :: calc
 
-    call c_f_pointer(calc_p, calc)
+    calc => get_mbd_calc(calc_cp)
+    calc%parallel = .true.
+    calc%my_task = rank
+    calc%n_tasks = n_proc
+end subroutine mbd_set_parallel
+
+subroutine mbd_destroy_calc(calc_cp) bind(c)
+    type(c_ptr), value :: calc_cp
+
+    type(mbd_calc), pointer :: calc
+    type(mbd_calc_c), pointer :: calc_c
+
+    call c_f_pointer(calc_cp, calc_c)
+    call c_f_pointer(calc_c%mbd_calc_f, calc)
     deallocate (calc)
+    deallocate (calc_c)
 end subroutine mbd_destroy_calc
 
-type(c_ptr) function mbd_init_system(calc_p, n_atoms, coords, periodic, lattice, k_grid) bind(c)
-    type(c_ptr), value :: calc_p
+type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, periodic, lattice, k_grid) bind(c)
+    type(c_ptr), value :: calc_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: coords(n_atoms, 3)
     logical(c_bool), intent(in), value :: periodic
@@ -47,7 +70,7 @@ type(c_ptr) function mbd_init_system(calc_p, n_atoms, coords, periodic, lattice,
     type(mbd_system), pointer :: sys
     type(mbd_system_c), pointer :: sys_c
 
-    call c_f_pointer(calc_p, calc)
+    calc => get_mbd_calc(calc_cp)
     allocate (sys)
     sys%calc => calc
     sys%coords = coords
@@ -109,6 +132,16 @@ function get_mbd_system(sys_cp)
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, get_mbd_system)
+end function
+
+function get_mbd_calc(calc_cp)
+    type(c_ptr), intent(in), value :: calc_cp
+    type(mbd_calc), pointer :: get_mbd_calc
+
+    type(mbd_calc_c), pointer :: calc_c
+
+    call c_f_pointer(calc_cp, calc_c)
+    call c_f_pointer(calc_c%mbd_calc_f, get_mbd_calc)
 end function
 
 real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, omega, damping_p) bind(c)

@@ -6,9 +6,10 @@ module mbd_common
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, nan
+public :: tostr, diff3, diff5, print_matrix, nan, dp, lower
 
 real(8), parameter :: nan = transfer(-2251799813685248_8, 1d0)
+integer, parameter :: dp = kind(0.d0)
 
 interface tostr
     module procedure tostr_int_
@@ -80,5 +81,23 @@ subroutine print_matrix(label, A)
         write (6, *)
     end do
 end subroutine
+
+
+elemental pure function lower(str)
+    character(len=*), intent(in) :: str
+    character(len=2) :: lower
+
+    integer :: i
+
+    lower = '  '
+    do i = 1, len(str)
+        select case (str(i:i))
+            case ('A':'Z')
+                lower(i:i) = achar(iachar(str(i:i))+32)
+            case default
+                lower(i:i) = str(i:i)
+        end select
+    end do
+end function
 
 end module

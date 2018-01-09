@@ -69,7 +69,7 @@ def calc():
 
 def test_argon_dimer_plain(calc):
     ene = calc.mbd_energy(
-        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [0.7, 0.7], [3.55, 3.55], 0.83,
+        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
         func='calc_mbd_energy'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
@@ -77,7 +77,7 @@ def test_argon_dimer_plain(calc):
 
 def test_argon_dimer_rpa(calc):
     ene = calc.mbd_energy(
-        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [0.7, 0.7], [3.55, 3.55], 0.83,
+        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
         func='calc_rpa_energy'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
@@ -136,8 +136,7 @@ def test_benzene(calc):
     alpha_0 *= vols
     C6 *= vols**2
     R_vdw *= vols**(1./3)
-    omega = 4./3*C6/alpha_0**2
-    ene = calc.mbd_energy(coords, alpha_0, omega, R_vdw, 0.83, func='calc_mbd_energy')
+    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='calc_mbd_energy')
     assert ene == approx(-0.007002398506090302, rel=1e-10)
 
 
@@ -151,8 +150,7 @@ def test_benzene_rpa(calc):
     alpha_0 *= vols
     C6 *= vols**2
     R_vdw *= vols**(1./3)
-    omega = 4./3*C6/alpha_0**2
-    ene = calc.mbd_energy(coords, alpha_0, omega, R_vdw, 0.83, func='calc_rpa_energy')
+    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='calc_rpa_energy')
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 

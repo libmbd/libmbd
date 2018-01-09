@@ -129,22 +129,21 @@ end type
 contains
 
 
-real(8) function mbd_rsscs_energy(sys, alpha_0, omega, damp)
+real(8) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     real(8), allocatable :: alpha_dyn(:, :)
     real(8), allocatable :: alpha_dyn_rsscs(:, :)
     real(8), allocatable :: C6_rsscs(:)
     real(8), allocatable :: R_vdw_rsscs(:)
-    real(8), allocatable :: omega_rsscs(:)
     type(mbd_damping) :: damp_rsscs, damp_mbd
 
     allocate (alpha_dyn(0:sys%calc%n_freq, size(sys%coords, 1)))
     allocate (alpha_dyn_rsscs(0:sys%calc%n_freq, size(sys%coords, 1)))
-    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, omega)
+    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_rsscs = damp
     damp_rsscs%version = 'fermi,dip,gg'
     alpha_dyn_rsscs = run_scs(sys, alpha_dyn, damp_rsscs)
@@ -153,27 +152,25 @@ real(8) function mbd_rsscs_energy(sys, alpha_0, omega, damp)
     damp_mbd%version = 'fermi,dip'
     damp_mbd%r_vdw = R_vdw_rsscs
     damp_mbd%beta = damp%beta
-    omega_rsscs = omega_eff(C6_rsscs, alpha_dyn_rsscs(0, :))
-    mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0, :), omega_rsscs, damp_mbd)
+    mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0, :), C6_rsscs, damp_mbd)
 end function mbd_rsscs_energy
 
 
-real(8) function mbd_scs_energy(sys, alpha_0, omega, damp)
+real(8) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     real(8), allocatable :: alpha_dyn(:, :)
     real(8), allocatable :: alpha_dyn_scs(:, :)
     real(8), allocatable :: C6_scs(:)
     real(8), allocatable :: R_vdw_scs(:)
-    real(8), allocatable :: omega_scs(:)
     type(mbd_damping) :: damp_scs, damp_mbd
 
     allocate (alpha_dyn(0:sys%calc%n_freq, size(sys%coords, 1)))
     allocate (alpha_dyn_scs(0:sys%calc%n_freq, size(sys%coords, 1)))
-    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, omega)
+    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_scs = damp
     damp_scs%version = 'dip,gg'
     alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
@@ -183,8 +180,7 @@ real(8) function mbd_scs_energy(sys, alpha_0, omega, damp)
     damp_mbd%r_vdw = R_vdw_scs
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
-    omega_scs = omega_eff(C6_scs, alpha_dyn_scs(0, :))
-    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0, :), omega_scs, damp_mbd)
+    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0, :), C6_scs, damp_mbd)
 end function mbd_scs_energy
 
 
@@ -670,7 +666,7 @@ real(8) function test_frequency_grid(calc) result(error)
     type(mbd_calc), intent(in) :: calc
     real(8) :: alpha(0:calc%n_freq, 1)
 
-    alpha = alpha_dynamic_ts(calc, (/ 21.d0 /), omega_eff((/ 99.5d0 /), (/ 21.d0 /)))
+    alpha = alpha_dynamic_ts(calc, (/ 21.d0 /), (/ 99.5d0 /))
     error = abs(get_total_C6_from_alpha(calc, alpha)/99.5d0-1.d0)
 end function
 
@@ -838,10 +834,10 @@ type(mbd_relay) function screened_alpha(sys, alpha, damp, k_point, lam)
 end function
 
 
-function get_mbd_energy(sys, alpha_0, omega, damp) result(ene)
+function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
     real(8) :: ene
 
@@ -854,27 +850,27 @@ function get_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     is_reciprocal = sys%do_reciprocal
     if (.not. is_crystal) then
         if (.not. do_rpa) then
-            ene = get_single_mbd_energy(sys, alpha_0, omega, damp)
+            ene = get_single_mbd_energy(sys, alpha_0, C6, damp)
         else
             allocate (alpha(0:sys%calc%n_freq, size(alpha_0)))
-            alpha = alpha_dynamic_ts(sys%calc, alpha_0, omega)
+            alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6)
             ene = get_single_rpa_energy(sys, alpha, damp)
             deallocate (alpha)
         end if
     else
         if (is_reciprocal) then
-            ene = get_reciprocal_mbd_energy(sys, alpha_0, omega, damp)
+            ene = get_reciprocal_mbd_energy(sys, alpha_0, C6, damp)
         else
-            ene = get_supercell_mbd_energy(sys, alpha_0, omega, damp)
+            ene = get_supercell_mbd_energy(sys, alpha_0, C6, damp)
         end if
     end if
 end function get_mbd_energy
 
 
-real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
+real(8) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     logical :: do_rpa
@@ -884,7 +880,7 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     integer :: idx_cell(3), n_cells
 
     real(8), allocatable :: &
-        xyz_super(:, :), alpha_0_super(:), omega_super(:), &
+        xyz_super(:, :), alpha_0_super(:), C6_super(:), &
         R_vdw_super(:), alpha_ts_super(:, :)
     type(mbd_system) :: sys_super
     type(mbd_damping) :: damp_super
@@ -900,7 +896,7 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     allocate (sys_super%coords(n_cells*size(sys%coords, 1), 3))
     allocate (alpha_0_super(n_cells*size(alpha_0)))
     allocate (alpha_ts_super(0:sys%calc%n_freq, n_cells*size(alpha_0)))
-    allocate (omega_super(n_cells*size(omega)))
+    allocate (C6_super(n_cells*size(C6)))
     if (allocated(damp%r_vdw)) allocate (damp_super%r_vdw(n_cells*size(damp%r_vdw)))
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
@@ -910,26 +906,26 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
             i = (i_cell-1)*size(sys%coords, 1)+i_atom
             sys_super%coords(i, :) = sys%coords(i_atom, :)+R_cell
             alpha_0_super(i) = alpha_0(i_atom)
-            omega_super(i) = omega(i_atom)
+            C6_super(i) = C6(i_atom)
             if (allocated(damp%R_vdw)) then
                 damp_super%R_vdw(i) = damp%R_vdw(i_atom)
             end if
         end do
     end do
     if (do_rpa) then
-        alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, omega_super)
+        alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, C6_super)
         ene = get_single_rpa_energy( &
             sys_super, alpha_ts_super, damp_super &
         )
     else
         ene = get_single_mbd_energy( &
-            sys_super, alpha_0_super, omega_super, damp_super &
+            sys_super, alpha_0_super, C6_super, damp_super &
         )
     end if
     deallocate (xyz_super)
     deallocate (alpha_0_super)
     deallocate (alpha_ts_super)
-    deallocate (omega_super)
+    deallocate (C6_super)
     deallocate (R_vdw_super)
     ene = ene/n_cells
     if (sys%work%get_rpa_orders) then
@@ -938,14 +934,15 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, omega, damp) result(ene)
 end function get_supercell_mbd_energy
     
 
-real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
+real(8) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     type(mbd_relay) :: relay
     real(8), allocatable :: eigs(:)
+    real(8), allocatable :: omega(:)
     integer :: i_xyz, i
     integer :: n_negative_eigs, n_atoms
     logical :: is_parallel
@@ -958,6 +955,7 @@ real(8) function get_single_mbd_energy(sys, alpha_0, omega, damp) result(ene)
     allocate (eigs(3*n_atoms))
     ! relay%re = T
     relay = dipole_matrix(sys, damp)
+    omega = omega_eff(C6, alpha_0)
     call form_mbd_matrix(relay, alpha_0, omega)
     call ts(sys%calc, 21)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
@@ -1032,10 +1030,10 @@ subroutine form_mbd_matrix(T, alpha_0, omega)
 end subroutine form_mbd_matrix
 
 
-real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene)
+real(8) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     logical :: &
@@ -1054,7 +1052,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
 
     sys%calc%parallel = .false.
 
-    alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, omega)
+    alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     ene = 0.d0
     if (sys%work%get_eigs) &
         allocate (sys%work%mode_enes_k(n_kpts, 3*n_atoms), source=0.d0)
@@ -1073,7 +1071,7 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
         if (do_rpa) then
             ene = ene + get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp)
         else
-            ene = ene + get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, damp)
+            ene = ene + get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
         end if
         sys%calc%mute = .true.
     end do ! k_point loop
@@ -1093,16 +1091,17 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, omega, damp) result(ene
 end function get_reciprocal_mbd_energy
 
 
-real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, damp) result(ene)
+real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     real(8), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
 
     type(mbd_relay) :: relay
     real(8), allocatable :: eigs(:)
+    real(8), allocatable :: omega(:)
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
     logical :: is_parallel
@@ -1110,6 +1109,7 @@ real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, omega, k_point, dam
     is_parallel = sys%calc%parallel
 
     allocate (eigs(3*size(sys%coords, 1)))
+    omega = omega_eff(C6, alpha_0)
     ! relay = T
     relay = dipole_matrix(sys, damp, k_point)
     do i_atom = 1, size(sys%coords, 1)
@@ -1784,16 +1784,19 @@ elemental function terf(r, r0, a)
 end function
 
 
-function alpha_dynamic_ts(calc, alpha_0, omega) result(alpha)
+function alpha_dynamic_ts(calc, alpha_0, C6) result(alpha)
     type(mbd_calc), intent(in) :: calc
     real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(8), intent(in) :: C6(:)
     real(8) :: alpha(0:calc%n_freq, size(alpha_0))
 
     integer :: i_freq
+    real(8), allocatable :: omega(:)
 
-    forall (i_freq = 0:calc%n_freq) &
+    omega = omega_eff(C6, alpha_0)
+    forall (i_freq = 0:calc%n_freq)
         alpha(i_freq, :) = alpha_osc(alpha_0, omega, calc%omega_grid(i_freq))
+    end forall
 end function
 
 

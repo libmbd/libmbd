@@ -29,7 +29,7 @@ class MBDCalc(object):
         _lib.mbd_destroy_calc(self._calc)
         self._calc = None
 
-    def mbd_energy(self, coords, alpha_0, omega, R_vdw, beta,
+    def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,
                    damping='fermi,dip'):
@@ -37,7 +37,7 @@ class MBDCalc(object):
             raise RuntimeError('MBDCalc must be used as a context manager')
         coords = np.array(coords, dtype=float, order='F')
         alpha_0 = np.array(alpha_0, dtype=float)
-        omega = np.array(omega, dtype=float)
+        C6 = np.array(C6, dtype=float)
         R_vdw = np.array(R_vdw, dtype=float)
         periodic = lattice is not None
         if periodic:
@@ -61,7 +61,7 @@ class MBDCalc(object):
             system,
             n_atoms,
             _ffi.cast('double*', alpha_0.ctypes.data),
-            _ffi.cast('double*', omega.ctypes.data),
+            _ffi.cast('double*', C6.ctypes.data),
             damping
         )
         if force:
@@ -81,8 +81,7 @@ class MBDCalc(object):
         alpha_0 *= volumes
         C6 *= volumes**2
         R_vdw *= volumes**(1./3)
-        omega = 4./3*C6/alpha_0**2
-        return self.mbd_energy(coords, alpha_0, omega, R_vdw, beta, **kwargs)
+        return self.mbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
 
 def numerical_forces(f, coords, *args, **kwargs):

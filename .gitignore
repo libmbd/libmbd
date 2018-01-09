@@ -5,3 +5,4 @@
 *.pyc
 *.so
 *.so.dSYM
+*.mod

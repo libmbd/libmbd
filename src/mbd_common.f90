@@ -6,7 +6,8 @@ module mbd_common
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, nan, dp, lower
+public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, printer_default, &
+    printer_interface
 
 real(8), parameter :: nan = transfer(-2251799813685248_8, 1d0)
 integer, parameter :: dp = kind(0.d0)
@@ -14,6 +15,12 @@ integer, parameter :: dp = kind(0.d0)
 interface tostr
     module procedure tostr_int_
     module procedure tostr_dble_
+end interface
+
+abstract interface
+    subroutine printer_interface(str)
+        character(len=*), intent(in) :: str
+    end subroutine
 end interface
 
 contains
@@ -99,5 +106,12 @@ elemental pure function lower(str)
         end select
     end do
 end function
+
+
+subroutine printer_default(str)
+    character(len=*), intent(in) :: str
+
+    print *, str
+end subroutine
 
 end module

@@ -31,7 +31,6 @@ before_install:
   fi
 install:
 - |
-- |
   if [[ "$WITH_CMAKE" ]]; then
     mkdir build
     pushd build

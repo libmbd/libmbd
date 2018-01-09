@@ -5,7 +5,8 @@ module mbd
 
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
-use mbd_common, only: tostr, nan, print_matrix
+use mbd_common, only: tostr, nan, print_matrix, printer_default, &
+    printer_interface
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert
@@ -53,15 +54,19 @@ type :: mbd_calc
     real(8), allocatable :: omega_grid(:)
     real(8), allocatable :: omega_grid_w(:)
     logical :: parallel = .false.
+    integer :: comm
     integer :: my_task = 0
     integer :: n_tasks = 1
     logical :: mute = .false.
+    procedure(printer_interface), nopass, pointer :: printer => printer_default
 end type mbd_calc
 
 type :: mbd_damping
     character(len=20) :: version
     real(8) :: beta = 0.d0
     real(8) :: a = 6.d0
+    real(8) :: ts_d = 20.d0
+    real(8) :: ts_sr = 0.d0
     real(8), allocatable :: r_vdw(:)
     real(8), allocatable :: sigma(:)
     real(8), allocatable :: damping_custom(:, :)

@@ -9,6 +9,8 @@ find_package(MPI)
 set(SRCS
     src/mbd.f90
     src/mbd_c_api.f90
+    src/mbd_api.f90
+    src/mbd_vdw_param.f90
     src/mbd_helper_dev.f90
     src/mbd_math.f90
     src/mbd_interface.f90

@@ -1420,7 +1420,9 @@ function eval_mbd_nonint_density(calc, pts, xyz, charges, masses, omegas) result
         end forall
         rho(i_pt) = sum(pre*exp(-kernel*rsq))
     end do
-    call sync_sum(rho)
+    if (calc%parallel) then
+        call sync_sum(rho)
+    end if
 end function
 
 
@@ -1460,8 +1462,10 @@ function eval_mbd_int_density(calc, pts, xyz, charges, masses, omegas, modes) re
         pre(i_atom) = charges(i_atom)*(masses(i_atom)/pi)**(3.d0/2) &
             *sqrt(product(omegas)/product(sdiagonalized(omegas_p(other, other))))
     end do
-    call sync_sum(kernel)
-    call sync_sum(pre)
+    if (calc%parallel) then
+        call sync_sum(kernel)
+        call sync_sum(pre)
+    end if
     rho(:) = 0.d0
     do i_pt = 1, size(pts, 1)
         if (calc%my_task /= modulo(i_pt, calc%n_tasks)) cycle
@@ -1474,7 +1478,9 @@ function eval_mbd_int_density(calc, pts, xyz, charges, masses, omegas, modes) re
         end do
         rho(i_pt) = sum(pre*exp(-factor))
     end do
-    call sync_sum(rho)
+    if (calc%parallel) then
+        call sync_sum(rho)
+    end if
 end function
 
 

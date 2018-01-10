@@ -6,7 +6,7 @@ module mbd
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
 use mbd_common, only: tostr, nan, print_matrix, printer_default, &
-    printer_interface
+    printer_interface, dp
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert
@@ -21,18 +21,18 @@ public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
     eval_mbd_int_density, nbody_coeffs, get_damping_parameters, v_to_r, &
     clock_rate
 
-real(8), parameter :: ang = 1.8897259886d0
+real(dp), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
 
 type :: mbd_param
-    real(8) :: ts_energy_accuracy = 1.d-10
-    real(8) :: ts_cutoff_radius = 50.d0*ang
-    real(8) :: dipole_low_dim_cutoff = 100.d0*ang
-    real(8) :: dipole_cutoff = 400.d0*ang  ! used only when Ewald is off
-    real(8) :: mayer_scaling = 1.d0
-    real(8) :: ewald_real_cutoff_scaling = 1.d0
-    real(8) :: ewald_rec_cutoff_scaling = 1.d0
-    real(8) :: k_grid_shift = 0.5d0
+    real(dp) :: ts_energy_accuracy = 1.d-10
+    real(dp) :: ts_cutoff_radius = 50.d0*ang
+    real(dp) :: dipole_low_dim_cutoff = 100.d0*ang
+    real(dp) :: dipole_cutoff = 400.d0*ang  ! used only when Ewald is off
+    real(dp) :: mayer_scaling = 1.d0
+    real(dp) :: ewald_real_cutoff_scaling = 1.d0
+    real(dp) :: ewald_rec_cutoff_scaling = 1.d0
+    real(dp) :: k_grid_shift = 0.5d0
     logical :: ewald_on = .true.
     logical :: zero_negative_eigs = .false.
     logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
@@ -51,8 +51,8 @@ type :: mbd_calc
     type(mbd_param) :: param
     type(mbd_timing) :: tm
     integer :: n_freq
-    real(8), allocatable :: omega_grid(:)
-    real(8), allocatable :: omega_grid_w(:)
+    real(dp), allocatable :: omega_grid(:)
+    real(dp), allocatable :: omega_grid_w(:)
     logical :: parallel = .false.
     integer :: comm
     integer :: my_task = 0
@@ -63,14 +63,14 @@ end type mbd_calc
 
 type :: mbd_damping
     character(len=20) :: version
-    real(8) :: beta = 0.d0
-    real(8) :: a = 6.d0
-    real(8) :: ts_d = 20.d0
-    real(8) :: ts_sr = 0.d0
-    real(8), allocatable :: r_vdw(:)
-    real(8), allocatable :: sigma(:)
-    real(8), allocatable :: damping_custom(:, :)
-    real(8), allocatable :: potential_custom(:, :, :, :)
+    real(dp) :: beta = 0.d0
+    real(dp) :: a = 6.d0
+    real(dp) :: ts_d = 20.d0
+    real(dp) :: ts_sr = 0.d0
+    real(dp), allocatable :: r_vdw(:)
+    real(dp), allocatable :: sigma(:)
+    real(dp), allocatable :: damping_custom(:, :)
+    real(dp), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
 
 type :: mbd_work
@@ -78,22 +78,22 @@ type :: mbd_work
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
     integer :: i_kpt = 0
-    real(8), allocatable :: k_pts(:, :)
-    real(8), allocatable :: mode_enes(:)
-    real(8), allocatable :: modes(:, :)
-    real(8), allocatable :: rpa_orders(:)
-    real(8), allocatable :: mode_enes_k(:, :)
-    complex(8), allocatable :: modes_k(:, :, :)
-    real(8), allocatable :: rpa_orders_k(:, :)
-    real(8), allocatable :: forces(:, :)
+    real(dp), allocatable :: k_pts(:, :)
+    real(dp), allocatable :: mode_enes(:)
+    real(dp), allocatable :: modes(:, :)
+    real(dp), allocatable :: rpa_orders(:)
+    real(dp), allocatable :: mode_enes_k(:, :)
+    complex(dp), allocatable :: modes_k(:, :, :)
+    real(dp), allocatable :: rpa_orders_k(:, :)
+    real(dp), allocatable :: forces(:, :)
 end type
 
 type :: mbd_system
     type(mbd_calc), pointer :: calc
     type(mbd_work) :: work
-    real(8), allocatable :: coords(:, :)
+    real(dp), allocatable :: coords(:, :)
     logical :: periodic = .false.
-    real(8) :: lattice(3, 3)
+    real(dp) :: lattice(3, 3)
     integer :: k_grid(3)
     integer :: supercell(3)
     logical :: do_rpa = .false.
@@ -102,43 +102,43 @@ type :: mbd_system
 end type mbd_system
 
 type :: mbd_relay
-    real(8), allocatable :: re(:, :)
-    complex(8), allocatable :: cplx(:, :)
-    real(8), allocatable :: re_dr(:, :, :)
+    real(dp), allocatable :: re(:, :)
+    complex(dp), allocatable :: cplx(:, :)
+    real(dp), allocatable :: re_dr(:, :, :)
 end type mbd_relay
 
 ! the following types are internal and serve for simultaneous passing of
 ! quantities and their force derivatives between functions
 
 type :: dip33
-    real(8) :: val(3, 3)
+    real(dp) :: val(3, 3)
     ! explicit derivative, [abc] ~ dval_{ab}/dR_c
-    real(8) :: dr(3, 3, 3)
+    real(dp) :: dr(3, 3, 3)
     logical :: has_vdw = .false.
-    real(8) :: dvdw(3, 3)
+    real(dp) :: dvdw(3, 3)
     logical :: has_sigma = .false.
-    real(8) :: dsigma(3, 3)
+    real(dp) :: dsigma(3, 3)
 end type
 
 type :: scalar
-    real(8) :: val
-    real(8) :: dr(3)  ! explicit derivative
-    real(8) :: dvdw
+    real(dp) :: val
+    real(dp) :: dr(3)  ! explicit derivative
+    real(dp) :: dvdw
 end type
 
 contains
 
 
-real(8) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
+real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
-    real(8), allocatable :: alpha_dyn(:, :)
-    real(8), allocatable :: alpha_dyn_rsscs(:, :)
-    real(8), allocatable :: C6_rsscs(:)
-    real(8), allocatable :: R_vdw_rsscs(:)
+    real(dp), allocatable :: alpha_dyn(:, :)
+    real(dp), allocatable :: alpha_dyn_rsscs(:, :)
+    real(dp), allocatable :: C6_rsscs(:)
+    real(dp), allocatable :: R_vdw_rsscs(:)
     type(mbd_damping) :: damp_rsscs, damp_mbd
 
     allocate (alpha_dyn(0:sys%calc%n_freq, size(sys%coords, 1)))
@@ -156,16 +156,16 @@ real(8) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
 end function mbd_rsscs_energy
 
 
-real(8) function mbd_scs_energy(sys, alpha_0, C6, damp)
+real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
-    real(8), allocatable :: alpha_dyn(:, :)
-    real(8), allocatable :: alpha_dyn_scs(:, :)
-    real(8), allocatable :: C6_scs(:)
-    real(8), allocatable :: R_vdw_scs(:)
+    real(dp), allocatable :: alpha_dyn(:, :)
+    real(dp), allocatable :: alpha_dyn_scs(:, :)
+    real(dp), allocatable :: C6_scs(:)
+    real(dp), allocatable :: R_vdw_scs(:)
     type(mbd_damping) :: damp_scs, damp_mbd
 
     allocate (alpha_dyn(0:sys%calc%n_freq, size(sys%coords, 1)))
@@ -188,24 +188,24 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         d, overlap, damping_custom, unit_cell) result(ene)
     type(mbd_calc), intent(in) :: calc
     character(len=*), intent(in) :: mode, version
-    real(8), intent(in) :: &
+    real(dp), intent(in) :: &
         xyz(:, :), &
         C6(size(xyz, 1)), &
         alpha_0(size(xyz, 1))
-    real(8), intent(in), optional :: &
+    real(dp), intent(in), optional :: &
         R_vdw(size(xyz, 1)), &
         s_R, &
         d, &
         overlap(size(xyz, 1), size(xyz, 1)), &
         damping_custom(size(xyz, 1), size(xyz, 1)), &
         unit_cell(3, 3)
-    real(8) :: ene
+    real(dp) :: ene
 
-    real(8) :: C6_ij, r(3), r_norm, R_vdw_ij, overlap_ij, &
+    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, overlap_ij, &
         ene_shell, ene_pair, R_cell(3)
     type(scalar) :: f_damp
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
-    real(8), parameter :: shell_thickness = 10.d0
+    real(dp), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
 
     is_crystal = is_in('C', mode)
@@ -316,12 +316,12 @@ end function get_ts_energy
 type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(in), optional :: k_point(3)
+    real(dp), intent(in), optional :: k_point(3)
 
-    real(8) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
+    real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
     type(dip33) :: Tpp
-    complex(8) :: Tpp_c(3, 3)
+    complex(dp) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, n_atoms
     logical :: mute, do_ewald
@@ -482,14 +482,14 @@ end function dipole_matrix
 
 subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha
-    real(8), intent(in), optional :: k_point(3)
+    real(dp), intent(in) :: alpha
+    real(dp), intent(in), optional :: k_point(3)
     type(mbd_relay), intent(inout) :: dipmat
 
     logical :: is_parallel, mute, do_surface
-    real(8) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
+    real(dp) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
         k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
-    complex(8) :: Tpp_c(3, 3)
+    complex(dp) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
         range_G_vector(3)
@@ -662,9 +662,9 @@ subroutine init_grid(calc)
 end subroutine
 
 
-real(8) function test_frequency_grid(calc) result(error)
+real(dp) function test_frequency_grid(calc) result(error)
     type(mbd_calc), intent(in) :: calc
-    real(8) :: alpha(0:calc%n_freq, 1)
+    real(dp) :: alpha(0:calc%n_freq, 1)
 
     alpha = alpha_dynamic_ts(calc, (/ 21.d0 /), (/ 99.5d0 /))
     error = abs(get_total_C6_from_alpha(calc, alpha)/99.5d0-1.d0)
@@ -673,8 +673,8 @@ end function
 
 subroutine get_omega_grid(n, L, x, w)
     integer, intent(in) :: n
-    real(8), intent(in) :: L
-    real(8), intent(out) :: x(n), w(n)
+    real(dp), intent(in) :: L
+    real(dp), intent(out) :: x(n), w(n)
 
     call gauss_legendre(n, x, w)
     w = 2*L/(1-x)**2*w
@@ -688,7 +688,7 @@ subroutine gauss_legendre(n, r, w)
     use mbd_interface, only: legendre_precision
 
     integer, intent(in) :: n
-    real(8), intent(out) :: r(n), w(n)
+    real(dp), intent(out) :: r(n), w(n)
 
     integer, parameter :: q = legendre_precision
     integer, parameter :: n_iter = 1000
@@ -733,9 +733,9 @@ end subroutine
 subroutine init_eqi_grid(calc, n, a, b)
     type(mbd_calc), intent(inout) :: calc
     integer, intent(in) :: n
-    real(8), intent(in) :: a, b
+    real(dp), intent(in) :: a, b
 
-    real(8) :: delta
+    real(dp) :: delta
     integer :: i
 
     if (allocated(calc%omega_grid)) deallocate(calc%omega_grid)
@@ -752,9 +752,9 @@ end subroutine
 
 function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(0:, :)
+    real(dp), intent(in) :: alpha(0:, :)
     type(mbd_damping), intent(in) :: damp
-    real(8) :: alpha_scs(0:ubound(alpha, 1), size(alpha, 2))
+    real(dp) :: alpha_scs(0:ubound(alpha, 1), size(alpha, 2))
 
     type(mbd_relay) :: alpha_full
     integer :: i_grid_omega
@@ -788,10 +788,10 @@ end function run_scs
 
 type(mbd_relay) function screened_alpha(sys, alpha, damp, k_point, lam)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(:)
+    real(dp), intent(in) :: alpha(:)
     type(mbd_damping), intent(in) :: damp
-    real(8), intent(in), optional :: k_point(3)
-    real(8), intent(in), optional :: lam
+    real(dp), intent(in), optional :: k_point(3)
+    real(dp), intent(in), optional :: lam
 
     integer :: i_atom, i_xyz, i
     type(mbd_damping) :: damp_local
@@ -836,13 +836,13 @@ end function
 
 function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
-    real(8) :: ene
+    real(dp) :: ene
 
     logical :: is_parallel, do_rpa, is_reciprocal, is_crystal
-    real(8), allocatable :: alpha(:, :)
+    real(dp), allocatable :: alpha(:, :)
 
     is_parallel = sys%calc%parallel
     is_crystal = sys%periodic
@@ -867,19 +867,19 @@ function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
 end function get_mbd_energy
 
 
-real(8) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
+real(dp) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     logical :: do_rpa
-    real(8) :: R_cell(3)
+    real(dp) :: R_cell(3)
     integer :: i_atom, i
     integer :: i_cell
     integer :: idx_cell(3), n_cells
 
-    real(8), allocatable :: &
+    real(dp), allocatable :: &
         xyz_super(:, :), alpha_0_super(:), C6_super(:), &
         R_vdw_super(:), alpha_ts_super(:, :)
     type(mbd_system) :: sys_super
@@ -934,20 +934,20 @@ real(8) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
 end function get_supercell_mbd_energy
     
 
-real(8) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
+real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     type(mbd_relay) :: relay
-    real(8), allocatable :: eigs(:)
-    real(8), allocatable :: omega(:)
+    real(dp), allocatable :: eigs(:)
+    real(dp), allocatable :: omega(:)
     integer :: i_xyz, i
     integer :: n_negative_eigs, n_atoms
     logical :: is_parallel
-    real(8), allocatable :: c_lambda12i_c(:, :)
-    real(8), allocatable :: c_lambda14i(:, :)
+    real(dp), allocatable :: c_lambda12i_c(:, :)
+    real(dp), allocatable :: c_lambda14i(:, :)
 
     is_parallel = sys%calc%parallel
 
@@ -1005,8 +1005,8 @@ end function get_single_mbd_energy
 
 subroutine form_mbd_matrix(T, alpha_0, omega)
     type(mbd_relay), intent(inout) :: T
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: omega(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: omega(:)
 
     integer :: n_atoms, i_atom, j_atom, i, j, i_xyz
 
@@ -1030,16 +1030,16 @@ subroutine form_mbd_matrix(T, alpha_0, omega)
 end subroutine form_mbd_matrix
 
 
-real(8) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
+real(dp) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
     logical :: &
         is_parallel, do_rpa, mute
     integer :: i_kpt, n_kpts, n_atoms
-    real(8) :: k_point(3), alpha_ts(0:sys%calc%n_freq, size(sys%coords, 1))
+    real(dp) :: k_point(3), alpha_ts(0:sys%calc%n_freq, size(sys%coords, 1))
 
     n_atoms = size(sys%coords, 1)
     sys%work%k_pts = make_k_grid( &
@@ -1091,17 +1091,17 @@ real(8) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
 end function get_reciprocal_mbd_energy
 
 
-real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp) result(ene)
+real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
-    real(8), intent(in) :: k_point(3)
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
 
     type(mbd_relay) :: relay
-    real(8), allocatable :: eigs(:)
-    real(8), allocatable :: omega(:)
+    real(dp), allocatable :: eigs(:)
+    real(dp), allocatable :: omega(:)
     integer :: i_atom, j_atom, i_xyz, i, j
     integer :: n_negative_eigs
     logical :: is_parallel
@@ -1161,13 +1161,13 @@ real(8) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp) 
 end function get_single_reciprocal_mbd_ene
 
 
-real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
+real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(0:, :)
+    real(dp), intent(in) :: alpha(0:, :)
     type(mbd_damping), intent(in) :: damp
 
     type(mbd_relay) :: relay, AT
-    complex(8), allocatable :: eigs(:)
+    complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, mute
@@ -1242,14 +1242,14 @@ real(8) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 end function get_single_rpa_energy
 
 
-real(8) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result(ene)
+real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: alpha(0:, :)
-    real(8), intent(in) :: k_point(3)
+    real(dp), intent(in) :: alpha(0:, :)
+    real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
     type(mbd_relay) :: relay, AT
-    complex(8), allocatable :: eigs(:)
+    complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     logical :: is_parallel, mute
@@ -1335,7 +1335,7 @@ end function get_single_reciprocal_rpa_ene
 !         R_vdw, beta, a, &
 !         calc%my_task, calc%n_tasks) &
 !         result(ene_orders)
-!     real(8), intent(in) :: &
+!     real(dp), intent(in) :: &
 !         xyz(:, :), &
 !         alpha_0(size(xyz, 1)), &
 !         omega(size(xyz, 1)), &
@@ -1343,12 +1343,12 @@ end function get_single_reciprocal_rpa_ene
 !         beta, a
 !     character(len=*), intent(in) :: version
 !     integer, intent(in), optional :: calc%my_task, calc%n_tasks
-!     real(8) :: ene_orders(20)
+!     real(dp) :: ene_orders(20)
 !
 !     integer :: &
 !         multi_index(calc%param%mbd_nbody_max), i_body, j_body, i_tuple, &
 !         i_atom_ind, j_atom_ind, i_index
-!     real(8) :: ene
+!     real(dp) :: ene
 !     logical :: is_parallel
 !     
 !     is_parallel = .false.
@@ -1403,16 +1403,16 @@ end function get_single_reciprocal_rpa_ene
 
 function eval_mbd_nonint_density(calc, pts, xyz, charges, masses, omegas) result(rho)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: &
+    real(dp), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
         charges(:), &
         masses(:), &
         omegas(:)
-    real(8) :: rho(size(pts, 1))
+    real(dp) :: rho(size(pts, 1))
 
     integer :: i_pt, i_atom, n_atoms
-    real(8), dimension(size(xyz, 1)) :: pre, kernel, rsq
+    real(dp), dimension(size(xyz, 1)) :: pre, kernel, rsq
 
     pre = charges*(masses*omegas/pi)**(3.d0/2)
     kernel = masses*omegas
@@ -1433,18 +1433,18 @@ end function
 
 function eval_mbd_int_density(calc, pts, xyz, charges, masses, omegas, modes) result(rho)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: &
+    real(dp), intent(in) :: &
         pts(:, :), &
         xyz(:, :), &
         charges(:), &
         masses(:), &
         omegas(:), &
         modes(:, :)
-    real(8) :: rho(size(pts, 1))
+    real(dp) :: rho(size(pts, 1))
 
     integer :: i_pt, i_atom, n_atoms, i, i_xyz, j_xyz
     integer :: self(3), other(3*(size(xyz, 1)-1))
-    real(8) :: &
+    real(dp) :: &
         pre(size(xyz, 1)), &
         factor(size(xyz, 1)), &
         rdiffsq(3, 3), &
@@ -1506,8 +1506,8 @@ end function nbody_coeffs
 
 
 function contract_polarizability(alpha_3n_3n) result(alpha_n)
-    real(8), intent(in) :: alpha_3n_3n(:, :)
-    real(8) :: alpha_n(size(alpha_3n_3n, 1)/3)
+    real(dp), intent(in) :: alpha_3n_3n(:, :)
+    real(dp) :: alpha_n(size(alpha_3n_3n, 1)/3)
 
     integer :: i_atom, i_xyz
 
@@ -1527,8 +1527,8 @@ end function contract_polarizability
 
 
 function contract_forces(relay) result(atomvec)
-    real(8), intent(in) :: relay(:, :)
-    real(8) :: atomvec(size(relay, 1)/3)
+    real(dp), intent(in) :: relay(:, :)
+    real(dp) :: atomvec(size(relay, 1)/3)
 
     integer :: i_atom
 
@@ -1543,11 +1543,11 @@ end function contract_forces
 
 
 function T_bare(rxyz) result(T)
-    real(8), intent(in) :: rxyz(3)
-    real(8) :: T(3, 3)
+    real(dp), intent(in) :: rxyz(3)
+    real(dp) :: T(3, 3)
 
     integer :: i, j
-    real(8) :: r_sq, r_5
+    real(dp) :: r_sq, r_5
 
     r_sq = sum(rxyz(:)**2)
     r_5 = sqrt(r_sq)**5
@@ -1563,11 +1563,11 @@ end function
 
 
 type(dip33) function T_bare_v2(r, deriv) result(T)
-    real(8), intent(in) :: r(3)
+    real(dp), intent(in) :: r(3)
     logical, intent(in) :: deriv
 
     integer :: a, b, c
-    real(8) :: r_1, r_2, r_5, r_7
+    real(dp) :: r_1, r_2, r_5, r_7
 
     r_2 = sum(r**2)
     r_1 = sqrt(r_2)
@@ -1604,26 +1604,26 @@ type(dip33) function T_bare_v2(r, deriv) result(T)
 end function
 
 
-real(8) function B_erfc(r, a) result(B)
-    real(8), intent(in) :: r, a
+real(dp) function B_erfc(r, a) result(B)
+    real(dp), intent(in) :: r, a
 
     B = (erfc(a*r)+(2*a*r/sqrt(pi))*exp(-(a*r)**2))/r**3
 end function
 
 
-real(8) elemental function C_erfc(r, a) result(C)
-    real(8), intent(in) :: r, a
+real(dp) elemental function C_erfc(r, a) result(C)
+    real(dp), intent(in) :: r, a
 
     C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3.d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
 end function
 
 
 function T_erfc(rxyz, alpha) result(T)
-    real(8), intent(in) :: rxyz(3), alpha
-    real(8) :: T(3, 3)
+    real(dp), intent(in) :: rxyz(3), alpha
+    real(dp) :: T(3, 3)
 
     integer :: i, j
-    real(8) :: r, B, C
+    real(dp) :: r, B, C
 
     r = sqrt(sum(rxyz(:)**2))
     B = B_erfc(r, alpha)
@@ -1639,12 +1639,12 @@ end function
 
 
 type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
-    real(8), intent(in) :: r(3)
-    real(8), intent(in) :: s_vdw
-    real(8), intent(in) :: d
+    real(dp), intent(in) :: r(3)
+    real(dp), intent(in) :: s_vdw
+    real(dp), intent(in) :: d
     logical, intent(in) :: deriv
 
-    real(8) :: pre, eta, r_1
+    real(dp) :: pre, eta, r_1
 
     r_1 = sqrt(sum(r**2))
     eta = r_1/s_vdw
@@ -1663,7 +1663,7 @@ type(dip33) function T_damped(sys, f, T, sr)
     type(dip33), intent(in) :: T
     logical, intent(in) :: sr  ! true: f, false: 1-f
 
-    real(8) :: pre
+    real(dp) :: pre
     integer :: sgn, c
 
     if (sr) then
@@ -1688,13 +1688,13 @@ end function
 
 
 type(dip33) function T_erf_coulomb(r, sigma, deriv) result(T)
-    real(8), intent(in) :: r(3)
-    real(8), intent(in) :: sigma
+    real(dp), intent(in) :: r(3)
+    real(dp), intent(in) :: sigma
     logical, intent(in) :: deriv
 
-    real(8) :: theta, erf_theta, r_5, r_1, zeta
+    real(dp) :: theta, erf_theta, r_5, r_1, zeta
     type(dip33) :: bare
-    real(8) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
+    real(dp) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
     integer :: a, c
 
     bare = T_bare_v2(r, deriv)
@@ -1718,10 +1718,10 @@ end function
 
 
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)
-    real(8), intent(in) :: rxyz(3), sigma, a
-    real(8) :: T(3, 3)
+    real(dp), intent(in) :: rxyz(3), sigma, a
+    real(dp) :: T(3, 3)
 
-    real(8) :: r_sigma, zeta_1, zeta_2
+    real(dp) :: r_sigma, zeta_1, zeta_2
 
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1.d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
@@ -1733,7 +1733,7 @@ end function
 subroutine get_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
         mbd_ts_erf_beta, mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta)
     character(len=*), intent(in) :: xc
-    real(8), intent(out) :: &
+    real(dp), intent(out) :: &
         ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
         mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta
 
@@ -1777,8 +1777,8 @@ end subroutine get_damping_parameters
 
 
 elemental function terf(r, r0, a)
-    real(8), intent(in) :: r, r0, a
-    real(8) :: terf
+    real(dp), intent(in) :: r, r0, a
+    real(dp) :: terf
 
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function
@@ -1786,12 +1786,12 @@ end function
 
 function alpha_dynamic_ts(calc, alpha_0, C6) result(alpha)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: alpha_0(:)
-    real(8), intent(in) :: C6(:)
-    real(8) :: alpha(0:calc%n_freq, size(alpha_0))
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    real(dp) :: alpha(0:calc%n_freq, size(alpha_0))
 
     integer :: i_freq
-    real(8), allocatable :: omega(:)
+    real(dp), allocatable :: omega(:)
 
     omega = omega_eff(C6, alpha_0)
     forall (i_freq = 0:calc%n_freq)
@@ -1801,32 +1801,32 @@ end function
 
 
 elemental function alpha_osc(alpha_0, omega, u) result(alpha)
-    real(8), intent(in) :: alpha_0, omega, u
-    real(8) :: alpha
+    real(dp), intent(in) :: alpha_0, omega, u
+    real(dp) :: alpha
 
     alpha = alpha_0/(1+(u/omega)**2)
 end function
 
 
 elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
-    real(8), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
-    real(8) :: C6_ij
+    real(dp), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
+    real(dp) :: C6_ij
 
     C6_ij = 2*C6_i*C6_j/(alpha_0_j/alpha_0_i*C6_i+alpha_0_i/alpha_0_j*C6_j)
 end function
 
 
 elemental function V_to_R(V) result(R)
-    real(8), intent(in) :: V
-    real(8) :: R
+    real(dp), intent(in) :: V
+    real(dp) :: R
 
     R = (3.d0*V/(4.d0*pi))**(1.d0/3)
 end function
 
 
 elemental function omega_eff(C6, alpha) result(omega)
-    real(8), intent(in) :: C6, alpha
-    real(8) :: omega
+    real(dp), intent(in) :: C6, alpha
+    real(dp) :: omega
 
     omega = 4.d0/3*C6/alpha**2
 end function
@@ -1834,8 +1834,8 @@ end function
 
 elemental function get_sigma_selfint(calc, alpha) result(sigma)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: alpha
-    real(8) :: sigma
+    real(dp), intent(in) :: alpha
+    real(dp) :: sigma
 
     sigma = calc%param%mayer_scaling*(sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
 end function
@@ -1843,8 +1843,8 @@ end function
 
 function get_C6_from_alpha(calc, alpha) result(C6)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: alpha(:, :)
-    real(8) :: C6(size(alpha, 2))
+    real(dp), intent(in) :: alpha(:, :)
+    real(dp) :: C6(size(alpha, 2))
     integer :: i_atom
 
     do i_atom = 1, size(alpha, 2)
@@ -1855,8 +1855,8 @@ end function
 
 function get_total_C6_from_alpha(calc, alpha) result(C6)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: alpha(:, :)
-    real(8) :: C6
+    real(dp), intent(in) :: alpha(:, :)
+    real(dp) :: C6
 
     C6 = 3.d0/pi*sum((sum(alpha, 2)**2)*calc%omega_grid_w(:))
 end function
@@ -1864,10 +1864,10 @@ end function
 
 function supercell_circum(calc, uc, radius) result(sc)
     type(mbd_calc), intent(in) :: calc
-    real(8), intent(in) :: uc(3, 3), radius
+    real(dp), intent(in) :: uc(3, 3), radius
     integer :: sc(3)
 
-    real(8) :: ruc(3, 3), layer_sep(3)
+    real(dp) :: ruc(3, 3), layer_sep(3)
     integer :: i
 
     ruc = 2*pi*inverted(transpose(uc))
@@ -1898,10 +1898,10 @@ end subroutine
 function make_g_grid(calc, n1, n2, n3) result(g_grid)
     type(mbd_calc), intent(in) :: calc
     integer, intent(in) :: n1, n2, n3
-    real(8) :: g_grid(n1*n2*n3, 3)
+    real(dp) :: g_grid(n1*n2*n3, 3)
 
     integer :: g_kpt(3), i_kpt, kpt_range(3)
-    real(8) :: g_kpt_shifted(3)
+    real(dp) :: g_kpt_shifted(3)
 
     g_kpt = (/ 0, 0, -1 /)
     kpt_range = (/ n1, n2, n3 /)
@@ -1917,11 +1917,11 @@ end function make_g_grid
 
 
 function make_k_grid(g_grid, uc) result(k_grid)
-    real(8), intent(in) :: g_grid(:, :), uc(3, 3)
-    real(8) :: k_grid(size(g_grid, 1), 3)
+    real(dp), intent(in) :: g_grid(:, :), uc(3, 3)
+    real(dp) :: k_grid(size(g_grid, 1), 3)
 
     integer :: i_kpt
-    real(8) :: ruc(3, 3)
+    real(dp) :: ruc(3, 3)
 
     ruc = 2*pi*inverted(transpose(uc))
     do i_kpt = 1, size(g_grid, 1)
@@ -1999,13 +1999,13 @@ subroutine run_tests()
     end subroutine
 
     subroutine test_T_bare_deriv()
-        real(8) :: r(3), r_diff(3)
+        real(dp) :: r(3), r_diff(3)
         type(dip33) :: T
-        real(8) :: diff(3, 3)
-        real(8) :: T_diff_anl(3, 3, 3)
-        real(8) :: T_diff_num(3, 3, -2:2)
+        real(dp) :: diff(3, 3)
+        real(dp) :: T_diff_anl(3, 3, 3)
+        real(dp) :: T_diff_num(3, 3, -2:2)
         integer :: a, b, c, i_step
-        real(8) :: delta
+        real(dp) :: delta
 
         delta = 1d-3
         r = [1.12d0, -2.12d0, 0.12d0]
@@ -2031,14 +2031,14 @@ subroutine run_tests()
     end subroutine test_T_bare_deriv
 
     subroutine test_T_GG_deriv_expl()
-        real(8) :: r(3), r_diff(3)
+        real(dp) :: r(3), r_diff(3)
         type(dip33) :: T
-        real(8) :: diff(3, 3)
-        real(8) :: T_diff_anl(3, 3, 3)
-        real(8) :: T_diff_num(3, 3, -2:2)
+        real(dp) :: diff(3, 3)
+        real(dp) :: T_diff_anl(3, 3, 3)
+        real(dp) :: T_diff_num(3, 3, -2:2)
         integer :: a, b, c, i_step
-        real(8) :: delta
-        real(8) :: sigma
+        real(dp) :: delta
+        real(dp) :: sigma
 
         delta = 1d-3
         r = [1.02d0, -2.22d0, 0.15d0]
@@ -2065,14 +2065,14 @@ subroutine run_tests()
     end subroutine test_T_GG_deriv_expl
 
     subroutine test_T_GG_deriv_impl()
-        real(8) :: r(3)
+        real(dp) :: r(3)
         type(dip33) :: T
-        real(8) :: diff(3, 3)
-        real(8) :: T_diff_anl(3, 3)
-        real(8) :: T_diff_num(3, 3, -2:2)
+        real(dp) :: diff(3, 3)
+        real(dp) :: T_diff_anl(3, 3)
+        real(dp) :: T_diff_num(3, 3, -2:2)
         integer :: a, b, i_step
-        real(8) :: delta
-        real(8) :: sigma, dsigma_dr, sigma_diff
+        real(dp) :: delta
+        real(dp) :: sigma, dsigma_dr, sigma_diff
 
         delta = 1d-3
         r = [1.02d0, -2.22d0, 0.15d0]
@@ -2097,15 +2097,15 @@ subroutine run_tests()
     end subroutine test_T_GG_deriv_impl
 
     subroutine test_mbd_deriv_expl()
-        real(8) :: delta
+        real(dp) :: delta
         type(mbd_system) :: sys
         type(mbd_damping) :: damp
-        real(8), allocatable :: coords(:, :)
-        real(8), allocatable :: forces(:, :)
-        real(8), allocatable :: diff(:, :)
-        real(8), allocatable :: alpha_0(:)
-        real(8), allocatable :: omega(:)
-        real(8) :: ene(-2:2)
+        real(dp), allocatable :: coords(:, :)
+        real(dp), allocatable :: forces(:, :)
+        real(dp), allocatable :: diff(:, :)
+        real(dp), allocatable :: alpha_0(:)
+        real(dp), allocatable :: omega(:)
+        real(dp) :: ene(-2:2)
         integer :: i_atom, n_atoms, i_xyz, i_step
 
         delta = 1d-3

@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_linalg
 
-use mbd_common, only: tostr
+use mbd_common, only: tostr, dp
 use mbd_interface, only: print_log, print_error
 
 implicit none
@@ -58,7 +58,7 @@ contains
 
 function eye(n) result(A)
     integer, intent(in) :: n
-    real(8) :: A(n, n)
+    real(dp) :: A(n, n)
 
     integer :: i
 
@@ -68,13 +68,13 @@ end function
 
 
 subroutine invert_ge_dble_(A)
-    real(8), intent(inout) :: A(:, :)
+    real(dp), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
-    real(8), allocatable :: work_arr(:)
+    real(dp), allocatable :: work_arr(:)
     integer :: n
     integer :: n_work_arr
-    real(8) :: n_work_arr_optim
+    real(dp) :: n_work_arr_optim
     integer :: error_flag
 
     n = size(A, 1)
@@ -99,13 +99,13 @@ end subroutine
 
 
 subroutine invert_ge_cmplx_(A)
-    complex(8), intent(inout) :: A(:, :)
+    complex(dp), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
-    complex(8), allocatable :: work_arr(:)
+    complex(dp), allocatable :: work_arr(:)
     integer :: n
     integer :: n_work_arr
-    complex(8) :: n_work_arr_optim
+    complex(dp) :: n_work_arr_optim
     integer :: error_flag
 
     n = size(A, 1)
@@ -129,13 +129,13 @@ end subroutine
 
 
 subroutine invert_sym_dble_(A)
-    real(8), intent(inout) :: A(:, :)
+    real(dp), intent(inout) :: A(:, :)
 
     integer :: i_pivot(size(A, 1))
-    real(8), allocatable :: work_arr(:)
+    real(dp), allocatable :: work_arr(:)
     integer :: n
     integer :: n_work_arr
-    real(8) :: n_work_arr_optim
+    real(dp) :: n_work_arr_optim
     integer :: error_flag
 
     n = size(A, 1)
@@ -161,8 +161,8 @@ end subroutine
 
 
 function inverted(A) result(A_inv)
-    real(8), intent(in) :: A(:, :)
-    real(8) :: A_inv(size(A, 1), size(A, 2))
+    real(dp), intent(in) :: A(:, :)
+    real(dp) :: A_inv(size(A, 1), size(A, 2))
 
     A_inv = A
     call invert(A_inv)
@@ -171,12 +171,12 @@ end function
 
 subroutine diagonalize_sym_dble_(mode, A, eigs)
     character(len=1), intent(in) :: mode
-    real(8), intent(inout) :: A(:, :)
-    real(8), intent(out) :: eigs(size(A, 1))
+    real(dp), intent(inout) :: A(:, :)
+    real(dp), intent(out) :: eigs(size(A, 1))
 
-    real(8), allocatable :: work_arr(:)
+    real(dp), allocatable :: work_arr(:)
     integer :: n
-    real(8) :: n_work_arr
+    real(dp) :: n_work_arr
     integer :: error_flag
 
     n = size(A, 1)
@@ -193,11 +193,11 @@ end subroutine
 
 
 function diagonalized_sym_dble_(A, eigvecs) result(eigs)
-    real(8), intent(in) :: A(:, :)
-    real(8), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
-    real(8) :: eigs(size(A, 1))
+    real(dp), intent(in) :: A(:, :)
+    real(dp), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    real(dp) :: eigs(size(A, 1))
 
-    real(8), pointer :: eigvecs_p(:, :)
+    real(dp), pointer :: eigvecs_p(:, :)
     character(len=1) :: mode
 
     if (present(eigvecs)) then
@@ -217,16 +217,16 @@ end function
 
 subroutine diagonalize_ge_dble_(mode, A, eigs)
     character(len=1), intent(in) :: mode
-    real(8), intent(inout) :: A(:, :)
-    complex(8), intent(out) :: eigs(size(A, 1))
+    real(dp), intent(inout) :: A(:, :)
+    complex(dp), intent(out) :: eigs(size(A, 1))
 
-    real(8), allocatable :: work_arr(:)
+    real(dp), allocatable :: work_arr(:)
     integer :: n
-    real(8) :: n_work_arr
+    real(dp) :: n_work_arr
     integer :: error_flag
-    real(8) :: eigs_r(size(A, 1)), eigs_i(size(A, 1))
-    real(8) :: dummy
-    real(8) :: vectors(size(A, 1), size(A, 2))
+    real(dp) :: eigs_r(size(A, 1)), eigs_i(size(A, 1))
+    real(dp) :: dummy
+    real(dp) :: vectors(size(A, 1), size(A, 2))
 
     n = size(A, 1)
     call DGEEV('N', mode, n, A, n, eigs_r, eigs_i, dummy, 1, &
@@ -246,11 +246,11 @@ end subroutine
 
 
 function diagonalized_ge_dble_(A, eigvecs) result(eigs)
-    real(8), intent(in) :: A(:, :)
-    real(8), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
-    complex(8) :: eigs(size(A, 1))
+    real(dp), intent(in) :: A(:, :)
+    real(dp), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    complex(dp) :: eigs(size(A, 1))
 
-    real(8), pointer :: eigvecs_p(:, :)
+    real(dp), pointer :: eigvecs_p(:, :)
     character(len=1) :: mode
 
     if (present(eigvecs)) then
@@ -270,12 +270,12 @@ end function
 
 subroutine diagonalize_he_cmplx_(mode, A, eigs)
     character(len=1), intent(in) :: mode
-    complex(8), intent(inout) :: A(:, :)
-    real(8), intent(out) :: eigs(size(A, 1))
+    complex(dp), intent(inout) :: A(:, :)
+    real(dp), intent(out) :: eigs(size(A, 1))
 
-    complex(8), allocatable :: work(:)
-    complex(8) :: lwork_cmplx
-    real(8), allocatable :: rwork(:)
+    complex(dp), allocatable :: work(:)
+    complex(dp) :: lwork_cmplx
+    real(dp), allocatable :: rwork(:)
     integer :: n, lwork
     integer :: error_flag
     integer, external :: ILAENV
@@ -298,16 +298,16 @@ end subroutine
 
 subroutine diagonalize_ge_cmplx_(mode, A, eigs)
     character(len=1), intent(in) :: mode
-    complex(8), intent(inout) :: A(:, :)
-    complex(8), intent(out) :: eigs(size(A, 1))
+    complex(dp), intent(inout) :: A(:, :)
+    complex(dp), intent(out) :: eigs(size(A, 1))
 
-    complex(8), allocatable :: work(:)
-    real(8) :: rwork(2*size(A, 1))
+    complex(dp), allocatable :: work(:)
+    real(dp) :: rwork(2*size(A, 1))
     integer :: n, lwork
-    complex(8) :: lwork_arr
+    complex(dp) :: lwork_arr
     integer :: error_flag
-    complex(8) :: dummy
-    complex(8) :: vectors(size(A, 1), size(A, 2))
+    complex(dp) :: dummy
+    complex(dp) :: vectors(size(A, 1), size(A, 2))
 
     n = size(A, 1)
     call ZGEEV('N', mode, n, A, n, eigs, dummy, 1, &
@@ -327,8 +327,8 @@ end subroutine
 
 
 function cart_prod_(a, b) result(c)
-    real(8), intent(in) :: a(:), b(:)
-    real(8) :: c(size(a), size(b))
+    real(dp), intent(in) :: a(:), b(:)
+    real(dp) :: c(size(a), size(b))
 
     integer :: i, j
 
@@ -341,8 +341,8 @@ end function
 
 
 function get_diag_(A) result(d)
-    real(8), intent(in) :: A(:, :)
-    real(8) :: d(size(A, 1))
+    real(dp), intent(in) :: A(:, :)
+    real(dp) :: d(size(A, 1))
 
     integer :: i
 
@@ -351,8 +351,8 @@ end function
 
 
 function get_diag_cmplx_(A) result(d)
-    complex(8), intent(in) :: A(:, :)
-    complex(8) :: d(size(A, 1))
+    complex(dp), intent(in) :: A(:, :)
+    complex(dp) :: d(size(A, 1))
 
     integer :: i
 
@@ -361,8 +361,8 @@ end function
 
 
 function make_diag_(d) result(A)
-    real(8), intent(in) :: d(:)
-    real(8) :: A(size(d), size(d))
+    real(dp), intent(in) :: d(:)
+    real(dp) :: A(size(d), size(d))
 
     integer :: i
 
@@ -372,10 +372,10 @@ end function
 
 
 function solve_lin_sys(A, b) result(x)
-    real(8), intent(in) :: A(:, :), b(size(A, 1))
-    real(8) :: x(size(b))
+    real(dp), intent(in) :: A(:, :), b(size(A, 1))
+    real(dp) :: x(size(b))
 
-    real(8) :: A_(size(b), size(b))
+    real(dp) :: A_(size(b), size(b))
     integer :: i_pivot(size(b))
     integer :: n
     integer :: error_flag

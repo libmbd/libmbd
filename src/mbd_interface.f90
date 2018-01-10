@@ -4,6 +4,7 @@
 module mbd_interface
 
 use mpi, only: MPI_COMM_WORLD, MPI_COMPLEX16, MPI_DOUBLE_PRECISION, MPI_SUM
+use mbd_common, only: dp
 
 implicit none
 
@@ -12,7 +13,7 @@ private
 public :: &
     sync_sum, broadcast, print_log, print_error, print_warning
 
-real(8), parameter, public :: pi = acos(-1.d0)
+real(dp), parameter, public :: pi = acos(-1.d0)
 integer, parameter, public :: legendre_precision = 8
 
 interface sync_sum
@@ -43,8 +44,8 @@ contains
 
 
 subroutine sync_sum_dble_(x)
-    real(8), intent(inout) :: x
-    real(8) :: x_buff
+    real(dp), intent(inout) :: x
+    real(dp) :: x_buff
     integer :: mpi_err
 
     call MPI_ALLREDUCE( &
@@ -56,9 +57,9 @@ end subroutine
 
 subroutine sync_sum_array_dble_(array, n_array)
     integer, intent(in) :: n_array
-    real(8), intent(inout) :: array(n_array)
+    real(dp), intent(inout) :: array(n_array)
 
-    real(8) :: array_buff(n_array)
+    real(dp) :: array_buff(n_array)
     integer :: mpi_err
 
     call MPI_ALLREDUCE( &
@@ -69,28 +70,28 @@ end subroutine
 
 
 subroutine sync_sum_vector_dble_(x)
-    real(8), intent(inout) :: x(:)
+    real(dp), intent(inout) :: x(:)
 
     call sync_sum_array_dble_(x, size(x))
 end subroutine
 
 
 subroutine sync_sum_matrix_dble_(x)
-    real(8), intent(inout) :: x(:, :)
+    real(dp), intent(inout) :: x(:, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
 
 
 subroutine sync_sum_3d_dble_(x)
-    real(8), intent(inout) :: x(:, :, :)
+    real(dp), intent(inout) :: x(:, :, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
 
 
 subroutine sync_sum_4d_dble_(x)
-    real(8), intent(inout) :: x(:, :, :, :)
+    real(dp), intent(inout) :: x(:, :, :, :)
 
     call  sync_sum_array_dble_(x, size(x))
 end subroutine
@@ -152,7 +153,7 @@ end subroutine
 
 subroutine broadcast_array_dble_(array, n_array)
     integer, intent(in) :: n_array
-    real(8), intent(inout) :: array(n_array)
+    real(dp), intent(inout) :: array(n_array)
 
     integer :: mpi_err
 
@@ -162,28 +163,28 @@ end subroutine
 
 
 subroutine broadcast_vector_dble_(x)
-    real(8), intent(inout) :: x(:)
+    real(dp), intent(inout) :: x(:)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 
 subroutine broadcast_matrix_dble_(x)
-    real(8), intent(inout) :: x(:, :)
+    real(dp), intent(inout) :: x(:, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 
 subroutine broadcast_3d_dble_(x)
-    real(8), intent(inout) :: x(:, :, :)
+    real(dp), intent(inout) :: x(:, :, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
 
 
 subroutine broadcast_4d_dble_(x)
-    real(8), intent(inout) :: x(:, :, :, :)
+    real(dp), intent(inout) :: x(:, :, :, :)
 
     call broadcast_array_dble_(x, size(x))
 end subroutine
@@ -191,7 +192,7 @@ end subroutine
 
 subroutine broadcast_array_cmplx_(array, n_array)
     integer, intent(in) :: n_array
-    complex(8), intent(inout) :: array(n_array)
+    complex(dp), intent(inout) :: array(n_array)
 
     integer :: mpi_err
 
@@ -201,14 +202,14 @@ end subroutine
 
 
 subroutine broadcast_vector_cmplx_(x)
-    complex(8), intent(inout) :: x(:)
+    complex(dp), intent(inout) :: x(:)
 
     call broadcast_array_cmplx_(x, size(x))
 end subroutine
 
 
 subroutine broadcast_matrix_cmplx_(x)
-    complex(8), intent(inout) :: x(:, :)
+    complex(dp), intent(inout) :: x(:, :)
 
     call broadcast_array_cmplx_(x, size(x))
 end subroutine

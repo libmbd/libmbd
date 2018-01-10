@@ -9,8 +9,8 @@ private
 public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, printer_default, &
     printer_interface
 
-real(8), parameter :: nan = transfer(-2251799813685248_8, 1d0)
 integer, parameter :: dp = kind(0.d0)
+real(dp), parameter :: nan = transfer(-2251799813685248_8, 1d0)
 
 interface tostr
     module procedure tostr_int_
@@ -56,17 +56,17 @@ character(len=50) elemental function tostr_dble_(x, format)
 end function tostr_dble_
 
 
-real(8) pure function diff3(x, delta)
-    real(8), intent(in) :: x(-1:)
-    real(8), intent(in) :: delta
+real(dp) pure function diff3(x, delta)
+    real(dp), intent(in) :: x(-1:)
+    real(dp), intent(in) :: delta
 
     diff3 = (x(1)-x(-1))/(2*delta)
 end function
 
 
-real(8) pure function diff5(x, delta)
-    real(8), intent(in) :: x(-2:)
-    real(8), intent(in) :: delta
+real(dp) pure function diff5(x, delta)
+    real(dp), intent(in) :: x(-2:)
+    real(dp), intent(in) :: delta
 
     diff5 = (1.d0/12*x(-2)-2.d0/3*x(-1)+2.d0/3*x(1)-1.d0/12*x(2))/delta
 end function
@@ -74,7 +74,7 @@ end function
 
 subroutine print_matrix(label, A)
     character(len=*), intent(in) :: label
-    real(8), intent(in) :: A(:, :)
+    real(dp), intent(in) :: A(:, :)
 
     integer :: m, n, i, j
 

@@ -6,27 +6,28 @@ module mbd_math
 use mbd_interface, only: pi
 use mbd_linalg, only: eye, inverted, diag, invert
 use mbd, only: dipole_matrix, mbd_system, mbd_damping, mbd_relay, get_sigma_selfint
+use mbd_common, only: dp
 
 implicit none
 
 integer, parameter :: n_pts_coulomb = 50
-real(8), parameter :: L_coulomb = 10.d0
-real(8), parameter :: point_charge = 100.d0
+real(dp), parameter :: L_coulomb = 10.d0
+real(dp), parameter :: point_charge = 100.d0
 
 external :: DGETRF
 
 contains
 
 subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
-    real(8), intent(in) :: R1(3), R2(3), K(6, 6)
-    real(8), intent(out), optional :: dip(3, 3), coul
+    real(dp), intent(in) :: R1(3), R2(3), K(6, 6)
+    real(dp), intent(out), optional :: dip(3, 3), coul
 
-    real(8), dimension(n_pts_coulomb) :: u, w, x
-    real(8) :: R(6), s
+    real(dp), dimension(n_pts_coulomb) :: u, w, x
+    real(dp) :: R(6), s
     integer :: i
-    real(8) :: det_K_plus_U2, coul_u, dot, dist
-    real(8) :: work(6, 6), Ks(6, 6)
-    real(8), dimension(3, 3) :: K11, K12, K22, dip_u
+    real(dp) :: det_K_plus_U2, coul_u, dot, dist
+    real(dp) :: work(6, 6), Ks(6, 6)
+    real(dp), dimension(3, 3) :: K11, K12, K22, dip_u
 
     ! print *, "det(K)", get_det(K)
     s = get_det(K)**(-1.d0/6)
@@ -74,8 +75,8 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
     contains
 
     subroutine  add_U2(A, u_sq)
-        real(8), intent(inout) :: A(6, 6)
-        real(8), intent(in) :: u_sq
+        real(dp), intent(inout) :: A(6, 6)
+        real(dp), intent(in) :: u_sq
 
         integer :: i
 
@@ -89,18 +90,18 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
-real(8) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
-    real(8), intent(in) :: R(:, :), q(size(R, 1)), m(size(R, 1)), w_t(3*size(R, 1))
-    real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
+real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
+    real(dp), intent(in) :: R(:, :), q(size(R, 1)), m(size(R, 1)), w_t(3*size(R, 1))
+    real(dp), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
 
-    real(8) :: O(size(C, 1), size(C, 1))
-    real(8) :: Opp(size(C, 1)-6, size(C, 1)-6)
-    real(8) :: OAB(6, 6), OABm(6, 6), K(6, 6)
-    real(8) :: RA(3), RB(3)
+    real(dp) :: O(size(C, 1), size(C, 1))
+    real(dp) :: Opp(size(C, 1)-6, size(C, 1)-6)
+    real(dp) :: OAB(6, 6), OABm(6, 6), K(6, 6)
+    real(dp) :: RA(3), RB(3)
     integer :: N, A, B, i, j
     integer :: AB(6), notAB(size(C, 1)-6)
-    real(8) :: ene_AB, ene_ABi(4)
-    real(8) :: prod_w_t, coul
+    real(dp) :: ene_AB, ene_ABi(4)
+    real(dp) :: prod_w_t, coul
     integer :: i2A(6) = (/ 1, 1, 1, 2, 2, 2 /)
 
     O = matmul(matmul(C, diag(w_t)), transpose(C))
@@ -140,10 +141,10 @@ real(8) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
     end do
 end function
 
-real(8) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
+real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(8), intent(in) :: a0(size(sys%coords, 1)), w(size(sys%coords, 1)), w_t(3*size(sys%coords, 1))
-    real(8), intent(in) :: C(3*size(sys%coords, 1), 3*size(sys%coords, 1))
+    real(dp), intent(in) :: a0(size(sys%coords, 1)), w(size(sys%coords, 1)), w_t(3*size(sys%coords, 1))
+    real(dp), intent(in) :: C(3*size(sys%coords, 1), 3*size(sys%coords, 1))
 
     integer :: A, B, i, j, N
     type(mbd_relay) :: T
@@ -166,11 +167,11 @@ real(8) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
     ene = sum(diag(T%re)/(4*w_t))
 end function
 
-real(8) function get_det(A) result(D)
-    real(8), intent(in) :: A(:, :)
+real(dp) function get_det(A) result(D)
+    real(dp), intent(in) :: A(:, :)
 
     integer :: n, i, info
-    real(8) :: LU(size(A, 1), size(A, 1))
+    real(dp) :: LU(size(A, 1), size(A, 1))
     integer :: ipiv(size(A, 1))
 
     n = size(A, 1)
@@ -190,8 +191,8 @@ subroutine swap_ints(a, b)
 end subroutine
 
 function get_outer(a, b) result(C)
-    real(8), intent(in) :: a(:), b(:)
-    real(8) :: C(size(a), size(b))
+    real(dp), intent(in) :: a(:), b(:)
+    real(dp) :: C(size(a), size(b))
 
     integer :: i, j
 

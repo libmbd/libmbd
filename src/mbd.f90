@@ -30,7 +30,6 @@ type :: mbd_param
     real(dp) :: ts_cutoff_radius = 50.d0*ang
     real(dp) :: dipole_low_dim_cutoff = 100.d0*ang
     real(dp) :: dipole_cutoff = 400.d0*ang  ! used only when Ewald is off
-    real(dp) :: mayer_scaling = 1.d0
     real(dp) :: ewald_real_cutoff_scaling = 1.d0
     real(dp) :: ewald_rec_cutoff_scaling = 1.d0
     real(dp) :: k_grid_shift = 0.5d0
@@ -68,6 +67,7 @@ type :: mbd_damping
     real(dp) :: a = 6.d0
     real(dp) :: ts_d = 20.d0
     real(dp) :: ts_sr = 0.d0
+    real(dp) :: mayer_scaling = 1.d0
     real(dp), allocatable :: r_vdw(:)
     real(dp), allocatable :: sigma(:)
     real(dp), allocatable :: damping_custom(:, :)
@@ -404,7 +404,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
                 end if
                 if (allocated(damp%sigma)) then
-                    sigma_ij = sqrt(sum(damp%sigma([i_atom, j_atom])**2))
+                    sigma_ij = damp%mayer_scaling*sqrt(sum(damp%sigma([i_atom, j_atom])**2))
                 end if
                 select case (damp%version)
                     case ("bare")
@@ -798,7 +798,7 @@ type(mbd_relay) function screened_alpha(sys, alpha, damp, k_point, lam)
     type(mbd_damping) :: damp_local
 
     damp_local = damp
-    damp_local%sigma = get_sigma_selfint(sys%calc, alpha)
+    damp_local%sigma = get_sigma_selfint(alpha)
     screened_alpha = dipole_matrix(sys, damp_local, k_point)
     if (present(lam)) then
         if (present(k_point)) then
@@ -1188,7 +1188,7 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%sigma = get_sigma_selfint(sys%calc, alpha(i_grid_omega, :))
+        damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
         do i_atom = 1, size(sys%coords, 1)
@@ -1270,7 +1270,7 @@ real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) resul
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%sigma = get_sigma_selfint(sys%calc, alpha(i_grid_omega, :))
+        damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
         do i_atom = 1, size(sys%coords, 1)
@@ -1833,12 +1833,11 @@ elemental function omega_eff(C6, alpha) result(omega)
 end function
 
 
-elemental function get_sigma_selfint(calc, alpha) result(sigma)
-    type(mbd_calc), intent(in) :: calc
+elemental function get_sigma_selfint(alpha) result(sigma)
     real(dp), intent(in) :: alpha
     real(dp) :: sigma
 
-    sigma = calc%param%mayer_scaling*(sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
+    sigma = (sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
 end function
 
 

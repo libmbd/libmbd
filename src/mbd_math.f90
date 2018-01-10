@@ -5,8 +5,9 @@ module mbd_math
 
 use mbd_interface, only: pi
 use mbd_linalg, only: eye, inverted, diag, invert
-use mbd, only: dipole_matrix, mbd_system, mbd_damping, mbd_relay, get_sigma_selfint
+use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint
 use mbd_common, only: dp
+use mbd_types, only: mat3n3n
 
 implicit none
 
@@ -147,7 +148,7 @@ real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
     real(dp), intent(in) :: C(3*size(sys%coords, 1), 3*size(sys%coords, 1))
 
     integer :: A, B, i, j, N
-    type(mbd_relay) :: T
+    type(mat3n3n) :: T
     type(mbd_damping) :: damp
 
     N = size(sys%coords, 1)

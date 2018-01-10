@@ -11,11 +11,12 @@ use mbd_common, only: tostr, nan, print_matrix, printer_default, &
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert
+use mbd_types, only: mat3n3n, mat33, scalar
 
 implicit none
 
 private
-public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, mbd_relay, &
+public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
     run_tests, get_sigma_selfint
 public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
@@ -100,31 +101,6 @@ type :: mbd_system
     logical :: do_reciprocal = .true.
     logical :: do_force = .false.
 end type mbd_system
-
-type :: mbd_relay
-    real(dp), allocatable :: re(:, :)
-    complex(dp), allocatable :: cplx(:, :)
-    real(dp), allocatable :: re_dr(:, :, :)
-end type mbd_relay
-
-! the following types are internal and serve for simultaneous passing of
-! quantities and their force derivatives between functions
-
-type :: dip33
-    real(dp) :: val(3, 3)
-    ! explicit derivative, [abc] ~ dval_{ab}/dR_c
-    real(dp) :: dr(3, 3, 3)
-    logical :: has_vdw = .false.
-    real(dp) :: dvdw(3, 3)
-    logical :: has_sigma = .false.
-    real(dp) :: dsigma(3, 3)
-end type
-
-type :: scalar
-    real(dp) :: val
-    real(dp) :: dr(3)  ! explicit derivative
-    real(dp) :: dvdw
-end type
 
 contains
 
@@ -303,14 +279,14 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
 end function get_ts_energy
 
 
-type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
+type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
     real(dp), intent(in), optional :: k_point(3)
 
     real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
-    type(dip33) :: Tpp
+    type(mat33) :: Tpp
     complex(dp) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, n_atoms
@@ -474,7 +450,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha
     real(dp), intent(in), optional :: k_point(3)
-    type(mbd_relay), intent(inout) :: dipmat
+    type(mat3n3n), intent(inout) :: dipmat
 
     logical :: is_parallel, mute, do_surface
     real(dp) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
@@ -746,7 +722,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_damping), intent(in) :: damp
     real(dp) :: alpha_scs(0:ubound(alpha, 1), size(alpha, 2))
 
-    type(mbd_relay) :: alpha_full
+    type(mat3n3n) :: alpha_full
     integer :: i_grid_omega
     logical :: is_parallel, mute
 
@@ -776,7 +752,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
 end function run_scs
 
 
-type(mbd_relay) function screened_alpha(sys, alpha, damp, k_point, lam)
+type(mat3n3n) function screened_alpha(sys, alpha, damp, k_point, lam)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha(:)
     type(mbd_damping), intent(in) :: damp
@@ -930,7 +906,7 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
 
-    type(mbd_relay) :: relay
+    type(mat3n3n) :: relay
     real(dp), allocatable :: eigs(:)
     real(dp), allocatable :: omega(:)
     integer :: i_xyz, i
@@ -994,7 +970,7 @@ end function get_single_mbd_energy
 
 
 subroutine form_mbd_matrix(T, alpha_0, omega)
-    type(mbd_relay), intent(inout) :: T
+    type(mat3n3n), intent(inout) :: T
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
 
@@ -1089,7 +1065,7 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
     type(mbd_damping), intent(in) :: damp
 
 
-    type(mbd_relay) :: relay
+    type(mat3n3n) :: relay
     real(dp), allocatable :: eigs(:)
     real(dp), allocatable :: omega(:)
     integer :: i_atom, j_atom, i_xyz, i, j
@@ -1156,7 +1132,7 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     real(dp), intent(in) :: alpha(0:, :)
     type(mbd_damping), intent(in) :: damp
 
-    type(mbd_relay) :: relay, AT
+    type(mat3n3n) :: relay, AT
     complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
@@ -1238,7 +1214,7 @@ real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) resul
     real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
-    type(mbd_relay) :: relay, AT
+    type(mat3n3n) :: relay, AT
     complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
@@ -1552,7 +1528,7 @@ function T_bare(rxyz) result(T)
 end function
 
 
-type(dip33) function T_bare_v2(r, deriv) result(T)
+type(mat33) function T_bare_v2(r, deriv) result(T)
     real(dp), intent(in) :: r(3)
     logical, intent(in) :: deriv
 
@@ -1647,10 +1623,10 @@ type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
 end function
 
 
-type(dip33) function T_damped(sys, f, T, sr)
+type(mat33) function T_damped(sys, f, T, sr)
     type(mbd_system), intent(in) :: sys
     type(scalar), intent(in) :: f
-    type(dip33), intent(in) :: T
+    type(mat33), intent(in) :: T
     logical, intent(in) :: sr  ! true: f, false: 1-f
 
     real(dp) :: pre
@@ -1677,13 +1653,13 @@ type(dip33) function T_damped(sys, f, T, sr)
 end function
 
 
-type(dip33) function T_erf_coulomb(r, sigma, deriv) result(T)
+type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma
     logical, intent(in) :: deriv
 
     real(dp) :: theta, erf_theta, r_5, r_1, zeta
-    type(dip33) :: bare
+    type(mat33) :: bare
     real(dp) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
     integer :: a, c
 
@@ -1989,7 +1965,7 @@ subroutine run_tests()
 
     subroutine test_T_bare_deriv()
         real(dp) :: r(3), r_diff(3)
-        type(dip33) :: T
+        type(mat33) :: T
         real(dp) :: diff(3, 3)
         real(dp) :: T_diff_anl(3, 3, 3)
         real(dp) :: T_diff_num(3, 3, -2:2)
@@ -2021,7 +1997,7 @@ subroutine run_tests()
 
     subroutine test_T_GG_deriv_expl()
         real(dp) :: r(3), r_diff(3)
-        type(dip33) :: T
+        type(mat33) :: T
         real(dp) :: diff(3, 3)
         real(dp) :: T_diff_anl(3, 3, 3)
         real(dp) :: T_diff_num(3, 3, -2:2)
@@ -2055,7 +2031,7 @@ subroutine run_tests()
 
     subroutine test_T_GG_deriv_impl()
         real(dp) :: r(3)
-        type(dip33) :: T
+        type(mat33) :: T
         real(dp) :: diff(3, 3)
         real(dp) :: T_diff_anl(3, 3)
         real(dp) :: T_diff_num(3, 3, -2:2)

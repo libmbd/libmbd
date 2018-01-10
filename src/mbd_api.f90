@@ -21,7 +21,7 @@ public :: &  ! subroutines
 
 type :: mbd_input
     ! subroutine used for printing
-    procedure(printer_interface), nopass, pointer :: printer => printer_default
+    procedure(printer_interface), nopass, pointer :: printer => null()
     integer :: comm  ! MPI communicator
 
     ! which calculation will be done (mbd|ts)
@@ -67,7 +67,11 @@ subroutine mbd_init(calc, input)
     type(mbd_calc), target, intent(out) :: calc
     type(mbd_input), intent(in) :: input
 
-    calc%sys%calc%printer => input%printer
+    if (associated(input%printer)) then
+        calc%sys%calc%printer => input%printer
+    else
+        calc%sys%calc%printer => printer_default
+    end if
     calc%sys%calc%comm = input%comm
     calc%dispersion_type = input%dispersion_type
     calc%sys%do_force = input%calculate_forces

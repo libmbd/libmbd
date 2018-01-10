@@ -58,7 +58,7 @@ type :: mbd_calc
     integer :: my_task = 0
     integer :: n_tasks = 1
     logical :: mute = .false.
-    procedure(printer_interface), nopass, pointer :: printer => printer_default
+    procedure(printer_interface), nopass, pointer :: printer => null()
 end type mbd_calc
 
 type :: mbd_damping
@@ -1966,28 +1966,29 @@ subroutine run_tests()
     call init_grid(calc)
     n_failed = 0
     n_all = 0
-    call exec_test('T_bare derivative', test_T_bare_deriv)
-    call exec_test('T_GG derivative explicit', test_T_GG_deriv_expl)
-    call exec_test('T_GG derivative implicit', test_T_GG_deriv_impl)
-    call exec_test('MBD derivative explicit', test_mbd_deriv_expl)
+    call exec_test('T_bare derivative')
+    call exec_test('T_GG derivative explicit')
+    call exec_test('T_GG derivative implicit')
+    call exec_test('MBD derivative explicit')
     write (6, *) &
         trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
     if (n_failed /= 0) stop 1
 
     contains
 
-    subroutine exec_test(test_name, test_routine)
+    subroutine exec_test(test_name)
         character(len=*), intent(in) :: test_name
-        interface
-            subroutine test_routine()
-            end subroutine
-        end interface
 
         integer :: n_failed_in
 
         write (6, '(A,A,A)', advance='no') 'Executing test "', test_name, '"... '
         n_failed_in = n_failed
-        call test_routine()
+        select case (test_name)
+        case ('T_bare derivative'); call test_T_bare_deriv()
+        case ('T_GG derivative explicit'); call test_T_GG_deriv_expl()
+        case ('T_GG derivative implicit'); call test_T_GG_deriv_impl()
+        case ('MBD derivative explicit'); call test_mbd_deriv_expl()
+        end select
         n_all = n_all + 1
         if (n_failed == n_failed_in) write (6, *) 'OK'
     end subroutine

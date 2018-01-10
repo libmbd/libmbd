@@ -185,32 +185,21 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
 end function mbd_scs_energy
 
 
-function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
-        d, overlap, damping_custom, unit_cell) result(ene)
-    type(mbd_calc), intent(in) :: calc
-    character(len=*), intent(in) :: mode, version
-    real(dp), intent(in) :: &
-        xyz(:, :), &
-        C6(size(xyz, 1)), &
-        alpha_0(size(xyz, 1))
-    real(dp), intent(in), optional :: &
-        R_vdw(size(xyz, 1)), &
-        s_R, &
-        d, &
-        overlap(size(xyz, 1), size(xyz, 1)), &
-        damping_custom(size(xyz, 1), size(xyz, 1)), &
-        unit_cell(3, 3)
+function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
+    type(mbd_system), intent(inout) :: sys
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    type(mbd_damping), intent(in) :: damp
     real(dp) :: ene
 
-    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, overlap_ij, &
-        ene_shell, ene_pair, R_cell(3)
+    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3)
     type(scalar) :: f_damp
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(dp), parameter :: shell_thickness = 10.d0
     logical :: is_crystal, is_parallel
 
-    is_crystal = is_in('C', mode)
-    is_parallel = is_in('P', mode)
+    is_crystal = sys%periodic
+    is_parallel = sys%calc%parallel
 
     ene = 0.d0
     i_shell = 0
@@ -218,7 +207,7 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         i_shell = i_shell+1
         ene_shell = 0.d0
         if (is_crystal) then
-            range_cell = supercell_circum(calc, unit_cell, i_shell*shell_thickness)
+            range_cell = supercell_circum(sys%calc, sys%lattice, i_shell*shell_thickness)
         else
             range_cell = (/ 0, 0, 0 /)
         end if
@@ -227,27 +216,27 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
             call shift_cell(idx_cell, -range_cell, range_cell)
             ! MPI code begin
             if (is_parallel .and. is_crystal) then
-                if (calc%my_task /= modulo(i_cell, calc%n_tasks)) cycle
+                if (sys%calc%my_task /= modulo(i_cell, sys%calc%n_tasks)) cycle
             end if
             ! MPI code end
             if (is_crystal) then
-                R_cell = matmul(idx_cell, unit_cell)
+                R_cell = matmul(idx_cell, sys%lattice)
             else
                 R_cell = (/ 0.d0, 0.d0, 0.d0 /)
             end if
-            do i_atom = 1, size(xyz, 1)
+            do i_atom = 1, size(sys%coords, 1)
                 ! MPI code begin
                 if (is_parallel .and. .not. is_crystal) then
-                    if (calc%my_task /= modulo(i_atom, calc%n_tasks)) cycle
+                    if (sys%calc%my_task /= modulo(i_atom, sys%calc%n_tasks)) cycle
                 end if
                 ! MPI code end
                 do j_atom = 1, i_atom
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = xyz(i_atom, :)-xyz(j_atom, :)-R_cell
+                    r = sys%coords(i_atom, :)-sys%coords(j_atom, :)-R_cell
                     r_norm = sqrt(sum(r**2))
-                    if (r_norm > calc%param%ts_cutoff_radius) cycle
+                    if (r_norm > sys%calc%param%ts_cutoff_radius) cycle
                     if (r_norm >= i_shell*shell_thickness &
                         .or. r_norm < (i_shell-1)*shell_thickness) then
                         cycle
@@ -255,20 +244,17 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
                     C6_ij = combine_C6( &
                         C6(i_atom), C6(j_atom), &
                         alpha_0(i_atom), alpha_0(j_atom))
-                    if (present(R_vdw)) then
-                        R_vdw_ij = R_vdw(i_atom)+R_vdw(j_atom)
+                    if (allocated(damp%r_vdw)) then
+                        R_vdw_ij = damp%r_vdw(i_atom)+damp%r_vdw(j_atom)
                     end if
-                    if (present(overlap)) then
-                        overlap_ij = overlap(i_atom, j_atom)
-                    end if
-                    select case (version)
+                    select case (damp%version)
                         case ("fermi")
-                            f_damp = damping_fermi(r, s_R*R_vdw_ij, d, .false.)
+                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false.)
                         case ("fermi2")
-                            f_damp = damping_fermi(r, s_R*R_vdw_ij, d, .false.)
+                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false.)
                             f_damp%val = f_damp%val**2
                         case ("custom")
-                            f_damp%val = damping_custom(i_atom, j_atom)
+                            f_damp%val = damp%damping_custom(i_atom, j_atom)
                     end select
                     ene_pair = -C6_ij*f_damp%val/r_norm**6
                     if (i_atom == j_atom) then
@@ -286,7 +272,7 @@ function get_ts_energy(calc, mode, version, xyz, C6, alpha_0, R_vdw, s_R, &
         ! MPI code end
         ene = ene+ene_shell
         if (.not. is_crystal) exit
-        if (i_shell > 1 .and. abs(ene_shell) < calc%param%ts_energy_accuracy) then
+        if (i_shell > 1 .and. abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
             call print_log("Periodic TS converged in " &
                 //trim(tostr(i_shell))//" shells, " &
                 //trim(tostr(i_shell*shell_thickness/ang))//" angstroms")

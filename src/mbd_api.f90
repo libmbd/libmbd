@@ -142,11 +142,7 @@ subroutine mbd_get_energy(calc, energy)
     case ('mbd')
         energy = mbd_rsscs_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
     case ('ts')
-        ! TODO unit_cell, mode
-        energy = get_ts_energy( &
-            calc%sys%calc, '', 'fermi', calc%sys%coords, calc%C6, calc%alpha_0, &
-            calc%damp%r_vdw, calc%damp%ts_sr, calc%damp%ts_d &
-        )
+        energy = get_ts_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
     end select
 end subroutine
 

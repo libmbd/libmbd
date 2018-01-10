@@ -3,6 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd
 
+use mbd_build_flags, only: WITH_MPI
 use mbd_interface, only: &
     sync_sum, broadcast, print_error, print_warning, print_log, pi
 use mbd_common, only: tostr, nan, print_matrix, printer_default, &

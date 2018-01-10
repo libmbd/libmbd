@@ -6,6 +6,8 @@ enable_language(Fortran)
 find_package(LAPACK REQUIRED)
 find_package(MPI)
 
+set(WITH_MPI .false.)
+
 set(SRCS
     src/mbd.f90
     src/mbd_c_api.f90
@@ -16,7 +18,8 @@ set(SRCS
     src/mbd_interface.f90
     src/mbd_common.f90
     src/mbd_linalg.f90
-    src/mbd_repulsion.f90)
+    src/mbd_repulsion.f90
+    mbd_build_flags.f90)
 if(NOT ${MPI_Fortran_FOUND})
     list(APPEND SRCS
         src/mpi_stubs.f90)
@@ -31,7 +34,10 @@ if(${MPI_Fortran_FOUND})
         PROPERTIES COMPILE_FLAGS "${MPI_Fortran_COMPILE_FLAGS}")
     target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
+    set(WITH_MPI .true.)
 endif()
+
+configure_file(src/mbd_build_flags.in.f90 mbd_build_flags.f90)
 
 install(TARGETS mbd
     LIBRARY DESTINATION lib)

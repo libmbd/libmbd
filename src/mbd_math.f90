@@ -152,7 +152,7 @@ real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
 
     N = size(sys%coords, 1)
     damp%version = 'dip,gg'
-    damp%sigma = get_sigma_selfint(sys%calc, a0)
+    damp%sigma = get_sigma_selfint(a0)
     T = dipole_matrix(sys, damp)
     do  A = 1, N
         do B = 1, N

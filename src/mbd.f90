@@ -35,7 +35,6 @@ type :: mbd_param
     real(dp) :: k_grid_shift = 0.5d0
     logical :: ewald_on = .true.
     logical :: zero_negative_eigs = .false.
-    logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
     integer :: mbd_nbody_max = 3
     integer :: rpa_order_max = 10
     integer :: n_frequency_grid = 15
@@ -94,6 +93,7 @@ type :: mbd_system
     type(mbd_work) :: work
     real(dp), allocatable :: coords(:, :)
     logical :: periodic = .false.
+    logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
     real(dp) :: lattice(3, 3)
     integer :: k_grid(3)
     integer :: supercell(3)
@@ -207,7 +207,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
         i_shell = i_shell+1
         ene_shell = 0.d0
         if (is_crystal) then
-            range_cell = supercell_circum(sys%calc, sys%lattice, i_shell*shell_thickness)
+            range_cell = supercell_circum(sys, sys%lattice, i_shell*shell_thickness)
         else
             range_cell = (/ 0, 0, 0 /)
         end if
@@ -335,7 +335,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
     end if
     ! MPI code end
     if (sys%periodic) then
-        if (any(sys%calc%param%vacuum_axis)) then
+        if (any(sys%vacuum_axis)) then
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
             do_ewald = .true.
@@ -347,7 +347,7 @@ type(mbd_relay) function dipole_matrix(sys, damp, k_point) result(dipmat)
         else
             real_space_cutoff = sys%calc%param%dipole_cutoff
         end if
-        range_cell = supercell_circum(sys%calc, sys%lattice, real_space_cutoff)
+        range_cell = supercell_circum(sys, sys%lattice, real_space_cutoff)
     else
         range_cell(:) = 0
     end if
@@ -506,7 +506,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     rec_unit_cell = 2*pi*inverted(transpose(sys%lattice))
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
-    range_G_vector = supercell_circum(sys%calc, rec_unit_cell, rec_space_cutoff)
+    range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
     call print_log('Ewald: using reciprocal cutoff = ' &
         //trim(tostr(rec_space_cutoff)), mute)
     call print_log('Ewald: summing reciprocal part in G vector range of ' &
@@ -1848,8 +1848,8 @@ function get_total_C6_from_alpha(calc, alpha) result(C6)
 end function
 
 
-function supercell_circum(calc, uc, radius) result(sc)
-    type(mbd_calc), intent(in) :: calc
+function supercell_circum(sys, uc, radius) result(sc)
+    type(mbd_system), intent(in) :: sys
     real(dp), intent(in) :: uc(3, 3), radius
     integer :: sc(3)
 
@@ -1859,7 +1859,7 @@ function supercell_circum(calc, uc, radius) result(sc)
     ruc = 2*pi*inverted(transpose(uc))
     forall (i = 1:3) layer_sep(i) = sum(uc(i, :)*ruc(i, :)/sqrt(sum(ruc(i, :)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
-    where (calc%param%vacuum_axis) sc = 0
+    where (sys%vacuum_axis) sc = 0
 end function
 
 

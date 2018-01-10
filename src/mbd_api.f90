@@ -88,7 +88,7 @@ subroutine mbd_init(calc, input)
     calc%damp%ts_d = input%ts_d
     calc%damp%ts_sr = input%ts_sr
     calc%sys%k_grid = input%k_grid
-    calc%sys%calc%param%vacuum_axis = input%vacuum_axis
+    calc%sys%vacuum_axis = input%vacuum_axis
     call init_grid(calc%calc)
     calc%sys%calc => calc%calc
 end subroutine

@@ -5,9 +5,9 @@
 module mbd_repulsion
 use mbd_helper_dev, only: my_repeat, i_matrix, matrix_embed, diag_double, det, &
     matrix_invert, combine_vector, gl_points, matrix_combine
+use mbd_common, only: pi
 contains
 subroutine E1_twobody(BigOmAB, RA, RB, Coul_en_2b)
-use mbd_interface, only: pi
 implicit none
 double precision, dimension(6, 6), intent(in) :: BigOmAB
 double precision, dimension(3), intent(in) :: RA, RB
@@ -48,7 +48,6 @@ print*, "Coulomb 2-body = ",coul_en_2b
 end subroutine E1_twobody
 !
 subroutine E1_onebody(BigOmA, RA, RB, Coul_en_1b)
-use mbd_interface, only: pi
 implicit none
 double precision, dimension(3, 3), intent(in) :: BigOmA
 double precision, dimension(3), intent(in) :: RA, RB

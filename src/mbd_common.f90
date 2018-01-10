@@ -7,10 +7,11 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, printer_default, &
-    printer_interface
+    printer_interface, pi
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: nan = transfer(-2251799813685248_8, 1d0)
+real(dp), parameter :: pi = acos(-1.d0)
 
 interface tostr
     module procedure tostr_int_

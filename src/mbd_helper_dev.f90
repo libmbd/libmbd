@@ -2,7 +2,7 @@
 !\author M. Sadhukhan
 module mbd_helper_dev
 
-use mbd_interface, only: pi
+use mbd_common, only: pi
 
 external :: DGETRI, DGETRF
 

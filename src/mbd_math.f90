@@ -3,10 +3,9 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_math
 
-use mbd_interface, only: pi
 use mbd_linalg, only: eye, inverted, diag, invert
 use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint
-use mbd_common, only: dp
+use mbd_common, only: dp, pi
 use mbd_types, only: mat3n3n
 
 implicit none

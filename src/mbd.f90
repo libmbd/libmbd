@@ -5,9 +5,9 @@ module mbd
 
 use mbd_build_flags, only: WITH_MPI
 use mbd_interface, only: &
-    sync_sum, broadcast, print_error, print_warning, print_log, pi
+    sync_sum, broadcast, print_error, print_warning, print_log
 use mbd_common, only: tostr, nan, print_matrix, printer_default, &
-    printer_interface, dp
+    printer_interface, dp, pi
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert

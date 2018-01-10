@@ -13,7 +13,6 @@ private
 public :: &
     sync_sum, broadcast, print_log, print_error, print_warning
 
-real(dp), parameter, public :: pi = acos(-1.d0)
 integer, parameter, public :: legendre_precision = 8
 
 interface sync_sum

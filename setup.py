@@ -13,6 +13,7 @@ sources = [
     'src/mbd.f90',
     'src/mbd_c_api.f90',
 ]
+mbd_build_flags = {'WITH_MPI': '.false.'}
 
 
 def libmbd_exists():
@@ -48,6 +49,7 @@ def setup_mpi():
     except ImportError:
         sources.insert(0, 'src/mpi_stubs.f90')
         return
+    mbd_build_flags['WITH_MPI'] = '.true.'
     # patch find_executables to insert the MPI compiler before FC or
     # --f90exec is checked
     from numpy.distutils.fcompiler import FCompiler
@@ -78,6 +80,13 @@ else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info
     setup_mpi()
+    with open('src/mbd_build_flags.in.f90') as f:
+        flags_src = f.read()
+    for var, val in mbd_build_flags.items():
+        flags_src = flags_src.replace('@' + var + '@', val)
+    with open('mbd_build_flags.f90', 'w') as f:
+        f.write(flags_src)
+    sources.append('mbd_build_flags.f90')
     kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
     update_dict(kwargs, get_info('lapack_opt', 2))
 

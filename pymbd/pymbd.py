@@ -17,6 +17,15 @@ from ._libmbd import ffi as _ffi, lib as _lib
 ang = 1/0.529177249
 
 
+def _array(obj, *args, **kwargs):
+    if obj is not None:
+        return np.array(obj, *args, **kwargs)
+
+
+def _cast(ctype, array):
+    return _ffi.NULL if array is None else _ffi.cast(ctype, array.ctypes.data)
+
+
 class MBDCalc(object):
     def __init__(self):
         self._calc = None
@@ -35,33 +44,30 @@ class MBDCalc(object):
                    damping='fermi,dip'):
         if not self._calc:
             raise RuntimeError('MBDCalc must be used as a context manager')
-        coords = np.array(coords, dtype=float, order='F')
-        alpha_0 = np.array(alpha_0, dtype=float)
-        C6 = np.array(C6, dtype=float)
-        R_vdw = np.array(R_vdw, dtype=float)
-        periodic = lattice is not None
-        if periodic:
-            lattice = np.array(lattice, dtype=float, order='F')
-            k_grid = np.array(k_grid, dtype='i4')
+        coords = _array(coords, dtype=float, order='F')
+        alpha_0 = _array(alpha_0, dtype=float)
+        C6 = _array(C6, dtype=float)
+        R_vdw = _array(R_vdw, dtype=float)
+        lattice = _array(lattice, dtype=float, order='F')
+        k_grid = _array(k_grid, dtype='i4')
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
             self._calc,
             n_atoms,
-            _ffi.cast('double*', coords.ctypes.data),
-            _ffi.cast('double*', lattice.ctypes.data) if periodic else _ffi.NULL,
-            _ffi.cast('int*', k_grid.ctypes.data) if periodic else _ffi.NULL,
+            _cast('double*', coords),
+            _cast('double*', lattice),
+            _cast('int*', k_grid),
         )
         if force:
             system.do_force[0] = True
         damping = _lib.mbd_init_damping(
-            n_atoms, damping.encode(), _ffi.cast('double*', R_vdw.ctypes.data),
-            _ffi.NULL, beta, a,
+            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
         )
         ene = getattr(_lib, func)(
             system,
             n_atoms,
-            _ffi.cast('double*', alpha_0.ctypes.data),
-            _ffi.cast('double*', C6.ctypes.data),
+            _cast('double*', alpha_0),
+            _cast('double*', C6),
             damping
         )
         if force:

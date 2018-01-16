@@ -54,7 +54,8 @@ class MBDCalc(object):
         if force:
             system.do_force[0] = True
         damping = _lib.mbd_init_damping(
-            n_atoms, damping.encode(), _ffi.cast('double*', R_vdw.ctypes.data), beta, a,
+            n_atoms, damping.encode(), _ffi.cast('double*', R_vdw.ctypes.data),
+            _ffi.NULL, beta, a,
         )
         ene = getattr(_lib, func)(
             system,

@@ -23,6 +23,7 @@ struct MBD_damping* mbd_init_damping(
     int n_atoms,
     char* version,
     double* R_vdw,
+    double* sigma,
     double beta,
     double a
 );

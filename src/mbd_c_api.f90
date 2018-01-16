@@ -97,10 +97,11 @@ subroutine mbd_destroy_system(sys_cp) bind(c)
     deallocate (sys_c)
 end subroutine mbd_destroy_system
 
-type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, beta, a) bind(c)
+type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a) bind(c)
     integer(c_int), intent(in), value :: n_atoms
     character(kind=c_char), intent(in) :: version_c(*)
-    real(c_double), intent(in) :: r_vdw(n_atoms)
+    real(c_double), intent(in), optional :: r_vdw(n_atoms)
+    real(c_double), intent(in), optional :: sigma(n_atoms)
     real(c_double), intent(in), value :: beta
     real(c_double), intent(in), value :: a
 
@@ -108,7 +109,8 @@ type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, beta, a) bind(c
 
     allocate (damping)
     damping%version = f_string(version_c)
-    damping%r_vdw = r_vdw
+    if (present(r_vdw)) damping%r_vdw = r_vdw
+    if (present(sigma)) damping%sigma = sigma
     damping%beta = beta
     damping%a = a
     mbd_init_damping = c_loc(damping)
@@ -120,7 +122,8 @@ subroutine mbd_destroy_damping(damping_p) bind(c)
     type(mbd_damping), pointer :: damping
 
     call c_f_pointer(damping_p, damping)
-    deallocate (damping%r_vdw)
+    if (allocated(damping%r_vdw)) deallocate (damping%r_vdw)
+    if (allocated(damping%sigma)) deallocate (damping%sigma)
     deallocate (damping)
 end subroutine mbd_destroy_damping
 

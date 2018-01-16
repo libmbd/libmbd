@@ -44,6 +44,13 @@ class MBDCalc(object):
             raise RuntimeError('MBDCalc must be used as a context manager')
         return self.__calc
 
+    @property
+    def omega_grid(self):
+        return (
+            _ndarray(self._calc.omega_grid, (self._calc.n_freq+1,)).copy(),
+            _ndarray(self._calc.omega_grid_w, (self._calc.n_freq+1,)).copy(),
+        )
+
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,

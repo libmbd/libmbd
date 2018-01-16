@@ -13,6 +13,9 @@ use mbd_types, only: mat3n3n
 implicit none
 
 type, bind(c) :: mbd_calc_c
+    integer(c_int) :: n_freq = 0
+    type(c_ptr) :: omega_grid = c_null_ptr
+    type(c_ptr) :: omega_grid_w = c_null_ptr
     type(c_ptr) :: mbd_calc_f = c_null_ptr
 end type
 
@@ -32,6 +35,9 @@ type(c_ptr) function mbd_init_calc() bind(c)
     calc%io = 6
     call init_grid(calc)
     allocate (calc_c)
+    calc_c%n_freq = ubound(calc%omega_grid, 1)
+    calc_c%omega_grid = c_loc(calc%omega_grid)
+    calc_c%omega_grid_w = c_loc(calc%omega_grid_w)
     calc_c%mbd_calc_f = c_loc(calc)
     mbd_init_calc = c_loc(calc_c)
 end function mbd_init_calc

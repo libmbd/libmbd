@@ -1,5 +1,11 @@
 // vim: set ft=c:
 
+struct MBD_calc {
+    int n_freq;
+    double* omega_grid;
+    double* omega_grid_w;
+};
+
 struct MBD_calc* mbd_init_calc(void);
 void mbd_set_parallel(struct MBD_calc* calc, int rank, int n_proc);
 void mbd_destroy_calc(struct MBD_calc* calc);

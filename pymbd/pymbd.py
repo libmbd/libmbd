@@ -28,22 +28,26 @@ def _cast(ctype, array):
 
 class MBDCalc(object):
     def __init__(self):
-        self._calc = None
+        self.__calc = None
 
     def __enter__(self):
-        self._calc = _lib.mbd_init_calc()
+        self.__calc = _lib.mbd_init_calc()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         _lib.mbd_destroy_calc(self._calc)
-        self._calc = None
+        self.__calc = None
+
+    @property
+    def _calc(self):
+        if not self.__calc:
+            raise RuntimeError('MBDCalc must be used as a context manager')
+        return self.__calc
 
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,
                    damping='fermi,dip'):
-        if not self._calc:
-            raise RuntimeError('MBDCalc must be used as a context manager')
         coords = _array(coords, dtype=float, order='F')
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
@@ -80,8 +84,6 @@ class MBDCalc(object):
 
     def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,
                       R_vdw=None, sigma=None, a=6.):
-        if not self._calc:
-            raise RuntimeError('MBDCalc must be used as a context manager')
         coords = _array(coords, dtype=float, order='F')
         R_vdw = _array(R_vdw, dtype=float)
         sigma = _array(sigma, dtype=float)

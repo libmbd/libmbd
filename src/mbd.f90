@@ -260,24 +260,6 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
             exit
         endif
     end do ! i_shell
-
-    contains
-
-    function is_in(c, str) result(is)
-        character(len=1), intent(in) :: c
-        character(len=*), intent(in) :: str
-        logical :: is
-
-        integer :: i
-
-        is = .false.
-        do i = 1, len(str)
-            if (c == str(i:i)) then
-                is = .true.
-                exit
-            end if
-        end do
-    end function is_in
 end function get_ts_energy
 
 

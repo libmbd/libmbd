@@ -27,6 +27,7 @@ type(c_ptr) function mbd_init_calc() bind(c)
     type(mbd_calc_c), pointer :: calc_c
 
     allocate (calc)
+    calc%io = 6
     call init_grid(calc)
     allocate (calc_c)
     calc_c%mbd_calc_f = c_loc(calc)

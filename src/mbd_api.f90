@@ -5,7 +5,7 @@ module mbd_api
 
 use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
     mbd_rsscs_energy, get_ts_energy, get_damping_parameters, init_grid
-use mbd_common, only: dp, printer_interface, printer_default
+use mbd_common, only: dp
 use mbd_vdw_param, only: default_vdw_params, species_index
 
 implicit none
@@ -20,8 +20,7 @@ public :: &  ! subroutines
     mbd_get_free_vdw_params
 
 type :: mbd_input
-    ! subroutine used for printing
-    procedure(printer_interface), nopass, pointer :: printer => null()
+    integer :: io  ! unit number for printing
     integer :: comm  ! MPI communicator
 
     ! which calculation will be done (mbd|ts)
@@ -55,7 +54,6 @@ type mbd_calc
     type(mbd_damping) :: damp
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    procedure(printer_interface), nopass, pointer :: printer
     character(len=30) :: dispersion_type
     type(mbd_calc_inner) :: calc
 end type
@@ -67,12 +65,8 @@ subroutine mbd_init(calc, input)
     type(mbd_calc), target, intent(out) :: calc
     type(mbd_input), intent(in) :: input
 
-    if (associated(input%printer)) then
-        calc%sys%calc%printer => input%printer
-    else
-        calc%sys%calc%printer => printer_default
-    end if
     calc%sys%calc%comm = input%comm
+    calc%sys%calc%io = input%io
     calc%dispersion_type = input%dispersion_type
     calc%sys%do_force = input%calculate_forces
     if (input%calculate_spectrum) then

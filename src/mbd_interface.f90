@@ -11,7 +11,7 @@ implicit none
 private
 
 public :: &
-    sync_sum, broadcast, print_log, print_error, print_warning
+    sync_sum, broadcast
 
 integer, parameter, public :: legendre_precision = 8
 
@@ -212,43 +212,5 @@ subroutine broadcast_matrix_cmplx_(x)
 
     call broadcast_array_cmplx_(x, size(x))
 end subroutine
-
-
-subroutine print_log(str, mute)
-    character(len=*), intent(in) :: str
-    integer :: myid, error
-    logical, optional :: mute
-
-    if (present(mute)) then
-        if (mute) return
-    end if
-    call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
-    if (myid == 0) then
-        write (6, *) str
-    end if
-end subroutine
-
-
-subroutine print_warning(str)
-    character(len=*), intent(in) :: str
-    integer :: myid, error
-
-    call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
-    if (myid == 0) then
-        write (0, *) "Warning: " // str
-    end if
-end subroutine
-
-
-subroutine print_error(str)
-    character(len=*), intent(in) :: str
-    integer :: myid, error
-
-    call MPI_COMM_RANK(MPI_COMM_WORLD, myid, error)
-    if (myid == 0) then
-        write (0, *) "Error: " // str
-    end if
-end subroutine
-
 
 end module mbd_interface

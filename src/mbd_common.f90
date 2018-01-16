@@ -3,11 +3,13 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_common
 
+use mbd_build_flags, only: WITH_MPI
+
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, printer_default, &
-    printer_interface, pi
+public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, pi, printer, &
+    exception
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: nan = transfer(-2251799813685248_8, 1d0)
@@ -18,13 +20,22 @@ interface tostr
     module procedure tostr_dble_
 end interface
 
-abstract interface
-    subroutine printer_interface(str)
-        character(len=*), intent(in) :: str
-    end subroutine
-end interface
+type :: exception
+    character(30) :: label = ''
+    character(50) :: origin = '(unknown)'
+    character(150) :: msg = ''
+end type
 
 contains
+
+
+subroutine printer(io, msg)
+    integer, intent(in) :: io
+    character(*), intent(in) :: msg
+
+    if (io < 0) return
+    write (io, *) msg
+end subroutine
 
 
 character(len=50) elemental function tostr_int_(k, format)
@@ -108,11 +119,5 @@ elemental pure function lower(str)
     end do
 end function
 
-
-subroutine printer_default(str)
-    character(len=*), intent(in) :: str
-
-    print *, str
-end subroutine
 
 end module

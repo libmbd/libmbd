@@ -5,9 +5,8 @@ module mbd
 
 use mbd_build_flags, only: WITH_MPI
 use mbd_interface, only: &
-    sync_sum, broadcast, print_error, print_warning, print_log
-use mbd_common, only: tostr, nan, print_matrix, printer_default, &
-    printer_interface, dp, pi
+    sync_sum, broadcast
+use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert
@@ -54,10 +53,10 @@ type :: mbd_calc
     real(dp), allocatable :: omega_grid_w(:)
     logical :: parallel = .false.
     integer :: comm
+    integer :: io = -1
     integer :: my_task = 0
     integer :: n_tasks = 1
     logical :: mute = .false.
-    procedure(printer_interface), nopass, pointer :: printer => null()
 end type mbd_calc
 
 type :: mbd_damping
@@ -86,6 +85,7 @@ type :: mbd_work
     complex(dp), allocatable :: modes_k(:, :, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
     real(dp), allocatable :: forces(:, :)
+    type(exception) :: exc
 end type
 
 type :: mbd_system
@@ -131,6 +131,7 @@ real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     damp_mbd%r_vdw = R_vdw_rsscs
     damp_mbd%beta = damp%beta
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0, :), C6_rsscs, damp_mbd)
+    if (has_exc(sys)) call print_exc(sys)
 end function mbd_rsscs_energy
 
 
@@ -161,6 +162,7 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
     mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0, :), C6_scs, damp_mbd)
+    if (has_exc(sys)) call print_exc(sys)
 end function mbd_scs_energy
 
 
@@ -252,7 +254,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
         ene = ene+ene_shell
         if (.not. is_crystal) exit
         if (i_shell > 1 .and. abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
-            call print_log("Periodic TS converged in " &
+            call printer(sys%calc%io, "Periodic TS converged in " &
                 //trim(tostr(i_shell))//" shells, " &
                 //trim(tostr(i_shell*shell_thickness/ang))//" angstroms")
             exit
@@ -321,8 +323,9 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
             volume = max(abs(dble(product(diagonalized(sys%lattice)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
             real_space_cutoff = 6.d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
-            call print_log('Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
-                //', real cutoff = '//trim(tostr(real_space_cutoff)), mute)
+            if (.not. mute) call printer(sys%calc%io, &
+                'Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
+                //', real cutoff = '//trim(tostr(real_space_cutoff)))
         else
             real_space_cutoff = sys%calc%param%dipole_cutoff
         end if
@@ -331,10 +334,11 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         range_cell(:) = 0
     end if
     if (sys%periodic) then
-        call print_log('Ewald: summing real part in cell vector range of ' &
+        if (.not. mute) call printer(sys%calc%io, &
+            'Ewald: summing real part in cell vector range of ' &
             //trim(tostr(1+2*range_cell(1)))//'x' &
             //trim(tostr(1+2*range_cell(2)))//'x' &
-            //trim(tostr(1+2*range_cell(3))), mute)
+            //trim(tostr(1+2*range_cell(3))))
     end if
     call ts(sys%calc, 11)
     idx_cell = (/ 0, 0, -1 /)
@@ -486,12 +490,14 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
-    call print_log('Ewald: using reciprocal cutoff = ' &
-        //trim(tostr(rec_space_cutoff)), mute)
-    call print_log('Ewald: summing reciprocal part in G vector range of ' &
-        //trim(tostr(1+2*range_G_vector(1)))//'x' &
-        //trim(tostr(1+2*range_G_vector(2)))//'x' &
-        //trim(tostr(1+2*range_G_vector(3))), mute)
+    if (.not. mute) then
+        call printer(sys%calc%io, 'Ewald: using reciprocal cutoff = ' &
+            //trim(tostr(rec_space_cutoff)))
+        call printer(sys%calc%io, 'Ewald: summing reciprocal part in G vector range of ' &
+            //trim(tostr(1+2*range_G_vector(1)))//'x' &
+            //trim(tostr(1+2*range_G_vector(2)))//'x' &
+            //trim(tostr(1+2*range_G_vector(3))))
+    end if
     call ts(sys%calc, 12)
     idx_G_vector = (/ 0, 0, -1 /)
     do i_G_vector = 1, product(1+2*range_G_vector)
@@ -617,10 +623,10 @@ subroutine init_grid(calc)
     calc%omega_grid(0) = 0.d0
     calc%omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, calc%omega_grid(1:n), calc%omega_grid_w(1:n))
-    call print_log( &
+    call printer(calc%io, &
         "Initialized a radial integration grid of "//trim(tostr(n))//" points." &
     )
-    call print_log( &
+    call printer(calc%io, &
         "Relative quadrature error in C6 of carbon atom: "// &
         trim(tostr(test_frequency_grid(calc))) &
     )
@@ -792,10 +798,11 @@ type(mat3n3n) function screened_alpha(sys, alpha, damp, k_point, lam)
     call ts(sys%calc, 32)
     if (present(k_point)) then
         ! TODO this needs to be implemented in linalg and switched
-        call invert(screened_alpha%cplx)
+        call invert(screened_alpha%cplx, sys%work%exc)
     else
-        call sinvert(screened_alpha%re)
+        call sinvert(screened_alpha%re, sys%work%exc)
     end if
+    if (has_exc(sys)) return
     call ts(sys%calc, -32)
 end function
 
@@ -926,11 +933,12 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     call ts(sys%calc, 21)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%work%get_modes .or. sys%do_force) then
-            call sdiagonalize('V', relay%re, eigs)
+            call sdiagonalize('V', relay%re, eigs, sys%work%exc)
             call move_alloc(relay%re, sys%work%modes)
         else
-            call sdiagonalize('N', relay%re, eigs)
+            call sdiagonalize('N', relay%re, eigs, sys%work%exc)
         end if
+        if (has_exc(sys)) return
     end if
     ! MPI code begin
     if (is_parallel) then
@@ -945,7 +953,7 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        call print_warning( &
+        call printer(sys%calc%io, &
             "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
             " negative eigenvalues" &
         )
@@ -1098,11 +1106,12 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
     call ts(sys%calc, 22)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%work%get_modes) then
-            call sdiagonalize('V', relay%cplx, eigs)
+            call sdiagonalize('V', relay%cplx, eigs, sys%work%exc)
             sys%work%modes_k(sys%work%i_kpt, :, :) = relay%cplx
         else
-            call sdiagonalize('N', relay%cplx, eigs)
+            call sdiagonalize('N', relay%cplx, eigs, sys%work%exc)
         end if
+        if (has_exc(sys)) return
     end if
     ! MPI code begin
     if (is_parallel) then
@@ -1117,7 +1126,7 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        call print_warning( &
+        call printer(sys%calc%io, &
             "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
             " negative eigenvalues" &
         )
@@ -1172,8 +1181,9 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             relay%re(i, i) = 1.d0+relay%re(i, i) ! relay = 1+alpha*T
         end do
         call ts(sys%calc, 23)
-        call diagonalize('N', relay%re, eigs)
+        call diagonalize('N', relay%re, eigs, sys%work%exc)
         call ts(sys%calc, -23)
+        if (has_exc(sys)) return
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
         n_negative_eigs = 0
@@ -1181,14 +1191,15 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            call print_warning("1+AT matrix has " &
+            call printer(sys%calc%io, "1+AT matrix has " &
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
         ene = ene+1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%work%get_rpa_orders) then
             call ts(sys%calc, 24)
-            call diagonalize('N', AT%re, eigs)
+            call diagonalize('N', AT%re, eigs, sys%work%exc)
             call ts(sys%calc, -24)
+            if (has_exc(sys)) return
             allocate (sys%work%rpa_orders(sys%calc%param%rpa_order_max))
             do n_order = 2, sys%calc%param%rpa_order_max
                 sys%work%rpa_orders(n_order) = sys%work%rpa_orders(n_order) &
@@ -1254,7 +1265,8 @@ real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) resul
             relay%cplx(i, i) = 1.d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
         call ts(sys%calc, 25)
-        call diagonalize('N', relay%cplx, eigs)
+        call diagonalize('N', relay%cplx, eigs, sys%work%exc)
+        if (has_exc(sys)) return
         call ts(sys%calc, -25)
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
@@ -1263,13 +1275,14 @@ real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) resul
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            call print_warning("1+AT matrix has " &
+            call printer(sys%calc%io, "1+AT matrix has " &
                 //trim(tostr(n_negative_eigs))//" negative eigenvalues")
         end if
         ene = ene+1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%work%get_rpa_orders) then
             call ts(sys%calc, 26)
-            call diagonalize('N', AT%cplx, eigs)
+            call diagonalize('N', AT%cplx, eigs, sys%work%exc)
+            if (has_exc(sys)) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
                 sys%work%rpa_orders_k(sys%work%i_kpt, n_order) = &
@@ -1879,6 +1892,22 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
         g_grid(i_kpt, :) = g_kpt_shifted/kpt_range
     end do
 end function make_g_grid
+
+
+logical function has_exc(sys)
+    type(mbd_system), intent(in) :: sys
+
+    has_exc = sys%work%exc%label /= ''
+end function
+
+
+subroutine print_exc(sys)
+    type(mbd_system), intent(in) :: sys
+
+    call printer(sys%calc%io, &
+        'Error "' // trim(sys%work%exc%label) // '" in "' // &
+        trim(sys%work%exc%origin) // ': ' // trim(sys%work%exc%msg))
+end subroutine
 
 
 function make_k_grid(g_grid, uc) result(k_grid)

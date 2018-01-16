@@ -3,8 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_linalg
 
-use mbd_common, only: tostr, dp
-use mbd_interface, only: print_log, print_error
+use mbd_common, only: tostr, dp, exception
 
 implicit none
 
@@ -67,8 +66,9 @@ function eye(n) result(A)
 end function
 
 
-subroutine invert_ge_dble_(A)
+subroutine invert_ge_dble_(A, exc)
     real(dp), intent(inout) :: A(:, :)
+    type(exception), intent(out), optional :: exc
 
     integer :: i_pivot(size(A, 1))
     real(dp), allocatable :: work_arr(:)
@@ -81,9 +81,12 @@ subroutine invert_ge_dble_(A)
     if (n == 0) return
     call DGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
-        call print_error( &
-            "Matrix inversion failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DGETRF'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
     call DGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(n_work_arr_optim)
@@ -91,15 +94,19 @@ subroutine invert_ge_dble_(A)
     call DGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        call print_error( &
-            "Matrix inversion failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DGETRI'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
 end subroutine
 
 
-subroutine invert_ge_cmplx_(A)
+subroutine invert_ge_cmplx_(A, exc)
     complex(dp), intent(inout) :: A(:, :)
+    type(exception), intent(out), optional :: exc
 
     integer :: i_pivot(size(A, 1))
     complex(dp), allocatable :: work_arr(:)
@@ -111,9 +118,12 @@ subroutine invert_ge_cmplx_(A)
     n = size(A, 1)
     call ZGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
-        call print_error( &
-            "Matrix inversion failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'ZGETRF'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
     call ZGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(dble(n_work_arr_optim))
@@ -121,15 +131,19 @@ subroutine invert_ge_cmplx_(A)
     call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        call print_error( &
-            "Matrix inversion failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'ZGETRI'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
 end subroutine
 
 
-subroutine invert_sym_dble_(A)
+subroutine invert_sym_dble_(A, exc)
     real(dp), intent(inout) :: A(:, :)
+    type(exception), intent(out), optional :: exc
 
     integer :: i_pivot(size(A, 1))
     real(dp), allocatable :: work_arr(:)
@@ -145,34 +159,42 @@ subroutine invert_sym_dble_(A)
     allocate (work_arr(n_work_arr))
     call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     if (error_flag /= 0) then
-        call print_error( &
-            "Matrix inversion failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DSYTRF'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
     deallocate (work_arr)
     allocate (work_arr(n))
     call DSYTRI('U', n, A, n, i_pivot, work_arr, error_flag)
     if (error_flag /= 0) then
-        call print_error( &
-            "Matrix inversion failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DSYTRI'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
 end subroutine
 
 
-function inverted(A) result(A_inv)
+function inverted(A, exc) result(A_inv)
     real(dp), intent(in) :: A(:, :)
     real(dp) :: A_inv(size(A, 1), size(A, 2))
+    type(exception), intent(out), optional :: exc
 
     A_inv = A
-    call invert(A_inv)
+    call invert(A_inv, exc)
 end function
 
 
-subroutine diagonalize_sym_dble_(mode, A, eigs)
+subroutine diagonalize_sym_dble_(mode, A, eigs, exc)
     character(len=1), intent(in) :: mode
     real(dp), intent(inout) :: A(:, :)
     real(dp), intent(out) :: eigs(size(A, 1))
+    type(exception), intent(out), optional :: exc
 
     real(dp), allocatable :: work_arr(:)
     integer :: n
@@ -185,16 +207,20 @@ subroutine diagonalize_sym_dble_(mode, A, eigs)
     call DSYEV(mode, "U", n, A, n, eigs, work_arr, size(work_arr), error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        call print_log( &
-            "DSYEV failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DSYEV'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
 end subroutine
 
 
-function diagonalized_sym_dble_(A, eigvecs) result(eigs)
+function diagonalized_sym_dble_(A, eigvecs, exc) result(eigs)
     real(dp), intent(in) :: A(:, :)
     real(dp), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    type(exception), intent(out), optional :: exc
     real(dp) :: eigs(size(A, 1))
 
     real(dp), pointer :: eigvecs_p(:, :)
@@ -208,17 +234,18 @@ function diagonalized_sym_dble_(A, eigvecs) result(eigs)
         allocate (eigvecs_p(size(A, 1), size(A, 2)))
     end if
     eigvecs_p = A
-    call sdiagonalize(mode, eigvecs_p, eigs)
+    call sdiagonalize(mode, eigvecs_p, eigs, exc)
     if (.not. present(eigvecs)) then
         deallocate (eigvecs_p)
     end if
 end function
 
 
-subroutine diagonalize_ge_dble_(mode, A, eigs)
+subroutine diagonalize_ge_dble_(mode, A, eigs, exc)
     character(len=1), intent(in) :: mode
     real(dp), intent(inout) :: A(:, :)
     complex(dp), intent(out) :: eigs(size(A, 1))
+    type(exception), intent(out), optional :: exc
 
     real(dp), allocatable :: work_arr(:)
     integer :: n
@@ -236,18 +263,22 @@ subroutine diagonalize_ge_dble_(mode, A, eigs)
         vectors, n, work_arr, size(work_arr), error_flag)
     deallocate (work_arr)
     if (error_flag /= 0) then
-        call print_log( &
-            "DGEEV failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DGEEV'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
     eigs = cmplx(eigs_r, eigs_i, 8)
     A = vectors
 end subroutine
 
 
-function diagonalized_ge_dble_(A, eigvecs) result(eigs)
+function diagonalized_ge_dble_(A, eigvecs, exc) result(eigs)
     real(dp), intent(in) :: A(:, :)
     real(dp), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+    type(exception), intent(out), optional :: exc
     complex(dp) :: eigs(size(A, 1))
 
     real(dp), pointer :: eigvecs_p(:, :)
@@ -261,17 +292,18 @@ function diagonalized_ge_dble_(A, eigvecs) result(eigs)
         allocate (eigvecs_p(size(A, 1), size(A, 2)))
     end if
     eigvecs_p = A
-    call diagonalize(mode, eigvecs_p, eigs)
+    call diagonalize(mode, eigvecs_p, eigs, exc)
     if (.not. present(eigvecs)) then
         deallocate (eigvecs_p)
     end if
 end function
 
 
-subroutine diagonalize_he_cmplx_(mode, A, eigs)
+subroutine diagonalize_he_cmplx_(mode, A, eigs, exc)
     character(len=1), intent(in) :: mode
     complex(dp), intent(inout) :: A(:, :)
     real(dp), intent(out) :: eigs(size(A, 1))
+    type(exception), intent(out), optional :: exc
 
     complex(dp), allocatable :: work(:)
     complex(dp) :: lwork_cmplx
@@ -289,17 +321,21 @@ subroutine diagonalize_he_cmplx_(mode, A, eigs)
     deallocate (rwork)
     deallocate (work)
     if (error_flag /= 0) then
-        call print_error( &
-            "ZHEEV failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'ZHEEV'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
 end subroutine
 
 
-subroutine diagonalize_ge_cmplx_(mode, A, eigs)
+subroutine diagonalize_ge_cmplx_(mode, A, eigs, exc)
     character(len=1), intent(in) :: mode
     complex(dp), intent(inout) :: A(:, :)
     complex(dp), intent(out) :: eigs(size(A, 1))
+    type(exception), intent(out), optional :: exc
 
     complex(dp), allocatable :: work(:)
     real(dp) :: rwork(2*size(A, 1))
@@ -318,9 +354,12 @@ subroutine diagonalize_ge_cmplx_(mode, A, eigs)
         vectors, n, work, lwork, rwork, error_flag)
     deallocate (work)
     if (error_flag /= 0) then
-        call print_log( &
-            "ZGEEV failed in module mbd with error code " &
-            //trim(tostr(error_flag)))
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'ZGEEV'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
     endif
     A = vectors
 end subroutine
@@ -371,9 +410,10 @@ function make_diag_(d) result(A)
 end function
 
 
-function solve_lin_sys(A, b) result(x)
+function solve_lin_sys(A, b, exc) result(x)
     real(dp), intent(in) :: A(:, :), b(size(A, 1))
     real(dp) :: x(size(b))
+    type(exception), intent(out), optional :: exc
 
     real(dp) :: A_(size(b), size(b))
     integer :: i_pivot(size(b))
@@ -384,6 +424,14 @@ function solve_lin_sys(A, b) result(x)
     x = b
     n = size(b)
     call DGESV(n, 1, A_, n, i_pivot, x, n, error_flag)
+    if (error_flag /= 0) then
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'DGESV'
+            exc%msg = "Failed with code " // trim(tostr(error_flag))
+        end if
+        return
+    endif
 end function
 
 end module mbd_linalg

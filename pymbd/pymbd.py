@@ -48,7 +48,6 @@ class MBDCalc(object):
             self._calc,
             n_atoms,
             _ffi.cast('double*', coords.ctypes.data),
-            periodic,
             _ffi.cast('double*', lattice.ctypes.data) if periodic else _ffi.NULL,
             _ffi.cast('int*', k_grid.ctypes.data) if periodic else _ffi.NULL,
         )

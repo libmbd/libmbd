@@ -13,7 +13,6 @@ struct MBD_system* mbd_init_system(
     struct MBD_calc* calc,
     int n_atoms,
     double* coords,
-    _Bool periodic,
     double* lattice,
     int* k_grid
 );

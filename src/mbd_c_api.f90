@@ -59,13 +59,12 @@ subroutine mbd_destroy_calc(calc_cp) bind(c)
     deallocate (calc_c)
 end subroutine mbd_destroy_calc
 
-type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, periodic, lattice, k_grid) bind(c)
+type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, lattice, k_grid) bind(c)
     type(c_ptr), value :: calc_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: coords(n_atoms, 3)
-    logical(c_bool), intent(in), value :: periodic
-    real(c_double), intent(in) :: lattice(3, 3)
-    integer(c_int), intent(in) :: k_grid(3)
+    real(c_double), intent(in), optional :: lattice(3, 3)
+    integer(c_int), intent(in), optional :: k_grid(3)
 
     type(mbd_calc), pointer :: calc
     type(mbd_system), pointer :: sys
@@ -75,11 +74,11 @@ type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, periodic, lattice
     allocate (sys)
     sys%calc => calc
     sys%coords = coords
-    if (periodic) then
+    if (present(lattice)) then
         sys%periodic = .true.
         sys%lattice = lattice
-        sys%k_grid = k_grid
     end if
+    if (present(k_grid)) sys%k_grid = k_grid
     allocate (sys_c)
     sys_c%mbd_system_f = c_loc(sys)
     sys_c%do_force = c_loc(sys%do_force)

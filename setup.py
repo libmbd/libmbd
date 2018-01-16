@@ -8,7 +8,7 @@ from setuptools import setup
 library_dirs = ['build'] if os.path.exists('build') else []
 sources = [
     'src/mbd_common.f90',
-    'src/mbd_interface.f90',
+    'src/mbd_mpi.f90',
     'src/mbd_linalg.f90',
     'src/mbd.f90',
     'src/mbd_c_api.f90',

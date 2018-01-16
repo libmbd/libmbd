@@ -4,8 +4,7 @@
 module mbd
 
 use mbd_build_flags, only: WITH_MPI
-use mbd_interface, only: &
-    sync_sum, broadcast
+use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
@@ -52,7 +51,7 @@ type :: mbd_calc
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
     logical :: parallel = .false.
-    integer :: comm
+    integer :: comm = MPI_COMM_WORLD
     integer :: io = -1
     integer :: my_task = 0
     integer :: n_tasks = 1
@@ -248,7 +247,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
         end do ! i_cell
         ! MPI code begin
         if (is_parallel) then
-            call sync_sum(ene_shell)
+            call sync_sum(ene_shell, sys%calc%comm)
         end if
         ! MPI code end
         ene = ene+ene_shell
@@ -420,9 +419,9 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     ! MPI code begin
     if (sys%calc%parallel) then
         if (present(k_point)) then
-            call sync_sum(dipmat%cplx)
+            call sync_sum(dipmat%cplx, sys%calc%comm)
         else
-            call sync_sum(dipmat%re)
+            call sync_sum(dipmat%re, sys%calc%comm)
         end if
     end if
     ! MPI code end
@@ -535,9 +534,9 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     ! MPI code begin
     if (is_parallel) then
         if (present(k_point)) then
-            call sync_sum(dipmat%cplx)
+            call sync_sum(dipmat%cplx, sys%calc%comm)
         else
-            call sync_sum(dipmat%re)
+            call sync_sum(dipmat%re, sys%calc%comm)
         end if
     end if
     ! MPI code end
@@ -639,12 +638,12 @@ end subroutine get_omega_grid
 
 
 subroutine gauss_legendre(n, r, w)
-    use mbd_interface, only: legendre_precision
+    use mbd_build_flags, only: LEGENDRE_PREC
 
     integer, intent(in) :: n
     real(dp), intent(out) :: r(n), w(n)
 
-    integer, parameter :: q = legendre_precision
+    integer, parameter :: q = LEGENDRE_PREC
     integer, parameter :: n_iter = 1000
     real(q) :: x, f, df, dx
     integer :: k, iter, i
@@ -731,7 +730,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     end do
     ! MPI code begin
     if (is_parallel) then
-        call sync_sum(alpha_scs)
+        call sync_sum(alpha_scs, sys%calc%comm)
     end if
     ! MPI code end
 
@@ -924,8 +923,8 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     end if
     ! MPI code begin
     if (is_parallel) then
-        call broadcast(relay%re)
-        call broadcast(eigs)
+        call broadcast(relay%re, sys%calc%comm)
+        call broadcast(eigs, sys%calc%comm)
     end if
     ! MPI code end
     call ts(sys%calc, -21)
@@ -1033,10 +1032,10 @@ real(dp) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     end do ! k_point loop
     ! MPI code begin
     if (is_parallel) then
-        call sync_sum(ene)
-        if (sys%work%get_eigs) call sync_sum(sys%work%mode_enes_k)
-        if (sys%work%get_modes) call sync_sum(sys%work%modes_k)
-        if (sys%work%get_rpa_orders) call sync_sum(sys%work%rpa_orders_k)
+        call sync_sum(ene, sys%calc%comm)
+        if (sys%work%get_eigs) call sync_sum(sys%work%mode_enes_k, sys%calc%comm)
+        if (sys%work%get_modes) call sync_sum(sys%work%modes_k, sys%calc%comm)
+        if (sys%work%get_rpa_orders) call sync_sum(sys%work%rpa_orders_k, sys%calc%comm)
     end if
     ! MPI code end
     ene = ene/size(sys%work%k_pts, 1)
@@ -1097,8 +1096,8 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
     end if
     ! MPI code begin
     if (is_parallel) then
-        call broadcast(relay%cplx)
-        call broadcast(eigs)
+        call broadcast(relay%cplx, sys%calc%comm)
+        call broadcast(eigs, sys%calc%comm)
     end if
     ! MPI code end
     call ts(sys%calc, -22)
@@ -1193,9 +1192,9 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         sys%calc%mute = .true.
     end do
     if (is_parallel) then
-        call sync_sum(ene)
+        call sync_sum(ene, sys%calc%comm)
         if (sys%work%get_rpa_orders) then
-            call sync_sum(sys%work%rpa_orders)
+            call sync_sum(sys%work%rpa_orders, sys%calc%comm)
         end if
     end if
 end function get_single_rpa_energy
@@ -1277,9 +1276,9 @@ real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) resul
         sys%calc%mute = .true.
     end do
     if (is_parallel) then
-        call sync_sum(ene)
+        call sync_sum(ene, sys%calc%comm)
         if (sys%work%get_rpa_orders) then
-            call sync_sum(sys%work%rpa_orders_k(sys%work%i_kpt, :))
+            call sync_sum(sys%work%rpa_orders_k(sys%work%i_kpt, :), sys%calc%comm)
         end if
     end if
 
@@ -1387,7 +1386,7 @@ function eval_mbd_nonint_density(calc, pts, xyz, charges, masses, omegas) result
         rho(i_pt) = sum(pre*exp(-kernel*rsq))
     end do
     if (calc%parallel) then
-        call sync_sum(rho)
+        call sync_sum(rho, calc%comm)
     end if
 end function
 
@@ -1429,8 +1428,8 @@ function eval_mbd_int_density(calc, pts, xyz, charges, masses, omegas, modes) re
             *sqrt(product(omegas)/product(sdiagonalized(omegas_p(other, other))))
     end do
     if (calc%parallel) then
-        call sync_sum(kernel)
-        call sync_sum(pre)
+        call sync_sum(kernel, calc%comm)
+        call sync_sum(pre, calc%comm)
     end if
     rho(:) = 0.d0
     do i_pt = 1, size(pts, 1)
@@ -1445,7 +1444,7 @@ function eval_mbd_int_density(calc, pts, xyz, charges, masses, omegas, modes) re
         rho(i_pt) = sum(pre*exp(-factor))
     end do
     if (calc%parallel) then
-        call sync_sum(rho)
+        call sync_sum(rho, calc%comm)
     end if
 end function
 

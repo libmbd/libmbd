@@ -15,7 +15,7 @@ set(SRCS
     src/mbd_vdw_param.f90
     src/mbd_helper_dev.f90
     src/mbd_math.f90
-    src/mbd_interface.f90
+    src/mbd_mpi.f90
     src/mbd_common.f90
     src/mbd_linalg.f90
     src/mbd_types.f90
@@ -31,7 +31,7 @@ add_library(mbd SHARED ${SRCS})
 target_link_libraries(mbd ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
 
 if(${MPI_Fortran_FOUND})
-    set_source_files_properties(src/mbd_interface.f90
+    set_source_files_properties(src/mbd_mpi.f90
         PROPERTIES COMPILE_FLAGS "${MPI_Fortran_COMPILE_FLAGS}")
     target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})

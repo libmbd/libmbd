@@ -6,7 +6,9 @@ module mbd_c_api
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
-    mbd_rsscs_energy, mbd_scs_energy
+    mbd_rsscs_energy, mbd_scs_energy, dipole_matrix
+use mbd_common, only: dp
+use mbd_types, only: mat3n3n
 
 implicit none
 
@@ -212,6 +214,32 @@ real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, dampin
     call c_f_pointer(damping_p, damping)
     calc_mbd_scs_energy = mbd_scs_energy(sys, alpha_0, C6, damping)
 end function calc_mbd_scs_energy
+
+subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
+    type(c_ptr), intent(in), value :: sys_cp
+    type(c_ptr), intent(in), value :: damping_p
+    real(c_double), intent(in), optional :: k_point(3)
+    type(c_ptr), intent(in), value :: dipmat_p
+
+    type(mbd_system), pointer :: sys
+    type(mbd_damping), pointer :: damp
+    type(mat3n3n) :: dipmat
+    real(dp), pointer :: dipmat_re(:, :)
+    complex(dp), pointer :: dipmat_cplx(:, :)
+    integer :: n_atoms
+
+    sys => get_mbd_system(sys_cp)
+    n_atoms = size(sys%coords, 1)
+    call c_f_pointer(damping_p, damp)
+    dipmat = dipole_matrix(sys, damp, k_point)
+    if (present(k_point)) then
+        call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
+        dipmat_cplx = dipmat%cplx
+    else
+        call c_f_pointer(dipmat_p, dipmat_re, [3*n_atoms, 3*n_atoms])
+        dipmat_re = dipmat%re
+    end if
+end subroutine calc_dipole_matrix
 
 function f_string(str_c) result(str_f)
     character(kind=c_char), intent(in) :: str_c(*)

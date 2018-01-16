@@ -61,3 +61,10 @@ double calc_mbd_scs_energy(
     double* C6,
     struct MBD_damping* damping
 );
+
+double calc_dipole_matrix(
+    struct MBD_system* sys,
+    struct MBD_damping* damping,
+    double* k_point,
+    double* dipmat
+);

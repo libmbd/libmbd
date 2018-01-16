@@ -78,6 +78,45 @@ class MBDCalc(object):
         _lib.mbd_destroy_system(system)
         return ret_val
 
+    def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,
+                      R_vdw=None, sigma=None, a=6.):
+        if not self._calc:
+            raise RuntimeError('MBDCalc must be used as a context manager')
+        coords = _array(coords, dtype=float, order='F')
+        R_vdw = _array(R_vdw, dtype=float)
+        sigma = _array(sigma, dtype=float)
+        lattice = _array(lattice, dtype=float, order='F')
+        k_point = _array(k_point, dtype=float)
+        n_atoms = len(coords)
+        system = _lib.mbd_init_system(
+            self._calc,
+            n_atoms,
+            _cast('double*', coords),
+            _cast('double*', lattice),
+            _ffi.NULL,
+        )
+        damping = _lib.mbd_init_damping(
+            n_atoms, damping.encode(),
+            _cast('double*', R_vdw),
+            _cast('double*', sigma),
+            beta, a,
+        )
+        dipmat = np.empty(
+            (3*n_atoms, 3*n_atoms),
+            dtype=float if k_point is None else complex,
+            order='F'
+        )
+        _lib.calc_dipole_matrix(
+            system,
+            damping,
+            _cast('double*', k_point),
+            _cast('double*', dipmat),
+        )
+        dipmat += dipmat.T
+        _lib.mbd_destroy_damping(damping)
+        _lib.mbd_destroy_system(system)
+        return dipmat
+
     def mbd_energy_species(self, coords, species, volumes, beta, **kwargs):
         alpha_0, C6, R_vdw = (
             np.array([vdw_params[sp][param] for sp in species])

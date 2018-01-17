@@ -73,9 +73,9 @@ def update_dict(dct, update):
 if libmbd_exists():
     kwargs = {'libraries': ['mbd']}
     if sys.platform == 'darwin':
-        kwargs['extra_link_args'] = ['-rpath', 'build']
+        kwargs['extra_link_args'] = ['-rpath', os.path.realpath('build')]
     else:
-        kwargs['runtime_library_dirs'] = ['build']
+        kwargs['runtime_library_dirs'] = [os.path.realpath('build')]
 else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info

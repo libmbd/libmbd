@@ -158,15 +158,24 @@ class MBDCalc(object):
         return ene
 
     def mbd_energy_species(self, coords, species, volumes, beta, **kwargs):
-        alpha_0, C6, R_vdw = (
-            np.array([vdw_params[sp][param] for sp in species])
-            for param in ['alpha_0', 'C6', 'R_vdw']
-        )
-        volumes = np.array(volumes)
-        alpha_0 *= volumes
-        C6 *= volumes**2
-        R_vdw *= volumes**(1./3)
+        alpha_0, C6, R_vdw = from_volumes(species, volumes)
         return self.mbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
+
+    def pymbd_energy_species(self, coords, species, volumes, beta, **kwargs):
+        alpha_0, C6, R_vdw = from_volumes(species, volumes)
+        return self.pymbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
+
+
+def from_volumes(species, volumes):
+    alpha_0, C6, R_vdw = (
+        np.array([vdw_params[sp][param] for sp in species])
+        for param in ['alpha_0', 'C6', 'R_vdw']
+    )
+    volumes = np.array(volumes)
+    alpha_0 *= volumes
+    C6 *= volumes**2
+    R_vdw *= volumes**(1./3)
+    return alpha_0, C6, R_vdw
 
 
 def numerical_forces(f, coords, *args, **kwargs):

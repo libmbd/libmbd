@@ -8,6 +8,7 @@ from setuptools import setup
 library_dirs = ['build'] if os.path.exists('build') else []
 sources = [
     'src/mbd_common.f90',
+    'src/mbd_types.f90',
     'src/mbd_mpi.f90',
     'src/mbd_linalg.f90',
     'src/mbd.f90',
@@ -86,7 +87,7 @@ else:
         flags_src = flags_src.replace('@' + var + '@', val)
     with open('mbd_build_flags.f90', 'w') as f:
         f.write(flags_src)
-    sources.append('mbd_build_flags.f90')
+    sources.insert(0, 'mbd_build_flags.f90')
     kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
     update_dict(kwargs, get_info('lapack_opt', 2))
 

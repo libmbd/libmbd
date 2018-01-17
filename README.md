@@ -1,10 +1,11 @@
 # `pymbd` — Many-body dispersion method
 
-[![](https://travis-ci.org/azag0/pymbd.svg)](https://travis-ci.org/azag0/pymbd)
-![](https://img.shields.io/codecov/c/github/azag0/pymbd.svg)
-![](https://img.shields.io/badge/Python-2.7-brightgreen.svg)
-![](https://img.shields.io/badge/Python-3.6-brightgreen.svg)
-[![GitHub license](https://img.shields.io/github/license/azag0/pymbd.svg)](https://github.com/azag0/pymbd/blob/master/LICENSE)
+
+[![Travis](https://img.shields.io/travis/azag0/pymbd.svg)](https://travis-ci.org/azag0/pymbd)
+[![Codecov](https://img.shields.io/codecov/c/github/azag0/pymbd.svg)](https://codecov.io/gh/azag0/pymbd)
+[![Python 2.7](https://img.shields.io/badge/Python-2.7-blue.svg)]()
+[![Python 3.6](https://img.shields.io/badge/Python-3.6-blue.svg)]()
+[![MPL 2.0 license](https://img.shields.io/github/license/azag0/pymbd.svg)](https://github.com/azag0/pymbd/blob/master/LICENSE)
 
 Python 2/3 package for calculating [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) energies.
 

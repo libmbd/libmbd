@@ -126,6 +126,37 @@ class MBDCalc(object):
         _lib.mbd_destroy_system(system)
         return dipmat
 
+    def pymbd_energy(self, coords, alpha_0, C6, R_vdw, beta):
+        coords = _array(coords, dtype=float, order='F')
+        alpha_0 = _array(alpha_0, dtype=float)
+        C6 = _array(C6, dtype=float)
+        R_vdw = _array(R_vdw, dtype=float)
+        freq, freq_w = self.omega_grid
+        omega = 4./3*C6/alpha_0**2
+        alpha_dyn = alpha_0/(1+(freq[:, None]/omega)**2)
+        alpha_dyn_rsscs = np.empty_like(alpha_dyn)
+        for a, a_scr in zip(alpha_dyn, alpha_dyn_rsscs):
+            sigma = (np.sqrt(2./np.pi)*a/3)**(1./3)
+            a_nlc = np.linalg.inv(
+                np.diag(np.repeat(1./a, 3)) +
+                self.dipole_matrix(
+                    coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta
+                )
+            )
+            a_scr[:] = sum(a_nlc[i::3, i::3].sum(1) for i in range(3))/3
+        C6_rsscs = 3./np.pi*np.sum(freq_w[:, None]*alpha_dyn_rsscs**2, 0)
+        R_vdw_rsscs = R_vdw*(alpha_dyn_rsscs[0, :]/alpha_0)**(1./3)
+        omega_rsscs = 4./3*C6_rsscs/alpha_dyn_rsscs[0, :]**2
+        pre = np.repeat(omega_rsscs*np.sqrt(alpha_dyn_rsscs[0, :]), 3)
+        eigs = np.linalg.eigvalsh(
+            np.diag(np.repeat(omega_rsscs**2, 3)) +
+            np.outer(pre, pre)*self.dipole_matrix(
+                coords, 'fermi,dip', R_vdw=R_vdw_rsscs, beta=beta
+            )
+        )
+        ene = np.sum(np.sqrt(eigs))/2-3*np.sum(omega_rsscs)/2
+        return ene
+
     def mbd_energy_species(self, coords, species, volumes, beta, **kwargs):
         alpha_0, C6, R_vdw = (
             np.array([vdw_params[sp][param] for sp in species])

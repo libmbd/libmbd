@@ -163,6 +163,18 @@ def test_ethylcarbamate(calc):
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
+def test_ethylcarbamate_python(calc):
+    enes = [
+        calc.pymbd_energy_species(
+            coords, species, vols, 0.83,
+            lattice=lattice, k_grid=k_grid
+        )
+        for coords, lattice, k_grid, species, vols in ethylcarbamate
+    ]
+    ene_int = enes[0]-2*enes[1]
+    assert ene_int == approx(-0.037040868610822564, rel=1e-10)
+
+
 def test_ethylcarbamate_scs(calc):
     enes = [
         calc.mbd_energy_species(

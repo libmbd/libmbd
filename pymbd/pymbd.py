@@ -6,6 +6,7 @@ import numpy as np
 import pkg_resources
 import sys
 import csv
+from itertools import product
 try:
     from mpi4py import MPI
     MPI.COMM_WORLD
@@ -126,7 +127,8 @@ class MBDCalc(object):
         _lib.mbd_destroy_system(system)
         return dipmat
 
-    def pymbd_energy(self, coords, alpha_0, C6, R_vdw, beta):
+    def pymbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
+                     lattice=None, k_grid=None):
         coords = _array(coords, dtype=float, order='F')
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
@@ -140,7 +142,8 @@ class MBDCalc(object):
             a_nlc = np.linalg.inv(
                 np.diag(np.repeat(1./a, 3)) +
                 self.dipole_matrix(
-                    coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta
+                    coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta,
+                    lattice=lattice
                 )
             )
             a_scr[:] = sum(a_nlc[i::3, i::3].sum(1) for i in range(3))/3
@@ -148,13 +151,22 @@ class MBDCalc(object):
         R_vdw_rsscs = R_vdw*(alpha_dyn_rsscs[0, :]/alpha_0)**(1./3)
         omega_rsscs = 4./3*C6_rsscs/alpha_dyn_rsscs[0, :]**2
         pre = np.repeat(omega_rsscs*np.sqrt(alpha_dyn_rsscs[0, :]), 3)
-        eigs = np.linalg.eigvalsh(
-            np.diag(np.repeat(omega_rsscs**2, 3)) +
-            np.outer(pre, pre)*self.dipole_matrix(
-                coords, 'fermi,dip', R_vdw=R_vdw_rsscs, beta=beta
+        if lattice is None:
+            k_grid = [None]
+        else:
+            assert k_grid is not None
+            k_grid = get_kgrid(lattice, k_grid)
+        ene = 0
+        for k_point in k_grid:
+            eigs = np.linalg.eigvalsh(
+                np.diag(np.repeat(omega_rsscs**2, 3)) +
+                np.outer(pre, pre)*self.dipole_matrix(
+                    coords, 'fermi,dip', R_vdw=R_vdw_rsscs, beta=beta,
+                    lattice=lattice, k_point=k_point
+                )
             )
-        )
-        ene = np.sum(np.sqrt(eigs))/2-3*np.sum(omega_rsscs)/2
+            ene += np.sum(np.sqrt(eigs))/2-3*np.sum(omega_rsscs)/2
+        ene /= len(k_grid)
         return ene
 
     def mbd_energy_species(self, coords, species, volumes, beta, **kwargs):
@@ -176,6 +188,17 @@ def from_volumes(species, volumes):
     C6 *= volumes**2
     R_vdw *= volumes**(1./3)
     return alpha_0, C6, R_vdw
+
+
+def get_kgrid(lattice, k_grid, shift=0.5):
+    k_grid = np.array(k_grid)
+    lattice = np.array(lattice)
+    idx_grid = np.array(list(product(*map(range, k_grid))))+shift
+    idx_grid /= k_grid
+    idx_grid = np.where(idx_grid > 0.5, idx_grid-1, idx_grid)
+    recp_lattice = 2*np.pi*np.linalg.inv(lattice.T)
+    k_grid = idx_grid.dot(recp_lattice)
+    return k_grid
 
 
 def numerical_forces(f, coords, *args, **kwargs):

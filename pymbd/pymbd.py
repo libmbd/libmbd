@@ -146,7 +146,9 @@ class MBDCalc(object):
                     lattice=lattice
                 )
             )
-            a_scr[:] = sum(a_nlc[i::3, i::3].sum(1) for i in range(3))/3
+            a_scr[:] = np.array(
+                [a_nlc[i::3, i::3].sum(1) for i in range(3)]
+            ).sum(0)/3
         C6_rsscs = 3./np.pi*np.sum(freq_w[:, None]*alpha_dyn_rsscs**2, 0)
         R_vdw_rsscs = R_vdw*(alpha_dyn_rsscs[0, :]/alpha_0)**(1./3)
         omega_rsscs = 4./3*C6_rsscs/alpha_dyn_rsscs[0, :]**2

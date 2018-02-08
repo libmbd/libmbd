@@ -28,11 +28,12 @@ def _cast(ctype, array):
 
 
 class MBDCalc(object):
-    def __init__(self):
+    def __init__(self, n_freq=15):
         self.__calc = None
+        self.n_freq = n_freq
 
     def __enter__(self):
-        self.__calc = _lib.mbd_init_calc()
+        self.__calc = _lib.mbd_init_calc(self.n_freq)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):

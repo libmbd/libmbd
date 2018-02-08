@@ -6,7 +6,7 @@ struct MBD_calc {
     double* omega_grid_w;
 };
 
-struct MBD_calc* mbd_init_calc(void);
+struct MBD_calc* mbd_init_calc(int n_freq);
 void mbd_set_parallel(struct MBD_calc* calc, int rank, int n_proc);
 void mbd_destroy_calc(struct MBD_calc* calc);
 

@@ -122,7 +122,6 @@ class MBDCalc(object):
             _cast('double*', k_point),
             _cast('double*', dipmat),
         )
-        dipmat = np.triu(dipmat)+np.triu(dipmat, 1).T
         _lib.mbd_destroy_damping(damping)
         _lib.mbd_destroy_system(system)
         return dipmat

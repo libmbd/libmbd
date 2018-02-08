@@ -428,6 +428,19 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     if (do_ewald) then
         call add_ewald_dipole_parts(sys, ewald_alpha, dipmat, k_point)
     end if
+    if (present(k_point)) then
+        do i_atom = 1, 3*n_atoms
+            do j_atom = i_atom+1, 3*n_atoms
+                dipmat%cplx(j_atom, i_atom) = dipmat%cplx(i_atom, j_atom)
+            end do
+        end do
+    else
+        do i_atom = 1, 3*n_atoms
+            do j_atom = i_atom+1, 3*n_atoms
+                dipmat%re(j_atom, i_atom) = dipmat%re(i_atom, j_atom)
+            end do
+        end do
+    end if
 end function dipole_matrix
 
 

@@ -431,7 +431,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     if (present(k_point)) then
         do i_atom = 1, 3*n_atoms
             do j_atom = i_atom+1, 3*n_atoms
-                dipmat%cplx(j_atom, i_atom) = dipmat%cplx(i_atom, j_atom)
+                dipmat%cplx(j_atom, i_atom) = conjg(dipmat%cplx(i_atom, j_atom))
             end do
         end do
     else

@@ -180,10 +180,10 @@ class MBDCalc(object):
         return self.pymbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
 
-def from_volumes(species, volumes):
+def from_volumes(species, volumes, kind='TS'):
     alpha_0, C6, R_vdw = (
         np.array([vdw_params[sp][param] for sp in species])
-        for param in ['alpha_0', 'C6', 'R_vdw']
+        for param in ['alpha_0({})'.format(kind), 'C6({})'.format(kind), 'R_vdw']
     )
     volumes = np.array(volumes)
     alpha_0 *= volumes
@@ -229,7 +229,7 @@ def _get_vdw_params():
     reader = csv.DictReader(csv_lines, quoting=csv.QUOTE_NONNUMERIC)
     vdw_params = {}
     for row in reader:
-        vdw_params[row.pop('species')] = row
+        vdw_params[row.pop('symbol')] = row
     return vdw_params
 
 

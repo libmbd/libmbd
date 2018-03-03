@@ -370,6 +370,13 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                             T_bare_v2(r, sys%do_force), &
                             .false. &
                         )
+                    case ("sqrtfermi,dip")
+                        Tpp = T_damped( &
+                            sys, &
+                            damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
+                            T_bare_v2(r, sys%do_force), &
+                            .false. &
+                        )
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
@@ -380,6 +387,14 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp = T_damped( &
                             sys, &
                             damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
+                            T_erf_coulomb(r, sigma_ij, sys%do_force), &
+                            .true. &
+                        )
+                        do_ewald = .false.
+                    case ("sqrtfermi,dip,gg")
+                        Tpp = T_damped( &
+                            sys, &
+                            damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
                             T_erf_coulomb(r, sigma_ij, sys%do_force), &
                             .true. &
                         )
@@ -1629,6 +1644,17 @@ type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
         f%dr = pre*r/(r_1*s_vdw)
         f%dvdw = -pre*r_1/s_vdw**2
     end if
+end function
+
+
+type(scalar) function damping_sqrtfermi(r, s_vdw, d, deriv) result(f)
+    real(dp), intent(in) :: r(3)
+    real(dp), intent(in) :: s_vdw
+    real(dp), intent(in) :: d
+    logical, intent(in) :: deriv
+
+    f = damping_fermi(r, s_vdw, d, deriv)
+    f%val = sqrt(f%val)
 end function
 
 

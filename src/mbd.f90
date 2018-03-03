@@ -217,9 +217,11 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
                     r = sys%coords(i_atom, :)-sys%coords(j_atom, :)-R_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm > sys%calc%param%ts_cutoff_radius) cycle
-                    if (r_norm >= i_shell*shell_thickness &
-                        .or. r_norm < (i_shell-1)*shell_thickness) then
-                        cycle
+                    if (is_crystal) then
+                        if (r_norm >= i_shell*shell_thickness &
+                            .or. r_norm < (i_shell-1)*shell_thickness) then
+                            cycle
+                        end if
                     end if
                     C6_ij = combine_C6( &
                         C6(i_atom), C6(j_atom), &

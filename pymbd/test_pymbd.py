@@ -152,7 +152,7 @@ def test_benzene_dimer_ts(calc):
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
-    assert ene_int == approx(-0.00839387307029841, rel=1e-10)
+    assert ene_int == approx(-0.008490052683234028, rel=1e-10)
 
 
 def test_benzene(calc):
@@ -214,4 +214,4 @@ def test_ethylcarbamate_ts(calc):
         for coords, lattice, _, species, vols in ethylcarbamate
     ]
     ene_int = enes[0]-2*enes[1]
-    assert ene_int == approx(-0.05220274116539777, rel=1e-10)
+    assert ene_int == approx(-0.052171811689150846, rel=1e-10)

@@ -36,6 +36,14 @@ struct MBD_damping* mbd_init_damping(
 
 void mbd_destroy_damping(struct MBD_damping* damping);
 
+double calc_ts_energy(
+    struct MBD_system* sys,
+    int n_atoms,
+    double* alpha_0,
+    double* C6,
+    struct MBD_damping* damping
+);
+
 double calc_mbd_energy(
     struct MBD_system* sys,
     int n_atoms,

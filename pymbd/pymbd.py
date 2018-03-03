@@ -53,6 +53,35 @@ class MBDCalc(object):
             _ndarray(self._calc.omega_grid_w, (self._calc.n_freq+1,)).copy(),
         )
 
+    def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
+                   lattice=None, d=20., damping='fermi'):
+        coords = _array(coords, dtype=float, order='F')
+        alpha_0 = _array(alpha_0, dtype=float)
+        C6 = _array(C6, dtype=float)
+        R_vdw = _array(R_vdw, dtype=float)
+        lattice = _array(lattice, dtype=float, order='F')
+        n_atoms = len(coords)
+        system = _lib.mbd_init_system(
+            self._calc,
+            n_atoms,
+            _cast('double*', coords),
+            _cast('double*', lattice),
+            _ffi.NULL,
+        )
+        damping = _lib.mbd_init_damping(
+            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d,
+        )
+        ene = _lib.calc_ts_energy(
+            system,
+            n_atoms,
+            _cast('double*', alpha_0),
+            _cast('double*', C6),
+            damping
+        )
+        _lib.mbd_destroy_damping(damping)
+        _lib.mbd_destroy_system(system)
+        return ene
+
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,
@@ -178,6 +207,10 @@ class MBDCalc(object):
     def pymbd_energy_species(self, coords, species, volumes, beta, **kwargs):
         alpha_0, C6, R_vdw = from_volumes(species, volumes)
         return self.pymbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
+
+    def ts_energy_species(self, coords, species, volumes, sR, **kwargs):
+        alpha_0, C6, R_vdw = from_volumes(species, volumes)
+        return self.ts_energy(coords, alpha_0, C6, R_vdw, sR, **kwargs)
 
 
 def from_volumes(species, volumes, kind='TS'):

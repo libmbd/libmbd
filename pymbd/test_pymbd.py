@@ -90,6 +90,13 @@ def test_argon_dimer_rsscs(calc):
     assert ene == approx(-0.0002462647623815428, rel=1e-10)
 
 
+def test_argon_dimer_ts(calc):
+    ene = calc.ts_energy(
+        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.94
+    )
+    assert ene == approx(-0.000318123017869182, rel=1e-10)
+
+
 def test_benzene_dimer(calc):
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
@@ -135,6 +142,17 @@ def test_benzene_dimer_scs(calc):
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.007462380657774048, rel=1e-10)
+
+
+def test_benzene_dimer_ts(calc):
+    mon1, mon2 = benzene_dimer
+    dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
+    enes = [
+        calc.ts_energy_species(coords, species, vols, 0.94)
+        for coords, species, vols in (mon1, mon2, dim)
+    ]
+    ene_int = enes[2]-enes[1]-enes[0]
+    assert ene_int == approx(-0.00839387307029841, rel=1e-10)
 
 
 def test_benzene(calc):
@@ -186,3 +204,14 @@ def test_ethylcarbamate_scs(calc):
     ]
     ene_int = enes[0]-2*enes[1]
     assert ene_int == approx(-0.03633331132194684, rel=1e-10)
+
+
+def test_ethylcarbamate_ts(calc):
+    enes = [
+        calc.ts_energy_species(
+            coords, species, vols, 0.83, lattice=lattice
+        )
+        for coords, lattice, _, species, vols in ethylcarbamate
+    ]
+    ene_int = enes[0]-2*enes[1]
+    assert ene_int == approx(-0.05220274116539777, rel=1e-10)

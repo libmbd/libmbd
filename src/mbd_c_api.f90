@@ -6,7 +6,7 @@ module mbd_c_api
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
-    mbd_rsscs_energy, mbd_scs_energy, dipole_matrix
+    mbd_rsscs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
 
@@ -124,6 +124,8 @@ type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a)
     if (present(sigma)) damping%sigma = sigma
     damping%beta = beta
     damping%a = a
+    damping%ts_sr = beta
+    damping%ts_d = a
     mbd_init_damping = c_loc(damping)
 end function mbd_init_damping
 
@@ -157,6 +159,23 @@ function get_mbd_calc(calc_cp)
     call c_f_pointer(calc_cp, calc_c)
     call c_f_pointer(calc_c%mbd_calc_f, get_mbd_calc)
 end function
+
+real(c_double) function calc_ts_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
+    type(c_ptr), intent(in), value :: sys_cp
+    integer(c_int), intent(in), value :: n_atoms
+    real(c_double), intent(in) :: alpha_0(n_atoms)
+    real(c_double), intent(in) :: C6(n_atoms)
+    type(c_ptr), intent(in), value :: damping_p
+
+    type(mbd_system_c), pointer :: sys_c
+    type(mbd_system), pointer :: sys
+    type(mbd_damping), pointer :: damping
+
+    call c_f_pointer(sys_cp, sys_c)
+    call c_f_pointer(sys_c%mbd_system_f, sys)
+    call c_f_pointer(damping_p, damping)
+    calc_ts_energy = get_ts_energy(sys, alpha_0, C6, damping)
+end function calc_ts_energy
 
 real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
     type(c_ptr), intent(in), value :: sys_cp

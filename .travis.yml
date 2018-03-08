@@ -27,7 +27,8 @@ before_install:
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     rm -rf /usr/local/include/c++
     brew update
-    brew install python3 gcc mpich
+    brew upgrade python
+    brew install gcc mpich
   fi
 install:
 - |

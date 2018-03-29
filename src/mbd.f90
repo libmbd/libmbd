@@ -366,14 +366,12 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     case ("fermi,dip")
                         Tpp = T_damped( &
                             damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
-                            T_bare_v2(r, sys%do_force), &
-                            .false. &
+                            T_bare_v2(r, sys%do_force) &
                         )
                     case ("sqrtfermi,dip")
                         Tpp = T_damped( &
                             damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
-                            T_bare_v2(r, sys%do_force), &
-                            .false. &
+                            T_bare_v2(r, sys%do_force) &
                         )
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
@@ -383,16 +381,14 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp = T_erf_coulomb(r, sigma_ij, sys%do_force)
                     case ("fermi,dip,gg")
                         Tpp = T_damped( &
-                            damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
-                            T_erf_coulomb(r, sigma_ij, sys%do_force), &
-                            .true. &
+                            op1minus(damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force)), &
+                            T_erf_coulomb(r, sigma_ij, sys%do_force) &
                         )
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
                         Tpp = T_damped( &
-                            damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
-                            T_erf_coulomb(r, sigma_ij, sys%do_force), &
-                            .true. &
+                            op1minus(damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force)), &
+                            T_erf_coulomb(r, sigma_ij, sys%do_force) &
                         )
                         do_ewald = .false.
                     case ("custom,dip,gg")
@@ -1655,31 +1651,31 @@ type(scalar) function damping_sqrtfermi(r, s_vdw, d, deriv) result(f)
 end function
 
 
-type(mat33) function T_damped(f, T, sr)
+type(scalar) function op1minus(f)
+    type(scalar), intent(in) :: f
+
+    op1minus%val = 1-f%val
+    if (allocated(f%dr)) op1minus%dr = -f%dr
+    if (allocated(f%dvdw)) op1minus%dvdw = -f%dvdw
+end function
+
+
+type(mat33) function T_damped(f, T)
     type(scalar), intent(in) :: f
     type(mat33), intent(in) :: T
-    logical, intent(in) :: sr  ! true: f, false: 1-f
 
-    real(dp) :: pre
-    integer :: sgn, c
+    integer :: c
 
-    if (sr) then
-        pre = 1-f%val
-        sgn = -1
-    else
-        pre = f%val
-        sgn = 1
-    end if
-    T_damped%val = pre*T%val
+    T_damped%val = f%val*T%val
     if (allocated(f%dr) .or. allocated(T%dr)) &
         allocate (T_damped%dr(3, 3, 3), source=0.d0)
     if (allocated(f%dvdw) .or. allocated(T%dvdw)) &
         allocate (T_damped%dvdw(3, 3), source=0.d0)
-    if (allocated(f%dr)) forall (c = 1:3) T_damped%dr(:, :, c) = sgn*f%dr(c)*T%val
-    if (allocated(T%dr)) T_damped%dr = T_damped%dr + pre*T%dr
-    if (allocated(f%dvdw)) T_damped%dvdw = sgn*f%dvdw*T%val
-    if (allocated(T%dvdw)) T_damped%dvdw = T_damped%dvdw + pre*T%dvdw
-    if (allocated(T%dsigma)) T_damped%dsigma = pre*T%dsigma
+    if (allocated(f%dr)) forall (c = 1:3) T_damped%dr(:, :, c) = f%dr(c)*T%val
+    if (allocated(T%dr)) T_damped%dr = T_damped%dr + f%val*T%dr
+    if (allocated(f%dvdw)) T_damped%dvdw = f%dvdw*T%val
+    if (allocated(T%dvdw)) T_damped%dvdw = T_damped%dvdw + f%val*T%dvdw
+    if (allocated(T%dsigma)) T_damped%dsigma = f%val*T%dsigma
 end function
 
 

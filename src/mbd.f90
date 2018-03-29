@@ -365,14 +365,12 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")
                         Tpp = T_damped( &
-                            sys, &
                             damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
                             T_bare_v2(r, sys%do_force), &
                             .false. &
                         )
                     case ("sqrtfermi,dip")
                         Tpp = T_damped( &
-                            sys, &
                             damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
                             T_bare_v2(r, sys%do_force), &
                             .false. &
@@ -385,7 +383,6 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp = T_erf_coulomb(r, sigma_ij, sys%do_force)
                     case ("fermi,dip,gg")
                         Tpp = T_damped( &
-                            sys, &
                             damping_fermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
                             T_erf_coulomb(r, sigma_ij, sys%do_force), &
                             .true. &
@@ -393,7 +390,6 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
                         Tpp = T_damped( &
-                            sys, &
                             damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a, sys%do_force), &
                             T_erf_coulomb(r, sigma_ij, sys%do_force), &
                             .true. &
@@ -1570,6 +1566,7 @@ type(mat33) function T_bare_v2(r, deriv) result(T)
         end forall
     end forall
     if (deriv) then
+        allocate (T%dr(3, 3, 3))
         r_7 = r_1**7
         forall (a = 1:3)
             T%dr(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
@@ -1658,8 +1655,7 @@ type(scalar) function damping_sqrtfermi(r, s_vdw, d, deriv) result(f)
 end function
 
 
-type(mat33) function T_damped(sys, f, T, sr)
-    type(mbd_system), intent(in) :: sys
+type(mat33) function T_damped(f, T, sr)
     type(scalar), intent(in) :: f
     type(mat33), intent(in) :: T
     logical, intent(in) :: sr  ! true: f, false: 1-f
@@ -1675,16 +1671,15 @@ type(mat33) function T_damped(sys, f, T, sr)
         sgn = 1
     end if
     T_damped%val = pre*T%val
-    if (sys%do_force) then
-        forall (c = 1:3) T_damped%dr(:, :, c) = sgn*f%dr(c)*T%val
-        T_damped%dr = T_damped%dr + pre*T%dr
-        T_damped%dvdw = sgn*f%dvdw*T%val
-        T_damped%has_vdw = .true.
-        if (T%has_sigma) then
-            T_damped%dsigma = pre*T%dsigma
-            T_damped%has_sigma = .true.
-        end if
-    end if
+    if (allocated(f%dr) .or. allocated(T%dr)) &
+        allocate (T_damped%dr(3, 3, 3), source=0.d0)
+    if (allocated(f%dvdw) .or. allocated(T%dvdw)) &
+        allocate (T_damped%dvdw(3, 3), source=0.d0)
+    if (allocated(f%dr)) forall (c = 1:3) T_damped%dr(:, :, c) = sgn*f%dr(c)*T%val
+    if (allocated(T%dr)) T_damped%dr = T_damped%dr + pre*T%dr
+    if (allocated(f%dvdw)) T_damped%dvdw = sgn*f%dvdw*T%val
+    if (allocated(T%dvdw)) T_damped%dvdw = T_damped%dvdw + pre*T%dvdw
+    if (allocated(T%dsigma)) T_damped%dsigma = pre*T%dsigma
 end function
 
 
@@ -1707,12 +1702,12 @@ type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     erf_theta = erf(zeta)-theta
     T%val = erf_theta*bare%val+2*(zeta**2)*theta*rr_r5
     if (deriv) then
+        allocate (T%dr(3, 3, 3))
         tmp33 = 2*zeta*theta*(bare%val+(3-2*zeta**2)*rr_r5)
         forall (c = 1:3) T%dr(:, :, c) = tmp33*r(c)/(r_1*sigma)
         tmp333 = bare%dr/3
         forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
         T%dr = T%dr + erf_theta*bare%dr-2*(zeta**2)*theta*tmp333
-        T%has_sigma = .true.
         T%dsigma = -tmp33*r_1/sigma**2
     end if
 end function

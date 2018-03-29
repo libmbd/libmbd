@@ -16,17 +16,15 @@ end type
 type :: mat33
     real(dp) :: val(3, 3)
     ! explicit derivative, [abc] ~ dval_{ab}/dR_c
-    real(dp) :: dr(3, 3, 3)
-    logical :: has_vdw = .false.
-    real(dp) :: dvdw(3, 3)
-    logical :: has_sigma = .false.
-    real(dp) :: dsigma(3, 3)
+    real(dp), allocatable :: dr(:, :, :)
+    real(dp), allocatable :: dvdw(:, :)
+    real(dp), allocatable :: dsigma(:, :)
 end type
 
 type :: scalar
     real(dp) :: val
-    real(dp) :: dr(3)  ! explicit derivative
-    real(dp) :: dvdw
+    real(dp), allocatable :: dr(:)  ! explicit derivative
+    real(dp), allocatable :: dvdw
 end type
 
 end module

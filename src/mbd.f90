@@ -8,7 +8,7 @@ use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, inverted, sinvert
+    sdiagonalized, inverted, sinvert, add_diag, repeatn
 use mbd_types, only: mat3n3n, mat33, scalar
 
 implicit none
@@ -562,16 +562,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if
     end if
     ! MPI code end
-    do i_atom = 1, size(sys%coords, 1) ! self energy
-        do i_xyz = 1, 3
-            i = 3*(i_atom-1)+i_xyz
-            if (present(k_point)) then
-                dipmat%cplx(i, i) = dipmat%cplx(i, i)-4*alpha**3/(3*sqrt(pi))
-            else
-                dipmat%re(i, i) = dipmat%re(i, i)-4*alpha**3/(3*sqrt(pi))
-            end if
-        end do
-    end do
+    call add_diag(dipmat, -4*alpha**3/(3*sqrt(pi))) ! self energy
     do_surface = .true.
     if (present(k_point)) then
         k_sq = sum(k_point**2)
@@ -768,7 +759,6 @@ type(mat3n3n) function screened_alpha(sys, alpha, damp, k_point, lam)
     real(dp), intent(in), optional :: k_point(3)
     real(dp), intent(in), optional :: lam
 
-    integer :: i_atom, i_xyz, i
     type(mbd_damping) :: damp_local
 
     damp_local = damp
@@ -781,23 +771,7 @@ type(mat3n3n) function screened_alpha(sys, alpha, damp, k_point, lam)
             screened_alpha%re = lam*screened_alpha%re
         end if
     end if
-    if (present(k_point)) then
-        do i_atom = 1, size(sys%coords, 1)
-            do i_xyz = 1, 3
-                i = 3*(i_atom-1)+i_xyz
-                screened_alpha%cplx(i, i) = screened_alpha%cplx(i, i) &
-                    + 1.d0/alpha(i_atom)
-            end do
-        end do
-    else
-        do i_atom = 1, size(sys%coords, 1)
-            do i_xyz = 1, 3
-                i = 3*(i_atom-1)+i_xyz
-                screened_alpha%re(i, i) = screened_alpha%re(i, i) &
-                    + 1.d0/alpha(i_atom)
-            end do
-        end do
-    end if
+    call add_diag(screened_alpha, repeatn(1.d0/alpha, 3))
     call ts(sys%calc, 32)
     if (present(k_point)) then
         ! TODO this needs to be implemented in linalg and switched
@@ -985,7 +959,7 @@ subroutine form_mbd_matrix(T, alpha_0, omega)
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
 
-    integer :: n_atoms, i_atom, j_atom, i, j, i_xyz
+    integer :: n_atoms, i_atom, j_atom, i, j
 
     n_atoms = size(alpha_0)
     do i_atom = 1, n_atoms
@@ -998,12 +972,7 @@ subroutine form_mbd_matrix(T, alpha_0, omega)
                 T%re(i+1:i+3, j+1:j+3)
         end do
     end do
-    do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            i = 3*(i_atom-1)+i_xyz
-            T%re(i, i) = T%re(i, i)+omega(i_atom)**2
-        end do
-    end do
+    call add_diag(T, repeatn(omega**2, 3))
 end subroutine form_mbd_matrix
 
 
@@ -1079,7 +1048,7 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
     type(mat3n3n) :: relay
     real(dp), allocatable :: eigs(:)
     real(dp), allocatable :: omega(:)
-    integer :: i_atom, j_atom, i_xyz, i, j
+    integer :: i_atom, j_atom, i, j
     integer :: n_negative_eigs
     logical :: is_parallel
 
@@ -1099,13 +1068,8 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
                 relay%cplx(i+1:i+3, j+1:j+3)
         end do
     end do
-    do i_atom = 1, size(sys%coords, 1)
-        do i_xyz = 1, 3
-            i = 3*(i_atom-1)+i_xyz
-            relay%cplx(i, i) = relay%cplx(i, i)+omega(i_atom)**2
-            ! relay = w^2+sqrt(a*a)*w*w*T
-        end do
-    end do
+    ! relay = w^2+sqrt(a*a)*w*w*T
+    call add_diag(relay, repeatn(omega**2, 3))
     call ts(sys%calc, 22)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%work%get_modes) then
@@ -1180,9 +1144,8 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         end do
         ! relay = alpha*T
         if (sys%work%get_rpa_orders) AT = relay
-        do i = 1, 3*size(sys%coords, 1)
-            relay%re(i, i) = 1.d0+relay%re(i, i) ! relay = 1+alpha*T
-        end do
+        ! relay = 1+alpha*T
+        call add_diag(relay, 1.d0)
         call ts(sys%calc, 23)
         call diagonalize('N', relay%re, eigs, sys%work%exc)
         call ts(sys%calc, -23)

@@ -4,12 +4,14 @@
 module mbd_linalg
 
 use mbd_common, only: tostr, dp, exception
+use mbd_types, only: mat3n3n
 
 implicit none
 
 private
 public :: diag, invert, inverted, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert
+    sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert, add_diag, &
+    repeatn
 
 interface operator(.cprod.)
     module procedure cart_prod_
@@ -19,6 +21,11 @@ interface diag
     module procedure get_diag_
     module procedure get_diag_cmplx_
     module procedure make_diag_
+end interface
+
+interface add_diag
+    module procedure add_diag_scalar_
+    module procedure add_diag_vec_
 end interface
 
 interface invert
@@ -376,6 +383,51 @@ function cart_prod_(a, b) result(c)
             c(i, j) = a(i)*b(j)
         end do
     end do
+end function
+
+
+subroutine add_diag_scalar_(A, d)
+    type(mat3n3n), intent(inout) :: A
+    real(dp), intent(in) :: d
+
+    integer :: i, n
+
+    if (allocated(A%re)) then
+        n = min(size(A%re, 1), size(A%re, 2))
+    else
+        n = min(size(A%cplx, 1), size(A%cplx, 2))
+    end if
+    call add_diag_vec_(A, [(d, i = 1, n)])
+end subroutine
+
+
+subroutine add_diag_vec_(A, d)
+    type(mat3n3n), intent(inout) :: A
+    real(dp), intent(in) :: d(:)
+
+    integer :: i
+
+    if (allocated(A%re)) then
+        do i = 1, size(d)
+            A%re(i, i) = A%re(i, i) + d(i)
+        end do
+    end if
+    if (allocated(A%cplx)) then
+        do i = 1, size(d)
+            A%cplx(i, i) = A%cplx(i, i) + d(i)
+        end do
+    end if
+end subroutine
+
+
+function repeatn(x, n)
+    real(dp), intent(in) :: x(:)
+    integer, intent(in) :: n
+    real(dp) :: repeatn(n*size(x))
+
+    integer :: i, j
+
+    repeatn = [([(x(i), j = 1, n)], i = 1, size(x))]
 end function
 
 

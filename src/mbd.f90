@@ -725,6 +725,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mat3n3n) :: alpha_full
     integer :: i_grid_omega
     logical :: is_parallel, mute
+    type(mbd_damping) :: damp_local
 
     is_parallel = sys%calc%parallel
     mute = sys%calc%mute
@@ -737,7 +738,14 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        alpha_full = screened_alpha(sys, alpha(i_grid_omega, :), damp)
+        damp_local = damp
+        damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
+        alpha_full = dipole_matrix(sys, damp_local)
+        call add_diag(alpha_full, repeatn(1.d0/alpha(i_grid_omega, :), 3))
+        call ts(sys%calc, 32)
+        call sinvert(alpha_full%re, sys%work%exc)
+        if (has_exc(sys)) return
+        call ts(sys%calc, -32)
         alpha_scs(i_grid_omega, :) = contract_polarizability(alpha_full%re)
         sys%calc%mute = .true.
     end do
@@ -750,38 +758,6 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     sys%calc%parallel = is_parallel
     sys%calc%mute = mute
 end function run_scs
-
-
-type(mat3n3n) function screened_alpha(sys, alpha, damp, k_point, lam)
-    type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha(:)
-    type(mbd_damping), intent(in) :: damp
-    real(dp), intent(in), optional :: k_point(3)
-    real(dp), intent(in), optional :: lam
-
-    type(mbd_damping) :: damp_local
-
-    damp_local = damp
-    damp_local%sigma = get_sigma_selfint(alpha)
-    screened_alpha = dipole_matrix(sys, damp_local, k_point)
-    if (present(lam)) then
-        if (present(k_point)) then
-            screened_alpha%cplx = lam*screened_alpha%cplx
-        else
-            screened_alpha%re = lam*screened_alpha%re
-        end if
-    end if
-    call add_diag(screened_alpha, repeatn(1.d0/alpha, 3))
-    call ts(sys%calc, 32)
-    if (present(k_point)) then
-        ! TODO this needs to be implemented in linalg and switched
-        call invert(screened_alpha%cplx, sys%work%exc)
-    else
-        call sinvert(screened_alpha%re, sys%work%exc)
-    end if
-    if (has_exc(sys)) return
-    call ts(sys%calc, -32)
-end function
 
 
 function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)

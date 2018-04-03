@@ -8,7 +8,7 @@ use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, inverted, sinvert, add_diag, repeatn
+    sdiagonalized, inverted, sinvert, add_diag, repeatn, mult_cprod
 use mbd_types, only: mat3n3n, mat33, scalar
 
 implicit none
@@ -935,19 +935,10 @@ subroutine form_mbd_matrix(T, alpha_0, omega)
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
 
-    integer :: n_atoms, i_atom, j_atom, i, j
+    real(dp), allocatable :: aw(:)
 
-    n_atoms = size(alpha_0)
-    do i_atom = 1, n_atoms
-        do j_atom = i_atom, n_atoms
-            i = 3*(i_atom-1)
-            j = 3*(j_atom-1)
-            T%re(i+1:i+3, j+1:j+3) = &
-                omega(i_atom)*omega(j_atom) &
-                *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
-                T%re(i+1:i+3, j+1:j+3)
-        end do
-    end do
+    aw = repeatn(omega*sqrt(alpha_0), 3)
+    call mult_cprod(T, aw, aw)
     call add_diag(T, repeatn(omega**2, 3))
 end subroutine form_mbd_matrix
 

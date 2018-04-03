@@ -11,7 +11,7 @@ implicit none
 private
 public :: diag, invert, inverted, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert, add_diag, &
-    repeatn
+    repeatn, mult_cprod
 
 interface operator(.cprod.)
     module procedure cart_prod_
@@ -415,6 +415,29 @@ subroutine add_diag_vec_(A, d)
     if (allocated(A%cplx)) then
         do i = 1, size(d)
             A%cplx(i, i) = A%cplx(i, i) + d(i)
+        end do
+    end if
+end subroutine
+
+
+subroutine mult_cprod(A, b, c)
+    type(mat3n3n), intent(inout) :: A
+    real(dp), intent(in) :: b(:)
+    real(dp), intent(in) :: c(:)
+
+    integer :: i, j
+
+    if (allocated(A%re)) then
+        do i = 1, size(b)
+            do j = 1, size(c)
+                A%re(i, j) = b(i)*c(j)*A%re(i, j)
+            end do
+        end do
+    else
+        do i = 1, size(b)
+            do j = 1, size(c)
+                A%cplx(i, j) = b(i)*c(j)*A%cplx(i, j)
+            end do
         end do
     end if
 end subroutine

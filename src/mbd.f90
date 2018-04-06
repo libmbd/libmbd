@@ -9,7 +9,7 @@ use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert, add_diag, repeatn, mult_cprod
-use mbd_types, only: mat3n3n, mat33, scalar
+use mbd_types, only: mat3n3n, mat33, scalar, vecn
 
 implicit none
 
@@ -115,7 +115,7 @@ real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(mbd_damping), intent(in) :: damp
 
     real(dp), allocatable :: alpha_dyn(:, :)
-    real(dp), allocatable :: alpha_dyn_rsscs(:, :)
+    type(vecn) :: alpha_dyn_rsscs(0:ubound(sys%calc%omega_grid, 1))
     real(dp), allocatable :: C6_rsscs(:)
     real(dp), allocatable :: R_vdw_rsscs(:)
     type(mbd_damping) :: damp_rsscs, damp_mbd
@@ -123,17 +123,16 @@ real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
 
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq, size(sys%coords, 1)))
-    allocate (alpha_dyn_rsscs(0:n_freq, size(sys%coords, 1)))
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_rsscs = damp
     damp_rsscs%version = 'fermi,dip,gg'
     alpha_dyn_rsscs = run_scs(sys, alpha_dyn, damp_rsscs)
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
-    R_vdw_rsscs = damp%R_vdw*(alpha_dyn_rsscs(0, :)/alpha_dyn(0, :))**(1.d0/3)
+    R_vdw_rsscs = damp%R_vdw*(alpha_dyn_rsscs(0)%val/alpha_dyn(0, :))**(1.d0/3)
     damp_mbd%version = 'fermi,dip'
     damp_mbd%r_vdw = R_vdw_rsscs
     damp_mbd%beta = damp%beta
-    mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0, :), C6_rsscs, damp_mbd)
+    mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0)%val, C6_rsscs, damp_mbd)
     if (has_exc(sys)) call print_exc(sys)
 end function mbd_rsscs_energy
 
@@ -145,7 +144,7 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(mbd_damping), intent(in) :: damp
 
     real(dp), allocatable :: alpha_dyn(:, :)
-    real(dp), allocatable :: alpha_dyn_scs(:, :)
+    type(vecn) :: alpha_dyn_scs(0:ubound(sys%calc%omega_grid, 1))
     real(dp), allocatable :: C6_scs(:)
     real(dp), allocatable :: R_vdw_scs(:)
     type(mbd_damping) :: damp_scs, damp_mbd
@@ -153,18 +152,17 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
 
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq, size(sys%coords, 1)))
-    allocate (alpha_dyn_scs(0:n_freq, size(sys%coords, 1)))
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_scs = damp
     damp_scs%version = 'dip,gg'
     alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
-    R_vdw_scs = damp%R_vdw*(alpha_dyn_scs(0, :)/alpha_dyn(0, :))**(1.d0/3)
+    R_vdw_scs = damp%R_vdw*(alpha_dyn_scs(0)%val(:)/alpha_dyn(0, :))**(1.d0/3)
     damp_mbd%version = 'dip,1mexp'
     damp_mbd%r_vdw = R_vdw_scs
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
-    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0, :), C6_scs, damp_mbd)
+    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0)%val, C6_scs, damp_mbd)
     if (has_exc(sys)) call print_exc(sys)
 end function mbd_scs_energy
 
@@ -720,42 +718,33 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha(0:, :)
     type(mbd_damping), intent(in) :: damp
-    real(dp) :: alpha_scs(0:ubound(alpha, 1), size(alpha, 2))
+    type(vecn) :: alpha_scs(0:ubound(alpha, 1))
 
-    type(mat3n3n) :: alpha_full
+    type(mat3n3n) :: alpha_full, T
     integer :: i_grid_omega
-    logical :: is_parallel, mute
+    logical :: mute
     type(mbd_damping) :: damp_local
 
-    is_parallel = sys%calc%parallel
     mute = sys%calc%mute
 
-    sys%calc%parallel = .false.
-
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
-        ! MPI code begin
-        if (is_parallel) then
-            if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
-        end if
-        ! MPI code end
         damp_local = damp
         damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
-        alpha_full = dipole_matrix(sys, damp_local)
+        T = dipole_matrix(sys, damp_local)
+        if (sys%do_force) then
+            alpha_full = T
+        else
+            call move_alloc(T%re, alpha_full%re)
+        end if
         call add_diag(alpha_full, repeatn(1.d0/alpha(i_grid_omega, :), 3))
         call ts(sys%calc, 32)
         call sinvert(alpha_full%re, sys%work%exc)
         if (has_exc(sys)) return
         call ts(sys%calc, -32)
-        alpha_scs(i_grid_omega, :) = contract_polarizability(alpha_full%re)
+        alpha_scs(i_grid_omega)%val = contract_polarizability(alpha_full%re)
         sys%calc%mute = .true.
     end do
-    ! MPI code begin
-    if (is_parallel) then
-        call sync_sum(alpha_scs, sys%calc%comm)
-    end if
-    ! MPI code end
 
-    sys%calc%parallel = is_parallel
     sys%calc%mute = mute
 end function run_scs
 
@@ -1764,12 +1753,16 @@ end function
 
 function get_C6_from_alpha(calc, alpha) result(C6)
     type(mbd_calc), intent(in) :: calc
-    real(dp), intent(in) :: alpha(:, :)
-    real(dp) :: C6(size(alpha, 2))
-    integer :: i_atom
+    type(vecn), intent(in) :: alpha(0:)
+    real(dp) :: C6(size(alpha(0)%val))
 
-    do i_atom = 1, size(alpha, 2)
-        C6(i_atom) = 3.d0/pi*sum((alpha(:, i_atom)**2)*calc%omega_grid_w(:))
+    integer :: i_atom, i
+
+    do i_atom = 1, size(alpha(0)%val)
+        C6(i_atom) = 3.d0/pi*sum( &
+            ([(alpha(i)%val(i_atom), i = 0, ubound(alpha, 1))]**2) * &
+            calc%omega_grid_w(:) &
+        )
     end do
 end function
 

@@ -21,6 +21,11 @@ type :: mat33
     real(dp), allocatable :: dsigma(:, :)
 end type
 
+type :: vecn
+    real(dp), allocatable :: val(:)
+    real(dp), allocatable :: dr(:, :)
+end type
+
 type :: scalar
     real(dp) :: val
     real(dp), allocatable :: dr(:)  ! explicit derivative

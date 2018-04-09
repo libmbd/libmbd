@@ -1,5 +1,4 @@
 # MBD forces
-
 $$
 E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-3\sum_i\frac{\omega_i}2,\qquad\mathbf Q_{ij}=\omega_i^2\delta_{ij}\mathbf I+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}
 $$
@@ -18,12 +17,10 @@ $$
 $$
 
 $$
-\begin{equation}
-\begin{aligned}
-T_{(ij)ab}&\equiv\frac{\partial^2}{\partial R_a\partial R_b}\frac1R=\frac{-3R_aR_b+R^2\delta_{ab}}{R^5},\qquad \mathbf R\equiv \mathbf R_{ij}\equiv\mathbf R_j-\mathbf R_i \\
-\frac{\partial T_{ab}}{\partial R_c}&=-3\left(\frac{R_a\delta_{bc}+R_b\delta_{ca}+R_c\delta_{ab}}{R^5}-\frac{5R_aR_bR_c}{R^7}\right)
-\end{aligned}
-\end{equation}
+\begin{gather}
+T_{(ij)ab}\equiv\frac{\partial^2}{\partial R_a\partial R_b}\frac1R=\frac{-3R_aR_b+R^2\delta_{ab}}{R^5},\qquad \mathbf R\equiv \mathbf R_{ij}\equiv\mathbf R_j-\mathbf R_i \\
+\frac{\partial\mathbf T_{ij}}{\partial\mathbf R_k}=\frac{\partial\mathbf T}{\partial\mathbf R}(\delta_{jk}-\delta_{ik}),\qquad\frac{\partial T_{ab}}{\partial R_c}=-3\left(\frac{R_a\delta_{bc}+R_b\delta_{ca}+R_c\delta_{ab}}{R^5}-\frac{5R_aR_bR_c}{R^7}\right)
+\end{gather}
 $$
 
 $$

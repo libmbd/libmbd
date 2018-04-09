@@ -721,12 +721,13 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     type(vecn) :: alpha_scs(0:ubound(alpha, 1))
 
     type(mat3n3n) :: alpha_full, T
-    integer :: i_grid_omega
+    integer :: i_grid_omega, n_atoms, i_xyz, i_atom, i, j
     logical :: mute
     type(mbd_damping) :: damp_local
 
     mute = sys%calc%mute
 
+    n_atoms = size(alpha, 2)
     do i_grid_omega = 0, ubound(alpha, 1)
         damp_local = damp
         damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
@@ -742,6 +743,28 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
         if (has_exc(sys)) return
         call ts(sys%calc, -32)
         alpha_scs(i_grid_omega)%val = contract_polarizability(alpha_full%re)
+        if (sys%do_force) then
+            allocate (alpha_scs(i_grid_omega)%dr(n_atoms, n_atoms, 3))
+            do i = 1, 3*n_atoms
+                do j = 1, i-1
+                    alpha_full%re(i, j) = alpha_full%re(j, i)
+                end do
+            end do
+            do i_atom = 1, n_atoms
+                associate (i => (i_atom-1)*3)
+                    do i_xyz = 1, 3
+                        T%re(:, :) = 0.d0
+                        T%re(:i, i+1:i+3) = T%re_dr(:i, i+1:i+3, i_xyz)
+                        T%re(i+1:i+3, :i) = transpose(T%re_dr(:i, i+1:i+3, i_xyz))
+                        T%re(i+1:i+3, i+3+1:) = -T%re_dr(i+1:i+3, i+3+1:, i_xyz)
+                        T%re(i+3+1:, i+1:i+3) = -transpose(T%re_dr(i+1:i+3, i+3+1:, i_xyz))
+                        T%re = matmul(alpha_full%re, matmul(T%re, alpha_full%re))
+                        alpha_scs(i_grid_omega)%dr(i_atom, :, i_xyz) = &
+                            contract_polarizability(T%re)
+                    end do
+                end associate
+            end do
+        end if
         sys%calc%mute = .true.
     end do
 
@@ -1900,6 +1923,7 @@ subroutine run_tests()
     call exec_test('T_GG derivative explicit')
     call exec_test('T_GG derivative implicit')
     call exec_test('MBD derivative explicit')
+    call exec_test('SCS derivative explicit')
     write (6, *) &
         trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
     if (n_failed /= 0) stop 1
@@ -1918,6 +1942,7 @@ subroutine run_tests()
         case ('T_GG derivative explicit'); call test_T_GG_deriv_expl()
         case ('T_GG derivative implicit'); call test_T_GG_deriv_impl()
         case ('MBD derivative explicit'); call test_mbd_deriv_expl()
+        case ('SCS derivative explicit'); call test_scs_deriv_expl()
         end select
         n_all = n_all + 1
         if (n_failed == n_failed_in) write (6, *) 'OK'
@@ -2071,6 +2096,60 @@ subroutine run_tests()
             call print_matrix('delta forces', diff)
         end if
     end subroutine test_mbd_deriv_expl
+
+    subroutine test_scs_deriv_expl()
+        real(dp) :: delta
+        type(mbd_system) :: sys
+        type(mbd_damping) :: damp
+        real(dp), allocatable :: coords(:, :)
+        real(dp), allocatable :: forces(:, :, :)
+        real(dp), allocatable :: diff(:, :, :)
+        real(dp), allocatable :: alpha_0(:)
+        real(dp), allocatable :: alpha(:, :)
+        real(dp), allocatable :: omega(:)
+        integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
+        type(vecn) :: alpha_scs(0:0, -2:2)
+
+        delta = 1d-3
+        n_atoms = 3
+        allocate (coords(n_atoms, 3), source=0.d0)
+        allocate (forces(n_atoms, n_atoms, 3))
+        allocate (alpha(0:0, n_atoms))
+        coords(2, 1) = 4.d0*ang
+        coords(3, 2) = 4.d0*ang
+        sys%calc => calc
+        sys%coords = coords
+        sys%do_force = .true.
+        damp%version = 'fermi,dip,gg'
+        damp%r_vdw = [3.55d0, 3.55d0, 3.55d0]
+        damp%beta = 0.83
+        alpha_0 = [11.d0, 11.d0, 11.d0]
+        omega = [0.7d0, 0.7d0, 0.7d0]
+        alpha(0, :) = alpha_0
+        alpha_scs(:, 0) = run_scs(sys, alpha, damp)
+        sys%do_force = .false.
+        do i_atom = 1, n_atoms
+            do i_xyz = 1, 3
+                do i_step = -2, 2
+                    if (i_step == 0) cycle
+                    sys%coords = coords
+                    sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                    alpha_scs(:, i_step) = run_scs(sys, alpha, damp)
+                end do
+                do j_atom = 1, n_atoms
+                    forces(i_atom, j_atom, i_xyz) = &
+                        diff5([(alpha_scs(0, i_step)%val(j_atom), i_step = -2, 2)], delta)
+                end do
+            end do
+        end do
+        diff = forces-alpha_scs(0, 0)%dr
+        if (any(abs(diff) > 1d-11)) then
+            call failed()
+            call print_matrix('diff x', diff(:, :, 1))
+            call print_matrix('diff y', diff(:, :, 2))
+            call print_matrix('diff z', diff(:, :, 3))
+        end if
+    end subroutine test_scs_deriv_expl
 end subroutine run_tests
 
 end module mbd

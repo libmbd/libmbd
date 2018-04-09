@@ -23,7 +23,7 @@ end type
 
 type :: vecn
     real(dp), allocatable :: val(:)
-    real(dp), allocatable :: dr(:, :)
+    real(dp), allocatable :: dr(:, :, :)
 end type
 
 type :: scalar

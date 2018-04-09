@@ -727,7 +727,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
 
     mute = sys%calc%mute
 
-    do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
+    do i_grid_omega = 0, ubound(alpha, 1)
         damp_local = damp
         damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
         T = dipole_matrix(sys, damp_local)
@@ -1943,7 +1943,7 @@ subroutine run_tests()
         T_diff_anl = T%dr(:, :, :)
         do c = 1, 3
             do i_step = -2, 2
-                if (i_step == 0) continue
+                if (i_step == 0) cycle
                 r_diff = r
                 r_diff(c) = r_diff(c)+i_step*delta
                 T = T_bare_v2(r_diff, deriv=.false.)
@@ -1977,7 +1977,7 @@ subroutine run_tests()
         T_diff_anl = T%dr
         do c = 1, 3
             do i_step = -2, 2
-                if (i_step == 0) continue
+                if (i_step == 0) cycle
                 r_diff = r
                 r_diff(c) = r_diff(c)+i_step*delta
                 T = T_erf_coulomb(r_diff, sigma, deriv=.false.)
@@ -2011,7 +2011,7 @@ subroutine run_tests()
         T = T_erf_coulomb(r, sigma, deriv=.true.)
         T_diff_anl = T%dsigma(:, :)*dsigma_dr
         do i_step = -2, 2
-            if (i_step == 0) continue
+            if (i_step == 0) cycle
             sigma_diff = sigma+i_step*delta*dsigma_dr
             T = T_erf_coulomb(r, sigma_diff, deriv=.false.)
             T_diff_num(:, :, i_step) = T%val
@@ -2057,7 +2057,7 @@ subroutine run_tests()
         do i_atom = 1, n_atoms
             do i_xyz = 1, 3
                 do i_step = -2, 2
-                    if (i_step == 0) continue
+                    if (i_step == 0) cycle
                     sys%coords = coords
                     sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                     ene(i_step) = get_single_mbd_energy(sys, alpha_0, omega, damp)

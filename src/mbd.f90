@@ -117,7 +117,8 @@ real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(vecn), allocatable :: alpha_dyn(:), alpha_dyn_rsscs(:)
     type(vecn) :: C6_rsscs
     type(mbd_damping) :: damp_rsscs, damp_mbd
-    integer :: n_freq
+    integer :: n_freq, i_freq
+    logical :: mute
 
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
@@ -125,7 +126,12 @@ real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_rsscs = damp
     damp_rsscs%version = 'fermi,dip,gg'
-    alpha_dyn_rsscs = run_scs(sys, alpha_dyn, damp_rsscs)
+    mute = sys%calc%mute
+    do i_freq = 0, n_freq
+        alpha_dyn_rsscs(i_freq) = run_scs(sys, alpha_dyn(i_freq), damp_rsscs)
+        sys%calc%mute = .true.
+    end do
+    sys%calc%mute = mute
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
     damp_mbd%version = 'fermi,dip'
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
@@ -144,7 +150,8 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(vecn), allocatable :: alpha_dyn(:), alpha_dyn_scs(:)
     type(vecn) :: C6_scs
     type(mbd_damping) :: damp_scs, damp_mbd
-    integer :: n_freq
+    integer :: n_freq, i_freq
+    logical :: mute
 
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
@@ -152,7 +159,11 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_scs = damp
     damp_scs%version = 'dip,gg'
-    alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
+    do i_freq = 0, n_freq
+        alpha_dyn_scs(i_freq) = run_scs(sys, alpha_dyn(i_freq), damp_scs)
+        sys%calc%mute = .true.
+    end do
+    sys%calc%mute = mute
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_scs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%version = 'dip,1mexp'
@@ -713,59 +724,49 @@ end subroutine
 
 function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
-    type(vecn), intent(in) :: alpha(0:)
+    type(vecn), intent(in) :: alpha
     type(mbd_damping), intent(in) :: damp
-    type(vecn) :: alpha_scs(0:ubound(alpha, 1))
+    type(vecn) :: alpha_scs
 
     type(mat3n3n) :: alpha_full, T
-    integer :: i_grid_omega, n_atoms, i_xyz, i_atom, i, j
-    logical :: mute
+    integer :: n_atoms, i_xyz, i_atom, i, j
     type(mbd_damping) :: damp_local
 
-    mute = sys%calc%mute
-
-    n_atoms = size(alpha(0)%val)
-    do i_grid_omega = 0, ubound(alpha, 1)
-        damp_local = damp
-        damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega))
-        T = dipole_matrix(sys, damp_local)
-        if (sys%do_force) then
-            alpha_full = T
-        else
-            call move_alloc(T%re, alpha_full%re)
-        end if
-        call add_diag(alpha_full, repeatn(1.d0/alpha(i_grid_omega)%val, 3))
-        call ts(sys%calc, 32)
-        call sinvert(alpha_full%re, sys%work%exc)
-        if (has_exc(sys)) return
-        call ts(sys%calc, -32)
-        alpha_scs(i_grid_omega)%val = contract_polarizability(alpha_full%re)
-        if (sys%do_force) then
-            allocate (alpha_scs(i_grid_omega)%dr(n_atoms, n_atoms, 3))
-            do i = 1, 3*n_atoms
-                do j = 1, i-1
-                    alpha_full%re(i, j) = alpha_full%re(j, i)
-                end do
-            end do
-            do i_atom = 1, n_atoms
-                associate (i => (i_atom-1)*3)
-                    do i_xyz = 1, 3
-                        T%re(:, :) = 0.d0
-                        T%re(:i, i+1:i+3) = T%re_dr(:i, i+1:i+3, i_xyz)
-                        T%re(i+1:i+3, :i) = transpose(T%re_dr(:i, i+1:i+3, i_xyz))
-                        T%re(i+1:i+3, i+3+1:) = -T%re_dr(i+1:i+3, i+3+1:, i_xyz)
-                        T%re(i+3+1:, i+1:i+3) = -transpose(T%re_dr(i+1:i+3, i+3+1:, i_xyz))
-                        T%re = matmul(alpha_full%re, matmul(T%re, alpha_full%re))
-                        alpha_scs(i_grid_omega)%dr(i_atom, :, i_xyz) = &
-                            contract_polarizability(T%re)
-                    end do
-                end associate
-            end do
-        end if
-        sys%calc%mute = .true.
+    n_atoms = size(alpha%val)
+    damp_local = damp
+    damp_local%sigma = get_sigma_selfint(alpha)
+    T = dipole_matrix(sys, damp_local)
+    if (sys%do_force) then
+        alpha_full = T
+    else
+        call move_alloc(T%re, alpha_full%re)
+    end if
+    call add_diag(alpha_full, repeatn(1.d0/alpha%val, 3))
+    call ts(sys%calc, 32)
+    call sinvert(alpha_full%re, sys%work%exc)
+    if (has_exc(sys)) return
+    call ts(sys%calc, -32)
+    alpha_scs%val = contract_polarizability(alpha_full%re)
+    if (.not. sys%do_force) return
+    allocate (alpha_scs%dr(n_atoms, n_atoms, 3))
+    do i = 1, 3*n_atoms
+        do j = 1, i-1
+            alpha_full%re(i, j) = alpha_full%re(j, i)
+        end do
     end do
-
-    sys%calc%mute = mute
+    do i_atom = 1, n_atoms
+        associate (i => (i_atom-1)*3)
+            do i_xyz = 1, 3
+                T%re(:, :) = 0.d0
+                T%re(:i, i+1:i+3) = T%re_dr(:i, i+1:i+3, i_xyz)
+                T%re(i+1:i+3, :i) = transpose(T%re_dr(:i, i+1:i+3, i_xyz))
+                T%re(i+1:i+3, i+3+1:) = -T%re_dr(i+1:i+3, i+3+1:, i_xyz)
+                T%re(i+3+1:, i+1:i+3) = -transpose(T%re_dr(i+1:i+3, i+3+1:, i_xyz))
+                T%re = matmul(alpha_full%re, matmul(T%re, alpha_full%re))
+                alpha_scs%dr(i_atom, :, i_xyz) = contract_polarizability(T%re)
+            end do
+        end associate
+    end do
 end function run_scs
 
 
@@ -2146,16 +2147,14 @@ subroutine run_tests()
         real(dp), allocatable :: forces(:, :, :)
         real(dp), allocatable :: diff(:, :, :)
         real(dp), allocatable :: alpha_0(:)
-        type(vecn), allocatable :: alpha(:)
         real(dp), allocatable :: omega(:)
         integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
-        type(vecn) :: alpha_scs(0:0, -2:2)
+        type(vecn) :: alpha_scs(-2:2)
 
         delta = 1d-3
         n_atoms = 3
         allocate (coords(n_atoms, 3), source=0.d0)
         allocate (forces(n_atoms, n_atoms, 3))
-        allocate (alpha(0:0))
         coords(2, 1) = 4.d0*ang
         coords(3, 2) = 4.d0*ang
         sys%calc => calc
@@ -2166,8 +2165,7 @@ subroutine run_tests()
         damp%beta = 0.83
         alpha_0 = [11.d0, 11.d0, 11.d0]
         omega = [0.7d0, 0.7d0, 0.7d0]
-        alpha(0)%val = alpha_0
-        alpha_scs(:, 0) = run_scs(sys, alpha, damp)
+        alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
         sys%do_force = .false.
         do i_atom = 1, n_atoms
             do i_xyz = 1, 3
@@ -2175,15 +2173,15 @@ subroutine run_tests()
                     if (i_step == 0) cycle
                     sys%coords = coords
                     sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
-                    alpha_scs(:, i_step) = run_scs(sys, alpha, damp)
+                    alpha_scs(i_step) = run_scs(sys, vecn(alpha_0), damp)
                 end do
                 do j_atom = 1, n_atoms
                     forces(i_atom, j_atom, i_xyz) = &
-                        diff5([(alpha_scs(0, i_step)%val(j_atom), i_step = -2, 2)], delta)
+                        diff5([(alpha_scs(i_step)%val(j_atom), i_step = -2, 2)], delta)
                 end do
             end do
         end do
-        diff = forces-alpha_scs(0, 0)%dr
+        diff = forces-alpha_scs(0)%dr
         if (any(abs(diff) > 1d-11)) then
             call failed()
             call print_matrix('diff x', diff(:, :, 1))

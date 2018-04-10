@@ -913,20 +913,19 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
-    if (sys%do_force) then
-        allocate (c_lambda14i(3*n_atoms, 3*n_atoms))
-        allocate (sys%work%forces(n_atoms, 3))
-        forall (i = 1:3*n_atoms)
-            c_lambda14i(:, i) = eigs(i)**(-1.d0/4)*sys%work%modes(:, i)
-        end forall
-        c_lambda12i_c = matmul(c_lambda14i, transpose(c_lambda14i))
-        do i_xyz = 1, 3
-            relay%re = -relay%re_dr(:, :, i_xyz)
-            call form_mbd_matrix(relay, alpha_0%val, omega%val)
-            relay%re = relay%re-transpose(relay%re)
-            sys%work%forces(:, i_xyz) = 1.d0/2*contract_forces(c_lambda12i_c*relay%re)
-        end do
-    end if
+    if (.not. sys%do_force) return
+    allocate (c_lambda14i(3*n_atoms, 3*n_atoms))
+    allocate (sys%work%forces(n_atoms, 3))
+    forall (i = 1:3*n_atoms)
+        c_lambda14i(:, i) = eigs(i)**(-1.d0/4)*sys%work%modes(:, i)
+    end forall
+    c_lambda12i_c = matmul(c_lambda14i, transpose(c_lambda14i))
+    do i_xyz = 1, 3
+        relay%re = -relay%re_dr(:, :, i_xyz)
+        call form_mbd_matrix(relay, alpha_0%val, omega%val)
+        relay%re = relay%re-transpose(relay%re)
+        sys%work%forces(:, i_xyz) = 1.d0/2*contract_forces(c_lambda12i_c*relay%re)
+    end do
 end function get_single_mbd_energy
 
 

@@ -18,7 +18,7 @@ public :: mbd_param, mbd_calc, mbd_damping, mbd_work, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
     run_tests, get_sigma_selfint
 public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
-    eval_mbd_int_density, nbody_coeffs, get_damping_parameters, v_to_r, &
+    eval_mbd_int_density, nbody_coeffs, get_damping_parameters, &
     clock_rate
 
 interface operator(.prod.)
@@ -69,8 +69,8 @@ type :: mbd_damping
     real(dp) :: ts_d = 20.d0
     real(dp) :: ts_sr = 0.d0
     real(dp) :: mayer_scaling = 1.d0
-    real(dp), allocatable :: r_vdw(:)
-    real(dp), allocatable :: sigma(:)
+    type(vecn) :: r_vdw
+    type(vecn) :: sigma
     real(dp), allocatable :: damping_custom(:, :)
     real(dp), allocatable :: potential_custom(:, :, :, :)
 end type mbd_damping
@@ -110,59 +110,56 @@ contains
 
 real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
-    real(dp), allocatable :: alpha_dyn(:, :)
-    type(vecn) :: alpha_dyn_rsscs(0:ubound(sys%calc%omega_grid, 1))
-    real(dp), allocatable :: C6_rsscs(:)
-    real(dp), allocatable :: R_vdw_rsscs(:)
+    type(vecn), allocatable :: alpha_dyn(:), alpha_dyn_rsscs(:)
+    type(vecn) :: C6_rsscs
     type(mbd_damping) :: damp_rsscs, damp_mbd
     integer :: n_freq
 
     n_freq = ubound(sys%calc%omega_grid, 1)
-    allocate (alpha_dyn(0:n_freq, size(sys%coords, 1)))
+    allocate (alpha_dyn(0:n_freq))
+    allocate (alpha_dyn_rsscs(0:n_freq))
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_rsscs = damp
     damp_rsscs%version = 'fermi,dip,gg'
     alpha_dyn_rsscs = run_scs(sys, alpha_dyn, damp_rsscs)
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
-    R_vdw_rsscs = damp%R_vdw*(alpha_dyn_rsscs(0)%val/alpha_dyn(0, :))**(1.d0/3)
     damp_mbd%version = 'fermi,dip'
-    damp_mbd%r_vdw = R_vdw_rsscs
+    damp_mbd%r_vdw%val = damp%R_vdw%val*(alpha_dyn_rsscs(0)%val/alpha_dyn(0)%val(:))**(1.d0/3)
     damp_mbd%beta = damp%beta
-    mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0)%val, C6_rsscs, damp_mbd)
+    mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0), C6_rsscs, damp_mbd)
     if (has_exc(sys)) call print_exc(sys)
 end function mbd_rsscs_energy
 
 
 real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
-    real(dp), allocatable :: alpha_dyn(:, :)
-    type(vecn) :: alpha_dyn_scs(0:ubound(sys%calc%omega_grid, 1))
-    real(dp), allocatable :: C6_scs(:)
-    real(dp), allocatable :: R_vdw_scs(:)
+    type(vecn), allocatable :: alpha_dyn(:), alpha_dyn_scs(:)
+    type(vecn) :: C6_scs
     type(mbd_damping) :: damp_scs, damp_mbd
     integer :: n_freq
 
     n_freq = ubound(sys%calc%omega_grid, 1)
-    allocate (alpha_dyn(0:n_freq, size(sys%coords, 1)))
+    allocate (alpha_dyn(0:n_freq))
+    allocate (alpha_dyn_scs(0:n_freq))
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_scs = damp
     damp_scs%version = 'dip,gg'
     alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
-    R_vdw_scs = damp%R_vdw*(alpha_dyn_scs(0)%val(:)/alpha_dyn(0, :))**(1.d0/3)
+    damp_mbd%r_vdw%val = damp%R_vdw%val*(alpha_dyn_scs(0)%val(:)/alpha_dyn(0)%val(:))**(1.d0/3)
+    ! TODO forces
     damp_mbd%version = 'dip,1mexp'
-    damp_mbd%r_vdw = R_vdw_scs
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
-    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0)%val, C6_scs, damp_mbd)
+    mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0), C6_scs, damp_mbd)
     if (has_exc(sys)) call print_exc(sys)
 end function mbd_scs_energy
 
@@ -228,8 +225,8 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
                     C6_ij = combine_C6( &
                         C6(i_atom), C6(j_atom), &
                         alpha_0(i_atom), alpha_0(j_atom))
-                    if (allocated(damp%r_vdw)) then
-                        R_vdw_ij = damp%r_vdw(i_atom)+damp%r_vdw(j_atom)
+                    if (allocated(damp%r_vdw%val)) then
+                        R_vdw_ij = damp%r_vdw%val(i_atom)+damp%r_vdw%val(j_atom)
                     end if
                     select case (damp%version)
                         case ("fermi")
@@ -354,11 +351,11 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 r = sys%coords(i_atom, :)-sys%coords(j_atom, :)-R_cell
                 r_norm = sqrt(sum(r**2))
                 if (sys%periodic .and. r_norm > real_space_cutoff) cycle
-                if (allocated(damp%R_vdw)) then
-                    R_vdw_ij = damp%R_vdw(i_atom)+damp%R_vdw(j_atom)
+                if (allocated(damp%R_vdw%val)) then
+                    R_vdw_ij = damp%R_vdw%val(i_atom)+damp%R_vdw%val(j_atom)
                 end if
-                if (allocated(damp%sigma)) then
-                    sigma_ij = damp%mayer_scaling*sqrt(sum(damp%sigma([i_atom, j_atom])**2))
+                if (allocated(damp%sigma%val)) then
+                    sigma_ij = damp%mayer_scaling*sqrt(sum(damp%sigma%val([i_atom, j_atom])**2))
                 end if
                 select case (damp%version)
                     case ("bare")
@@ -628,10 +625,11 @@ end subroutine
 real(dp) function test_frequency_grid(calc) result(error)
     type(mbd_calc), intent(in) :: calc
 
-    real(dp) :: alpha(0:ubound(calc%omega_grid, 1), 1)
+    type(vecn) :: alpha(0:ubound(calc%omega_grid, 1)), C6
 
-    alpha = alpha_dynamic_ts(calc, (/ 21.d0 /), (/ 99.5d0 /))
-    error = abs(get_total_C6_from_alpha(calc, alpha)/99.5d0-1.d0)
+    alpha = alpha_dynamic_ts(calc, vecn([21.d0]), vecn([99.5d0]))
+    C6 = get_C6_from_alpha(calc, alpha)
+    error = abs(C6%val(1)/99.5d0-1.d0)
 end function
 
 
@@ -716,7 +714,7 @@ end subroutine
 
 function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha(0:, :)
+    type(vecn), intent(in) :: alpha(0:)
     type(mbd_damping), intent(in) :: damp
     type(vecn) :: alpha_scs(0:ubound(alpha, 1))
 
@@ -727,17 +725,17 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
 
     mute = sys%calc%mute
 
-    n_atoms = size(alpha, 2)
+    n_atoms = size(alpha(0)%val)
     do i_grid_omega = 0, ubound(alpha, 1)
         damp_local = damp
-        damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
+        damp_local%sigma = get_sigma_selfint(alpha(i_grid_omega))
         T = dipole_matrix(sys, damp_local)
         if (sys%do_force) then
             alpha_full = T
         else
             call move_alloc(T%re, alpha_full%re)
         end if
-        call add_diag(alpha_full, repeatn(1.d0/alpha(i_grid_omega, :), 3))
+        call add_diag(alpha_full, repeatn(1.d0/alpha(i_grid_omega)%val, 3))
         call ts(sys%calc, 32)
         call sinvert(alpha_full%re, sys%work%exc)
         if (has_exc(sys)) return
@@ -774,13 +772,13 @@ end function run_scs
 
 function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
     real(dp) :: ene
 
     logical :: is_parallel, do_rpa, is_reciprocal, is_crystal
-    real(dp), allocatable :: alpha(:, :)
+    type(vecn), allocatable :: alpha(:)
 
     is_parallel = sys%calc%parallel
     is_crystal = sys%periodic
@@ -790,7 +788,7 @@ function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
         if (.not. do_rpa) then
             ene = get_single_mbd_energy(sys, alpha_0, C6, damp)
         else
-            allocate (alpha(0:ubound(sys%calc%omega_grid, 1), size(alpha_0)))
+            allocate (alpha(0:ubound(sys%calc%omega_grid, 1)))
             alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6)
             ene = get_single_rpa_energy(sys, alpha, damp)
             deallocate (alpha)
@@ -807,8 +805,8 @@ end function get_mbd_energy
 
 real(dp) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
     logical :: do_rpa
@@ -817,9 +815,8 @@ real(dp) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     integer :: i_cell
     integer :: idx_cell(3), n_cells
 
-    real(dp), allocatable :: &
-        xyz_super(:, :), alpha_0_super(:), C6_super(:), &
-        R_vdw_super(:), alpha_ts_super(:, :)
+    type(vecn) :: alpha_0_super, C6_super
+    type(vecn), allocatable :: alpha_ts_super(:)
     type(mbd_system) :: sys_super
     type(mbd_damping) :: damp_super
 
@@ -832,10 +829,10 @@ real(dp) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
         sys_super%lattice(i, :) = sys%lattice(i, :)*sys%supercell(i)
     end do
     allocate (sys_super%coords(n_cells*size(sys%coords, 1), 3))
-    allocate (alpha_0_super(n_cells*size(alpha_0)))
-    allocate (alpha_ts_super(0:ubound(sys%calc%omega_grid, 1), n_cells*size(alpha_0)))
-    allocate (C6_super(n_cells*size(C6)))
-    if (allocated(damp%r_vdw)) allocate (damp_super%r_vdw(n_cells*size(damp%r_vdw)))
+    allocate (alpha_0_super%val(n_cells*size(alpha_0%val)))
+    allocate (C6_super%val(n_cells*size(C6%val)))
+    allocate (alpha_ts_super(0:ubound(sys%calc%omega_grid, 1)))
+    if (allocated(damp%r_vdw%val)) allocate (damp_super%r_vdw%val(n_cells*size(damp%r_vdw%val)))
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
@@ -843,44 +840,35 @@ real(dp) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
         do i_atom = 1, size(sys%coords, 1)
             i = (i_cell-1)*size(sys%coords, 1)+i_atom
             sys_super%coords(i, :) = sys%coords(i_atom, :)+R_cell
-            alpha_0_super(i) = alpha_0(i_atom)
-            C6_super(i) = C6(i_atom)
-            if (allocated(damp%R_vdw)) then
-                damp_super%R_vdw(i) = damp%R_vdw(i_atom)
+            alpha_0_super%val(i) = alpha_0%val(i_atom)
+            C6_super%val(i) = C6%val(i_atom)
+            if (allocated(damp%R_vdw%val)) then
+                damp_super%R_vdw%val(i) = damp%R_vdw%val(i_atom)
             end if
         end do
     end do
     if (do_rpa) then
         alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, C6_super)
-        ene = get_single_rpa_energy( &
-            sys_super, alpha_ts_super, damp_super &
-        )
+        ene = get_single_rpa_energy(sys_super, alpha_ts_super, damp_super)
     else
-        ene = get_single_mbd_energy( &
-            sys_super, alpha_0_super, C6_super, damp_super &
-        )
+        ene = get_single_mbd_energy(sys_super, alpha_0_super, C6_super, damp_super)
     end if
-    deallocate (xyz_super)
-    deallocate (alpha_0_super)
-    deallocate (alpha_ts_super)
-    deallocate (C6_super)
-    deallocate (R_vdw_super)
     ene = ene/n_cells
     if (sys%work%get_rpa_orders) then
         sys%work%rpa_orders =sys_super%work%rpa_orders/n_cells
     end if
 end function get_supercell_mbd_energy
-    
+
 
 real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
     type(mat3n3n) :: relay
     real(dp), allocatable :: eigs(:)
-    real(dp), allocatable :: omega(:)
+    type(vecn) :: omega
     integer :: i_xyz, i
     integer :: n_negative_eigs, n_atoms
     logical :: is_parallel
@@ -894,7 +882,7 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     ! relay%re = T
     relay = dipole_matrix(sys, damp)
     omega = omega_eff(C6, alpha_0)
-    call form_mbd_matrix(relay, alpha_0, omega)
+    call form_mbd_matrix(relay, alpha_0%val, omega%val)
     call ts(sys%calc, 21)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%work%get_modes .or. sys%do_force) then
@@ -924,7 +912,7 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
         )
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
-    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
     if (sys%do_force) then
         allocate (c_lambda14i(3*n_atoms, 3*n_atoms))
         allocate (sys%work%forces(n_atoms, 3))
@@ -934,7 +922,7 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
         c_lambda12i_c = matmul(c_lambda14i, transpose(c_lambda14i))
         do i_xyz = 1, 3
             relay%re = -relay%re_dr(:, :, i_xyz)
-            call form_mbd_matrix(relay, alpha_0, omega)
+            call form_mbd_matrix(relay, alpha_0%val, omega%val)
             relay%re = relay%re-transpose(relay%re)
             sys%work%forces(:, i_xyz) = 1.d0/2*contract_forces(c_lambda12i_c*relay%re)
         end do
@@ -957,14 +945,15 @@ end subroutine form_mbd_matrix
 
 real(dp) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
     logical :: &
         is_parallel, do_rpa, mute
     integer :: i_kpt, n_kpts, n_atoms
-    real(dp) :: k_point(3), alpha_ts(0:ubound(sys%calc%omega_grid, 1), size(sys%coords, 1))
+    real(dp) :: k_point(3)
+    type(vecn), allocatable :: alpha_ts(:)
 
     n_atoms = size(sys%coords, 1)
     sys%work%k_pts = make_k_grid( &
@@ -977,6 +966,7 @@ real(dp) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
 
     sys%calc%parallel = .false.
 
+    allocate (alpha_ts(0:ubound(sys%calc%omega_grid, 1)))
     alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     ene = 0.d0
     if (sys%work%get_eigs) &
@@ -1018,15 +1008,15 @@ end function get_reciprocal_mbd_energy
 
 real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
     real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
 
     type(mat3n3n) :: relay
     real(dp), allocatable :: eigs(:)
-    real(dp), allocatable :: omega(:)
+    type(vecn) :: omega
     integer :: i_atom, j_atom, i, j
     integer :: n_negative_eigs
     logical :: is_parallel
@@ -1042,13 +1032,13 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
             relay%cplx(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
-                omega(i_atom)*omega(j_atom) &
-                *sqrt(alpha_0(i_atom)*alpha_0(j_atom))* &
+                omega%val(i_atom)*omega%val(j_atom) &
+                *sqrt(alpha_0%val(i_atom)*alpha_0%val(j_atom))* &
                 relay%cplx(i+1:i+3, j+1:j+3)
         end do
     end do
     ! relay = w^2+sqrt(a*a)*w*w*T
-    call add_diag(relay, repeatn(omega**2, 3))
+    call add_diag(relay, repeatn(omega%val**2, 3))
     call ts(sys%calc, 22)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%work%get_modes) then
@@ -1078,13 +1068,13 @@ real(dp) function get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp)
         )
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
-    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega)
+    ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
 end function get_single_reciprocal_mbd_ene
 
 
 real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha(0:, :)
+    type(vecn), intent(in) :: alpha(0:)
     type(mbd_damping), intent(in) :: damp
 
     type(mat3n3n) :: relay, AT
@@ -1108,18 +1098,18 @@ real(dp) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
+        damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
         do i_atom = 1, size(sys%coords, 1)
             i = 3*(i_atom-1)
             relay%re(i+1:i+3, :i) = &
-                alpha(i_grid_omega, i_atom)*transpose(relay%re(:i, i+1:i+3))
+                alpha(i_grid_omega)%val(i_atom)*transpose(relay%re(:i, i+1:i+3))
         end do
         do i_atom = 1, size(sys%coords, 1)
             i = 3*(i_atom-1)
             relay%re(i+1:i+3, i+1:) = &
-                alpha(i_grid_omega, i_atom)*relay%re(i+1:i+3, i+1:)
+                alpha(i_grid_omega)%val(i_atom)*relay%re(i+1:i+3, i+1:)
         end do
         ! relay = alpha*T
         if (sys%work%get_rpa_orders) AT = relay
@@ -1166,7 +1156,7 @@ end function get_single_rpa_energy
 
 real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha(0:, :)
+    type(vecn), intent(in) :: alpha(0:)
     real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
 
@@ -1191,18 +1181,18 @@ real(dp) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) resul
             if (sys%calc%my_task /= modulo(i_grid_omega, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega, :))
+        damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
         do i_atom = 1, size(sys%coords, 1)
             i = 3*(i_atom-1)
             relay%cplx(i+1:i+3, :i) = &
-                alpha(i_grid_omega, i_atom)*conjg(transpose(relay%cplx(:i, i+1:i+3)))
+                alpha(i_grid_omega)%val(i_atom)*conjg(transpose(relay%cplx(:i, i+1:i+3)))
         end do
         do i_atom = 1, size(sys%coords, 1)
             i = 3*(i_atom-1)
             relay%cplx(i+1:i+3, i+1:) = &
-                alpha(i_grid_omega, i_atom)*relay%cplx(i+1:i+3, i+1:)
+                alpha(i_grid_omega)%val(i_atom)*relay%cplx(i+1:i+3, i+1:)
         end do
         ! relay = alpha*T
         if (sys%work%get_rpa_orders) AT = relay
@@ -1720,29 +1710,30 @@ end function
 
 function alpha_dynamic_ts(calc, alpha_0, C6) result(alpha)
     type(mbd_calc), intent(in) :: calc
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
-    real(dp) :: alpha(0:ubound(calc%omega_grid, 1), size(alpha_0))
+    type(vecn), intent(in) :: alpha_0
+    type(vecn), intent(in) :: C6
+    type(vecn) :: alpha(0:ubound(calc%omega_grid, 1))
 
     integer :: i_freq
-    real(dp), allocatable :: omega(:)
+    type(vecn) :: omega
 
     omega = omega_eff(C6, alpha_0)
-    forall (i_freq = 0:ubound(calc%omega_grid, 1))
-        alpha(i_freq, :) = alpha_osc(alpha_0, omega, calc%omega_grid(i_freq))
-    end forall
+    do i_freq = 0, ubound(alpha, 1)
+        alpha(i_freq) = alpha_osc(alpha_0, omega, calc%omega_grid(i_freq))
+    end do
 end function
 
 
-elemental function alpha_osc(alpha_0, omega, u) result(alpha)
-    real(dp), intent(in) :: alpha_0, omega, u
-    real(dp) :: alpha
+type(vecn) function alpha_osc(alpha_0, omega, u) result(alpha)
+    type(vecn), intent(in) :: alpha_0, omega
+    real(dp), intent(in) :: u
 
-    alpha = alpha_0/(1+(u/omega)**2)
+    alpha%val = alpha_0%val/(1+(u/omega%val)**2)
+    ! TODO forces
 end function
 
 
-elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
+elemental function combine_C6(C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     real(dp), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
     real(dp) :: C6_ij
 
@@ -1750,52 +1741,37 @@ elemental function combine_C6 (C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
 end function
 
 
-elemental function V_to_R(V) result(R)
-    real(dp), intent(in) :: V
-    real(dp) :: R
+type(vecn) function omega_eff(C6, alpha) result(omega)
+    type(vecn), intent(in) :: C6, alpha
 
-    R = (3.d0*V/(4.d0*pi))**(1.d0/3)
+
+    omega%val = 4.d0/3*C6%val/alpha%val**2
+    ! TODO forces
 end function
 
 
-elemental function omega_eff(C6, alpha) result(omega)
-    real(dp), intent(in) :: C6, alpha
-    real(dp) :: omega
+type(vecn) function get_sigma_selfint(alpha) result(sigma)
+    type(vecn), intent(in) :: alpha
 
-    omega = 4.d0/3*C6/alpha**2
+    sigma%val = (sqrt(2.d0/pi)*alpha%val/3.d0)**(1.d0/3)
+    ! TODO forces
 end function
 
 
-elemental function get_sigma_selfint(alpha) result(sigma)
-    real(dp), intent(in) :: alpha
-    real(dp) :: sigma
-
-    sigma = (sqrt(2.d0/pi)*alpha/3.d0)**(1.d0/3)
-end function
-
-
-function get_C6_from_alpha(calc, alpha) result(C6)
+type(vecn) function get_C6_from_alpha(calc, alpha) result(C6)
     type(mbd_calc), intent(in) :: calc
     type(vecn), intent(in) :: alpha(0:)
-    real(dp) :: C6(size(alpha(0)%val))
 
     integer :: i_atom, i
 
+    allocate (C6%val(size(alpha(0)%val)))
     do i_atom = 1, size(alpha(0)%val)
-        C6(i_atom) = 3.d0/pi*sum( &
+        C6%val(i_atom) = 3.d0/pi*sum( &
             ([(alpha(i)%val(i_atom), i = 0, ubound(alpha, 1))]**2) * &
             calc%omega_grid_w(:) &
         )
     end do
-end function
-
-
-function get_total_C6_from_alpha(calc, alpha) result(C6)
-    type(mbd_calc), intent(in) :: calc
-    real(dp), intent(in) :: alpha(:, :)
-    real(dp) :: C6
-
-    C6 = 3.d0/pi*sum((sum(alpha, 2)**2)*calc%omega_grid_w(:))
+    ! TODO forces
 end function
 
 
@@ -2073,11 +2049,11 @@ subroutine run_tests()
         sys%coords = coords
         sys%do_force = .true.
         damp%version = 'fermi,dip'
-        damp%r_vdw = [3.55d0, 3.55d0, 3.55d0]
+        damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
         damp%beta = 0.83
         alpha_0 = [11.d0, 11.d0, 11.d0]
         omega = [0.7d0, 0.7d0, 0.7d0]
-        ene(0) = get_single_mbd_energy(sys, alpha_0, omega, damp)
+        ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(omega), damp)
         sys%do_force = .false.
         do i_atom = 1, n_atoms
             do i_xyz = 1, 3
@@ -2085,7 +2061,7 @@ subroutine run_tests()
                     if (i_step == 0) cycle
                     sys%coords = coords
                     sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
-                    ene(i_step) = get_single_mbd_energy(sys, alpha_0, omega, damp)
+                    ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(omega), damp)
                 end do
                 forces(i_atom, i_xyz) = diff5(ene, delta)
             end do
@@ -2105,7 +2081,7 @@ subroutine run_tests()
         real(dp), allocatable :: forces(:, :, :)
         real(dp), allocatable :: diff(:, :, :)
         real(dp), allocatable :: alpha_0(:)
-        real(dp), allocatable :: alpha(:, :)
+        type(vecn), allocatable :: alpha(:)
         real(dp), allocatable :: omega(:)
         integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
         type(vecn) :: alpha_scs(0:0, -2:2)
@@ -2114,18 +2090,18 @@ subroutine run_tests()
         n_atoms = 3
         allocate (coords(n_atoms, 3), source=0.d0)
         allocate (forces(n_atoms, n_atoms, 3))
-        allocate (alpha(0:0, n_atoms))
+        allocate (alpha(0:0))
         coords(2, 1) = 4.d0*ang
         coords(3, 2) = 4.d0*ang
         sys%calc => calc
         sys%coords = coords
         sys%do_force = .true.
         damp%version = 'fermi,dip,gg'
-        damp%r_vdw = [3.55d0, 3.55d0, 3.55d0]
+        damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
         damp%beta = 0.83
         alpha_0 = [11.d0, 11.d0, 11.d0]
         omega = [0.7d0, 0.7d0, 0.7d0]
-        alpha(0, :) = alpha_0
+        alpha(0)%val = alpha_0
         alpha_scs(:, 0) = run_scs(sys, alpha, damp)
         sys%do_force = .false.
         do i_atom = 1, n_atoms

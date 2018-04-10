@@ -6,6 +6,7 @@ module mbd_api
 use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
     mbd_rsscs_energy, get_ts_energy, get_damping_parameters, init_grid
 use mbd_common, only: dp
+use mbd_types, only: vecn
 use mbd_vdw_param, only: default_vdw_params, species_index
 
 implicit none
@@ -112,7 +113,7 @@ subroutine mbd_update_vdw_params_custom(calc, alpha_0, C6, r_vdw)
 
     calc%alpha_0 = alpha_0
     calc%C6 = C6
-    calc%damp%r_vdw = r_vdw
+    calc%damp%r_vdw%val = r_vdw
 end subroutine
 
 
@@ -124,7 +125,7 @@ subroutine mbd_update_vdw_params_from_ratios(calc, ratios, free_values)
     ! TODO allocate only once
     calc%alpha_0 = free_values(1, :)*ratios
     calc%C6 = free_values(2, :)*ratios**2
-    calc%damp%r_vdw = free_values(3, :)*ratios**(1.d0/3)
+    calc%damp%r_vdw%val = free_values(3, :)*ratios**(1.d0/3)
 end subroutine
 
 
@@ -134,7 +135,7 @@ subroutine mbd_get_energy(calc, energy)
 
     select case (calc%dispersion_type)
     case ('mbd')
-        energy = mbd_rsscs_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
+        energy = mbd_rsscs_energy(calc%sys, vecn(calc%alpha_0), vecn(calc%C6), calc%damp)
     case ('ts')
         energy = get_ts_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
     end select

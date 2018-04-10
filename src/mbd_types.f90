@@ -26,10 +26,22 @@ type :: vecn
     real(dp), allocatable :: dr(:, :, :)
 end type
 
+interface vecn
+    module procedure vecn_no_dr__
+end interface
+
 type :: scalar
     real(dp) :: val
     real(dp), allocatable :: dr(:)  ! explicit derivative
     real(dp), allocatable :: dvdw
 end type
+
+contains
+
+type(vecn) function vecn_no_dr__(x)
+    real(dp), intent(in) :: x(:)
+
+    vecn_no_dr__%val = x
+end function
 
 end module

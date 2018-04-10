@@ -8,7 +8,7 @@ use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
     mbd_rsscs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy
 use mbd_common, only: dp
-use mbd_types, only: mat3n3n
+use mbd_types, only: mat3n3n, vecn
 
 implicit none
 
@@ -120,8 +120,8 @@ type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a)
 
     allocate (damping)
     damping%version = f_string(version_c)
-    if (present(r_vdw)) damping%r_vdw = r_vdw
-    if (present(sigma)) damping%sigma = sigma
+    if (present(r_vdw)) damping%r_vdw%val = r_vdw
+    if (present(sigma)) damping%sigma%val = sigma
     damping%beta = beta
     damping%a = a
     damping%ts_sr = beta
@@ -135,8 +135,8 @@ subroutine mbd_destroy_damping(damping_p) bind(c)
     type(mbd_damping), pointer :: damping
 
     call c_f_pointer(damping_p, damping)
-    if (allocated(damping%r_vdw)) deallocate (damping%r_vdw)
-    if (allocated(damping%sigma)) deallocate (damping%sigma)
+    if (allocated(damping%r_vdw%val)) deallocate (damping%r_vdw%val)
+    if (allocated(damping%sigma%val)) deallocate (damping%sigma%val)
     deallocate (damping)
 end subroutine mbd_destroy_damping
 
@@ -191,7 +191,7 @@ real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p)
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    calc_mbd_energy = get_mbd_energy(sys, alpha_0, C6, damping)
+    calc_mbd_energy = get_mbd_energy(sys, vecn(alpha_0), vecn(C6), damping)
     if (sys%do_force) sys_c%forces = c_loc(sys%work%forces)
 end function calc_mbd_energy
 
@@ -210,7 +210,7 @@ real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p)
     call c_f_pointer(damping_p, damping)
     sys2 = sys
     sys2%do_rpa = .true.
-    calc_rpa_energy = get_mbd_energy(sys2, alpha_0, C6, damping)
+    calc_rpa_energy = get_mbd_energy(sys2, vecn(alpha_0), vecn(C6), damping)
 end function calc_rpa_energy
 
 real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
@@ -225,7 +225,7 @@ real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    calc_mbd_rsscs_energy = mbd_rsscs_energy(sys, alpha_0, C6, damping)
+    calc_mbd_rsscs_energy = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
 end function calc_mbd_rsscs_energy
 
 real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
@@ -240,7 +240,7 @@ real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, dampin
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    calc_mbd_scs_energy = mbd_scs_energy(sys, alpha_0, C6, damping)
+    calc_mbd_scs_energy = mbd_scs_energy(sys, vecn(alpha_0), vecn(C6), damping)
 end function calc_mbd_scs_energy
 
 subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)

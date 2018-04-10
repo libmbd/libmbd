@@ -6,7 +6,7 @@ module mbd_math
 use mbd_linalg, only: eye, inverted, diag, invert
 use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint
 use mbd_common, only: dp, pi
-use mbd_types, only: mat3n3n
+use mbd_types, only: mat3n3n, vecn
 
 implicit none
 
@@ -152,7 +152,7 @@ real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
 
     N = size(sys%coords, 1)
     damp%version = 'dip,gg'
-    damp%sigma = get_sigma_selfint(a0)
+    damp%sigma = get_sigma_selfint(vecn(a0))
     T = dipole_matrix(sys, damp)
     do  A = 1, N
         do B = 1, N

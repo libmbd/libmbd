@@ -128,7 +128,7 @@ real(dp) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     alpha_dyn_rsscs = run_scs(sys, alpha_dyn, damp_rsscs)
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
     damp_mbd%version = 'fermi,dip'
-    damp_mbd%r_vdw%val = damp%R_vdw%val*(alpha_dyn_rsscs(0)%val/alpha_dyn(0)%val(:))**(1.d0/3)
+    damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%beta = damp%beta
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0), C6_rsscs, damp_mbd)
     if (has_exc(sys)) call print_exc(sys)
@@ -154,8 +154,7 @@ real(dp) function mbd_scs_energy(sys, alpha_0, C6, damp)
     damp_scs%version = 'dip,gg'
     alpha_dyn_scs = run_scs(sys, alpha_dyn, damp_scs)
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
-    damp_mbd%r_vdw%val = damp%R_vdw%val*(alpha_dyn_scs(0)%val(:)/alpha_dyn(0)%val(:))**(1.d0/3)
-    ! TODO forces
+    damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_scs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%version = 'dip,1mexp'
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
@@ -1724,12 +1723,61 @@ function alpha_dynamic_ts(calc, alpha_0, C6) result(alpha)
 end function
 
 
+! equation 14
 type(vecn) function alpha_osc(alpha_0, omega, u) result(alpha)
     type(vecn), intent(in) :: alpha_0, omega
     real(dp), intent(in) :: u
 
+    integer :: n_atoms, i
+
     alpha%val = alpha_0%val/(1+(u/omega%val)**2)
-    ! TODO forces
+    n_atoms = size(alpha_0%val)
+    if (allocated(alpha_0%dr) .or. allocated(omega%dr)) then
+        allocate (alpha%dr(n_atoms, n_atoms, 3), source=0.d0)
+    end if
+    if (allocated(alpha_0%dr)) then
+        do i = 1, n_atoms
+            alpha%dr(i, :, :) = alpha%val(i)*alpha_0%dr(i, :, :)/alpha_0%val(i)
+        end do
+    end if
+    if (allocated(omega%dr)) then
+        do i = 1, n_atoms
+            alpha%dr(i, :, :) = alpha%dr(i, :, :) + &
+                alpha%val(i)*2.d0/omega%val(i)*omega%dr(i, :, :)/(1.d0+(omega%val(i)/u)**2)
+        end do
+    end if
+end function
+
+
+! equation 13
+type(vecn) function scale_TS(X, alpha_0_sc, alpha_0, q) result(X_sc)
+    type(vecn), intent(in) :: X, alpha_0_sc, alpha_0
+    real(dp), intent(in) :: q
+
+    integer :: i, n_atoms
+
+    X_sc%val = X%val*(alpha_0_sc%val/alpha_0%val)**q
+    n_atoms = size(X%val)
+    if (allocated(X%dr) .or. allocated(alpha_0_sc%dr) .or. allocated(alpha_0%dr)) then
+        allocate (X_sc%dr(n_atoms, n_atoms, 3), source=0.d0)
+    end if
+    if (allocated(X%dr)) then
+        do i = 1, n_atoms
+            X_sc%dr(i, :, :) = X_sc%val(i)*X%dr(i, :, :)/X%val(i)
+        end do
+    end if
+    if (allocated(alpha_0_sc%dr)) then
+        do i = 1, n_atoms
+            X_sc%dr(i, :, :) = X_sc%dr(i, :, :) + &
+                X_sc%val(i)*q*alpha_0_sc%dr(i, :, :)/alpha_0_sc%val(i)
+        end do
+    end if
+    if (allocated(alpha_0%dr)) then
+        do i = 1, n_atoms
+            X_sc%dr(i, :, :) = X_sc%dr(i, :, :) - &
+                X_sc%val(i)*q*alpha_0%dr(i, :, :)/alpha_0%val(i)
+        end do
+    end if
 end function
 
 
@@ -1741,12 +1789,28 @@ elemental function combine_C6(C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
 end function
 
 
+! equation 12
 type(vecn) function omega_eff(C6, alpha) result(omega)
     type(vecn), intent(in) :: C6, alpha
 
+    integer :: i, n_atoms
 
     omega%val = 4.d0/3*C6%val/alpha%val**2
-    ! TODO forces
+    n_atoms = size(C6%val)
+    if (allocated(C6%dr) .or. allocated(alpha%dr)) then
+        allocate (omega%dr(n_atoms, n_atoms, 3), source=0.d0)
+    end if
+    if (allocated(C6%dr)) then
+        do i = 1, n_atoms
+            omega%dr(i, :, :) = omega%val(i)*C6%dr(i, :, :)/C6%val(i)
+        end do
+    end if
+    if (allocated(alpha%dr)) then
+        do i = 1, n_atoms
+            omega%dr(i, :, :) = omega%dr(i, :, :) - &
+                2*omega%val(i)*alpha%dr(i, :, :)/alpha%val(i)
+        end do
+    end if
 end function
 
 
@@ -1758,6 +1822,7 @@ type(vecn) function get_sigma_selfint(alpha) result(sigma)
 end function
 
 
+! equation 15
 type(vecn) function get_C6_from_alpha(calc, alpha) result(C6)
     type(mbd_calc), intent(in) :: calc
     type(vecn), intent(in) :: alpha(0:)

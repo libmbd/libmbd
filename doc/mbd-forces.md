@@ -1,4 +1,5 @@
 # MBD forces
+
 $$
 E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-3\sum_i\frac{\omega_i}2,\qquad\mathbf Q_{ij}=\omega_i^2\delta_{ij}\mathbf I+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}
 $$
@@ -18,10 +19,6 @@ $$
 &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\partial\mathbf T_{ij},\qquad \alpha_{0,i}\equiv\alpha_i(0)
 \end{aligned}
 \end{equation}
-$$
-
-$$
-\omega=\frac{4C_6}{3\alpha_{0}^2},\qquad\partial\omega=\omega\left(\frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}\right)
 $$
 
 $$
@@ -75,20 +72,19 @@ $$
 $$
 
 $$
-\begin{equation}
-\begin{aligned}
-\alpha(\mathrm iu)^{-1}&=\alpha(0)^{-1}(1+u^2/\omega^2) \\
-\partial\big(\alpha(\mathrm iu)^{-1}\big)&=-\big(\alpha(0)\alpha(\mathrm iu)\big)^{-1}\partial\alpha(0)-2\alpha(0)^{-1}\omega^{-3}u^2\partial\omega
-\end{aligned}
-\end{equation}
+\omega=\frac{4C_6}{3\alpha_{0}^2},\qquad\partial\omega=\omega\left(\frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}\right)
 $$
 
 $$
-\begin{equation}
-\begin{aligned}
-\bar\omega_i&=\frac4{\pi\bar\alpha_i(0)^2}\int_0^\infty\mathrm du\,\bar\alpha_i(u)^2 \\
-\partial\bar\omega_i&=-2\bar\omega_i\bar\alpha_i(0)^{-1}\partial\bar\alpha_i(0)+\frac8{\pi\bar\alpha_i(0)^2}\int_0^\infty\mathrm du\,\bar\alpha_i(u)\partial\bar\alpha_i(u)
-\end{aligned}
-\end{equation}
+\bar X=X\left(\frac{\bar\alpha_0}{\alpha_0}\right)^q,\qquad\partial\bar X=\bar X\left(\frac{\partial X}{X}+q\frac{\partial\bar\alpha_0}{\bar\alpha_0}-q\frac{\partial\alpha_0}{\alpha_0}\right)
+$$
+
+$$
+\alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
+\partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(\frac{\partial\alpha_0}{\alpha_0}+\frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}\right)
+$$
+
+$$
+\bar C_6=\frac3\pi\int_0^\infty\mathrm du\,\bar\alpha(u)^2,\qquad\partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du\,\bar\alpha(u)\partial\bar\alpha(u)
 $$
 

@@ -4,7 +4,11 @@ E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-3\sum_i\frac{\omega_
 $$
 
 $$
-\partial\operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\tfrac12\operatorname{Tr}\big(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T\partial\mathbf Q),\qquad\mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\quad\boldsymbol\Lambda\equiv\operatorname{diag}(\{\tilde\omega_i^2\})
+\mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad\boldsymbol\Lambda\equiv\operatorname{diag}(\{\tilde\omega_i^2\}),\qquad\operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\sum_i\tilde\omega_i
+$$
+
+$$
+\partial\operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\tfrac12\operatorname{Tr}\big(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T\partial\mathbf Q)
 $$
 
 $$
@@ -14,6 +18,10 @@ $$
 &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\partial\mathbf T_{ij},\qquad \alpha_{0,i}\equiv\alpha_i(0)
 \end{aligned}
 \end{equation}
+$$
+
+$$
+\omega=\frac{4C_6}{3\alpha_{0}^2},\qquad\partial\omega=\omega\left(\frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}\right)
 $$
 
 $$
@@ -36,7 +44,7 @@ $$
 \begin{equation}
 \begin{gathered}
 T^\text{GG}_{(ij)ab}\equiv\frac{\partial^2}{\partial R_a\partial R_b}\frac{\operatorname{erf}(\zeta)}R=\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}+2\zeta^2\Theta(\zeta)\frac{R_aR_b}{R^5},
-\\\Theta(\zeta)=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\quad \zeta=\frac{R_{(ij)}}{\sigma_{(ij)}}
+\\\Theta(\zeta)=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\qquad \zeta=\frac{R_{(ij)}}{\sigma_{(ij)}}
 \end{gathered}
 \end{equation}
 $$

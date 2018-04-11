@@ -10,7 +10,7 @@ matrix:
         - liblapack-dev
   - env: WITH_PIP=1 PYTHON=python
     addons: *nompi
-  - env: WITH_CMAKE=1 WITH_MPI4PY=1 PYTHON=python
+  - env: WITH_CMAKE=1 WITH_MPI4PY=1 PYTHON=python COVERAGE=1
     addons: &mpi
       apt:
         packages:

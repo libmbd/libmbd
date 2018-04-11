@@ -9,7 +9,7 @@ find_package(MPI)
 set(WITH_MPI .false.)
 
 set(SRCS
-    src/mbd.f90
+    src/mbd.F90
     src/mbd_c_api.f90
     src/mbd_api.f90
     src/mbd_vdw_param.f90
@@ -47,7 +47,7 @@ enable_testing()
 set(CMAKE_CTEST_COMMAND ctest -V)
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 
-add_executable(tests EXCLUDE_FROM_ALL src/tests.f90)
+add_executable(tests EXCLUDE_FROM_ALL src/mbd_tests.F90)
 target_link_libraries(tests mbd)
 add_test(tests tests)
 add_dependencies(check tests)

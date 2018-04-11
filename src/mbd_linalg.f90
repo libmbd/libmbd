@@ -11,10 +11,15 @@ implicit none
 private
 public :: diag, invert, inverted, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert, add_diag, &
-    repeatn, mult_cprod
+    repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), cross_self_add, &
+    fill_tril, cross_self_prod
 
 interface operator(.cprod.)
     module procedure cart_prod_
+end interface
+
+interface operator(.cadd.)
+    module procedure cart_add_
 end interface
 
 interface diag
@@ -386,6 +391,36 @@ function cart_prod_(a, b) result(c)
 end function
 
 
+function cart_add_(a, b) result(c)
+    real(dp), intent(in) :: a(:), b(:)
+    real(dp) :: c(size(a), size(b))
+
+    integer :: i, j
+
+    do i = 1, size(a)
+        do j = 1, size(b)
+            c(i, j) = a(i)+b(j)
+        end do
+    end do
+end function
+
+
+function cross_self_prod(a) result(c)
+    real(dp), intent(in) :: a(:)
+    real(dp) :: c(size(a), size(a))
+
+    c = cart_prod_(a, a)
+end function
+
+
+function cross_self_add(a) result(c)
+    real(dp), intent(in) :: a(:)
+    real(dp) :: c(size(a), size(a))
+
+    c = cart_add_(a, a)
+end function
+
+
 subroutine add_diag_scalar_(A, d)
     type(mat3n3n), intent(inout) :: A
     real(dp), intent(in) :: d
@@ -420,27 +455,39 @@ subroutine add_diag_vec_(A, d)
 end subroutine
 
 
-subroutine mult_cprod(A, b, c)
-    type(mat3n3n), intent(inout) :: A
-    real(dp), intent(in) :: b(:)
-    real(dp), intent(in) :: c(:)
+subroutine mult_small(A, B)
+    real(dp), intent(inout) :: A(:, :)
+    real(dp), intent(in) :: B(:, :)
+
+    integer :: i, i3, j, j3
+
+    forall (i = 1:size(B, 1), i3 = 1:3, j = 1:size(B, 1), j3 = 1:3)
+        A((i-1)*3+i3, (j-1)*3+j3) = B(i, j)*A((i-1)*3+i3, (j-1)*3+j3)
+    end forall
+end subroutine
+
+
+subroutine fill_tril(A)
+    real(dp), intent(inout) :: A(:, :)
 
     integer :: i, j
 
-    if (allocated(A%re)) then
-        do i = 1, size(b)
-            do j = 1, size(c)
-                A%re(i, j) = b(i)*c(j)*A%re(i, j)
-            end do
+    do i = 1, size(A, 1)
+        do j = i+1, size(A, 1)
+            A(j, i) = A(i, j)
         end do
-    else
-        do i = 1, size(b)
-            do j = 1, size(c)
-                A%cplx(i, j) = b(i)*c(j)*A%cplx(i, j)
-            end do
-        end do
-    end if
+    end do
 end subroutine
+
+
+function multed_small(A, B)
+    real(dp), intent(in) :: A(:, :)
+    real(dp), intent(in) :: B(:, :)
+    real(dp) :: multed_small(size(A, 1), size(A, 1))
+
+    multed_small = A
+    call mult_small(multed_small, B)
+end function
 
 
 function repeatn(x, n)
@@ -482,6 +529,14 @@ function make_diag_(d) result(A)
 
     A(:, :) = 0.d0
     forall (i = 1:size(d)) A(i, i) = d(i)
+end function
+
+
+function symmetrize(A)
+    real(dp), intent(in) :: A(:, :)
+    real(dp) :: symmetrize(size(A, 1), size(A, 1))
+
+    symmetrize = A + transpose(A)
 end function
 
 

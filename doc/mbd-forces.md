@@ -9,14 +9,15 @@ $$
 $$
 
 $$
-\partial\operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\tfrac12\operatorname{Tr}\big(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T\partial\mathbf Q)
+\partial E_\text{MBD}=\frac14\operatorname{Tr}\big(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T\partial\mathbf Q)-3\sum_i\frac{\partial\omega_i}2
 $$
 
 $$
 \begin{equation}
 \begin{aligned}
-\partial\mathbf Q_{ij}=2&\delta_{ij}\omega_i\partial\omega_i\\&+\big((\omega_i\partial\omega_j+\omega_j\partial\omega_i)\sqrt{\alpha_{0,i}\alpha_{0,j}}+\omega_i\omega_j(\alpha_{0,i}\partial\alpha_{0,j}+\alpha_{0,j}\partial\alpha_{0,i})/2\sqrt{\alpha_{0,i}\alpha_{0,j}}\big)\mathbf T_{ij} \\
-&+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\partial\mathbf T_{ij},\qquad \alpha_{0,i}\equiv\alpha_i(0)
+\partial\mathbf Q_{ij}=&2\delta_{ij}\omega_i\partial\omega_i\mathbf I
++\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}\left(\frac{\partial\omega_i}{\omega_i}+\frac{\partial\omega_j}{\omega_j}+\frac12\frac{\partial\alpha_{0,i}}{\alpha_{0,i}}+\frac12\frac{\partial\alpha_{0,j}}{\alpha_{0,j}}\right)\\
+&+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\partial\mathbf T_{ij}
 \end{aligned}
 \end{equation}
 $$
@@ -56,9 +57,9 @@ $$
 $$
 \begin{equation}
 \begin{gathered}
-\sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad\sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13} \\
-\frac{\mathrm d\sigma}{\mathrm dR_c}=\frac 1{3\sigma}\left(\frac{\sigma_i^2}{\alpha_i}\frac{\mathrm d\alpha_i}{\mathrm dR_c}+\frac{\sigma_j^2}{\alpha_j}\frac{\mathrm d\alpha_j}{\mathrm dR_c}\right)
-\end{gathered}
+\sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad\partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}\\
+\sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad\partial\sigma_{ij}=\frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
+\end{gathered}\tag{sigma}
 \end{equation}
 $$
 

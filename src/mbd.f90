@@ -8,7 +8,8 @@ use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, inverted, sinvert, add_diag, repeatn, mult_cprod
+    sdiagonalized, inverted, sinvert, add_diag, repeatn, symmetrize, mult_small, &
+    multed_small, operator(.cadd.), cross_self_add, fill_tril, cross_self_prod
 use mbd_types, only: mat3n3n, mat33, scalar, vecn
 
 implicit none
@@ -304,6 +305,12 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         allocate (dipmat%re(3*n_atoms, 3*n_atoms), source=0.d0)
         if (sys%do_force) then
             allocate (dipmat%re_dr(3*n_atoms, 3*n_atoms, 3), source=0.d0)
+            if (allocated(damp%r_vdw%dr)) then
+                allocate (dipmat%re_dvdw(3*n_atoms, 3*n_atoms), source=0.d0)
+            end if
+            if (allocated(damp%sigma%dr)) then
+                allocate (dipmat%re_dsigma(3*n_atoms, 3*n_atoms), source=0.d0)
+            end if
         end if
     end if
     ! MPI code end
@@ -362,7 +369,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 r_norm = sqrt(sum(r**2))
                 if (sys%periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw%val)) then
-                    R_vdw_ij = damp%R_vdw%val(i_atom)+damp%R_vdw%val(j_atom)
+                    R_vdw_ij = sum(damp%R_vdw%val([i_atom, j_atom]))
                 end if
                 if (allocated(damp%sigma%val)) then
                     sigma_ij = damp%mayer_scaling*sqrt(sum(damp%sigma%val([i_atom, j_atom])**2))
@@ -402,6 +409,9 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                 end select
+                if (allocated(Tpp%dvdw)) then
+                    Tpp%dvdw = damp%beta*Tpp%dvdw
+                end if
                 if (do_ewald) then
                     Tpp%val = Tpp%val+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
@@ -419,9 +429,19 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     associate (T => dipmat%re(i+1:i+3, j+1:j+3))
                         T = T + Tpp%val
                     end associate
-                    if (sys%do_force) then
+                    if (allocated(dipmat%re_dr)) then
                         associate (T => dipmat%re_dr(i+1:i+3, j+1:j+3, :))
                             T = T + Tpp%dr
+                        end associate
+                    end if
+                    if (allocated(dipmat%re_dvdw)) then
+                        associate (dTdRvdw => dipmat%re_dvdw(i+1:i+3, j+1:j+3))
+                            dTdRvdw = dTdRvdw + Tpp%dvdw
+                        end associate
+                    end if
+                    if (allocated(dipmat%re_dsigma)) then
+                        associate (dTdsigma => dipmat%re_dsigma(i+1:i+3, j+1:j+3))
+                            dTdsigma = dTdsigma + Tpp%dsigma
                         end associate
                     end if
                 end if
@@ -866,21 +886,26 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
-    type(mat3n3n) :: relay
+    type(mat3n3n) :: relay, dQ, T
     real(dp), allocatable :: eigs(:)
     type(vecn) :: omega
-    integer :: i_xyz, i
+    integer :: i_xyz, i, i_atom
     integer :: n_negative_eigs, n_atoms
-    logical :: is_parallel
+    logical :: is_parallel, do_impl_deriv
     real(dp), allocatable :: c_lambda12i_c(:, :)
-    real(dp), allocatable :: c_lambda14i(:, :)
 
     is_parallel = sys%calc%parallel
+    do_impl_deriv = allocated(alpha_0%dr) .or. allocated(C6%dr) .or. &
+        allocated(damp%r_vdw%dr) .or. allocated(damp%sigma%dr)
 
     n_atoms = size(sys%coords, 1)
     allocate (eigs(3*n_atoms))
-    ! relay%re = T
-    relay = dipole_matrix(sys, damp)
+    T = dipole_matrix(sys, damp)
+    if (do_impl_deriv) then
+        relay = T
+    else
+        call move_alloc(T%re, relay%re)
+    end if
     omega = omega_eff(C6, alpha_0)
     call form_mbd_matrix(relay, alpha_0%val, omega%val)
     call ts(sys%calc, 21)
@@ -914,18 +939,58 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     end if
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
     if (.not. sys%do_force) return
-    allocate (c_lambda14i(3*n_atoms, 3*n_atoms))
-    allocate (sys%work%forces(n_atoms, 3))
+    allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
+    allocate (sys%work%forces(n_atoms, 3), source=0.d0)
     forall (i = 1:3*n_atoms)
-        c_lambda14i(:, i) = eigs(i)**(-1.d0/4)*sys%work%modes(:, i)
+        c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*sys%work%modes(:, i)
     end forall
-    c_lambda12i_c = matmul(c_lambda14i, transpose(c_lambda14i))
+    c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
     do i_xyz = 1, 3
-        relay%re = -relay%re_dr(:, :, i_xyz)
-        call form_mbd_matrix(relay, alpha_0%val, omega%val)
-        relay%re = relay%re-transpose(relay%re)
-        sys%work%forces(:, i_xyz) = 1.d0/2*contract_forces(c_lambda12i_c*relay%re)
+        dQ%re = -T%re_dr(:, :, i_xyz)
+        call form_mbd_matrix(dQ, alpha_0%val, omega%val)
+        dQ%re = dQ%re-transpose(dQ%re)
+        sys%work%forces(:, i_xyz) = 1.d0/4*contract_forces(c_lambda12i_c*dQ%re)
     end do
+    if (.not. do_impl_deriv) return
+    do i_atom = 1, n_atoms
+        do i_xyz = 1, 3
+            dQ%re(:, :) = 0.d0
+            if (allocated(omega%dr)) then
+                dQ%re(:, :) = dQ%re(:, :) + &
+                    2*diag(repeatn(omega%val*omega%dr(:, i_atom, i_xyz), 3)) + &
+                    multed_small(T%re, symmetrize(omega%val*sqrt(alpha_0%val) .cprod. &
+                    omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val)))
+            end if
+            if (allocated(alpha_0%dr)) then
+                dQ%re(:, :) = dQ%re(:, :) + &
+                    multed_small(T%re, symmetrize(omega%val*sqrt(alpha_0%val) .cprod. &
+                    omega%val*alpha_0%dr(:, i_atom, i_xyz)/sqrt(alpha_0%val))/2)
+            end if
+            if (allocated(damp%sigma%dr)) then
+                call fill_tril(T%re_dsigma)
+                dQ%re(:, :) = dQ%re(:, :) + &
+                    multed_small( &
+                        T%re_dsigma, &
+                        cross_self_add(damp%sigma%val*damp%sigma%dr(:, i_atom, i_xyz)) / &
+                        sqrt(cross_self_add(damp%sigma%val**2)) * &
+                        cross_self_prod(omega%val*sqrt(alpha_0%val)) &
+                    )
+            end if
+            if (allocated(damp%r_vdw%dr)) then
+                call fill_tril(T%re_dvdw)
+                dQ%re(:, :) = dQ%re(:, :) + multed_small( &
+                    T%re_dvdw, &
+                    cross_self_add(damp%r_vdw%dr(:, i_atom, i_xyz)) * &
+                    cross_self_prod(omega%val*sqrt(alpha_0%val)) &
+                )
+            end if
+            sys%work%forces(i_atom, i_xyz) = sys%work%forces(i_atom, i_xyz) + &
+                1.d0/4*sum(c_lambda12i_c*dQ%re)
+        end do
+    end do
+    if (allocated(omega%dr)) then
+        sys%work%forces = sys%work%forces - 3.d0/2*sum(omega%dr, 1)
+    end if
 end function get_single_mbd_energy
 
 
@@ -936,8 +1001,8 @@ subroutine form_mbd_matrix(T, alpha_0, omega)
 
     real(dp), allocatable :: aw(:)
 
-    aw = repeatn(omega*sqrt(alpha_0), 3)
-    call mult_cprod(T, aw, aw)
+    aw = omega*sqrt(alpha_0)
+    call mult_small(T%re, aw .cprod. aw)
     call add_diag(T, repeatn(omega**2, 3))
 end subroutine form_mbd_matrix
 
@@ -1448,7 +1513,7 @@ function contract_forces(relay) result(atomvec)
     atomvec(:) = 0.d0
     do i_atom = 1, size(atomvec)
         associate (A => atomvec(i_atom), i => 3*(i_atom-1))
-            A = A + sum(relay(:, i+1:i+3))
+            A = A + 2*sum(relay(:, i+1:i+3))
         end associate
     end do
     atomvec = atomvec
@@ -1817,8 +1882,16 @@ end function
 type(vecn) function get_sigma_selfint(alpha) result(sigma)
     type(vecn), intent(in) :: alpha
 
+    integer :: i, n_atoms
+
     sigma%val = (sqrt(2.d0/pi)*alpha%val/3.d0)**(1.d0/3)
-    ! TODO forces
+    if (allocated(alpha%dr)) then
+        n_atoms = size(alpha%val)
+        allocate (sigma%dr(n_atoms, n_atoms, 3))
+        do i = 1, n_atoms
+            sigma%dr(i, :, :) = sigma%val(i)*alpha%dr(i, :, :)/(3*alpha%val(i))
+        end do
+    end if
 end function
 
 
@@ -1963,8 +2036,12 @@ subroutine run_tests()
     call exec_test('T_bare derivative')
     call exec_test('T_GG derivative explicit')
     call exec_test('T_GG derivative implicit')
+    call exec_test('T_fermi derivative implicit')
     call exec_test('MBD derivative explicit')
     call exec_test('SCS derivative explicit')
+    call exec_test('MBD derivative implicit alpha')
+    call exec_test('MBD derivative implicit C6')
+    call exec_test('MBD derivative implicit Rvdw')
     write (6, *) &
         trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
     if (n_failed /= 0) stop 1
@@ -1982,8 +2059,12 @@ subroutine run_tests()
         case ('T_bare derivative'); call test_T_bare_deriv()
         case ('T_GG derivative explicit'); call test_T_GG_deriv_expl()
         case ('T_GG derivative implicit'); call test_T_GG_deriv_impl()
+        case ('T_fermi derivative implicit'); call test_T_fermi_deriv_impl()
         case ('MBD derivative explicit'); call test_mbd_deriv_expl()
         case ('SCS derivative explicit'); call test_scs_deriv_expl()
+        case ('MBD derivative implicit alpha'); call test_mbd_deriv_impl_alpha()
+        case ('MBD derivative implicit C6'); call test_mbd_deriv_impl_C6()
+        case ('MBD derivative implicit Rvdw'); call test_mbd_deriv_impl_vdw()
         end select
         n_all = n_all + 1
         if (n_failed == n_failed_in) write (6, *) 'OK'
@@ -2092,6 +2173,38 @@ subroutine run_tests()
         end if
     end subroutine test_T_GG_deriv_impl
 
+    subroutine test_T_fermi_deriv_impl()
+        real(dp) :: r(3)
+        type(mat33) :: T
+        real(dp) :: diff(3, 3)
+        real(dp) :: T_diff_anl(3, 3)
+        real(dp) :: T_diff_num(3, 3, -2:2)
+        integer :: a, b, i_step
+        real(dp) :: delta
+        real(dp) :: rvdw, drvdw_dr, rvdw_diff
+
+        delta = 1d-3
+        r = [1.02d0, -2.22d0, 0.15d0]
+        rvdw = 2.5d0
+        drvdw_dr = -0.3d0
+        T = damping_fermi(r, rvdw, 6.d0, .true.).prod.T_bare_v2(r, .true.)
+        T_diff_anl = T%dvdw(:, :)*drvdw_dr
+        do i_step = -2, 2
+            if (i_step == 0) cycle
+            rvdw_diff =rvdw+i_step*delta*drvdw_dr
+            T = damping_fermi(r, rvdw_diff, 6.d0, .false.).prod.T_bare_v2(r, .false.)
+            T_diff_num(:, :, i_step) = T%val
+        end do
+        forall (a = 1:3, b = 1:3)
+            T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+        end forall
+        diff = T_diff_num(:, :, 0)-T_diff_anl
+        if (any(abs(diff) > 1d-12)) then
+            call failed()
+            call print_matrix('delta dTfermi', diff)
+        end if
+    end subroutine test_T_fermi_deriv_impl
+
     subroutine test_mbd_deriv_expl()
         real(dp) :: delta
         type(mbd_system) :: sys
@@ -2100,7 +2213,7 @@ subroutine run_tests()
         real(dp), allocatable :: forces(:, :)
         real(dp), allocatable :: diff(:, :)
         real(dp), allocatable :: alpha_0(:)
-        real(dp), allocatable :: omega(:)
+        real(dp), allocatable :: C6(:)
         real(dp) :: ene(-2:2)
         integer :: i_atom, n_atoms, i_xyz, i_step
 
@@ -2117,8 +2230,8 @@ subroutine run_tests()
         damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
         damp%beta = 0.83
         alpha_0 = [11.d0, 11.d0, 11.d0]
-        omega = [0.7d0, 0.7d0, 0.7d0]
-        ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(omega), damp)
+        C6 = [65d0, 65d0, 65d0]
+        ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
         sys%do_force = .false.
         do i_atom = 1, n_atoms
             do i_xyz = 1, 3
@@ -2126,7 +2239,7 @@ subroutine run_tests()
                     if (i_step == 0) cycle
                     sys%coords = coords
                     sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
-                    ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(omega), damp)
+                    ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
                 end do
                 forces(i_atom, i_xyz) = diff5(ene, delta)
             end do
@@ -2146,7 +2259,6 @@ subroutine run_tests()
         real(dp), allocatable :: forces(:, :, :)
         real(dp), allocatable :: diff(:, :, :)
         real(dp), allocatable :: alpha_0(:)
-        real(dp), allocatable :: omega(:)
         integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
         type(vecn) :: alpha_scs(-2:2)
 
@@ -2163,7 +2275,6 @@ subroutine run_tests()
         damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
         damp%beta = 0.83
         alpha_0 = [11.d0, 11.d0, 11.d0]
-        omega = [0.7d0, 0.7d0, 0.7d0]
         alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
         sys%do_force = .false.
         do i_atom = 1, n_atoms
@@ -2188,6 +2299,154 @@ subroutine run_tests()
             call print_matrix('diff z', diff(:, :, 3))
         end if
     end subroutine test_scs_deriv_expl
+
+    subroutine test_mbd_deriv_impl_alpha()
+        real(dp) :: delta
+        type(mbd_system) :: sys
+        type(mbd_damping) :: damp
+        real(dp), allocatable :: coords(:, :)
+        real(dp), allocatable :: forces(:, :)
+        real(dp), allocatable :: diff(:, :)
+        type(vecn) :: alpha_0
+        real(dp), allocatable :: alpha_0_diff(:)
+        real(dp), allocatable :: C6(:)
+        real(dp) :: ene(-2:2)
+        integer :: i_atom, n_atoms, i_xyz, i_step
+
+        delta = 1d-3
+        n_atoms = 3
+        allocate (coords(n_atoms, 3), source=0.d0)
+        allocate (forces(n_atoms, 3))
+        coords(2, 1) = 4.d0*ang
+        coords(3, 2) = 4.d0*ang
+        sys%calc => calc
+        sys%coords = coords
+        sys%do_force = .true.
+        damp%version = 'fermi,dip'
+        damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+        damp%beta = 0.83
+        alpha_0%val= [11.d0, 11.d0, 11.d0]
+        allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=200d0)
+        C6 = [65d0, 65d0, 65d0]
+        ene(0) = get_single_mbd_energy(sys, alpha_0, vecn(C6), damp)
+        sys%do_force = .false.
+        do i_atom = 1, n_atoms
+            do i_xyz = 1, 3
+                do i_step = -2, 2
+                    if (i_step == 0) cycle
+                    sys%coords = coords
+                    sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                    alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
+                    ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
+                end do
+                forces(i_atom, i_xyz) = diff5(ene, delta)
+            end do
+        end do
+        diff = forces-sys%work%forces
+        if (any(abs(diff) > 1d-12)) then
+            call failed()
+            call print_matrix('delta forces', diff)
+        end if
+    end subroutine test_mbd_deriv_impl_alpha
+
+    subroutine test_mbd_deriv_impl_C6()
+        real(dp) :: delta
+        type(mbd_system) :: sys
+        type(mbd_damping) :: damp
+        real(dp), allocatable :: coords(:, :)
+        real(dp), allocatable :: forces(:, :)
+        real(dp), allocatable :: diff(:, :)
+        type(vecn) :: C6
+        real(dp), allocatable :: C6_diff(:)
+        real(dp), allocatable :: alpha_0(:)
+        real(dp) :: ene(-2:2)
+        integer :: i_atom, n_atoms, i_xyz, i_step
+
+        delta = 1d-3
+        n_atoms = 3
+        allocate (coords(n_atoms, 3), source=0.d0)
+        allocate (forces(n_atoms, 3))
+        coords(2, 1) = 4.d0*ang
+        coords(3, 2) = 4.d0*ang
+        sys%calc => calc
+        sys%coords = coords
+        sys%do_force = .true.
+        damp%version = 'fermi,dip'
+        damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+        damp%beta = 0.83
+        alpha_0 = [11.d0, 11.d0, 11.d0]
+        C6%val = [65d0, 65d0, 65d0]
+        allocate (C6%dr(n_atoms, n_atoms, 3), source=200d0)
+        ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), C6, damp)
+        sys%do_force = .false.
+        do i_atom = 1, n_atoms
+            do i_xyz = 1, 3
+                do i_step = -2, 2
+                    if (i_step == 0) cycle
+                    sys%coords = coords
+                    sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                    C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
+                    ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
+                end do
+                forces(i_atom, i_xyz) = diff5(ene, delta)
+            end do
+        end do
+        diff = forces-sys%work%forces
+        if (any(abs(diff) > 1d-11)) then
+            call failed()
+            call print_matrix('delta forces', diff)
+        end if
+    end subroutine test_mbd_deriv_impl_C6
+
+    subroutine test_mbd_deriv_impl_vdw()
+        real(dp) :: delta
+        type(mbd_system) :: sys
+        type(mbd_damping) :: damp
+        real(dp), allocatable :: coords(:, :)
+        real(dp), allocatable :: forces(:, :)
+        real(dp), allocatable :: diff(:, :)
+        real(dp), allocatable :: rvdw(:)
+        real(dp), allocatable :: alpha_0(:)
+        real(dp), allocatable :: C6(:)
+        real(dp) :: ene(-2:2)
+        integer :: i_atom, n_atoms, i_xyz, i_step
+
+        delta = 1d-3
+        n_atoms = 3
+        allocate (coords(n_atoms, 3), source=0.d0)
+        allocate (forces(n_atoms, 3))
+        coords(2, 1) = 4.d0*ang
+        coords(3, 2) = 4.d0*ang
+        sys%calc => calc
+        sys%coords = coords
+        sys%do_force = .true.
+        damp%version = 'fermi,dip'
+        rvdw = [3.55d0, 3.55d0, 3.55d0]
+        damp%r_vdw%val = rvdw
+        allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=5d0)
+        damp%beta = 0.83
+        alpha_0 = [11.d0, 11.d0, 11.d0]
+        C6 = [65d0, 65d0, 65d0]
+        ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
+        sys%do_force = .false.
+        do i_atom = 1, n_atoms
+            do i_xyz = 1, 3
+                do i_step = -2, 2
+                    if (i_step == 0) cycle
+                    sys%coords = coords
+                    sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                    damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
+                    ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
+                end do
+                forces(i_atom, i_xyz) = diff5(ene, delta)
+            end do
+        end do
+        diff = forces-sys%work%forces
+        if (any(abs(diff) > 1d-11)) then
+            call failed()
+            call print_matrix('delta forces', diff)
+        end if
+    end subroutine test_mbd_deriv_impl_vdw
 end subroutine run_tests
 
 end module mbd

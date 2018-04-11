@@ -11,6 +11,8 @@ type :: mat3n3n
     real(dp), allocatable :: re(:, :)
     complex(dp), allocatable :: cplx(:, :)
     real(dp), allocatable :: re_dr(:, :, :)
+    real(dp), allocatable :: re_dvdw(:, :)
+    real(dp), allocatable :: re_dsigma(:, :)
 end type
 
 type :: mat33

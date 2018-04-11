@@ -11,7 +11,7 @@ sources = [
     'src/mbd_types.f90',
     'src/mbd_mpi.f90',
     'src/mbd_linalg.f90',
-    'src/mbd.f90',
+    'src/mbd.F90',
     'src/mbd_c_api.f90',
 ]
 mbd_build_flags = {'WITH_MPI': '.false.'}

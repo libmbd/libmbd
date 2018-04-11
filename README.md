@@ -9,7 +9,7 @@
 
 Python 2/3 package for calculating [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) energies.
 
-Most functionality is implemented in the Fortran module in `src/mbd.f90`.
+Most functionality is implemented in the Fortran module in `src/mbd.F90`.
 
 ## Installation
 

@@ -47,6 +47,9 @@ install:
     else
       $PYTHON -m pip install --user -r <(grep -v mpi4py requirements.txt)
     fi
+    if [[ "$COVERAGE" ]]; then
+      $PYTHON -m pip install --user pytest-cov
+    fi
     $PYTHON setup.py build_ext -i
   fi
 - |
@@ -59,10 +62,12 @@ script:
 - |
   if [[ "$WITH_CMAKE" ]]; then
     make -C build check
-    $PYTHON -m pytest -v --durations=3
     if [[ "$COVERAGE" ]]; then
+      $PYTHON -m pytest --cov=./ -v --durations=3
       cp build/CMakeFiles/mbd.dir/src/*.f90.gc?? src/
       bash <(curl -s https://codecov.io/bash) -F pytest
+    else
+      $PYTHON -m pytest -v --durations=3
     fi
   fi
 - |

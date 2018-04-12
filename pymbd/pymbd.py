@@ -76,7 +76,8 @@ class MBDCalc(object):
             n_atoms,
             _cast('double*', alpha_0),
             _cast('double*', C6),
-            damping
+            damping,
+            _ffi.NULL,
         )
         _lib.mbd_destroy_damping(damping)
         _lib.mbd_destroy_system(system)
@@ -100,25 +101,23 @@ class MBDCalc(object):
             _cast('double*', lattice),
             _cast('int*', k_grid),
         )
-        if force:
-            system.do_force[0] = True
         damping = _lib.mbd_init_damping(
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
         )
+        gradients = np.zeros((n_atoms, 3)) if force else None
         ene = getattr(_lib, func)(
             system,
             n_atoms,
             _cast('double*', alpha_0),
             _cast('double*', C6),
-            damping
+            damping,
+            _cast('double*', gradients),
         )
-        if force:
-            ret_val = ene, _ndarray(system.forces, (n_atoms, 3)).copy()
-        else:
-            ret_val = ene
         _lib.mbd_destroy_damping(damping)
         _lib.mbd_destroy_system(system)
-        return ret_val
+        if force:
+            return ene, gradients
+        return ene
 
     def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,
                       R_vdw=None, sigma=None, a=6.):

@@ -208,7 +208,7 @@ subroutine test_mbd_deriv_expl()
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-3:3)
+    type(mbd_result) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 0.05d0
@@ -236,10 +236,10 @@ subroutine test_mbd_deriv_expl()
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff7(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
-    diff = (forces-sys%work%forces)/forces
+    diff = (forces-ene(0)%forces)/forces
     if (failed(maxval(abs(diff)), 1d-9)) then
         call print_matrix('delta forces', diff)
     end if
@@ -304,7 +304,7 @@ subroutine test_mbd_deriv_impl_alpha()
     type(vecn) :: alpha_0
     real(dp), allocatable :: alpha_0_diff(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-3:3)
+    type(mbd_result) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 1d-2
@@ -334,10 +334,10 @@ subroutine test_mbd_deriv_impl_alpha()
                 alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff7(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
-    diff = (forces-sys%work%forces)/forces
+    diff = (forces-ene(0)%forces)/forces
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta forces', diff)
     end if
@@ -353,7 +353,7 @@ subroutine test_mbd_deriv_impl_C6()
     type(vecn) :: C6
     real(dp), allocatable :: C6_diff(:)
     real(dp), allocatable :: alpha_0(:)
-    real(dp) :: ene(-3:3)
+    type(mbd_result) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 0.03d0
@@ -382,10 +382,10 @@ subroutine test_mbd_deriv_impl_C6()
                 C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
             end do
-            forces(i_atom, i_xyz) = diff7(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
-    diff = (forces-sys%work%forces)/forces
+    diff = (forces-ene(0)%forces)/forces
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta forces', diff)
     end if
@@ -401,7 +401,7 @@ subroutine test_mbd_deriv_impl_vdw()
     real(dp), allocatable :: rvdw(:)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-3:3)
+    type(mbd_result) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 1d-3
@@ -431,10 +431,10 @@ subroutine test_mbd_deriv_impl_vdw()
                 damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff7(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
-    diff = (forces-sys%work%forces)/forces
+    diff = (forces-ene(0)%forces)/forces
     if (failed(maxval(abs(diff)), 1d-9)) then
         call print_matrix('delta forces', diff)
     end if
@@ -449,7 +449,7 @@ subroutine test_mbd_rsscs_deriv_expl()
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-3:3)
+    type(mbd_result) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 0.03d0
@@ -476,10 +476,10 @@ subroutine test_mbd_rsscs_deriv_expl()
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                 ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff7(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
-    diff = (forces-sys%work%forces)/forces
+    diff = (forces-ene(0)%forces)/forces
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta forces', diff)
     end if

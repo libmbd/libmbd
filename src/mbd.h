@@ -10,11 +10,6 @@ struct MBD_calc* mbd_init_calc(int n_freq);
 void mbd_set_parallel(struct MBD_calc* calc, int rank, int n_proc);
 void mbd_destroy_calc(struct MBD_calc* calc);
 
-struct MBD_system {
-    double* forces;
-    _Bool* do_force;
-};
-
 struct MBD_system* mbd_init_system(
     struct MBD_calc* calc,
     int n_atoms,
@@ -41,7 +36,8 @@ double calc_ts_energy(
     int n_atoms,
     double* alpha_0,
     double* C6,
-    struct MBD_damping* damping
+    struct MBD_damping* damping,
+    double* gradients
 );
 
 double calc_mbd_energy(
@@ -49,7 +45,8 @@ double calc_mbd_energy(
     int n_atoms,
     double* alpha_0,
     double* C6,
-    struct MBD_damping* damping
+    struct MBD_damping* damping,
+    double* gradients
 );
 
 double calc_rpa_energy(
@@ -57,7 +54,8 @@ double calc_rpa_energy(
     int n_atoms,
     double* alpha_0,
     double* C6,
-    struct MBD_damping* damping
+    struct MBD_damping* damping,
+    double* gradients
 );
 
 double calc_mbd_rsscs_energy(
@@ -65,7 +63,8 @@ double calc_mbd_rsscs_energy(
     int n_atoms,
     double* alpha_0,
     double* C6,
-    struct MBD_damping* damping
+    struct MBD_damping* damping,
+    double* gradients
 );
 
 double calc_mbd_scs_energy(
@@ -73,7 +72,8 @@ double calc_mbd_scs_energy(
     int n_atoms,
     double* alpha_0,
     double* C6,
-    struct MBD_damping* damping
+    struct MBD_damping* damping,
+    double* gradients
 );
 
 double calc_dipole_matrix(

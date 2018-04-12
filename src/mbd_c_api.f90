@@ -6,7 +6,7 @@ module mbd_c_api
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
-    mbd_rsscs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy
+    mbd_rsscs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy, mbd_result
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n, vecn
 
@@ -20,8 +20,6 @@ type, bind(c) :: mbd_calc_c
 end type
 
 type, bind(c) :: mbd_system_c
-    type(c_ptr) :: forces = c_null_ptr
-    type(c_ptr) :: do_force = c_null_ptr
     type(c_ptr) :: mbd_system_f = c_null_ptr
 end type
 
@@ -92,7 +90,6 @@ type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, lattice, k_grid) 
     if (present(k_grid)) sys%k_grid = k_grid
     allocate (sys_c)
     sys_c%mbd_system_f = c_loc(sys)
-    sys_c%do_force = c_loc(sys%do_force)
     mbd_init_system = c_loc(sys_c)
 end function mbd_init_system
 
@@ -160,12 +157,13 @@ function get_mbd_calc(calc_cp)
     call c_f_pointer(calc_c%mbd_calc_f, get_mbd_calc)
 end function
 
-real(c_double) function calc_ts_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
+real(c_double) function calc_ts_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
     type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
+    real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
@@ -177,73 +175,87 @@ real(c_double) function calc_ts_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) 
     calc_ts_energy = get_ts_energy(sys, alpha_0, C6, damping)
 end function calc_ts_energy
 
-real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
+real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
     type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
+    real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
+    type(mbd_result) :: res
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    calc_mbd_energy = get_mbd_energy(sys, vecn(alpha_0), vecn(C6), damping)
-    if (sys%do_force) sys_c%forces = c_loc(sys%work%forces)
+    if (present(gradients)) sys%do_force = .true.
+    res = get_mbd_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    calc_mbd_energy = res%energy
+    if (present(gradients)) gradients = transpose(res%forces)
 end function calc_mbd_energy
 
-real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
+real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
     type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
+    real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(mbd_system), pointer :: sys
     type(mbd_system) :: sys2
     type(mbd_damping), pointer :: damping
+    type(mbd_result) :: res
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
     sys2 = sys
     sys2%do_rpa = .true.
-    calc_rpa_energy = get_mbd_energy(sys2, vecn(alpha_0), vecn(C6), damping)
+    res = get_mbd_energy(sys2, vecn(alpha_0), vecn(C6), damping)
+    calc_rpa_energy = res%energy
 end function calc_rpa_energy
 
-real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
+real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
     type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
+    real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
+    type(mbd_result) :: res
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    calc_mbd_rsscs_energy = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
-    if (sys%do_force) sys_c%forces = c_loc(sys%work%forces)
+    if (present(gradients)) sys%do_force = .true.
+    res = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    calc_mbd_rsscs_energy = res%energy
+    if (present(gradients)) gradients = transpose(res%forces)
 end function calc_mbd_rsscs_energy
 
-real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
+real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
     type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
+    real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
+    type(mbd_result) :: res
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    calc_mbd_scs_energy = mbd_scs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    res = mbd_scs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    calc_mbd_scs_energy = res%energy
 end function calc_mbd_scs_energy
 
 subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)

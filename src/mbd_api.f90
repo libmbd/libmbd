@@ -4,7 +4,8 @@
 module mbd_api
 
 use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
-    mbd_rsscs_energy, get_ts_energy, get_damping_parameters, init_grid
+    mbd_rsscs_energy, get_ts_energy, get_damping_parameters, init_grid, &
+    mbd_result
 use mbd_common, only: dp
 use mbd_types, only: vecn
 use mbd_vdw_param, only: default_vdw_params, species_index
@@ -58,6 +59,7 @@ type mbd_calc
     real(dp), allocatable :: C6(:)
     character(len=30) :: dispersion_type
     type(mbd_calc_inner) :: calc
+    type(mbd_result) :: results
 end type
 
 contains
@@ -73,8 +75,8 @@ subroutine mbd_init(calc, input)
     calc%dispersion_type = input%dispersion_type
     calc%sys%do_force = input%calculate_forces
     if (input%calculate_spectrum) then
-        calc%sys%work%get_eigs = .true.
-        calc%sys%work%get_modes = .true.
+        calc%sys%get_eigs = .true.
+        calc%sys%get_modes = .true.
     end if
     calc%sys%calc%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
@@ -137,7 +139,8 @@ subroutine mbd_get_energy(calc, energy)
 
     select case (calc%dispersion_type)
     case ('mbd')
-        energy = mbd_rsscs_energy(calc%sys, vecn(calc%alpha_0), vecn(calc%C6), calc%damp)
+        calc%results = mbd_rsscs_energy(calc%sys, vecn(calc%alpha_0), vecn(calc%C6), calc%damp)
+        energy = calc%results%energy
     case ('ts')
         energy = get_ts_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
     end select
@@ -148,7 +151,7 @@ subroutine mbd_get_gradients(calc, gradients)  ! 3 by N  dE/dR
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(out) :: gradients(:, :)
 
-    gradients = transpose(calc%sys%work%forces)
+    gradients = transpose(calc%results%forces)
 end subroutine
 
 
@@ -166,9 +169,9 @@ subroutine mbd_get_spectrum_modes(calc, spectrum, modes)
     real(dp), intent(out), optional :: modes(:, :)
     ! TODO document that this can be called only once
 
-    spectrum = calc%sys%work%mode_enes
+    spectrum = calc%results%mode_enes
     if (present(modes)) then
-        modes = calc%sys%work%modes
+        modes = calc%results%modes
     end if
 end subroutine
 

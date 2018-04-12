@@ -105,7 +105,7 @@ subroutine mbd_update_lattice_vectors(calc, latt_vecs)
     type(mbd_calc), intent(inout) :: calc
     real(dp), intent(in) :: latt_vecs(:, :)
 
-    calc%sys%lattice =  transpose(latt_vecs)
+    calc%sys%lattice = latt_vecs
 end subroutine
 
 

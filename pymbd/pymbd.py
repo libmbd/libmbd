@@ -59,7 +59,7 @@ class MBDCalc(object):
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
-        lattice = _array(lattice, dtype=float, order='F')
+        lattice = _array(lattice, dtype=float)
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
             self._calc,
@@ -91,7 +91,7 @@ class MBDCalc(object):
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
-        lattice = _array(lattice, dtype=float, order='F')
+        lattice = _array(lattice, dtype=float)
         k_grid = _array(k_grid, dtype='i4')
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
@@ -124,7 +124,7 @@ class MBDCalc(object):
         coords = _array(coords, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
         sigma = _array(sigma, dtype=float)
-        lattice = _array(lattice, dtype=float, order='F')
+        lattice = _array(lattice, dtype=float)
         k_point = _array(k_point, dtype=float)
         n_atoms = len(coords)
         system = _lib.mbd_init_system(

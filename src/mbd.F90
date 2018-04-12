@@ -98,7 +98,7 @@ type :: mbd_system
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
     logical :: periodic = .false.
     logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
-    real(dp) :: lattice(3, 3)
+    real(dp) :: lattice(3, 3)  ! vectors in columns
     integer :: k_grid(3)
     integer :: supercell(3)
     logical :: do_rpa = .false.
@@ -213,7 +213,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
             end if
             ! MPI code end
             if (is_crystal) then
-                R_cell = matmul(idx_cell, sys%lattice)
+                R_cell = matmul(sys%lattice, idx_cell)
             else
                 R_cell = (/ 0.d0, 0.d0, 0.d0 /)
             end if
@@ -352,7 +352,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         end if
         ! MPI code end
         if (sys%periodic) then
-            R_cell = matmul(idx_cell, sys%lattice)
+            R_cell = matmul(sys%lattice, idx_cell)
         else
             R_cell(:) = 0.d0
         end if
@@ -539,7 +539,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
             if (sys%calc%my_task /= modulo(i_G_vector, sys%calc%n_tasks)) cycle
         end if
         ! MPI code end
-        G_vector = matmul(idx_G_vector, rec_unit_cell)
+        G_vector = matmul(rec_unit_cell, idx_G_vector)
         if (present(k_point)) then
             k_total = k_point+G_vector
         else
@@ -848,7 +848,7 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
     sys_super%calc = sys%calc
     n_cells = product(sys%supercell)
     do i = 1, 3
-        sys_super%lattice(i, :) = sys%lattice(i, :)*sys%supercell(i)
+        sys_super%lattice(:, i) = sys%lattice(:, i)*sys%supercell(i)
     end do
     allocate (sys_super%coords(3, n_cells*size(sys%coords, 2)))
     allocate (alpha_0_super%val(n_cells*size(alpha_0%val)))
@@ -858,7 +858,7 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
-        R_cell = matmul(idx_cell, sys%lattice)
+        R_cell = matmul(sys%lattice, idx_cell)
         do i_atom = 1, size(sys%coords, 2)
             i = (i_cell-1)*size(sys%coords, 2)+i_atom
             sys_super%coords(:, i) = sys%coords(:, i_atom)+R_cell
@@ -1939,7 +1939,7 @@ function supercell_circum(sys, uc, radius) result(sc)
     integer :: i
 
     ruc = 2*pi*inverted(transpose(uc))
-    forall (i = 1:3) layer_sep(i) = sum(uc(i, :)*ruc(i, :)/sqrt(sum(ruc(i, :)**2)))
+    forall (i = 1:3) layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
     where (sys%vacuum_axis) sc = 0
 end function
@@ -2009,7 +2009,7 @@ function make_k_grid(g_grid, uc) result(k_grid)
 
     ruc = 2*pi*inverted(transpose(uc))
     do i_kpt = 1, size(g_grid, 1)
-        k_grid(i_kpt, :) = matmul(g_grid(i_kpt, :), ruc)
+        k_grid(i_kpt, :) = matmul(ruc, g_grid(i_kpt, :))
     end do
 end function make_k_grid
 

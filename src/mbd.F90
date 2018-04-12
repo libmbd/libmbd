@@ -1029,7 +1029,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     ene%k_pts = make_k_grid( &
         make_g_grid(sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3)), sys%lattice &
     )
-    n_kpts = size(ene%k_pts, 1)
+    n_kpts = size(ene%k_pts, 2)
     is_parallel = sys%calc%parallel
     do_rpa = sys%do_rpa
     mute = sys%calc%mute
@@ -1040,11 +1040,11 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     ene%energy = 0.d0
     if (sys%get_eigs) &
-        allocate (ene%mode_enes_k(n_kpts, 3*n_atoms), source=0.d0)
+        allocate (ene%mode_enes_k(3*n_atoms, n_kpts), source=0.d0)
     if (sys%get_modes) &
-        allocate (ene%modes_k(n_kpts, 3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
+        allocate (ene%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0.d0, 0.d0))
     if (sys%get_rpa_orders) &
-        allocate (ene%rpa_orders_k(n_kpts, sys%calc%param%rpa_order_max), source=0.d0)
+        allocate (ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0.d0)
     do i_kpt = 1, n_kpts
         ! MPI code begin
         if (is_parallel) then
@@ -1052,7 +1052,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
         end if
         ! MPI code end
         ene%i_kpt = i_kpt
-        k_point = ene%k_pts(i_kpt, :)
+        k_point = ene%k_pts(:, i_kpt)
         if (do_rpa) then
             call get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp, ene)
         else
@@ -1068,7 +1068,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
         if (sys%get_rpa_orders) call sync_sum(ene%rpa_orders_k, sys%calc%comm)
     end if
     ! MPI code end
-    ene%energy = ene%energy/size(ene%k_pts, 1)
+    ene%energy = ene%energy/size(ene%k_pts, 2)
     if (sys%get_rpa_orders) ene%rpa_orders = ene%rpa_orders/n_kpts
 
     sys%calc%parallel = is_parallel
@@ -1114,7 +1114,7 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
     if (.not. is_parallel .or. sys%calc%my_task == 0) then
         if (sys%get_modes) then
             call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
-            ene%modes_k(ene%i_kpt, :, :) = relay%cplx
+            ene%modes_k(:, :, ene%i_kpt) = relay%cplx
         else
             call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
         end if
@@ -1128,7 +1128,7 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
     ! MPI code end
     call ts(sys%calc, -22)
     if (sys%get_eigs) then
-        ene%mode_enes_k(ene%i_kpt, :) = sqrt(eigs)
+        ene%mode_enes_k(:, ene%i_kpt) = sqrt(eigs)
         where (eigs < 0) ene%mode_enes = 0.d0
     end if
     n_negative_eigs = count(eigs(:) < 0)
@@ -1294,7 +1294,7 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
             if (has_exc(sys)) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
-                ene%rpa_orders_k(ene%i_kpt, n_order) = ene%rpa_orders_k(ene%i_kpt, n_order) + &
+                ene%rpa_orders_k(n_order, ene%i_kpt) = ene%rpa_orders_k(n_order, ene%i_kpt) + &
                     (-1.d0)/(2*pi)*(-1)**n_order &
                     *dble(sum(eigs**n_order))/n_order &
                     *sys%calc%omega_grid_w(i_grid_omega)
@@ -1966,7 +1966,7 @@ end subroutine
 function make_g_grid(calc, n1, n2, n3) result(g_grid)
     type(mbd_calc), intent(in) :: calc
     integer, intent(in) :: n1, n2, n3
-    real(dp) :: g_grid(n1*n2*n3, 3)
+    real(dp) :: g_grid(3, n1*n2*n3)
 
     integer :: g_kpt(3), i_kpt, kpt_range(3)
     real(dp) :: g_kpt_shifted(3)
@@ -1979,7 +1979,7 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
         where (2*g_kpt_shifted > kpt_range)
             g_kpt_shifted = g_kpt_shifted-dble(kpt_range)
         end where
-        g_grid(i_kpt, :) = g_kpt_shifted/kpt_range
+        g_grid(:, i_kpt) = g_kpt_shifted/kpt_range
     end do
 end function make_g_grid
 
@@ -2002,14 +2002,14 @@ end subroutine
 
 function make_k_grid(g_grid, uc) result(k_grid)
     real(dp), intent(in) :: g_grid(:, :), uc(3, 3)
-    real(dp) :: k_grid(size(g_grid, 1), 3)
+    real(dp) :: k_grid(3, size(g_grid, 2))
 
     integer :: i_kpt
     real(dp) :: ruc(3, 3)
 
     ruc = 2*pi*inverted(transpose(uc))
-    do i_kpt = 1, size(g_grid, 1)
-        k_grid(i_kpt, :) = matmul(ruc, g_grid(i_kpt, :))
+    do i_kpt = 1, size(g_grid, 2)
+        k_grid(:, i_kpt) = matmul(ruc, g_grid(:, i_kpt))
     end do
 end function make_k_grid
 

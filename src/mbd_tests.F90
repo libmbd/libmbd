@@ -91,8 +91,8 @@ subroutine test_T_bare_deriv()
         forall (a = 1:3, b = 1:3)
             T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
         end forall
-        diff = T_diff_num(:, :, 0)-T_diff_anl(:, :, c)
-        if (any(abs(diff) > 1d-12)) then
+        diff = (T_diff_num(:, :, 0)-T_diff_anl(:, :, c))/T_diff_num(:, :, 0)
+        if (any(abs(diff) > 1d-10)) then
             call failed()
             call print_matrix('delta dT(:, :, ' // trim(tostr(c)) // ')', diff)
         end if
@@ -125,8 +125,8 @@ subroutine test_T_GG_deriv_expl()
         forall (a = 1:3, b = 1:3)
             T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
         end forall
-        diff = T_diff_num(:, :, 0)-T_diff_anl(:, :, c)
-        if (any(abs(diff) > 1d-12)) then
+        diff = (T_diff_num(:, :, 0)-T_diff_anl(:, :, c))/T_diff_num(:, :, 0)
+        if (any(abs(diff) > 1d-10)) then
             call failed()
             call print_matrix('delta dTGG_{ab,' // trim(tostr(c)) // '}', diff)
         end if
@@ -158,8 +158,8 @@ subroutine test_T_GG_deriv_impl()
     forall (a = 1:3, b = 1:3)
         T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
     end forall
-    diff = T_diff_num(:, :, 0)-T_diff_anl
-    if (any(abs(diff) > 1d-12)) then
+    diff = (T_diff_num(:, :, 0)-T_diff_anl)/T_diff_num(:, :, 0)
+    if (any(abs(diff) > 1d-10)) then
         call failed()
         call print_matrix('delta dTGG', diff)
     end if
@@ -190,8 +190,8 @@ subroutine test_T_fermi_deriv_impl()
     forall (a = 1:3, b = 1:3)
         T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
     end forall
-    diff = T_diff_num(:, :, 0)-T_diff_anl
-    if (any(abs(diff) > 1d-12)) then
+    diff = (T_diff_num(:, :, 0)-T_diff_anl)/T_diff_num(:, :, 0)
+    if (any(abs(diff) > 1d-10)) then
         call failed()
         call print_matrix('delta dTfermi', diff)
     end if
@@ -209,10 +209,11 @@ subroutine test_mbd_deriv_expl()
     real(dp) :: ene(-2:2)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
-    delta = 1d-3
+    delta = 1d-2
     n_atoms = 3
     allocate (coords(n_atoms, 3), source=0.d0)
     allocate (forces(n_atoms, 3))
+    coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
     coords(3, 2) = 4.d0*ang
     sys%calc => calc
@@ -236,8 +237,8 @@ subroutine test_mbd_deriv_expl()
             forces(i_atom, i_xyz) = diff5(ene, delta)
         end do
     end do
-    diff = forces-sys%work%forces
-    if (any(abs(diff) > 1d-12)) then
+    diff = (forces-sys%work%forces)/forces
+    if (any(abs(diff) > 1d-8)) then
         call failed()
         call print_matrix('delta forces', diff)
     end if
@@ -254,10 +255,11 @@ subroutine test_scs_deriv_expl()
     integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
     type(vecn) :: alpha_scs(-2:2)
 
-    delta = 1d-3
+    delta = 1.5d-2
     n_atoms = 3
     allocate (coords(n_atoms, 3), source=0.d0)
     allocate (forces(n_atoms, n_atoms, 3))
+    coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
     coords(3, 2) = 4.d0*ang
     sys%calc => calc
@@ -283,8 +285,8 @@ subroutine test_scs_deriv_expl()
             end do
         end do
     end do
-    diff = forces-alpha_scs(0)%dr
-    if (any(abs(diff) > 1d-11)) then
+    diff = (forces-alpha_scs(0)%dr)/forces
+    if (any(abs(diff) > 1d-7)) then
         call failed()
         call print_matrix('diff x', diff(:, :, 1))
         call print_matrix('diff y', diff(:, :, 2))
@@ -305,7 +307,7 @@ subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: ene(-2:2)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
-    delta = 1d-3
+    delta = 1d-2
     n_atoms = 3
     allocate (coords(n_atoms, 3), source=0.d0)
     allocate (forces(n_atoms, 3))
@@ -334,8 +336,8 @@ subroutine test_mbd_deriv_impl_alpha()
             forces(i_atom, i_xyz) = diff5(ene, delta)
         end do
     end do
-    diff = forces-sys%work%forces
-    if (any(abs(diff) > 1d-12)) then
+    diff = (forces-sys%work%forces)/forces
+    if (any(abs(diff) > 1d-7)) then
         call failed()
         call print_matrix('delta forces', diff)
     end if
@@ -354,7 +356,7 @@ subroutine test_mbd_deriv_impl_C6()
     real(dp) :: ene(-2:2)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
-    delta = 1d-3
+    delta = 1d-2
     n_atoms = 3
     allocate (coords(n_atoms, 3), source=0.d0)
     allocate (forces(n_atoms, 3))
@@ -383,8 +385,8 @@ subroutine test_mbd_deriv_impl_C6()
             forces(i_atom, i_xyz) = diff5(ene, delta)
         end do
     end do
-    diff = forces-sys%work%forces
-    if (any(abs(diff) > 1d-11)) then
+    diff = (forces-sys%work%forces)/forces
+    if (any(abs(diff) > 1d-9)) then
         call failed()
         call print_matrix('delta forces', diff)
     end if
@@ -433,8 +435,8 @@ subroutine test_mbd_deriv_impl_vdw()
             forces(i_atom, i_xyz) = diff5(ene, delta)
         end do
     end do
-    diff = forces-sys%work%forces
-    if (any(abs(diff) > 1d-11)) then
+    diff = (forces-sys%work%forces)/forces
+    if (any(abs(diff) > 1d-9)) then
         call failed()
         call print_matrix('delta forces', diff)
     end if

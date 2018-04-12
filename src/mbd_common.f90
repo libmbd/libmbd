@@ -9,7 +9,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, pi, printer, &
-    exception
+    exception, diff7
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: nan = transfer(-2251799813685248_8, 1d0)
@@ -81,6 +81,14 @@ real(dp) pure function diff5(x, delta)
     real(dp), intent(in) :: delta
 
     diff5 = (1.d0/12*x(-2)-2.d0/3*x(-1)+2.d0/3*x(1)-1.d0/12*x(2))/delta
+end function
+
+
+real(dp) pure function diff7(x, delta)
+    real(dp), intent(in) :: x(-3:)
+    real(dp), intent(in) :: delta
+
+    diff7 = (-1.d0/60*x(-3)+3.d0/20*x(-2)-3.d0/4*x(-1)+3.d0/4*x(1)-3.d0/20*x(2)+1.d0/60*x(3))/delta
 end function
 
 

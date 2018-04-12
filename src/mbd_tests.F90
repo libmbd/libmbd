@@ -7,7 +7,7 @@
 program mbd_tests
 
 use mbd
-use mbd_common, only: diff3, diff5
+use mbd_common, only: diff7
 
 implicit none
 
@@ -72,7 +72,7 @@ subroutine test_T_bare_deriv()
     type(mat33) :: T
     real(dp) :: diff(3, 3)
     real(dp) :: T_diff_anl(3, 3, 3)
-    real(dp) :: T_diff_num(3, 3, -2:2)
+    real(dp) :: T_diff_num(3, 3, -3:3)
     integer :: a, b, c, i_step
     real(dp) :: delta
 
@@ -81,7 +81,7 @@ subroutine test_T_bare_deriv()
     T = T_bare_v2(r, deriv=.true.)
     T_diff_anl = T%dr(:, :, :)
     do c = 1, 3
-        do i_step = -2, 2
+        do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
             r_diff(c) = r_diff(c)+i_step*delta
@@ -89,7 +89,7 @@ subroutine test_T_bare_deriv()
             T_diff_num(:, :, i_step) = T%val
         end do
         forall (a = 1:3, b = 1:3)
-            T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end forall
         diff = (T_diff_num(:, :, 0)-T_diff_anl(:, :, c))/T_diff_num(:, :, 0)
         if (any(abs(diff) > 1d-10)) then
@@ -104,7 +104,7 @@ subroutine test_T_GG_deriv_expl()
     type(mat33) :: T
     real(dp) :: diff(3, 3)
     real(dp) :: T_diff_anl(3, 3, 3)
-    real(dp) :: T_diff_num(3, 3, -2:2)
+    real(dp) :: T_diff_num(3, 3, -3:3)
     integer :: a, b, c, i_step
     real(dp) :: delta
     real(dp) :: sigma
@@ -115,7 +115,7 @@ subroutine test_T_GG_deriv_expl()
     T = T_erf_coulomb(r, sigma, deriv=.true.)
     T_diff_anl = T%dr
     do c = 1, 3
-        do i_step = -2, 2
+        do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
             r_diff(c) = r_diff(c)+i_step*delta
@@ -123,7 +123,7 @@ subroutine test_T_GG_deriv_expl()
             T_diff_num(:, :, i_step) = T%val
         end do
         forall (a = 1:3, b = 1:3)
-            T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end forall
         diff = (T_diff_num(:, :, 0)-T_diff_anl(:, :, c))/T_diff_num(:, :, 0)
         if (any(abs(diff) > 1d-10)) then
@@ -138,7 +138,7 @@ subroutine test_T_GG_deriv_impl()
     type(mat33) :: T
     real(dp) :: diff(3, 3)
     real(dp) :: T_diff_anl(3, 3)
-    real(dp) :: T_diff_num(3, 3, -2:2)
+    real(dp) :: T_diff_num(3, 3, -3:3)
     integer :: a, b, i_step
     real(dp) :: delta
     real(dp) :: sigma, dsigma_dr, sigma_diff
@@ -149,14 +149,14 @@ subroutine test_T_GG_deriv_impl()
     dsigma_dr = -0.3d0
     T = T_erf_coulomb(r, sigma, deriv=.true.)
     T_diff_anl = T%dsigma(:, :)*dsigma_dr
-    do i_step = -2, 2
+    do i_step = -3, 3
         if (i_step == 0) cycle
         sigma_diff = sigma+i_step*delta*dsigma_dr
         T = T_erf_coulomb(r, sigma_diff, deriv=.false.)
         T_diff_num(:, :, i_step) = T%val
     end do
     forall (a = 1:3, b = 1:3)
-        T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+        T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
     end forall
     diff = (T_diff_num(:, :, 0)-T_diff_anl)/T_diff_num(:, :, 0)
     if (any(abs(diff) > 1d-10)) then
@@ -170,7 +170,7 @@ subroutine test_T_fermi_deriv_impl()
     type(mat33) :: T
     real(dp) :: diff(3, 3)
     real(dp) :: T_diff_anl(3, 3)
-    real(dp) :: T_diff_num(3, 3, -2:2)
+    real(dp) :: T_diff_num(3, 3, -3:3)
     integer :: a, b, i_step
     real(dp) :: delta
     real(dp) :: rvdw, drvdw_dr, rvdw_diff
@@ -181,14 +181,14 @@ subroutine test_T_fermi_deriv_impl()
     drvdw_dr = -0.3d0
     T = damping_fermi(r, rvdw, 6.d0, .true.).prod.T_bare_v2(r, .true.)
     T_diff_anl = T%dvdw(:, :)*drvdw_dr
-    do i_step = -2, 2
+    do i_step = -3, 3
         if (i_step == 0) cycle
         rvdw_diff =rvdw+i_step*delta*drvdw_dr
         T = damping_fermi(r, rvdw_diff, 6.d0, .false.).prod.T_bare_v2(r, .false.)
         T_diff_num(:, :, i_step) = T%val
     end do
     forall (a = 1:3, b = 1:3)
-        T_diff_num(a, b, 0) = diff5(T_diff_num(a, b, :), delta)
+        T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
     end forall
     diff = (T_diff_num(:, :, 0)-T_diff_anl)/T_diff_num(:, :, 0)
     if (any(abs(diff) > 1d-10)) then
@@ -206,7 +206,7 @@ subroutine test_mbd_deriv_expl()
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-2:2)
+    real(dp) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 1d-2
@@ -221,20 +221,20 @@ subroutine test_mbd_deriv_expl()
     sys%do_force = .true.
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    damp%beta = 0.83
+    damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
     C6 = [65d0, 65d0, 65d0]
     ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_force = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            do i_step = -2, 2
+            do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff5(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene, delta)
         end do
     end do
     diff = (forces-sys%work%forces)/forces
@@ -253,9 +253,9 @@ subroutine test_scs_deriv_expl()
     real(dp), allocatable :: diff(:, :, :)
     real(dp), allocatable :: alpha_0(:)
     integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
-    type(vecn) :: alpha_scs(-2:2)
+    type(vecn) :: alpha_scs(-3:3)
 
-    delta = 1.5d-2
+    delta = 0.05d0
     n_atoms = 3
     allocate (coords(n_atoms, 3), source=0.d0)
     allocate (forces(n_atoms, n_atoms, 3))
@@ -267,13 +267,13 @@ subroutine test_scs_deriv_expl()
     sys%do_force = .true.
     damp%version = 'fermi,dip,gg'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    damp%beta = 0.83
+    damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
     alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
     sys%do_force = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            do i_step = -2, 2
+            do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
@@ -281,7 +281,7 @@ subroutine test_scs_deriv_expl()
             end do
             do j_atom = 1, n_atoms
                 forces(j_atom, i_atom, i_xyz) = &
-                    diff5([(alpha_scs(i_step)%val(j_atom), i_step = -2, 2)], delta)
+                    diff7([(alpha_scs(i_step)%val(j_atom), i_step = -3, 3)], delta)
             end do
         end do
     end do
@@ -304,13 +304,14 @@ subroutine test_mbd_deriv_impl_alpha()
     type(vecn) :: alpha_0
     real(dp), allocatable :: alpha_0_diff(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-2:2)
+    real(dp) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 1d-2
     n_atoms = 3
     allocate (coords(n_atoms, 3), source=0.d0)
     allocate (forces(n_atoms, 3))
+    coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
     coords(3, 2) = 4.d0*ang
     sys%calc => calc
@@ -318,22 +319,22 @@ subroutine test_mbd_deriv_impl_alpha()
     sys%do_force = .true.
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    damp%beta = 0.83
     alpha_0%val= [11.d0, 11.d0, 11.d0]
-    allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=200d0)
+    allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
+    damp%beta = 0.83d0
     C6 = [65d0, 65d0, 65d0]
     ene(0) = get_single_mbd_energy(sys, alpha_0, vecn(C6), damp)
     sys%do_force = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            do i_step = -2, 2
+            do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                 alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff5(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene, delta)
         end do
     end do
     diff = (forces-sys%work%forces)/forces
@@ -353,7 +354,7 @@ subroutine test_mbd_deriv_impl_C6()
     type(vecn) :: C6
     real(dp), allocatable :: C6_diff(:)
     real(dp), allocatable :: alpha_0(:)
-    real(dp) :: ene(-2:2)
+    real(dp) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 1d-2
@@ -367,22 +368,22 @@ subroutine test_mbd_deriv_impl_C6()
     sys%do_force = .true.
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    damp%beta = 0.83
+    damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
     C6%val = [65d0, 65d0, 65d0]
-    allocate (C6%dr(n_atoms, n_atoms, 3), source=200d0)
+    allocate (C6%dr(n_atoms, n_atoms, 3), source=0.2d0)
     ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), C6, damp)
     sys%do_force = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            do i_step = -2, 2
+            do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                 C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
             end do
-            forces(i_atom, i_xyz) = diff5(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene, delta)
         end do
     end do
     diff = (forces-sys%work%forces)/forces
@@ -402,7 +403,7 @@ subroutine test_mbd_deriv_impl_vdw()
     real(dp), allocatable :: rvdw(:)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    real(dp) :: ene(-2:2)
+    real(dp) :: ene(-3:3)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 1d-3
@@ -418,21 +419,21 @@ subroutine test_mbd_deriv_impl_vdw()
     rvdw = [3.55d0, 3.55d0, 3.55d0]
     damp%r_vdw%val = rvdw
     allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=5d0)
-    damp%beta = 0.83
+    damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
     C6 = [65d0, 65d0, 65d0]
     ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_force = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            do i_step = -2, 2
+            do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
                 damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
-            forces(i_atom, i_xyz) = diff5(ene, delta)
+            forces(i_atom, i_xyz) = diff7(ene, delta)
         end do
     end do
     diff = (forces-sys%work%forces)/forces

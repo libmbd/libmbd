@@ -95,7 +95,7 @@ end type
 
 type :: mbd_system
     type(mbd_calc), pointer :: calc
-    real(dp), allocatable :: coords(:, :)
+    real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
     logical :: periodic = .false.
     logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
     real(dp) :: lattice(3, 3)
@@ -217,7 +217,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
             else
                 R_cell = (/ 0.d0, 0.d0, 0.d0 /)
             end if
-            do i_atom = 1, size(sys%coords, 1)
+            do i_atom = 1, size(sys%coords, 2)
                 ! MPI code begin
                 if (is_parallel .and. .not. is_crystal) then
                     if (sys%calc%my_task /= modulo(i_atom, sys%calc%n_tasks)) cycle
@@ -227,7 +227,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = sys%coords(i_atom, :)-sys%coords(j_atom, :)-R_cell
+                    r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm > sys%calc%param%ts_cutoff_radius) cycle
                     if (is_crystal) then
@@ -292,7 +292,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
 
     do_ewald = .false.
     mute = sys%calc%mute
-    n_atoms = size(sys%coords, 1)
+    n_atoms = size(sys%coords, 2)
     if (sys%calc%parallel) then
         parallel_mode = 'A' ! atoms
         if (sys%periodic .and. n_atoms < sys%calc%n_tasks) then
@@ -368,7 +368,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                r = sys%coords(i_atom, :)-sys%coords(j_atom, :)-R_cell
+                r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
                 r_norm = sqrt(sum(r**2))
                 if (sys%periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw%val)) then
@@ -500,7 +500,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     mute = sys%calc%mute
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
-        if (size(sys%coords, 1) < sys%calc%n_tasks) then
+        if (size(sys%coords, 2) < sys%calc%n_tasks) then
             parallel_mode = 'G' ! G vectors
         end if
     else
@@ -551,15 +551,15 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
-        do i_atom = 1, size(sys%coords, 1)
+        do i_atom = 1, size(sys%coords, 2)
             ! MPI code begin
             if (parallel_mode == 'A') then
                 if (sys%calc%my_task /= modulo(i_atom, sys%calc%n_tasks)) cycle
             end if
             ! MPI code end
             !$omp parallel do private(r, Tpp, i, j, Tpp_c)
-            do j_atom = i_atom, size(sys%coords, 1)
-                r = sys%coords(i_atom, :)-sys%coords(j_atom, :)
+            do j_atom = i_atom, size(sys%coords, 2)
+                r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
                 if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
                         *dot_product(G_vector, r))
@@ -596,8 +596,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         k_sq = sum(k_point**2)
         if (sqrt(k_sq) > 1.d-15) then
             do_surface = .false.
-            do i_atom = 1, size(sys%coords, 1)
-            do j_atom = i_atom, size(sys%coords, 1)
+            do i_atom = 1, size(sys%coords, 2)
+            do j_atom = i_atom, size(sys%coords, 2)
                 do i_xyz = 1, 3
                 do j_xyz = 1, 3
                     i = 3*(i_atom-1)+i_xyz
@@ -616,8 +616,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if ! k_sq >
     end if ! k_point present
     if (do_surface) then ! surface energy
-        do i_atom = 1, size(sys%coords, 1)
-        do j_atom = i_atom, size(sys%coords, 1)
+        do i_atom = 1, size(sys%coords, 2)
+        do j_atom = i_atom, size(sys%coords, 2)
             do i_xyz = 1, 3
                 i = 3*(i_atom-1)+i_xyz
                 j = 3*(j_atom-1)+i_xyz
@@ -850,7 +850,7 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
     do i = 1, 3
         sys_super%lattice(i, :) = sys%lattice(i, :)*sys%supercell(i)
     end do
-    allocate (sys_super%coords(n_cells*size(sys%coords, 1), 3))
+    allocate (sys_super%coords(3, n_cells*size(sys%coords, 2)))
     allocate (alpha_0_super%val(n_cells*size(alpha_0%val)))
     allocate (C6_super%val(n_cells*size(C6%val)))
     allocate (alpha_ts_super(0:ubound(sys%calc%omega_grid, 1)))
@@ -859,9 +859,9 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
         R_cell = matmul(idx_cell, sys%lattice)
-        do i_atom = 1, size(sys%coords, 1)
-            i = (i_cell-1)*size(sys%coords, 1)+i_atom
-            sys_super%coords(i, :) = sys%coords(i_atom, :)+R_cell
+        do i_atom = 1, size(sys%coords, 2)
+            i = (i_cell-1)*size(sys%coords, 2)+i_atom
+            sys_super%coords(:, i) = sys%coords(:, i_atom)+R_cell
             alpha_0_super%val(i) = alpha_0%val(i_atom)
             C6_super%val(i) = C6%val(i_atom)
             if (allocated(damp%R_vdw%val)) then
@@ -900,7 +900,7 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
     do_impl_deriv = allocated(alpha_0%dr) .or. allocated(C6%dr) .or. &
         allocated(damp%r_vdw%dr) .or. allocated(damp%sigma%dr)
 
-    n_atoms = size(sys%coords, 1)
+    n_atoms = size(sys%coords, 2)
     allocate (eigs(3*n_atoms))
     T = dipole_matrix(sys, damp)
     if (do_impl_deriv) then
@@ -1025,7 +1025,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     real(dp) :: k_point(3)
     type(vecn), allocatable :: alpha_ts(:)
 
-    n_atoms = size(sys%coords, 1)
+    n_atoms = size(sys%coords, 2)
     ene%k_pts = make_k_grid( &
         make_g_grid(sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3)), sys%lattice &
     )
@@ -1094,12 +1094,12 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
     is_parallel = sys%calc%parallel
 
     n_atoms = size(alpha_0%val)
-    allocate (eigs(3*size(sys%coords, 1)))
+    allocate (eigs(3*size(sys%coords, 2)))
     omega = omega_eff(C6, alpha_0)
     ! relay = T
     relay = dipole_matrix(sys, damp, k_point)
-    do i_atom = 1, size(sys%coords, 1)
-        do j_atom = i_atom, size(sys%coords, 1)
+    do i_atom = 1, size(sys%coords, 2)
+        do j_atom = i_atom, size(sys%coords, 2)
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
             relay%cplx(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
@@ -1162,7 +1162,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 
     ene%energy = 0.d0
     damp_alpha = damp
-    allocate (eigs(3*size(sys%coords, 1)))
+    allocate (eigs(3*size(sys%coords, 2)))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
         ! MPI code begin
         if (is_parallel) then
@@ -1172,12 +1172,12 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
-        do i_atom = 1, size(sys%coords, 1)
+        do i_atom = 1, size(sys%coords, 2)
             i = 3*(i_atom-1)
             relay%re(i+1:i+3, :i) = &
                 alpha(i_grid_omega)%val(i_atom)*transpose(relay%re(:i, i+1:i+3))
         end do
-        do i_atom = 1, size(sys%coords, 1)
+        do i_atom = 1, size(sys%coords, 2)
             i = 3*(i_atom-1)
             relay%re(i+1:i+3, i+1:) = &
                 alpha(i_grid_omega)%val(i_atom)*relay%re(i+1:i+3, i+1:)
@@ -1248,7 +1248,7 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
 
     ene_k = 0d0
     damp_alpha = damp
-    allocate (eigs(3*size(sys%coords, 1)))
+    allocate (eigs(3*size(sys%coords, 2)))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
         ! MPI code begin
         if (is_parallel) then
@@ -1258,19 +1258,19 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
         damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
-        do i_atom = 1, size(sys%coords, 1)
+        do i_atom = 1, size(sys%coords, 2)
             i = 3*(i_atom-1)
             relay%cplx(i+1:i+3, :i) = &
                 alpha(i_grid_omega)%val(i_atom)*conjg(transpose(relay%cplx(:i, i+1:i+3)))
         end do
-        do i_atom = 1, size(sys%coords, 1)
+        do i_atom = 1, size(sys%coords, 2)
             i = 3*(i_atom-1)
             relay%cplx(i+1:i+3, i+1:) = &
                 alpha(i_grid_omega)%val(i_atom)*relay%cplx(i+1:i+3, i+1:)
         end do
         ! relay = alpha*T
         if (sys%get_rpa_orders) AT = relay
-        do i = 1, 3*size(sys%coords, 1)
+        do i = 1, 3*size(sys%coords, 2)
             relay%cplx(i, i) = 1.d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
         call ts(sys%calc, 25)

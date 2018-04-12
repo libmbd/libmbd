@@ -213,7 +213,7 @@ subroutine test_mbd_deriv_expl()
 
     delta = 0.05d0
     n_atoms = 3
-    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (coords(3, n_atoms), source=0.d0)
     allocate (forces(n_atoms, 3))
     coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
@@ -233,7 +233,7 @@ subroutine test_mbd_deriv_expl()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
             forces(i_atom, i_xyz) = diff7(ene%energy, delta)
@@ -258,7 +258,7 @@ subroutine test_scs_deriv_expl()
 
     delta = 0.05d0
     n_atoms = 3
-    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (coords(3, n_atoms), source=0.d0)
     allocate (forces(n_atoms, n_atoms, 3))
     coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
@@ -277,7 +277,7 @@ subroutine test_scs_deriv_expl()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 alpha_scs(i_step) = run_scs(sys, vecn(alpha_0), damp)
             end do
             do j_atom = 1, n_atoms
@@ -309,7 +309,7 @@ subroutine test_mbd_deriv_impl_alpha()
 
     delta = 1d-2
     n_atoms = 3
-    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (coords(3, n_atoms), source=0.d0)
     allocate (forces(n_atoms, 3))
     coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
@@ -330,7 +330,7 @@ subroutine test_mbd_deriv_impl_alpha()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
             end do
@@ -358,7 +358,7 @@ subroutine test_mbd_deriv_impl_C6()
 
     delta = 0.03d0
     n_atoms = 3
-    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (coords(3, n_atoms), source=0.d0)
     allocate (forces(n_atoms, 3))
     coords(2, 1) = 4.d0*ang
     coords(3, 2) = 4.d0*ang
@@ -378,7 +378,7 @@ subroutine test_mbd_deriv_impl_C6()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
             end do
@@ -406,7 +406,7 @@ subroutine test_mbd_deriv_impl_vdw()
 
     delta = 1d-3
     n_atoms = 3
-    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (coords(3, n_atoms), source=0.d0)
     allocate (forces(n_atoms, 3))
     coords(2, 1) = 4.d0*ang
     coords(3, 2) = 4.d0*ang
@@ -427,7 +427,7 @@ subroutine test_mbd_deriv_impl_vdw()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
                 ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
@@ -454,7 +454,7 @@ subroutine test_mbd_rsscs_deriv_expl()
 
     delta = 0.03d0
     n_atoms = 3
-    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (coords(3, n_atoms), source=0.d0)
     allocate (forces(n_atoms, 3))
     coords(1, 3) = 1.d0*ang
     coords(2, 1) = 4.d0*ang
@@ -473,7 +473,7 @@ subroutine test_mbd_rsscs_deriv_expl()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
             forces(i_atom, i_xyz) = diff7(ene%energy, delta)

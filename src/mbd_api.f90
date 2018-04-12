@@ -96,8 +96,8 @@ subroutine mbd_update_coords(calc, coords)
     type(mbd_calc), intent(inout) :: calc
     real(dp), intent(in) :: coords(:, :)
 
-    allocate (calc%sys%coords(size(coords, 2), 3))
-    calc%sys%coords = transpose(coords)
+    allocate (calc%sys%coords(3, size(coords, 2)))
+    calc%sys%coords = coords
 end subroutine
 
 

@@ -55,7 +55,7 @@ class MBDCalc(object):
 
     def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
                    lattice=None, d=20., damping='fermi'):
-        coords = _array(coords, dtype=float, order='F')
+        coords = _array(coords, dtype=float)
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
@@ -87,7 +87,7 @@ class MBDCalc(object):
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,
                    damping='fermi,dip'):
-        coords = _array(coords, dtype=float, order='F')
+        coords = _array(coords, dtype=float)
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
@@ -121,7 +121,7 @@ class MBDCalc(object):
 
     def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,
                       R_vdw=None, sigma=None, a=6.):
-        coords = _array(coords, dtype=float, order='F')
+        coords = _array(coords, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
         sigma = _array(sigma, dtype=float)
         lattice = _array(lattice, dtype=float, order='F')
@@ -143,7 +143,6 @@ class MBDCalc(object):
         dipmat = np.empty(
             (3*n_atoms, 3*n_atoms),
             dtype=float if k_point is None else complex,
-            order='F'
         )
         _lib.calc_dipole_matrix(
             system,
@@ -157,7 +156,7 @@ class MBDCalc(object):
 
     def pymbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                      lattice=None, k_grid=None):
-        coords = _array(coords, dtype=float, order='F')
+        coords = _array(coords, dtype=float)
         alpha_0 = _array(alpha_0, dtype=float)
         C6 = _array(C6, dtype=float)
         R_vdw = _array(R_vdw, dtype=float)
@@ -276,5 +275,4 @@ def _ndarray(ptr, shape=None, dtype='float'):
         ),
         shape=shape,
         dtype=dtype,
-        order='F'
     )

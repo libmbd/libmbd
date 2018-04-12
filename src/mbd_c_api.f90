@@ -71,7 +71,7 @@ end subroutine mbd_destroy_calc
 type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, lattice, k_grid) bind(c)
     type(c_ptr), value :: calc_cp
     integer(c_int), intent(in), value :: n_atoms
-    real(c_double), intent(in) :: coords(n_atoms, 3)
+    real(c_double), intent(in) :: coords(3, n_atoms)
     real(c_double), intent(in), optional :: lattice(3, 3)
     integer(c_int), intent(in), optional :: k_grid(3)
 
@@ -272,15 +272,15 @@ subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
     integer :: n_atoms
 
     sys => get_mbd_system(sys_cp)
-    n_atoms = size(sys%coords, 1)
+    n_atoms = size(sys%coords, 2)
     call c_f_pointer(damping_p, damp)
     dipmat = dipole_matrix(sys, damp, k_point)
     if (present(k_point)) then
         call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
-        dipmat_cplx = dipmat%cplx
+        dipmat_cplx = transpose(dipmat%cplx)
     else
         call c_f_pointer(dipmat_p, dipmat_re, [3*n_atoms, 3*n_atoms])
-        dipmat_re = dipmat%re
+        dipmat_re = transpose(dipmat%re)
     end if
 end subroutine calc_dipole_matrix
 

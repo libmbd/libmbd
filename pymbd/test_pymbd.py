@@ -108,6 +108,18 @@ def test_benzene_dimer(calc):
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
+def test_benzene_forces(calc):
+    coords, species, vols = benzene_dimer[0]
+    ene, forces = calc.mbd_energy_species(
+        coords, species, vols, 0.83, force=True
+    )
+    num_forces = numerical_forces(
+        calc.mbd_energy_species, coords, species, vols, 0.83,
+    )
+    for i in range(len(coords)):
+        assert forces[i] == approx(num_forces[i], rel=1e-10, abs=1e-10)
+
+
 def test_benzene_dimer_python(calc):
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])

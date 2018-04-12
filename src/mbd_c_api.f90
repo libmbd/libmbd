@@ -220,12 +220,15 @@ real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
 
+    type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
 
-    sys => get_mbd_system(sys_cp)
+    call c_f_pointer(sys_cp, sys_c)
+    call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
     calc_mbd_rsscs_energy = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    if (sys%do_force) sys_c%forces = c_loc(sys%work%forces)
 end function calc_mbd_rsscs_energy
 
 real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p) bind(c)

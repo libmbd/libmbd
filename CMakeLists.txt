@@ -19,6 +19,7 @@ set(SRCS
     src/mbd_common.f90
     src/mbd_linalg.f90
     src/mbd_types.f90
+    src/mbd_defaults.f90
     # src/mbd_repulsion.f90
     mbd_build_flags.f90)
 if(NOT ${MPI_Fortran_FOUND})

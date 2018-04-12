@@ -11,6 +11,7 @@ use mbd_linalg, only: &
     sdiagonalized, inverted, sinvert, add_diag, repeatn, symmetrize, mult_small, &
     multed_small, operator(.cadd.), cross_self_add, fill_tril, cross_self_prod
 use mbd_types, only: mat3n3n, mat33, scalar, vecn
+use mbd_defaults
 
 implicit none
 
@@ -32,18 +33,18 @@ real(dp), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
 
 type :: mbd_param
-    real(dp) :: ts_energy_accuracy = 1.d-10
+    real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
     real(dp) :: ts_cutoff_radius = 50.d0*ang
     real(dp) :: dipole_low_dim_cutoff = 100.d0*ang
     real(dp) :: dipole_cutoff = 400.d0*ang  ! used only when Ewald is off
     real(dp) :: ewald_real_cutoff_scaling = 1.d0
     real(dp) :: ewald_rec_cutoff_scaling = 1.d0
-    real(dp) :: k_grid_shift = 0.5d0
+    real(dp) :: k_grid_shift = K_GRID_SHIFT
     logical :: ewald_on = .true.
     logical :: zero_negative_eigs = .false.
     integer :: mbd_nbody_max = 3
     integer :: rpa_order_max = 10
-    integer :: n_frequency_grid = 15
+    integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
 
 type :: mbd_timing
@@ -68,8 +69,8 @@ end type mbd_calc
 type :: mbd_damping
     character(len=20) :: version
     real(dp) :: beta = 0.d0
-    real(dp) :: a = 6.d0
-    real(dp) :: ts_d = 20.d0
+    real(dp) :: a = MBD_DAMPING_A
+    real(dp) :: ts_d = TS_DAMPING_D
     real(dp) :: ts_sr = 0.d0
     real(dp) :: mayer_scaling = 1.d0
     type(vecn) :: r_vdw

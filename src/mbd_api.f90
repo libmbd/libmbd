@@ -8,6 +8,7 @@ use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
 use mbd_common, only: dp
 use mbd_types, only: vecn
 use mbd_vdw_param, only: default_vdw_params, species_index
+use mbd_defaults
 
 implicit none
 
@@ -29,17 +30,17 @@ type :: mbd_input
     logical :: calculate_forces = .true.
     logical :: calculate_spectrum = .false.
 
-    real(dp) :: ts_ene_acc = 1e-6_dp  ! accuracy of TS energy
-    real(dp) :: ts_f_acc=1e-7_dp  ! accuracy of TS gradients
-    integer :: n_omega_grid = 15  ! number of frequency grid points
+    real(dp) :: ts_ene_acc = TS_ENERGY_ACCURACY  ! accuracy of TS energy
+    real(dp) :: ts_f_acc = TS_FORCES_ACCURACY  ! accuracy of TS gradients
+    integer :: n_omega_grid = N_FREQUENCY_GRID  ! number of frequency grid points
     ! off-gamma shift of k-points in units of inter-k-point distance
-    real(dp) :: k_grid_shift = 0.5_dp
+    real(dp) :: k_grid_shift = K_GRID_SHIFT
 
     ! TS damping parameters
-    real(dp) :: ts_d = 20.d0
+    real(dp) :: ts_d = TS_DAMPING_D
     real(dp) :: ts_sr
     ! MBD damping parameters
-    real(dp) :: mbd_a = 6.d0
+    real(dp) :: mbd_a = MBD_DAMPING_A
     real(dp) :: mbd_beta
 
     ! lattice vectors as column vectors, unallocated when not periodic

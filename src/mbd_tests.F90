@@ -32,6 +32,7 @@ call exec_test('SCS derivative explicit')
 call exec_test('MBD derivative implicit alpha')
 call exec_test('MBD derivative implicit C6')
 call exec_test('MBD derivative implicit Rvdw')
+call exec_test('MBD@rsscs derivative explicit')
 write (6, *) &
     trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
 if (n_failed /= 0) stop 1
@@ -57,6 +58,7 @@ subroutine exec_test(test_name)
     case ('MBD derivative implicit alpha'); call test_mbd_deriv_impl_alpha()
     case ('MBD derivative implicit C6'); call test_mbd_deriv_impl_C6()
     case ('MBD derivative implicit Rvdw'); call test_mbd_deriv_impl_vdw()
+    case ('MBD@rsscs derivative explicit'); call test_mbd_rsscs_deriv_expl()
     end select
     n_all = n_all + 1
     if (n_failed == n_failed_in) write (6, *) 'OK'
@@ -442,5 +444,51 @@ subroutine test_mbd_deriv_impl_vdw()
         call print_matrix('delta forces', diff)
     end if
 end subroutine test_mbd_deriv_impl_vdw
+
+subroutine test_mbd_rsscs_deriv_expl()
+    real(dp) :: delta
+    type(mbd_system) :: sys
+    type(mbd_damping) :: damp
+    real(dp), allocatable :: coords(:, :)
+    real(dp), allocatable :: forces(:, :)
+    real(dp), allocatable :: diff(:, :)
+    real(dp), allocatable :: alpha_0(:)
+    real(dp), allocatable :: C6(:)
+    real(dp) :: ene(-3:3)
+    integer :: i_atom, n_atoms, i_xyz, i_step
+
+    delta = 1d-2
+    n_atoms = 3
+    allocate (coords(n_atoms, 3), source=0.d0)
+    allocate (forces(n_atoms, 3))
+    coords(1, 3) = 1.d0*ang
+    coords(2, 1) = 4.d0*ang
+    coords(3, 2) = 4.d0*ang
+    sys%calc => calc
+    sys%coords = coords
+    sys%do_force = .true.
+    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11.d0, 11.d0, 11.d0]
+    C6 = [65d0, 65d0, 65d0]
+    ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
+    sys%do_force = .false.
+    do i_atom = 1, n_atoms
+        do i_xyz = 1, 3
+            do i_step = -3, 3
+                if (i_step == 0) cycle
+                sys%coords = coords
+                sys%coords(i_atom, i_xyz) = sys%coords(i_atom, i_xyz)+i_step*delta
+                ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
+            end do
+            forces(i_atom, i_xyz) = diff7(ene, delta)
+        end do
+    end do
+    diff = (forces-sys%work%forces)/forces
+    if (any(abs(diff) > 1d-8)) then
+        call failed()
+        call print_matrix('delta forces', diff)
+    end if
+end subroutine test_mbd_rsscs_deriv_expl
 
 end program

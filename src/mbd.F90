@@ -1897,21 +1897,28 @@ type(vecn) function get_sigma_selfint(alpha) result(sigma)
 end function
 
 
-! equation 15
 type(vecn) function get_C6_from_alpha(calc, alpha) result(C6)
     type(mbd_calc), intent(in) :: calc
     type(vecn), intent(in) :: alpha(0:)
 
-    integer :: i_atom, i
+    integer :: i_atom, i_freq, n_atoms
 
-    allocate (C6%val(size(alpha(0)%val)))
-    do i_atom = 1, size(alpha(0)%val)
-        C6%val(i_atom) = 3.d0/pi*sum( &
-            ([(alpha(i)%val(i_atom), i = 0, ubound(alpha, 1))]**2) * &
-            calc%omega_grid_w(:) &
-        )
+    n_atoms = size(alpha(0)%val)
+    allocate (C6%val(n_atoms), source=0.d0)
+    do i_freq = 0, ubound(alpha, 1)
+        C6%val = C6%val + &
+            3.d0/pi*alpha(i_freq)%val**2*calc%omega_grid_w(i_freq)
     end do
-    ! TODO forces
+    if (allocated(alpha(0)%dr)) then
+        allocate (C6%dr(n_atoms, n_atoms, 3), source=0.d0)
+        do i_freq = 0, ubound(alpha, 1)
+            do i_atom = 1, n_atoms
+                C6%dr(i_atom, :, :) = C6%dr(i_atom, :, :) + &
+                    6.d0/pi*alpha(i_freq)%val(i_atom)*alpha(i_freq)%dr(i_atom, :, :) * &
+                    calc%omega_grid_w(i_freq)
+            end do
+        end do
+    end if
 end function
 
 

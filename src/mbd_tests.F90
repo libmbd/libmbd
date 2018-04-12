@@ -280,7 +280,7 @@ subroutine test_scs_deriv_expl()
                 alpha_scs(i_step) = run_scs(sys, vecn(alpha_0), damp)
             end do
             do j_atom = 1, n_atoms
-                forces(i_atom, j_atom, i_xyz) = &
+                forces(j_atom, i_atom, i_xyz) = &
                     diff5([(alpha_scs(i_step)%val(j_atom), i_step = -2, 2)], delta)
             end do
         end do

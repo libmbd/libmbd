@@ -785,7 +785,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
                 T%re(i+1:i+3, i+3+1:) = -T%re_dr(i+1:i+3, i+3+1:, i_xyz)
                 T%re(i+3+1:, i+1:i+3) = -transpose(T%re_dr(i+1:i+3, i+3+1:, i_xyz))
                 T%re = matmul(alpha_full%re, matmul(T%re, alpha_full%re))
-                alpha_scs%dr(i_atom, :, i_xyz) = contract_polarizability(T%re)
+                alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T%re)
             end do
         end associate
     end do

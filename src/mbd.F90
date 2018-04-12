@@ -943,6 +943,7 @@ real(dp) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     ene = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
     if (.not. sys%do_force) return
     allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
+    if (allocated(sys%work%forces)) deallocate(sys%work%forces)
     allocate (sys%work%forces(n_atoms, 3), source=0.d0)
     forall (i = 1:3*n_atoms)
         c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*sys%work%modes(:, i)

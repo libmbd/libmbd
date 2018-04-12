@@ -67,6 +67,7 @@ subroutine mbd_init(calc, input)
     type(mbd_calc), target, intent(out) :: calc
     type(mbd_input), intent(in) :: input
 
+    calc%sys%calc => calc%calc
     calc%sys%calc%comm = input%comm
     calc%sys%calc%io = input%io
     calc%dispersion_type = input%dispersion_type
@@ -86,7 +87,6 @@ subroutine mbd_init(calc, input)
     calc%sys%k_grid = input%k_grid
     calc%sys%vacuum_axis = input%vacuum_axis
     call init_grid(calc%calc)
-    calc%sys%calc => calc%calc
 end subroutine
 
 
@@ -94,6 +94,7 @@ subroutine mbd_update_coords(calc, coords)
     type(mbd_calc), intent(inout) :: calc
     real(dp), intent(in) :: coords(:, :)
 
+    allocate (calc%sys%coords(size(coords, 2), 3))
     calc%sys%coords = transpose(coords)
 end subroutine
 
@@ -147,7 +148,7 @@ subroutine mbd_get_gradients(calc, gradients)  ! 3 by N  dE/dR
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(out) :: gradients(:, :)
 
-    ! TODO
+    gradients = transpose(calc%sys%work%forces)
 end subroutine
 
 

@@ -11,8 +11,8 @@ set(WITH_MPI .false.)
 set(SRCS
     src/mbd.F90
     src/mbd_c_api.f90
-    # src/mbd_api.f90
-    # src/mbd_vdw_param.f90
+    src/mbd_api.f90
+    src/mbd_vdw_param.f90
     # src/mbd_helper_dev.f90
     # src/mbd_math.f90
     src/mbd_mpi.f90
@@ -48,7 +48,10 @@ enable_testing()
 set(CMAKE_CTEST_COMMAND ctest -V)
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 
-add_executable(tests EXCLUDE_FROM_ALL src/mbd_tests.F90)
-target_link_libraries(tests mbd)
-add_test(tests tests)
-add_dependencies(check tests)
+add_executable(mbd_tests EXCLUDE_FROM_ALL src/mbd_tests.F90)
+target_link_libraries(mbd_tests mbd)
+add_test(mbd_tests mbd_tests)
+add_executable(mbd_api_tests EXCLUDE_FROM_ALL src/mbd_api_tests.f90)
+target_link_libraries(mbd_api_tests mbd)
+add_test(mbd_api_tests mbd_api_tests)
+add_dependencies(check mbd_tests mbd_api_tests)

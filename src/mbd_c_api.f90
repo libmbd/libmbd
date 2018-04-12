@@ -32,7 +32,6 @@ type(c_ptr) function mbd_init_calc(n_freq) bind(c)
     type(mbd_calc_c), pointer :: calc_c
 
     allocate (calc)
-    calc%io = 6
     calc%param%n_frequency_grid = n_freq
     call init_grid(calc)
     allocate (calc_c)

@@ -5,7 +5,7 @@ module mbd
 
 use mbd_build_flags, only: WITH_MPI
 use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
-use mbd_common, only: tostr, nan, print_matrix, dp, pi, printer, exception
+use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
 use mbd_linalg, only: &
     operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, inverted, sinvert, add_diag, repeatn, symmetrize, mult_small, &
@@ -53,6 +53,12 @@ type :: mbd_timing
     integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
 end type mbd_timing
 
+type :: mbd_info
+    character(len=120) :: ewald_alpha = '', ewald_rsum = '', ts_conv = '', &
+        ewald_cutoff = '', ewald_recsum = '', freq_n = '', freq_error = '', &
+        neg_eig = ''
+end type mbd_info
+
 type :: mbd_calc
     type(mbd_param) :: param
     type(mbd_timing) :: tm
@@ -60,11 +66,10 @@ type :: mbd_calc
     real(dp), allocatable :: omega_grid_w(:)
     logical :: parallel = .false.
     integer :: comm = MPI_COMM_WORLD
-    integer :: io = -1
     integer :: my_task = 0
     integer :: n_tasks = 1
-    logical :: mute = .false.
     type(exception) :: exc
+    type(mbd_info) :: info
 end type mbd_calc
 
 type :: mbd_damping
@@ -122,7 +127,6 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(vecn) :: C6_rsscs
     type(mbd_damping) :: damp_rsscs, damp_mbd
     integer :: n_freq, i_freq
-    logical :: mute
 
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
@@ -130,18 +134,14 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6)
     damp_rsscs = damp
     damp_rsscs%version = 'fermi,dip,gg'
-    mute = sys%calc%mute
     do i_freq = 0, n_freq
         alpha_dyn_rsscs(i_freq) = run_scs(sys, alpha_dyn(i_freq), damp_rsscs)
-        sys%calc%mute = .true.
     end do
-    sys%calc%mute = mute
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
     damp_mbd%version = 'fermi,dip'
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%beta = damp%beta
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0), C6_rsscs, damp_mbd)
-    if (has_exc(sys)) call print_exc(sys)
 end function mbd_rsscs_energy
 
 
@@ -155,7 +155,6 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(vecn) :: C6_scs
     type(mbd_damping) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq
-    logical :: mute
 
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
@@ -165,16 +164,13 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     damp_scs%version = 'dip,gg'
     do i_freq = 0, n_freq
         alpha_dyn_scs(i_freq) = run_scs(sys, alpha_dyn(i_freq), damp_scs)
-        sys%calc%mute = .true.
     end do
-    sys%calc%mute = mute
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_scs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%version = 'dip,1mexp'
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
     mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0), C6_scs, damp_mbd)
-    if (has_exc(sys)) call print_exc(sys)
 end function mbd_scs_energy
 
 
@@ -268,9 +264,9 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
         ene = ene+ene_shell
         if (.not. is_crystal) exit
         if (i_shell > 1 .and. abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
-            call printer(sys%calc%io, "Periodic TS converged in " &
+            sys%calc%info%ts_conv = "Periodic TS converged in " &
                 //trim(tostr(i_shell))//" shells, " &
-                //trim(tostr(i_shell*shell_thickness/ang))//" angstroms")
+                //trim(tostr(i_shell*shell_thickness/ang))//" angstroms"
             exit
         endif
     end do ! i_shell
@@ -288,10 +284,9 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     complex(dp) :: Tpp_c(3, 3)
     character(len=1) :: parallel_mode
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, n_atoms
-    logical :: mute, do_ewald
+    logical :: do_ewald
 
     do_ewald = .false.
-    mute = sys%calc%mute
     n_atoms = size(sys%coords, 2)
     if (sys%calc%parallel) then
         parallel_mode = 'A' ! atoms
@@ -325,9 +320,8 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
             volume = max(abs(dble(product(diagonalized(sys%lattice)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
             real_space_cutoff = 6.d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
-            if (.not. mute) call printer(sys%calc%io, &
-                'Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
-                //', real cutoff = '//trim(tostr(real_space_cutoff)))
+            sys%calc%info%ewald_alpha = 'Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
+                //', real cutoff = '//trim(tostr(real_space_cutoff))
         else
             real_space_cutoff = sys%calc%param%dipole_cutoff
         end if
@@ -336,11 +330,10 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         range_cell(:) = 0
     end if
     if (sys%periodic) then
-        if (.not. mute) call printer(sys%calc%io, &
-            'Ewald: summing real part in cell vector range of ' &
+        sys%calc%info%ewald_rsum = 'Ewald: summing real part in cell vector range of ' &
             //trim(tostr(1+2*range_cell(1)))//'x' &
             //trim(tostr(1+2*range_cell(2)))//'x' &
-            //trim(tostr(1+2*range_cell(3))))
+            //trim(tostr(1+2*range_cell(3)))
     end if
     call ts(sys%calc, 11)
     idx_cell = (/ 0, 0, -1 /)
@@ -487,7 +480,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     real(dp), intent(in), optional :: k_point(3)
     type(mat3n3n), intent(inout) :: dipmat
 
-    logical :: is_parallel, mute, do_surface
+    logical :: is_parallel, do_surface
     real(dp) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
         k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
     complex(dp) :: Tpp_c(3, 3)
@@ -497,7 +490,6 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     character(len=1) :: parallel_mode
 
     is_parallel = sys%calc%parallel
-    mute = sys%calc%mute
     if (is_parallel) then
         parallel_mode = 'A' ! atoms
         if (size(sys%coords, 2) < sys%calc%n_tasks) then
@@ -521,14 +513,12 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
-    if (.not. mute) then
-        call printer(sys%calc%io, 'Ewald: using reciprocal cutoff = ' &
-            //trim(tostr(rec_space_cutoff)))
-        call printer(sys%calc%io, 'Ewald: summing reciprocal part in G vector range of ' &
-            //trim(tostr(1+2*range_G_vector(1)))//'x' &
-            //trim(tostr(1+2*range_G_vector(2)))//'x' &
-            //trim(tostr(1+2*range_G_vector(3))))
-    end if
+    sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' &
+        //trim(tostr(rec_space_cutoff))
+    sys%calc%info%ewald_recsum = 'Ewald: summing reciprocal part in G vector range of ' &
+        //trim(tostr(1+2*range_G_vector(1)))//'x' &
+        //trim(tostr(1+2*range_G_vector(2)))//'x' &
+        //trim(tostr(1+2*range_G_vector(3)))
     call ts(sys%calc, 12)
     idx_G_vector = (/ 0, 0, -1 /)
     do i_G_vector = 1, product(1+2*range_G_vector)
@@ -645,13 +635,9 @@ subroutine init_grid(calc)
     calc%omega_grid(0) = 0.d0
     calc%omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, calc%omega_grid(1:n), calc%omega_grid_w(1:n))
-    call printer(calc%io, &
-        "Initialized a radial integration grid of "//trim(tostr(n))//" points." &
-    )
-    call printer(calc%io, &
-        "Relative quadrature error in C6 of carbon atom: "// &
-        trim(tostr(test_frequency_grid(calc))) &
-    )
+    calc%info%freq_n = "Initialized a radial integration grid of "//trim(tostr(n))//" points."
+    calc%info%freq_error = "Relative quadrature error in C6 of carbon atom: "// &
+        trim(tostr(test_frequency_grid(calc)))
 end subroutine
 
 
@@ -937,10 +923,8 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        call printer(sys%calc%io, &
-            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
-            " negative eigenvalues" &
-        )
+        sys%calc%info%neg_eig = &
+            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene%energy = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
@@ -1020,7 +1004,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     type(mbd_damping), intent(in) :: damp
 
     logical :: &
-        is_parallel, do_rpa, mute
+        is_parallel, do_rpa
     integer :: i_kpt, n_kpts, n_atoms
     real(dp) :: k_point(3)
     type(vecn), allocatable :: alpha_ts(:)
@@ -1032,7 +1016,6 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     n_kpts = size(ene%k_pts, 2)
     is_parallel = sys%calc%parallel
     do_rpa = sys%do_rpa
-    mute = sys%calc%mute
 
     sys%calc%parallel = .false.
 
@@ -1058,7 +1041,6 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
         else
             call get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
         end if
-        sys%calc%mute = .true.
     end do ! k_point loop
     ! MPI code begin
     if (is_parallel) then
@@ -1072,7 +1054,6 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     if (sys%get_rpa_orders) ene%rpa_orders = ene%rpa_orders/n_kpts
 
     sys%calc%parallel = is_parallel
-    sys%calc%mute = mute
 end function get_reciprocal_mbd_energy
 
 
@@ -1133,10 +1114,8 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        call printer(sys%calc%io, &
-            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
-            " negative eigenvalues" &
-        )
+        sys%calc%info%neg_eig = &
+            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene%energy = ene%energy + 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
@@ -1152,11 +1131,10 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
-    logical :: is_parallel, mute
+    logical :: is_parallel
     type(mbd_damping) :: damp_alpha
 
     is_parallel = sys%calc%parallel
-    mute = sys%calc%mute
 
     sys%calc%parallel = .false.
 
@@ -1197,8 +1175,8 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            call printer(sys%calc%io, "1+AT matrix has " &
-                //trim(tostr(n_negative_eigs))//" negative eigenvalues")
+            sys%calc%info%neg_eig = &
+                "1+AT matrix has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         end if
         ene%energy = ene%energy + &
             1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
@@ -1215,7 +1193,6 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
                     *sys%calc%omega_grid_w(i_grid_omega)
             end do
         end if
-        sys%calc%mute = .true.
     end do
     if (is_parallel) then
         call sync_sum(ene%energy, sys%calc%comm)
@@ -1237,12 +1214,11 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
     complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
-    logical :: is_parallel, mute
+    logical :: is_parallel
     type(mbd_damping) :: damp_alpha
     real(dp) :: ene_k
 
     is_parallel = sys%calc%parallel
-    mute = sys%calc%mute
 
     sys%calc%parallel = .false.
 
@@ -1284,8 +1260,8 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            call printer(sys%calc%io, "1+AT matrix has " &
-                //trim(tostr(n_negative_eigs))//" negative eigenvalues")
+            sys%calc%info%neg_eig = &
+                "1+AT matrix has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         end if
         ene_k = ene_k + 1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
@@ -1300,7 +1276,6 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
                     *sys%calc%omega_grid_w(i_grid_omega)
             end do
         end if
-        sys%calc%mute = .true.
     end do
     if (is_parallel) then
         call sync_sum(ene_k, sys%calc%comm)
@@ -1311,7 +1286,6 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
     ene%energy = ene%energy + ene_k
 
     sys%calc%parallel = is_parallel
-    sys%calc%mute = mute
 end subroutine get_single_reciprocal_rpa_ene
 
 
@@ -1989,15 +1963,6 @@ logical function has_exc(sys)
 
     has_exc = sys%calc%exc%label /= ''
 end function
-
-
-subroutine print_exc(sys)
-    type(mbd_system), intent(in) :: sys
-
-    call printer(sys%calc%io, &
-        'Error "' // trim(sys%calc%exc%label) // '" in "' // &
-        trim(sys%calc%exc%origin) // ': ' // trim(sys%calc%exc%msg))
-end subroutine
 
 
 function make_k_grid(g_grid, uc) result(k_grid)

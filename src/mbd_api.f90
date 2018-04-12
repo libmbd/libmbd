@@ -23,7 +23,6 @@ public :: &  ! subroutines
     mbd_get_free_vdw_params
 
 type :: mbd_input
-    integer :: io  ! unit number for printing
     integer :: comm  ! MPI communicator
 
     ! which calculation will be done (mbd|ts)
@@ -71,7 +70,6 @@ subroutine mbd_init(calc, input)
 
     calc%sys%calc => calc%calc
     calc%sys%calc%comm = input%comm
-    calc%sys%calc%io = input%io
     calc%dispersion_type = input%dispersion_type
     calc%sys%do_force = input%calculate_forces
     if (input%calculate_spectrum) then

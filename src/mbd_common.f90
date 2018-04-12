@@ -8,8 +8,7 @@ use mbd_build_flags, only: WITH_MPI
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, pi, printer, &
-    exception, diff7
+public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, pi, exception, diff7
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: nan = transfer(-2251799813685248_8, 1d0)
@@ -27,15 +26,6 @@ type :: exception
 end type
 
 contains
-
-
-subroutine printer(io, msg)
-    integer, intent(in) :: io
-    character(*), intent(in) :: msg
-
-    if (io < 0) return
-    write (io, *) msg
-end subroutine
 
 
 character(len=50) elemental function tostr_int_(k, format)

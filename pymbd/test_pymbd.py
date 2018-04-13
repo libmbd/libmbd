@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from pymbd import ang, MBDCalc, from_volumes, numerical_forces
+from pymbd import ang, MBDCalc, from_volumes, numerical_gradients
 
 benzene_dimer = [(
     np.array([
@@ -108,16 +108,16 @@ def test_benzene_dimer(calc):
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
-def test_benzene_forces(calc):
+def test_benzene_gradients(calc):
     coords, species, vols = benzene_dimer[0]
-    ene, forces = calc.mbd_energy_species(
+    ene, gradients = calc.mbd_energy_species(
         coords, species, vols, 0.83, force=True
     )
-    num_forces = numerical_forces(
+    num_gradients = numerical_gradients(
         calc.mbd_energy_species, coords, species, vols, 0.83,
     )
     for i in range(len(coords)):
-        assert forces[i] == approx(num_forces[i], rel=1e-10, abs=1e-10)
+        assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
 
 
 def test_benzene_dimer_python(calc):
@@ -131,18 +131,18 @@ def test_benzene_dimer_python(calc):
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
-def test_benzene_forces_plain(calc):
+def test_benzene_gradients_plain(calc):
     coords, species, vols = benzene_dimer[0]
-    ene, forces = calc.mbd_energy_species(
+    ene, gradients = calc.mbd_energy_species(
         coords, species, vols, 0.83,
         func='calc_mbd_energy', force=True
     )
-    num_forces = numerical_forces(
+    num_gradients = numerical_gradients(
         calc.mbd_energy_species, coords, species, vols, 0.83,
         func='calc_mbd_energy'
     )
     for i in range(len(coords)):
-        assert forces[i] == approx(num_forces[i], rel=1e-10, abs=1e-10)
+        assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
 
 
 def test_benzene_dimer_scs(calc):

@@ -45,9 +45,9 @@ type :: mbd_input
 
     ! lattice vectors as column vectors, unallocated when not periodic
     real(dp), allocatable :: lattice_vectors(:, :)
-    integer  :: k_grid(3)  ! number of k-points along reciprocal axes
+    integer :: k_grid(3)  ! number of k-points along reciprocal axes
     ! is there vacuum along some axes in a periodic calculation
-    logical  :: vacuum_axis(3) = [.false., .false., .false.]
+    logical :: vacuum_axis(3) = [.false., .false., .false.]
 end type
 
 type mbd_calc
@@ -71,7 +71,7 @@ subroutine mbd_init(calc, input)
     calc%sys%calc => calc%calc
     calc%sys%calc%comm = input%comm
     calc%dispersion_type = input%dispersion_type
-    calc%sys%do_force = input%calculate_forces
+    calc%sys%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
         calc%sys%get_eigs = .true.
         calc%sys%get_modes = .true.
@@ -158,7 +158,7 @@ subroutine mbd_get_gradients(calc, gradients)  ! 3 by N  dE/dR
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(out) :: gradients(:, :)
 
-    gradients = transpose(calc%results%forces)
+    gradients = transpose(calc%results%gradients)
 end subroutine
 
 

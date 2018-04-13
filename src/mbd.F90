@@ -89,7 +89,7 @@ type :: mbd_result
     real(dp), allocatable :: mode_enes_k(:, :)
     complex(dp), allocatable :: modes_k(:, :, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
-    real(dp), allocatable :: forces(:, :)
+    real(dp), allocatable :: gradients(:, :)
 end type
 
 type :: mbd_system
@@ -102,7 +102,7 @@ type :: mbd_system
     integer :: supercell(3)
     logical :: do_rpa = .false.
     logical :: do_reciprocal = .true.
-    logical :: do_force = .false.
+    logical :: do_gradients = .false.
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
@@ -268,7 +268,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
     else
         allocate (dipmat%re(3*n_atoms, 3*n_atoms), source=0.d0)
-        if (sys%do_force) then
+        if (sys%do_gradients) then
             allocate (dipmat%re_dr(3*n_atoms, 3*n_atoms, 3), source=0.d0)
             if (allocated(damp%r_vdw%dr)) then
                 allocate (dipmat%re_dvdw(3*n_atoms, 3*n_atoms), source=0.d0)
@@ -327,36 +327,36 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                 end if
                 select case (damp%version)
                     case ("bare")
-                        Tpp = T_bare_v2(r, sys%do_force)
+                        Tpp = T_bare_v2(r, sys%do_gradients)
                     case ("dip,1mexp")
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")
                         Tpp = damping_fermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, sys%do_force &
-                        ).prod.T_bare_v2(r, sys%do_force)
+                            r, damp%beta*R_vdw_ij, damp%a, sys%do_gradients &
+                        ).prod.T_bare_v2(r, sys%do_gradients)
                     case ("sqrtfermi,dip")
                         Tpp = damping_sqrtfermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, sys%do_force &
-                        ).prod.T_bare_v2(r, sys%do_force)
+                            r, damp%beta*R_vdw_ij, damp%a, sys%do_gradients &
+                        ).prod.T_bare_v2(r, sys%do_gradients)
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
                         Tpp%val = damp%potential_custom(i_atom, j_atom, :, :)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, sigma_ij, sys%do_force)
+                        Tpp = T_erf_coulomb(r, sigma_ij, sys%do_gradients)
                     case ("fermi,dip,gg")
                         Tpp = op1minus(damping_fermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, sys%do_force &
-                        )).prod.T_erf_coulomb(r, sigma_ij, sys%do_force)
+                            r, damp%beta*R_vdw_ij, damp%a, sys%do_gradients &
+                        )).prod.T_erf_coulomb(r, sigma_ij, sys%do_gradients)
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
                         Tpp = op1minus(damping_sqrtfermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, sys%do_force &
-                        )).prod.T_erf_coulomb(r, sigma_ij, sys%do_force)
+                            r, damp%beta*R_vdw_ij, damp%a, sys%do_gradients &
+                        )).prod.T_erf_coulomb(r, sigma_ij, sys%do_gradients)
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         f_ij = 1.d0-damp%damping_custom(i_atom, j_atom)
-                        Tpp = T_erf_coulomb(r, sigma_ij, sys%do_force)
+                        Tpp = T_erf_coulomb(r, sigma_ij, sys%do_gradients)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                 end select
@@ -648,7 +648,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     damp_local = damp
     damp_local%sigma = get_sigma_selfint(alpha)
     T = dipole_matrix(sys, damp_local)
-    if (sys%do_force) then
+    if (sys%do_gradients) then
         alpha_full = T
     else
         call move_alloc(T%re, alpha_full%re)
@@ -659,7 +659,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     if (has_exc(sys)) return
     call ts(sys%calc, -32)
     alpha_scs%val = contract_polarizability(alpha_full%re)
-    if (.not. sys%do_force) return
+    if (.not. sys%do_gradients) return
     allocate (alpha_scs%dr(n_atoms, n_atoms, 3))
     do i = 1, 3*n_atoms
         do j = 1, i-1
@@ -816,7 +816,7 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
     omega = omega_eff(C6, alpha_0)
     call form_mbd_matrix(relay, alpha_0%val, omega%val)
     call ts(sys%calc, 21)
-    if (sys%get_modes .or. sys%do_force) then
+    if (sys%get_modes .or. sys%do_gradients) then
         call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
         if (sys%get_modes) then
             call move_alloc(relay%re, ene%modes)
@@ -839,9 +839,9 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene%energy = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
-    if (.not. sys%do_force) return
+    if (.not. sys%do_gradients) return
     allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
-    allocate (ene%forces(n_atoms, 3), source=0.d0)
+    allocate (ene%gradients(n_atoms, 3), source=0.d0)
     forall (i = 1:3*n_atoms)
         c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*modes(:, i)
     end forall
@@ -850,7 +850,7 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
         dQ%re = -T%re_dr(:, :, i_xyz)
         call form_mbd_matrix(dQ, alpha_0%val, omega%val)
         dQ%re = dQ%re-transpose(dQ%re)
-        ene%forces(:, i_xyz) = 1.d0/4*contract_forces(c_lambda12i_c*dQ%re)
+        ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(c_lambda12i_c*dQ%re)
     end do
     if (.not. do_impl_deriv) return
     do i_atom = 1, n_atoms
@@ -875,12 +875,12 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
                     cross_self_prod(omega%val*sqrt(alpha_0%val)) &
                 )
             end if
-            ene%forces(i_atom, i_xyz) = ene%forces(i_atom, i_xyz) + &
+            ene%gradients(i_atom, i_xyz) = ene%gradients(i_atom, i_xyz) + &
                 1.d0/4*sum(c_lambda12i_c*dQ%re)
         end do
     end do
     if (allocated(omega%dr)) then
-        ene%forces = ene%forces - 3.d0/2*sum(omega%dr, 1)
+        ene%gradients = ene%gradients - 3.d0/2*sum(omega%dr, 1)
     end if
 end function get_single_mbd_energy
 
@@ -1147,7 +1147,7 @@ function contract_polarizability(alpha_3n_3n) result(alpha_n)
 end function contract_polarizability
 
 
-function contract_forces(relay) result(atomvec)
+function contract_gradients(relay) result(atomvec)
     real(dp), intent(in) :: relay(:, :)
     real(dp) :: atomvec(size(relay, 1)/3)
 
@@ -1160,7 +1160,7 @@ function contract_forces(relay) result(atomvec)
         end associate
     end do
     atomvec = atomvec
-end function contract_forces
+end function contract_gradients
 
 
 function T_bare(rxyz) result(T)

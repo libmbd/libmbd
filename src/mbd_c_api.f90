@@ -185,10 +185,10 @@ real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    if (present(gradients)) sys%do_force = .true.
+    if (present(gradients)) sys%do_gradients = .true.
     res = get_mbd_energy(sys, vecn(alpha_0), vecn(C6), damping)
     calc_mbd_energy = res%energy
-    if (present(gradients)) gradients = transpose(res%forces)
+    if (present(gradients)) gradients = transpose(res%gradients)
 end function calc_mbd_energy
 
 real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
@@ -228,10 +228,10 @@ real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    if (present(gradients)) sys%do_force = .true.
+    if (present(gradients)) sys%do_gradients = .true.
     res = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
     calc_mbd_rsscs_energy = res%energy
-    if (present(gradients)) gradients = transpose(res%forces)
+    if (present(gradients)) gradients = transpose(res%gradients)
 end function calc_mbd_rsscs_energy
 
 real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)

@@ -1,4 +1,4 @@
-# MBD forces
+# MBD gradients
 
 $$
 \begin{equation}

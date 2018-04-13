@@ -234,10 +234,10 @@ def get_kgrid(lattice, k_grid, shift=0.5):
     return k_grid
 
 
-def numerical_forces(f, coords, *args, **kwargs):
+def numerical_gradients(f, coords, *args, **kwargs):
     delta = kwargs.pop('delta', 1e-3)  # support python 2
     coords = np.array(coords)
-    forces = np.zeros(coords.shape)
+    gradients = np.zeros(coords.shape)
     for i_atom in range(coords.shape[0]):
         for i_xyz in range(3):
             ene = {}
@@ -245,8 +245,8 @@ def numerical_forces(f, coords, *args, **kwargs):
                 coords_diff = coords.copy()
                 coords_diff[i_atom, i_xyz] += step*delta
                 ene[step] = f(coords_diff, *args, **kwargs)
-            forces[i_atom, i_xyz] = _diff5(ene, delta)
-    return forces
+            gradients[i_atom, i_xyz] = _diff5(ene, delta)
+    return gradients
 
 
 def _diff5(x, delta):

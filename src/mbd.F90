@@ -670,11 +670,22 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
         associate (i => (i_atom-1)*3)
             do i_xyz = 1, 3
                 T%re(:, :) = 0.d0
-                T%re(:i, i+1:i+3) = T%re_dr(:i, i+1:i+3, i_xyz)
-                T%re(i+1:i+3, :i) = transpose(T%re_dr(:i, i+1:i+3, i_xyz))
-                T%re(i+1:i+3, i+3+1:) = -T%re_dr(i+1:i+3, i+3+1:, i_xyz)
-                T%re(i+3+1:, i+1:i+3) = -transpose(T%re_dr(i+1:i+3, i+3+1:, i_xyz))
-                T%re = matmul(alpha_full%re, matmul(T%re, alpha_full%re))
+                T%re(:i, i+1:i+3) = -T%re_dr(:i, i+1:i+3, i_xyz)
+                T%re(i+1:i+3, :i) = -transpose(T%re_dr(:i, i+1:i+3, i_xyz))
+                T%re(i+1:i+3, i+3+1:) = T%re_dr(i+1:i+3, i+3+1:, i_xyz)
+                T%re(i+3+1:, i+1:i+3) = transpose(T%re_dr(i+1:i+3, i+3+1:, i_xyz))
+                if (allocated(alpha%dr)) then
+                    call add_diag(T, repeatn(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2, 3))
+                end if
+                if (allocated(damp%sigma%dr)) then
+                    call fill_tril(T%re_dsigma)
+                    T%re(:, :) = T%re(:, :) + multed_small( &
+                        T%re_dsigma, &
+                        cross_self_add(damp%sigma%val*damp%sigma%dr(:, i_atom, i_xyz)) / &
+                        sqrt(cross_self_add(damp%sigma%val**2)) &
+                    )
+                end if
+                T%re = -matmul(alpha_full%re, matmul(T%re, alpha_full%re))
                 alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T%re)
             end do
         end associate
@@ -848,16 +859,6 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
                 dQ%re(:, :) = dQ%re(:, :) + &
                     multed_small(T%re, symmetrize(omega%val*sqrt(alpha_0%val) .cprod. &
                     omega%val*alpha_0%dr(:, i_atom, i_xyz)/sqrt(alpha_0%val))/2)
-            end if
-            if (allocated(damp%sigma%dr)) then
-                call fill_tril(T%re_dsigma)
-                dQ%re(:, :) = dQ%re(:, :) + &
-                    multed_small( &
-                        T%re_dsigma, &
-                        cross_self_add(damp%sigma%val*damp%sigma%dr(:, i_atom, i_xyz)) / &
-                        sqrt(cross_self_add(damp%sigma%val**2)) * &
-                        cross_self_prod(omega%val*sqrt(alpha_0%val)) &
-                    )
             end if
             if (allocated(damp%r_vdw%dr)) then
                 call fill_tril(T%re_dvdw)

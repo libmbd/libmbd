@@ -29,6 +29,7 @@ call exec_test('T_GG derivative implicit')
 call exec_test('T_fermi derivative implicit')
 call exec_test('MBD derivative explicit')
 call exec_test('SCS derivative explicit')
+call exec_test('SCS derivative implicit')
 call exec_test('MBD derivative implicit alpha')
 call exec_test('MBD derivative implicit C6')
 call exec_test('MBD derivative implicit Rvdw')
@@ -52,6 +53,7 @@ subroutine exec_test(test_name)
     case ('T_fermi derivative implicit'); call test_T_fermi_deriv_impl()
     case ('MBD derivative explicit'); call test_mbd_deriv_expl()
     case ('SCS derivative explicit'); call test_scs_deriv_expl()
+    case ('SCS derivative implicit'); call test_scs_deriv_impl()
     case ('MBD derivative implicit alpha'); call test_mbd_deriv_impl_alpha()
     case ('MBD derivative implicit C6'); call test_mbd_deriv_impl_C6()
     case ('MBD derivative implicit Rvdw'); call test_mbd_deriv_impl_vdw()
@@ -293,6 +295,58 @@ subroutine test_scs_deriv_expl()
         call print_matrix('diff z', diff(:, :, 3))
     end if
 end subroutine test_scs_deriv_expl
+
+subroutine test_scs_deriv_impl
+    real(dp) :: delta
+    type(mbd_system) :: sys
+    type(mbd_damping) :: damp
+    real(dp), allocatable :: coords(:, :)
+    real(dp), allocatable :: forces(:, :, :)
+    real(dp), allocatable :: diff(:, :, :)
+    type(vecn) :: alpha_0
+    real(dp), allocatable :: alpha_0_diff(:)
+    integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
+    type(vecn) :: alpha_scs(-3:3)
+
+    delta = 0.1d0
+    n_atoms = 3
+    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (forces(n_atoms, n_atoms, 3))
+    coords(1, 3) = 1.d0*ang
+    coords(2, 1) = 4.d0*ang
+    coords(3, 2) = 4.d0*ang
+    sys%calc => calc
+    sys%coords = coords
+    sys%do_force = .true.
+    damp%version = 'fermi,dip,gg'
+    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%beta = 0.83d0
+    alpha_0%val = [11.d0, 11.d0, 11.d0]
+    allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
+    alpha_scs(0) = run_scs(sys, alpha_0, damp)
+    sys%do_force = .false.
+    do i_atom = 1, n_atoms
+        do i_xyz = 1, 3
+            do i_step = -3, 3
+                if (i_step == 0) cycle
+                sys%coords = coords
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
+                alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
+                alpha_scs(i_step) = run_scs(sys, vecn(alpha_0_diff), damp)
+            end do
+            do j_atom = 1, n_atoms
+                forces(j_atom, i_atom, i_xyz) = &
+                    diff7([(alpha_scs(i_step)%val(j_atom), i_step = -3, 3)], delta)
+            end do
+        end do
+    end do
+    diff = (forces-alpha_scs(0)%dr)/forces
+    if (failed(maxval(abs(diff)), 1d-6)) then
+        call print_matrix('diff x', diff(:, :, 1))
+        call print_matrix('diff y', diff(:, :, 2))
+        call print_matrix('diff z', diff(:, :, 3))
+    end if
+end subroutine test_scs_deriv_impl
 
 subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: delta

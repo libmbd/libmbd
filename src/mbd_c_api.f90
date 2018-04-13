@@ -42,17 +42,12 @@ type(c_ptr) function mbd_init_calc(n_freq) bind(c)
     mbd_init_calc = c_loc(calc_c)
 end function mbd_init_calc
 
-subroutine mbd_set_parallel(calc_cp, rank, n_proc) bind(c)
+subroutine mbd_set_parallel(calc_cp) bind(c)
     type(c_ptr), value :: calc_cp
-    integer(c_int), intent(in), value :: rank
-    integer(c_int), intent(in), value :: n_proc
 
     type(mbd_calc), pointer :: calc
 
     calc => get_mbd_calc(calc_cp)
-    calc%parallel = .true.
-    calc%my_task = rank
-    calc%n_tasks = n_proc
 end subroutine mbd_set_parallel
 
 subroutine mbd_destroy_calc(calc_cp) bind(c)

@@ -7,7 +7,7 @@ struct MBD_calc {
 };
 
 struct MBD_calc* mbd_init_calc(int n_freq);
-void mbd_set_parallel(struct MBD_calc* calc, int rank, int n_proc);
+void mbd_set_parallel(struct MBD_calc* calc);
 void mbd_destroy_calc(struct MBD_calc* calc);
 
 struct MBD_system* mbd_init_system(

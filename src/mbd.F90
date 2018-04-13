@@ -19,7 +19,7 @@ implicit none
 private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
-    get_sigma_selfint
+    get_sigma_selfint, scale_TS
 public :: get_ts_energy, init_eqi_grid, get_damping_parameters, clock_rate
 #endif
 

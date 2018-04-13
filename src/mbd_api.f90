@@ -5,7 +5,7 @@ module mbd_api
 
 use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
     mbd_rsscs_energy, get_ts_energy, get_damping_parameters, init_grid, &
-    mbd_result
+    mbd_result, scale_TS
 use mbd_common, only: dp
 use mbd_types, only: vecn
 use mbd_vdw_param, only: default_vdw_params, species_index
@@ -54,8 +54,8 @@ type mbd_calc
     private
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: alpha_0(:)
-    real(dp), allocatable :: C6(:)
+    type(vecn) :: alpha_0
+    type(vecn) :: C6
     character(len=30) :: dispersion_type
     type(mbd_calc_inner) :: calc
     type(mbd_result) :: results
@@ -107,27 +107,36 @@ subroutine mbd_update_lattice_vectors(calc, latt_vecs)
 end subroutine
 
 
-subroutine mbd_update_vdw_params_custom(calc, alpha_0, C6, r_vdw)
+subroutine mbd_update_vdw_params_custom(calc, alpha_0, C6, r_vdw, dalpha_0, dC6, dr_vdw)
     type(mbd_calc), intent(inout) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: r_vdw(:)
+    real(dp), intent(in), optional :: dalpha_0(:, :, :), dC6(:, :, :), dr_vdw(:, :, :)
 
-    calc%alpha_0 = alpha_0
-    calc%C6 = C6
+    calc%alpha_0%val = alpha_0
+    calc%C6%val = C6
     calc%damp%r_vdw%val = r_vdw
+    if (present(dalpha_0)) calc%alpha_0%dr = dalpha_0
+    if (present(dC6)) calc%C6%dr = dC6
+    if (present(dr_vdw)) calc%damp%r_vdw%dr = dr_vdw
 end subroutine
 
 
-subroutine mbd_update_vdw_params_from_ratios(calc, ratios, free_values)
+subroutine mbd_update_vdw_params_from_ratios(calc, ratios, free_values, dratios)
     type(mbd_calc), intent(inout) :: calc
     real(dp), intent(in) :: ratios(:)
     real(dp), intent(in) :: free_values(:, :)
+    real(dp), intent(in), optional :: dratios(:, :, :)
 
-    ! TODO allocate only once
-    calc%alpha_0 = free_values(1, :)*ratios
-    calc%C6 = free_values(2, :)*ratios**2
-    calc%damp%r_vdw%val = free_values(3, :)*ratios**(1.d0/3)
+    type(vecn) :: vols, ones
+
+    allocate (ones%val(size(ratios)), source=1d0)
+    vols%val = ratios
+    if (present(dratios)) vols%dr = dratios
+    calc%alpha_0 = scale_TS(vecn(free_values(1, :)), vols, ones, 1d0)
+    calc%C6 = scale_TS(vecn(free_values(2, :)), vols, ones, 2d0)
+    calc%damp%r_vdw = scale_TS(vecn(free_values(3, :)), vols, ones, 1d0/3)
 end subroutine
 
 
@@ -137,10 +146,10 @@ subroutine mbd_get_energy(calc, energy)
 
     select case (calc%dispersion_type)
     case ('mbd')
-        calc%results = mbd_rsscs_energy(calc%sys, vecn(calc%alpha_0), vecn(calc%C6), calc%damp)
+        calc%results = mbd_rsscs_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
         energy = calc%results%energy
     case ('ts')
-        energy = get_ts_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
+        energy = get_ts_energy(calc%sys, calc%alpha_0%val, calc%C6%val, calc%damp)
     end select
 end subroutine
 

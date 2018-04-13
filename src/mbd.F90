@@ -685,6 +685,13 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
                         sqrt(cross_self_add(damp%sigma%val**2)) &
                     )
                 end if
+                if (allocated(damp%r_vdw%dr)) then
+                    call fill_tril(T%re_dvdw)
+                    T%re(:, :) = T%re(:, :) + multed_small( &
+                        T%re_dvdw, &
+                        cross_self_add(damp%r_vdw%dr(:, i_atom, i_xyz)) &
+                    )
+                end if
                 T%re = -matmul(alpha_full%re, matmul(T%re, alpha_full%re))
                 alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T%re)
             end do

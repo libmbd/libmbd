@@ -15,6 +15,7 @@ set(SRCS
     src/mbd_vdw_param.f90
     # src/mbd_helper_dev.f90
     # src/mbd_math.f90
+    # src/mbd_density.f90
     src/mbd_mpi.f90
     src/mbd_common.f90
     src/mbd_linalg.f90

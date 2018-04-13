@@ -1,9 +1,11 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#ifndef LEGENDRE_PREC
+#define LEGENDRE_PREC 8
+#endif
 module mbd
 
-use mbd_build_flags, only: WITH_MPI
 use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
 use mbd_linalg, only: &
@@ -569,8 +571,6 @@ end subroutine get_omega_grid
 
 
 subroutine gauss_legendre(n, r, w)
-    use mbd_build_flags, only: LEGENDRE_PREC
-
     integer, intent(in) :: n
     real(dp), intent(out) :: r(n), w(n)
 

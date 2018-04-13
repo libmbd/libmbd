@@ -3,8 +3,6 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_common
 
-use mbd_build_flags, only: WITH_MPI
-
 implicit none
 
 private

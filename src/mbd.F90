@@ -21,8 +21,7 @@ public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
     get_sigma_selfint
 public :: get_ts_energy, init_eqi_grid, eval_mbd_nonint_density, &
-    eval_mbd_int_density, nbody_coeffs, get_damping_parameters, &
-    clock_rate
+    eval_mbd_int_density, get_damping_parameters, clock_rate
 #endif
 
 interface operator(.prod.)
@@ -42,7 +41,6 @@ type :: mbd_param
     real(dp) :: k_grid_shift = K_GRID_SHIFT
     logical :: ewald_on = .true.
     logical :: zero_negative_eigs = .false.
-    integer :: mbd_nbody_max = 3
     integer :: rpa_order_max = 10
     integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
@@ -1121,80 +1119,6 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
 end subroutine get_single_reciprocal_rpa_ene
 
 
-! function mbd_nbody( &
-!         xyz, &
-!         alpha_0, &
-!         omega, &
-!         version, &
-!         R_vdw, beta, a, &
-!         calc%my_task, calc%n_tasks) &
-!         result(ene_orders)
-!     real(dp), intent(in) :: &
-!         xyz(:, :), &
-!         alpha_0(size(xyz, 1)), &
-!         omega(size(xyz, 1)), &
-!         R_vdw(size(xyz, 1)), &
-!         beta, a
-!     character(len=*), intent(in) :: version
-!     integer, intent(in), optional :: calc%my_task, calc%n_tasks
-!     real(dp) :: ene_orders(20)
-!
-!     integer :: &
-!         multi_index(calc%param%mbd_nbody_max), i_body, j_body, i_tuple, &
-!         i_atom_ind, j_atom_ind, i_index
-!     real(dp) :: ene
-!     logical :: is_parallel
-!     
-!     is_parallel = .false.
-!     if (present(calc%n_tasks)) then
-!         if (calc%n_tasks > 0) then
-!             is_parallel = .true.
-!         end if
-!     end if
-!     ene_orders(:) = 0.d0
-!     do i_body = 2, calc%param%mbd_nbody_max
-!         i_tuple = 0
-!         multi_index(1:i_body-1) = 1
-!         multi_index(i_body:calc%param%mbd_nbody_max) = 0
-!         do
-!             multi_index(i_body) = multi_index(i_body)+1
-!             do i_index = i_body, 2, -1
-!                 if (multi_index(i_index) > size(xyz, 1)) then
-!                     multi_index(i_index) = 1
-!                     multi_index(i_index-1) = multi_index(i_index-1)+1
-!                 end if
-!             end do
-!             if (multi_index(1) > size(xyz, 1)) exit
-!             if (any(multi_index(1:i_body-1)-multi_index(2:i_body) >= 0)) cycle
-!             i_tuple = i_tuple+1
-!             if (is_parallel) then
-!                 if (calc%my_task /= modulo(i_tuple, calc%n_tasks)) cycle
-!             end if
-!             ene = get_mbd_energy( &
-!                 xyz(multi_index(1:i_body), :), &
-!                 alpha_0(multi_index(1:i_body)), &
-!                 omega(multi_index(1:i_body)), &
-!                 version, &
-!                 R_vdw(multi_index(1:i_body)), &
-!                 beta, a)
-!             ene_orders(i_body) = ene_orders(i_body) &
-!                 +ene+3.d0/2*sum(omega(multi_index(1:i_body)))
-!         end do ! i_tuple
-!     end do ! i_body
-!     if (is_parallel) then
-!         call sync_sum(ene_orders, size(ene_orders))
-!     end if
-!     ene_orders(1) = 3.d0/2*sum(omega)
-!     do i_body = 2, min(calc%param%mbd_nbody_max, size(xyz, 1))
-!         do j_body = 1, i_body-1
-!             ene_orders(i_body) = ene_orders(i_body) &
-!                 -nbody_coeffs(j_body, i_body, size(xyz, 1))*ene_orders(j_body)
-!         end do
-!     end do
-!     ene_orders(1) = sum(ene_orders(2:calc%param%mbd_nbody_max))
-! end function mbd_nbody
-
-
 function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) result(rho)
     real(dp), intent(in) :: &
         pts(:, :), &
@@ -1266,22 +1190,6 @@ function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) result(r
         rho(i_pt) = sum(pre*exp(-factor))
     end do
 end function
-
-
-function nbody_coeffs(k, m, N) result(a)
-    integer, intent(in) :: k, m, N
-    integer :: a
-
-    integer :: i
-
-    a = 1
-    do i = N-m+1, N-k
-        a = a*i
-    end do
-    do i = 1, m-k
-        a = a/i
-    end do
-end function nbody_coeffs
 
 
 function contract_polarizability(alpha_3n_3n) result(alpha_n)

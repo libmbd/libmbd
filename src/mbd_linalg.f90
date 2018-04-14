@@ -9,29 +9,8 @@ use mbd_types, only: mat3n3n
 implicit none
 
 private
-public :: diag, invert, inverted, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert, add_diag, &
-    repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), cross_self_add, &
-    cross_self_prod
-
-interface operator(.cprod.)
-    module procedure cart_prod_
-end interface
-
-interface operator(.cadd.)
-    module procedure cart_add_
-end interface
-
-interface diag
-    module procedure get_diag_
-    module procedure get_diag_cmplx_
-    module procedure make_diag_
-end interface
-
-interface add_diag
-    module procedure add_diag_scalar_
-    module procedure add_diag_vec_
-end interface
+public :: invert, inverted, diagonalize, sdiagonalize, diagonalized, &
+    sdiagonalized, solve_lin_sys, sinvert
 
 interface invert
     module procedure invert_ge_dble_
@@ -65,17 +44,6 @@ external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
     ZGEEV, ZGEEB, DSYTRI, DSYTRF
 
 contains
-
-
-function eye(n) result(A)
-    integer, intent(in) :: n
-    real(dp) :: A(n, n)
-
-    integer :: i
-
-    A(:, :) = 0.d0
-    forall (i = 1:n) A(i, i) = 1.d0
-end function
 
 
 subroutine invert_ge_dble_(A, exc)
@@ -378,91 +346,6 @@ subroutine diagonalize_ge_cmplx_(mode, A, eigs, exc)
 end subroutine
 
 
-function cart_prod_(a, b) result(c)
-    real(dp), intent(in) :: a(:), b(:)
-    real(dp) :: c(size(a), size(b))
-
-    integer :: i, j
-
-    do i = 1, size(a)
-        do j = 1, size(b)
-            c(i, j) = a(i)*b(j)
-        end do
-    end do
-end function
-
-
-function cart_add_(a, b) result(c)
-    real(dp), intent(in) :: a(:), b(:)
-    real(dp) :: c(size(a), size(b))
-
-    integer :: i, j
-
-    do i = 1, size(a)
-        do j = 1, size(b)
-            c(i, j) = a(i)+b(j)
-        end do
-    end do
-end function
-
-
-function cross_self_prod(a) result(c)
-    real(dp), intent(in) :: a(:)
-    real(dp) :: c(size(a), size(a))
-
-    c = cart_prod_(a, a)
-end function
-
-
-function cross_self_add(a) result(c)
-    real(dp), intent(in) :: a(:)
-    real(dp) :: c(size(a), size(a))
-
-    c = cart_add_(a, a)
-end function
-
-
-subroutine add_diag_scalar_(A, d)
-    type(mat3n3n), intent(inout) :: A
-    real(dp), intent(in) :: d
-
-    integer :: i
-
-    call add_diag_vec_(A, [(d, i = 1, A%siz(1))])
-end subroutine
-
-
-subroutine add_diag_vec_(A, d)
-    type(mat3n3n), intent(inout) :: A
-    real(dp), intent(in) :: d(:)
-
-    integer :: i
-
-    if (allocated(A%re)) then
-        do i = 1, size(d)
-            A%re(i, i) = A%re(i, i) + d(i)
-        end do
-    end if
-    if (allocated(A%cplx)) then
-        do i = 1, size(d)
-            A%cplx(i, i) = A%cplx(i, i) + d(i)
-        end do
-    end if
-end subroutine
-
-
-subroutine mult_small(A, B)
-    real(dp), intent(inout) :: A(:, :)
-    real(dp), intent(in) :: B(:, :)
-
-    integer :: i, i3, j, j3
-
-    forall (i = 1:size(B, 1), i3 = 1:3, j = 1:size(B, 1), j3 = 1:3)
-        A((i-1)*3+i3, (j-1)*3+j3) = B(i, j)*A((i-1)*3+i3, (j-1)*3+j3)
-    end forall
-end subroutine
-
-
 subroutine fill_tril(A)
     real(dp), intent(inout) :: A(:, :)
 
@@ -474,66 +357,6 @@ subroutine fill_tril(A)
         end do
     end do
 end subroutine
-
-
-function multed_small(A, B)
-    real(dp), intent(in) :: A(:, :)
-    real(dp), intent(in) :: B(:, :)
-    real(dp) :: multed_small(size(A, 1), size(A, 1))
-
-    multed_small = A
-    call mult_small(multed_small, B)
-end function
-
-
-function repeatn(x, n)
-    real(dp), intent(in) :: x(:)
-    integer, intent(in) :: n
-    real(dp) :: repeatn(n*size(x))
-
-    integer :: i, j
-
-    repeatn = [([(x(i), j = 1, n)], i = 1, size(x))]
-end function
-
-
-function get_diag_(A) result(d)
-    real(dp), intent(in) :: A(:, :)
-    real(dp) :: d(size(A, 1))
-
-    integer :: i
-
-    forall (i = 1:size(A, 1)) d(i) = A(i, i)
-end function
-
-
-function get_diag_cmplx_(A) result(d)
-    complex(dp), intent(in) :: A(:, :)
-    complex(dp) :: d(size(A, 1))
-
-    integer :: i
-
-    forall (i = 1:size(A, 1)) d(i) = A(i, i)
-end function
-
-
-function make_diag_(d) result(A)
-    real(dp), intent(in) :: d(:)
-    real(dp) :: A(size(d), size(d))
-
-    integer :: i
-
-    A(:, :) = 0.d0
-    forall (i = 1:size(d)) A(i, i) = d(i)
-end function
-
-
-function symmetrize(A)
-    real(dp), intent(in) :: A(:, :)
-    real(dp) :: symmetrize(size(A, 1), size(A, 1))
-
-    symmetrize = A + transpose(A)
-end function
 
 
 function solve_lin_sys(A, b, exc) result(x)

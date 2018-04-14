@@ -9,10 +9,11 @@ module mbd
 use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
 use mbd_linalg, only: &
-    operator(.cprod.), diag, invert, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, inverted, sinvert, add_diag, repeatn, symmetrize, mult_small, &
-    multed_small, operator(.cadd.), cross_self_add, cross_self_prod
-use mbd_types, only: mat3n3n, mat33, scalar, vecn
+    invert, diagonalize, sdiagonalize, diagonalized, sdiagonalized, inverted, &
+    sinvert
+use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.), diag, &
+    add_diag, repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), &
+    cross_self_add, cross_self_prod
 use mbd_defaults
 
 implicit none

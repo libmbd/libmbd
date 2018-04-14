@@ -12,7 +12,7 @@ private
 public :: diag, invert, inverted, diagonalize, sdiagonalize, diagonalized, &
     sdiagonalized, solve_lin_sys, eye, operator(.cprod.), sinvert, add_diag, &
     repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), cross_self_add, &
-    fill_tril, cross_self_prod
+    cross_self_prod
 
 interface operator(.cprod.)
     module procedure cart_prod_
@@ -189,6 +189,7 @@ subroutine invert_sym_dble_(A, exc)
         end if
         return
     endif
+    call fill_tril(A)
 end subroutine
 
 

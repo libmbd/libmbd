@@ -108,6 +108,8 @@ type :: mbd_system
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
+    contains
+    procedure :: siz => system_siz
 end type mbd_system
 
 contains
@@ -202,7 +204,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
             else
                 R_cell = (/ 0.d0, 0.d0, 0.d0 /)
             end if
-            do i_atom = 1, size(sys%coords, 2)
+            do i_atom = 1, sys%siz()
                 do j_atom = 1, i_atom
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
@@ -265,7 +267,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     logical :: do_ewald
 
     do_ewald = .false.
-    n_atoms = size(sys%coords, 2)
+    n_atoms = sys%siz()
     if (present(k_point)) then
         allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
     else
@@ -420,8 +422,9 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     complex(dp) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
-        range_G_vector(3)
+        range_G_vector(3), n_atoms
 
+    n_atoms = sys%siz()
     rec_unit_cell = 2*pi*inverted(transpose(sys%lattice))
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
@@ -449,8 +452,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
-        do i_atom = 1, size(sys%coords, 2)
-            do j_atom = 1, size(sys%coords, 2)
+        do i_atom = 1, n_atoms
+            do j_atom = 1, n_atoms
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
                 if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
@@ -478,8 +481,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         k_sq = sum(k_point**2)
         if (sqrt(k_sq) > 1.d-15) then
             do_surface = .false.
-            do i_atom = 1, size(sys%coords, 2)
-            do j_atom = 1, size(sys%coords, 2)
+            do i_atom = 1, n_atoms
+            do j_atom = 1, n_atoms
                 do i_xyz = 1, 3
                 do j_xyz = 1, 3
                     i = 3*(i_atom-1)+i_xyz
@@ -498,8 +501,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if ! k_sq >
     end if ! k_point present
     if (do_surface) then ! surface energy
-        do i_atom = 1, size(sys%coords, 2)
-        do j_atom = 1, size(sys%coords, 2)
+        do i_atom = 1, n_atoms
+        do j_atom = 1, n_atoms
             do i_xyz = 1, 3
                 i = 3*(i_atom-1)+i_xyz
                 j = 3*(j_atom-1)+i_xyz
@@ -631,7 +634,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     integer :: n_atoms, i_xyz, i_atom
     type(mbd_damping) :: damp_local
 
-    n_atoms = size(alpha%val)
+    n_atoms = sys%siz()
     damp_local = damp
     damp_local%sigma = get_sigma_selfint(alpha)
     T = dipole_matrix(sys, damp_local)
@@ -717,9 +720,7 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
 
     logical :: do_rpa
     real(dp) :: R_cell(3)
-    integer :: i_atom, i
-    integer :: i_cell
-    integer :: idx_cell(3), n_cells
+    integer :: idx_cell(3), n_cells, i_atom, i, i_cell, n_atoms
 
     type(vecn) :: alpha_0_super, C6_super
     type(vecn), allocatable :: alpha_ts_super(:)
@@ -731,20 +732,21 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
 
     sys_super%calc = sys%calc
     n_cells = product(sys%supercell)
+    n_atoms = sys%siz()
     do i = 1, 3
         sys_super%lattice(:, i) = sys%lattice(:, i)*sys%supercell(i)
     end do
-    allocate (sys_super%coords(3, n_cells*size(sys%coords, 2)))
-    allocate (alpha_0_super%val(n_cells*size(alpha_0%val)))
-    allocate (C6_super%val(n_cells*size(C6%val)))
+    allocate (sys_super%coords(3, n_cells*n_atoms))
+    allocate (alpha_0_super%val(n_cells*n_atoms))
+    allocate (C6_super%val(n_cells*n_atoms))
     allocate (alpha_ts_super(0:ubound(sys%calc%omega_grid, 1)))
-    if (allocated(damp%r_vdw%val)) allocate (damp_super%r_vdw%val(n_cells*size(damp%r_vdw%val)))
+    if (allocated(damp%r_vdw%val)) allocate (damp_super%r_vdw%val(n_cells*n_atoms))
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
         R_cell = matmul(sys%lattice, idx_cell)
-        do i_atom = 1, size(sys%coords, 2)
-            i = (i_cell-1)*size(sys%coords, 2)+i_atom
+        do i_atom = 1, n_atoms
+            i = (i_cell-1)*n_atoms+i_atom
             sys_super%coords(:, i) = sys%coords(:, i_atom)+R_cell
             alpha_0_super%val(i) = alpha_0%val(i_atom)
             C6_super%val(i) = C6%val(i_atom)
@@ -783,7 +785,7 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
     do_impl_deriv = allocated(alpha_0%dr) .or. allocated(C6%dr) .or. &
         allocated(damp%r_vdw%dr) .or. allocated(damp%sigma%dr)
 
-    n_atoms = size(sys%coords, 2)
+    n_atoms = sys%siz()
     allocate (eigs(3*n_atoms))
     T = dipole_matrix(sys, damp)
     if (do_impl_deriv) then
@@ -873,7 +875,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     real(dp) :: k_point(3)
     type(vecn), allocatable :: alpha_ts(:)
 
-    n_atoms = size(sys%coords, 2)
+    n_atoms = sys%siz()
     ene%k_pts = make_k_grid( &
         make_g_grid(sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3)), sys%lattice &
     )
@@ -917,13 +919,13 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
     integer :: i_atom, j_atom, i, j
     integer :: n_negative_eigs, n_atoms
 
-    n_atoms = size(alpha_0%val)
-    allocate (eigs(3*size(sys%coords, 2)))
+    n_atoms = sys%siz()
+    allocate (eigs(3*sys%siz()))
     omega = omega_eff(C6, alpha_0)
     ! relay = T
     relay = dipole_matrix(sys, damp, k_point)
-    do i_atom = 1, size(sys%coords, 2)
-        do j_atom = 1, size(sys%coords, 2)
+    do i_atom = 1, sys%siz()
+        do j_atom = 1, sys%siz()
             i = 3*(i_atom-1)
             j = 3*(j_atom-1)
             relay%cplx(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
@@ -970,17 +972,17 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 
     ene%energy = 0.d0
     damp_alpha = damp
-    allocate (eigs(3*size(sys%coords, 2)))
+    allocate (eigs(3*sys%siz()))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
         damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
-        do i_atom = 1, size(sys%coords, 2)
+        do i_atom = 1, sys%siz()
             i = 3*(i_atom-1)
             relay%re(i+1:i+3, :i) = &
                 alpha(i_grid_omega)%val(i_atom)*transpose(relay%re(:i, i+1:i+3))
         end do
-        do i_atom = 1, size(sys%coords, 2)
+        do i_atom = 1, sys%siz()
             i = 3*(i_atom-1)
             relay%re(i+1:i+3, i+1:) = &
                 alpha(i_grid_omega)%val(i_atom)*relay%re(i+1:i+3, i+1:)
@@ -1038,24 +1040,24 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
 
     ene_k = 0d0
     damp_alpha = damp
-    allocate (eigs(3*size(sys%coords, 2)))
+    allocate (eigs(3*sys%siz()))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
         damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, k_point)
-        do i_atom = 1, size(sys%coords, 2)
+        do i_atom = 1, sys%siz()
             i = 3*(i_atom-1)
             relay%cplx(i+1:i+3, :i) = &
                 alpha(i_grid_omega)%val(i_atom)*conjg(transpose(relay%cplx(:i, i+1:i+3)))
         end do
-        do i_atom = 1, size(sys%coords, 2)
+        do i_atom = 1, sys%siz()
             i = 3*(i_atom-1)
             relay%cplx(i+1:i+3, i+1:) = &
                 alpha(i_grid_omega)%val(i_atom)*relay%cplx(i+1:i+3, i+1:)
         end do
         ! relay = alpha*T
         if (sys%get_rpa_orders) AT = relay
-        do i = 1, 3*size(sys%coords, 2)
+        do i = 1, 3*sys%siz()
             relay%cplx(i, i) = 1.d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
         call ts(sys%calc, 25)
@@ -1426,7 +1428,7 @@ type(vecn) function scale_TS(X, alpha_0_sc, alpha_0, q) result(X_sc)
     integer :: i, n_atoms
 
     X_sc%val = X%val*(alpha_0_sc%val/alpha_0%val)**q
-    n_atoms = size(X%val)
+    n_atoms = X%siz()
     if (allocated(X%dr) .or. allocated(alpha_0_sc%dr) .or. allocated(alpha_0%dr)) then
         allocate (X_sc%dr(n_atoms, n_atoms, 3), source=0.d0)
     end if
@@ -1465,7 +1467,7 @@ type(vecn) function omega_eff(C6, alpha) result(omega)
     integer :: i, n_atoms
 
     omega%val = 4.d0/3*C6%val/alpha%val**2
-    n_atoms = size(C6%val)
+    n_atoms = C6%siz()
     if (allocated(C6%dr) .or. allocated(alpha%dr)) then
         allocate (omega%dr(n_atoms, n_atoms, 3), source=0.d0)
     end if
@@ -1490,7 +1492,7 @@ type(vecn) function get_sigma_selfint(alpha) result(sigma)
 
     sigma%val = (sqrt(2.d0/pi)*alpha%val/3.d0)**(1.d0/3)
     if (allocated(alpha%dr)) then
-        n_atoms = size(alpha%val)
+        n_atoms = alpha%siz()
         allocate (sigma%dr(n_atoms, n_atoms, 3))
         do i = 1, n_atoms
             sigma%dr(i, :, :) = sigma%val(i)*alpha%dr(i, :, :)/(3*alpha%val(i))
@@ -1505,7 +1507,7 @@ type(vecn) function get_C6_from_alpha(calc, alpha) result(C6)
 
     integer :: i_atom, i_freq, n_atoms
 
-    n_atoms = size(alpha(0)%val)
+    n_atoms = alpha(0)%siz()
     allocate (C6%val(n_atoms), source=0.d0)
     do i_freq = 0, ubound(alpha, 1)
         C6%val = C6%val + &
@@ -1622,6 +1624,17 @@ function clock_rate() result(rate)
 
     call system_clock(cnt, rate, cnt_max) 
 end function clock_rate
+
+
+integer function system_siz(this)
+    class(mbd_system), intent(in) :: this
+
+    if (allocated(this%coords)) then
+        system_siz = size(this%coords, 2)
+    else
+        system_siz = 0
+    end if
+end function
 
 
 end module mbd

@@ -426,14 +426,9 @@ subroutine add_diag_scalar_(A, d)
     type(mat3n3n), intent(inout) :: A
     real(dp), intent(in) :: d
 
-    integer :: i, n
+    integer :: i
 
-    if (allocated(A%re)) then
-        n = min(size(A%re, 1), size(A%re, 2))
-    else
-        n = min(size(A%cplx, 1), size(A%cplx, 2))
-    end if
-    call add_diag_vec_(A, [(d, i = 1, n)])
+    call add_diag_vec_(A, [(d, i = 1, A%siz(1))])
 end subroutine
 
 

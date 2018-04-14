@@ -227,9 +227,13 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
                     end if
                     select case (damp%version)
                         case ("fermi")
-                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false.)
+                            f_damp = damping_fermi( &
+                                r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false. &
+                            )
                         case ("fermi2")
-                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false.)
+                            f_damp = damping_fermi( &
+                                r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false. &
+                            )
                             f_damp%val = f_damp%val**2
                         case ("custom")
                             f_damp%val = damp%damping_custom(i_atom, j_atom)
@@ -245,10 +249,11 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
         end do ! i_cell
         ene = ene+ene_shell
         if (.not. is_crystal) exit
-        if (i_shell > 1 .and. abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
-            sys%calc%info%ts_conv = "Periodic TS converged in " &
-                //trim(tostr(i_shell))//" shells, " &
-                //trim(tostr(i_shell*shell_thickness/ang))//" angstroms"
+        if (i_shell > 1 .and. &
+                abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
+            sys%calc%info%ts_conv = "Periodic TS converged in " // &
+                trim(tostr(i_shell)) // " shells, " // &
+                trim(tostr(i_shell*shell_thickness/ang)) // " angstroms"
             exit
         endif
     end do ! i_shell
@@ -291,9 +296,11 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
             do_ewald = .true.
             volume = max(abs(dble(product(diagonalized(sys%lattice)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
-            real_space_cutoff = 6.d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
-            sys%calc%info%ewald_alpha = 'Ewald: using alpha = '//trim(tostr(ewald_alpha)) &
-                //', real cutoff = '//trim(tostr(real_space_cutoff))
+            real_space_cutoff = &
+                6.d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
+            sys%calc%info%ewald_alpha = &
+                'Ewald: using alpha = ' // trim(tostr(ewald_alpha)) // &
+                ', real cutoff = ' // trim(tostr(real_space_cutoff))
         else
             real_space_cutoff = sys%calc%param%dipole_cutoff
         end if
@@ -302,10 +309,11 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         range_cell(:) = 0
     end if
     if (sys%periodic) then
-        sys%calc%info%ewald_rsum = 'Ewald: summing real part in cell vector range of ' &
-            //trim(tostr(1+2*range_cell(1)))//'x' &
-            //trim(tostr(1+2*range_cell(2)))//'x' &
-            //trim(tostr(1+2*range_cell(3)))
+        sys%calc%info%ewald_rsum = &
+            'Ewald: summing real part in cell vector range of ' // &
+            trim(tostr(1+2*range_cell(1))) // 'x' // &
+            trim(tostr(1+2*range_cell(2))) // 'x' // &
+            trim(tostr(1+2*range_cell(3)))
     end if
     call ts(sys%calc, 11)
     idx_cell = (/ 0, 0, -1 /)
@@ -328,7 +336,8 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     R_vdw_ij = sum(damp%R_vdw%val([i_atom, j_atom]))
                 end if
                 if (allocated(damp%sigma%val)) then
-                    sigma_ij = damp%mayer_scaling*sqrt(sum(damp%sigma%val([i_atom, j_atom])**2))
+                    sigma_ij = damp%mayer_scaling * &
+                        sqrt(sum(damp%sigma%val([i_atom, j_atom])**2))
                 end if
                 select case (damp%version)
                     case ("bare")
@@ -430,12 +439,13 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
-    sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' &
-        //trim(tostr(rec_space_cutoff))
-    sys%calc%info%ewald_recsum = 'Ewald: summing reciprocal part in G vector range of ' &
-        //trim(tostr(1+2*range_G_vector(1)))//'x' &
-        //trim(tostr(1+2*range_G_vector(2)))//'x' &
-        //trim(tostr(1+2*range_G_vector(3)))
+    sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
+        trim(tostr(rec_space_cutoff))
+    sys%calc%info%ewald_recsum = &
+        'Ewald: summing reciprocal part in G vector range of ' // &
+        trim(tostr(1+2*range_G_vector(1))) // 'x' // &
+        trim(tostr(1+2*range_G_vector(2))) // 'x' // &
+        trim(tostr(1+2*range_G_vector(3)))
     call ts(sys%calc, 12)
     idx_G_vector = (/ 0, 0, -1 /)
     do i_G_vector = 1, product(1+2*range_G_vector)
@@ -531,8 +541,11 @@ subroutine init_grid(calc)
     calc%omega_grid(0) = 0.d0
     calc%omega_grid_w(0) = 0.d0
     call get_omega_grid(n, 0.6d0, calc%omega_grid(1:n), calc%omega_grid_w(1:n))
-    calc%info%freq_n = "Initialized a radial integration grid of "//trim(tostr(n))//" points."
-    calc%info%freq_error = "Relative quadrature error in C6 of carbon atom: "// &
+    calc%info%freq_n = &
+        "Initialized a radial integration grid of " // trim(tostr(n)) // &
+        " points."
+    calc%info%freq_error = &
+        "Relative quadrature error in C6 of carbon atom: " // &
         trim(tostr(test_frequency_grid(calc)))
 end subroutine
 
@@ -579,7 +592,8 @@ subroutine gauss_legendre(n, r, w)
     Pk2(0) = 1._q  ! k = 0
     Pk1(0:1) = (/ 0._q, 1._q /)  ! k = 1
     do k = 2, n
-        Pk(0:k) = ((2*k-1)*(/ 0.0_q, Pk1(0:k-1) /)-(k-1)*(/ Pk2(0:k-2), 0._q, 0._q /))/k
+        Pk(0:k) = ((2*k-1) * &
+            (/ 0.0_q, Pk1(0:k-1) /)-(k-1)*(/ Pk2(0:k-2), 0._q, 0._q /))/k
         if (k < n) then
             Pk2(0:k-1) = Pk1(0:k-1)
             Pk1(0:k) = Pk(0:k)
@@ -659,13 +673,17 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
                 T%re(i+1:i+3, :) = T%re_dr(i+1:i+3, :, i_xyz)
                 T%re(:, i+1:i+3) = -T%re_dr(:, i+1:i+3, i_xyz)
                 if (allocated(alpha%dr)) then
-                    call add_diag(T, repeatn(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2, 3))
+                    call add_diag( &
+                        T, &
+                        repeatn(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2, 3) &
+                    )
                 end if
                 if (allocated(damp%sigma%dr)) then
                     T%re(:, :) = T%re(:, :) + multed_small( &
                         T%re_dsigma, &
-                        cross_self_add(damp%sigma%val*damp%sigma%dr(:, i_atom, i_xyz)) / &
-                        sqrt(cross_self_add(damp%sigma%val**2)) &
+                        cross_self_add( &
+                            damp%sigma%val*damp%sigma%dr(:, i_atom, i_xyz) &
+                        )/sqrt(cross_self_add(damp%sigma%val**2)) &
                     )
                 end if
                 if (allocated(damp%r_vdw%dr)) then
@@ -713,7 +731,8 @@ type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
 end function get_mbd_energy
 
 
-type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) result(ene)
+type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
+        result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha_0
     type(vecn), intent(in) :: C6
@@ -741,7 +760,9 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
     allocate (alpha_0_super%val(n_cells*n_atoms))
     allocate (C6_super%val(n_cells*n_atoms))
     allocate (alpha_ts_super(0:ubound(sys%calc%omega_grid, 1)))
-    if (allocated(damp%r_vdw%val)) allocate (damp_super%r_vdw%val(n_cells*n_atoms))
+    if (allocated(damp%r_vdw%val)) then
+        allocate (damp_super%r_vdw%val(n_cells*n_atoms))
+    end if
     idx_cell = (/ 0, 0, -1 /)
     do i_cell = 1, n_cells
         call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
@@ -760,7 +781,9 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
         alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, C6_super)
         ene_super = get_single_rpa_energy(sys_super, alpha_ts_super, damp_super)
     else
-        ene_super = get_single_mbd_energy(sys_super, alpha_0_super, C6_super, damp_super)
+        ene_super = get_single_mbd_energy( &
+            sys_super, alpha_0_super, C6_super, damp_super &
+        )
     end if
     ene%energy = ene_super%energy/n_cells
     if (sys%get_rpa_orders) then
@@ -769,7 +792,8 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) resul
 end function get_supercell_mbd_energy
 
 
-type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(ene)
+type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
+        result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha_0
     type(vecn), intent(in) :: C6
@@ -795,7 +819,10 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
         call move_alloc(T%re, relay%re)
     end if
     omega = omega_eff(C6, alpha_0)
-    call mult_small(relay%re, omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val))
+    call mult_small( &
+        relay%re, &
+        omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val) &
+    )
     call add_diag(relay, repeatn(omega%val**2, 3))
     call ts(sys%calc, 21)
     if (sys%get_modes .or. sys%do_gradients) then
@@ -816,8 +843,8 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        sys%calc%info%neg_eig = &
-            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
+        sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
+            trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene%energy = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
@@ -830,7 +857,10 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
     c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
     do i_xyz = 1, 3
         dQ%re = -T%re_dr(:, :, i_xyz)
-        call mult_small(dQ%re, omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val))
+        call mult_small( &
+            dQ%re, &
+            omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val) &
+        )
         ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(c_lambda12i_c*dQ%re)
     end do
     if (.not. do_impl_deriv) return
@@ -840,13 +870,17 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
             if (allocated(omega%dr)) then
                 dQ%re(:, :) = dQ%re(:, :) + &
                     2*diag(repeatn(omega%val*omega%dr(:, i_atom, i_xyz), 3)) + &
-                    multed_small(T%re, symmetrize(omega%val*sqrt(alpha_0%val) .cprod. &
-                    omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val)))
+                    multed_small(T%re, symmetrize( &
+                        omega%val*sqrt(alpha_0%val) .cprod. &
+                        omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val) &
+                    ))
             end if
             if (allocated(alpha_0%dr)) then
-                dQ%re(:, :) = dQ%re(:, :) + &
-                    multed_small(T%re, symmetrize(omega%val*sqrt(alpha_0%val) .cprod. &
-                    omega%val*alpha_0%dr(:, i_atom, i_xyz)/sqrt(alpha_0%val))/2)
+                dQ%re(:, :) = dQ%re(:, :) + multed_small(T%re, symmetrize( &
+                    omega%val*sqrt(alpha_0%val) .cprod. &
+                    omega%val*alpha_0%dr(:, i_atom, i_xyz) / &
+                    sqrt(alpha_0%val) &
+                )/2)
             end if
             if (allocated(damp%r_vdw%dr)) then
                 dQ%re(:, :) = dQ%re(:, :) + multed_small( &
@@ -865,7 +899,8 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) result(e
 end function get_single_mbd_energy
 
 
-type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(ene)
+type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
+        result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha_0
     type(vecn), intent(in) :: C6
@@ -877,9 +912,9 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     type(vecn), allocatable :: alpha_ts(:)
 
     n_atoms = sys%siz()
-    ene%k_pts = make_k_grid( &
-        make_g_grid(sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3)), sys%lattice &
-    )
+    ene%k_pts = make_k_grid(make_g_grid( &
+        sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3) &
+    ), sys%lattice)
     n_kpts = size(ene%k_pts, 2)
     do_rpa = sys%do_rpa
 
@@ -890,15 +925,18 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
         allocate (ene%mode_enes_k(3*n_atoms, n_kpts), source=0.d0)
     if (sys%get_modes) &
         allocate (ene%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0.d0, 0.d0))
-    if (sys%get_rpa_orders) &
-        allocate (ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0.d0)
+    if (sys%get_rpa_orders) allocate ( &
+        ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0.d0 &
+    )
     do i_kpt = 1, n_kpts
         ene%i_kpt = i_kpt
         k_point = ene%k_pts(:, i_kpt)
         if (do_rpa) then
             call get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp, ene)
         else
-            call get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
+            call get_single_reciprocal_mbd_ene( &
+                sys, alpha_0, C6, k_point, damp, ene &
+            )
         end if
     end do ! k_point loop
     ene%energy = ene%energy/size(ene%k_pts, 2)
@@ -952,8 +990,8 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        sys%calc%info%neg_eig = &
-            "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
+        sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
+            trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
     ene%energy = ene%energy + 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
@@ -1003,8 +1041,8 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            sys%calc%info%neg_eig = &
-                "1+AT matrix has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
+            sys%calc%info%neg_eig = "1+AT matrix has " // &
+                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         end if
         ene%energy = ene%energy + &
             1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
@@ -1048,8 +1086,8 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
         relay = dipole_matrix(sys, damp_alpha, k_point)
         do i_atom = 1, sys%siz()
             i = 3*(i_atom-1)
-            relay%cplx(i+1:i+3, :i) = &
-                alpha(i_grid_omega)%val(i_atom)*conjg(transpose(relay%cplx(:i, i+1:i+3)))
+            relay%cplx(i+1:i+3, :i) = alpha(i_grid_omega)%val(i_atom) * &
+                conjg(transpose(relay%cplx(:i, i+1:i+3)))
         end do
         do i_atom = 1, sys%siz()
             i = 3*(i_atom-1)
@@ -1072,20 +1110,23 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            sys%calc%info%neg_eig = &
-                "1+AT matrix has " // trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
+            sys%calc%info%neg_eig = "1+AT matrix has " // &
+                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         end if
-        ene_k = ene_k + 1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
+        ene_k = ene_k + &
+            1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 26)
             call diagonalize('N', AT%cplx, eigs, sys%calc%exc)
             if (has_exc(sys)) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
-                ene%rpa_orders_k(n_order, ene%i_kpt) = ene%rpa_orders_k(n_order, ene%i_kpt) + &
-                    (-1.d0)/(2*pi)*(-1)**n_order &
-                    *dble(sum(eigs**n_order))/n_order &
-                    *sys%calc%omega_grid_w(i_grid_omega)
+                associate (ene_order => ene%rpa_orders_k(n_order, ene%i_kpt))
+                    ene_order = ene_order + &
+                        (-1.d0)/(2*pi)*(-1)**n_order * &
+                        dble(sum(eigs**n_order))/n_order * &
+                        sys%calc%omega_grid_w(i_grid_omega)
+                end associate
             end do
         end if
     end do
@@ -1415,7 +1456,8 @@ type(vecn) function alpha_osc(alpha_0, omega, u) result(alpha)
     if (allocated(omega%dr)) then
         do i = 1, n_atoms
             alpha%dr(i, :, :) = alpha%dr(i, :, :) + &
-                alpha%val(i)*2.d0/omega%val(i)*omega%dr(i, :, :)/(1.d0+(omega%val(i)/u)**2)
+                alpha%val(i)*2.d0/omega%val(i)*omega%dr(i, :, :) / &
+                (1.d0+(omega%val(i)/u)**2)
         end do
     end if
 end function
@@ -1430,7 +1472,8 @@ type(vecn) function scale_TS(X, alpha_0_sc, alpha_0, q) result(X_sc)
 
     X_sc%val = X%val*(alpha_0_sc%val/alpha_0%val)**q
     n_atoms = X%siz()
-    if (allocated(X%dr) .or. allocated(alpha_0_sc%dr) .or. allocated(alpha_0%dr)) then
+    if (allocated(X%dr) .or. allocated(alpha_0_sc%dr) .or. &
+            allocated(alpha_0%dr)) then
         allocate (X_sc%dr(n_atoms, n_atoms, 3), source=0.d0)
     end if
     if (allocated(X%dr)) then
@@ -1519,8 +1562,8 @@ type(vecn) function get_C6_from_alpha(calc, alpha) result(C6)
         do i_freq = 0, ubound(alpha, 1)
             do i_atom = 1, n_atoms
                 C6%dr(i_atom, :, :) = C6%dr(i_atom, :, :) + &
-                    6.d0/pi*alpha(i_freq)%val(i_atom)*alpha(i_freq)%dr(i_atom, :, :) * &
-                    calc%omega_grid_w(i_freq)
+                    6.d0/pi*alpha(i_freq)%val(i_atom) * &
+                    alpha(i_freq)%dr(i_atom, :, :)*calc%omega_grid_w(i_freq)
             end do
         end do
     end if
@@ -1536,7 +1579,8 @@ function supercell_circum(sys, uc, radius) result(sc)
     integer :: i
 
     ruc = 2*pi*inverted(transpose(uc))
-    forall (i = 1:3) layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
+    forall (i = 1:3) &
+        layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
     where (sys%vacuum_axis) sc = 0
 end function
@@ -1613,8 +1657,10 @@ subroutine ts(calc, id, always)
             calc%tm%timestamps(id) = calc%tm%timestamps(id)-calc%tm%ts_cnt
         else
             calc%tm%ts_aid = abs(id)
-            calc%tm%timestamps(calc%tm%ts_aid) = calc%tm%timestamps(calc%tm%ts_aid)+calc%tm%ts_cnt
-            calc%tm%ts_counts(calc%tm%ts_aid) = calc%tm%ts_counts(calc%tm%ts_aid)+1
+            calc%tm%timestamps(calc%tm%ts_aid) = &
+                calc%tm%timestamps(calc%tm%ts_aid)+calc%tm%ts_cnt
+            calc%tm%ts_counts(calc%tm%ts_aid) = &
+                calc%tm%ts_counts(calc%tm%ts_aid)+1
         end if
     end if
 end subroutine ts
@@ -1623,7 +1669,7 @@ end subroutine ts
 function clock_rate() result(rate)
     integer :: cnt, rate, cnt_max
 
-    call system_clock(cnt, rate, cnt_max) 
+    call system_clock(cnt, rate, cnt_max)
 end function clock_rate
 
 

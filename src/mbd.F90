@@ -720,7 +720,7 @@ type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     is_reciprocal = sys%do_reciprocal
     if (.not. is_crystal) then
         if (.not. do_rpa) then
-            ene = get_single_mbd_energy(sys, alpha_0, C6, damp)
+            call get_single_mbd_energy(sys, alpha_0, C6, damp, ene)
         else
             allocate (alpha(0:ubound(sys%calc%omega_grid, 1)))
             alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6)
@@ -787,8 +787,8 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
         alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, C6_super)
         ene_super = get_single_rpa_energy(sys_super, alpha_ts_super, damp_super)
     else
-        ene_super = get_single_mbd_energy( &
-            sys_super, alpha_0_super, C6_super, damp_super &
+        call get_single_mbd_energy( &
+            sys_super, alpha_0_super, C6_super, damp_super, ene_super &
         )
     end if
     ene%energy = ene_super%energy/n_cells
@@ -798,15 +798,17 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
 end function get_supercell_mbd_energy
 
 
-type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
-        result(ene)
+subroutine get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha_0
     type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
+    type(mbd_result), intent(inout) :: ene
+    real(dp), intent(in), optional :: k_point(3)
 
     type(mat3n3n) :: relay, dQ, T, dQ_add
     real(dp), allocatable :: eigs(:)
+    real(dp) :: ene_add
     type(vecn) :: omega
     integer :: i_xyz, i, i_atom
     integer :: n_negative_eigs, n_atoms
@@ -818,26 +820,39 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
 
     n_atoms = sys%siz()
     allocate (eigs(3*n_atoms))
-    T = dipole_matrix(sys, damp)
+    T = dipole_matrix(sys, damp, k_point)
     if (do_impl_deriv) then
         relay = T
     else
-        call move_alloc(T%re, relay%re)
+        if (present(k_point)) then
+            call move_alloc(T%cplx, relay%cplx)
+        else
+            call move_alloc(T%re, relay%re)
+        end if
         relay%blacs = T%blacs
     end if
     omega = omega_eff(C6, alpha_0)
     call relay%mult_cross(omega%val*sqrt(alpha_0%val))
     call relay%add_diag(omega%val**2)
     call ts(sys%calc, 21)
-    if (sys%get_modes .or. sys%do_gradients) then
-        call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
+    if (present(k_point)) then
         if (sys%get_modes) then
-            call move_alloc(relay%re, ene%modes)
+            call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
+            ene%modes_k(:, :, ene%i_kpt) = relay%cplx
         else
-            call move_alloc(relay%re, modes)
+            call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
         end if
     else
-        call sdiagonalize('N', relay%re, eigs, sys%calc%exc)
+        if (sys%get_modes .or. sys%do_gradients) then
+            call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
+            if (sys%get_modes) then
+                call move_alloc(relay%re, ene%modes)
+            else
+                call move_alloc(relay%re, modes)
+            end if
+        else
+            call sdiagonalize('N', relay%re, eigs, sys%calc%exc)
+        end if
     end if
     if (has_exc(sys)) return
     call ts(sys%calc, -21)
@@ -851,7 +866,13 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
             trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
-    ene%energy = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
+    ene_add = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
+    ! TODO temporary hack, turn this routine into a function
+    if (present(k_point)) then
+        ene%energy = ene%energy + ene_add
+    else
+        ene%energy = ene_add
+    end if
     if (.not. sys%do_gradients) return
     allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
     allocate (ene%gradients(n_atoms, 3), source=0.d0)
@@ -897,7 +918,7 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
     if (allocated(omega%dr)) then
         ene%gradients = ene%gradients - 3.d0/2*sum(omega%dr, 1)
     end if
-end function get_single_mbd_energy
+end subroutine get_single_mbd_energy
 
 
 type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
@@ -935,68 +956,12 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
         if (do_rpa) then
             call get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp, ene)
         else
-            call get_single_reciprocal_mbd_ene( &
-                sys, alpha_0, C6, k_point, damp, ene &
-            )
+            call get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
         end if
     end do ! k_point loop
     ene%energy = ene%energy/size(ene%k_pts, 2)
     if (sys%get_rpa_orders) ene%rpa_orders = ene%rpa_orders/n_kpts
 end function get_reciprocal_mbd_energy
-
-
-subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
-    type(mbd_system), intent(inout) :: sys
-    type(vecn), intent(in) :: alpha_0
-    type(vecn), intent(in) :: C6
-    real(dp), intent(in) :: k_point(3)
-    type(mbd_damping), intent(in) :: damp
-    type(mbd_result), intent(inout) :: ene
-
-    type(mat3n3n) :: relay
-    real(dp), allocatable :: eigs(:)
-    type(vecn) :: omega
-    integer :: i_atom, j_atom, i, j
-    integer :: n_negative_eigs, n_atoms
-
-    n_atoms = sys%siz()
-    allocate (eigs(3*sys%siz()))
-    omega = omega_eff(C6, alpha_0)
-    ! relay = T
-    relay = dipole_matrix(sys, damp, k_point)
-    do i_atom = 1, sys%siz()
-        do j_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            j = 3*(j_atom-1)
-            relay%cplx(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
-                omega%val(i_atom)*omega%val(j_atom) &
-                *sqrt(alpha_0%val(i_atom)*alpha_0%val(j_atom))* &
-                relay%cplx(i+1:i+3, j+1:j+3)
-        end do
-    end do
-    ! relay = w^2+sqrt(a*a)*w*w*T
-    call relay%add_diag(omega%val**2)
-    call ts(sys%calc, 22)
-    if (sys%get_modes) then
-        call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
-        ene%modes_k(:, :, ene%i_kpt) = relay%cplx
-    else
-        call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
-    end if
-    if (has_exc(sys)) return
-    call ts(sys%calc, -22)
-    if (sys%get_eigs) then
-        ene%mode_enes_k(:, ene%i_kpt) = sqrt(eigs)
-        where (eigs < 0) ene%mode_enes = 0.d0
-    end if
-    n_negative_eigs = count(eigs(:) < 0)
-    if (n_negative_eigs > 0) then
-        sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
-            trim(tostr(n_negative_eigs)) // " negative eigenvalues"
-        if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
-    end if
-    ene%energy = ene%energy + 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
-end subroutine get_single_reciprocal_mbd_ene
 
 
 type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)

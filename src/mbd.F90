@@ -668,7 +668,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     call sinvert(alpha_full%re, sys%calc%exc)
     if (has_exc(sys)) return
     call ts(sys%calc, -32)
-    alpha_scs%val = contract_polarizability(alpha_full%re)
+    alpha_scs%val = contract_polarizability(alpha_full)
     if (.not. sys%do_gradients) return
     dQ_add%blacs = T%blacs
     allocate (alpha_scs%dr(n_atoms, n_atoms, 3))
@@ -694,7 +694,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
                     call T%add(dQ_add)
                 end if
                 T%re = -matmul(alpha_full%re, matmul(T%re, alpha_full%re))
-                alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T%re)
+                alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T)
             end do
         end associate
     end do
@@ -1129,21 +1129,22 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
 end subroutine get_single_reciprocal_rpa_ene
 
 
-function contract_polarizability(alpha_3n_3n) result(alpha_n)
-    real(dp), intent(in) :: alpha_3n_3n(:, :)
-    real(dp) :: alpha_n(size(alpha_3n_3n, 1)/3)
+function contract_polarizability(alpha_full) result(alpha)
+    type(mat3n3n), intent(in) :: alpha_full
+    real(dp) :: alpha(alpha_full%blacs%n_atoms)
 
-    integer :: i_atom, i_xyz
+    integer :: i_xyz, my_i_atom
 
-    alpha_n(:) = 0.d0
-    do i_atom = 1, size(alpha_n)
-        associate (A => alpha_n(i_atom))
+    alpha(:) = 0.d0
+    do my_i_atom = 1, size(alpha_full%blacs%i_atom)
+        associate (i_atom => alpha_full%blacs%i_atom(my_i_atom))
             do i_xyz = 1, 3
-                A = A + sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+i_xyz))
+                alpha(i_atom) = alpha(i_atom) + &
+                    sum(alpha_full%re(i_xyz::3, 3*(my_i_atom-1)+i_xyz))
             end do
         end associate
     end do
-    alpha_n = alpha_n/3
+    alpha = alpha/3
 end function contract_polarizability
 
 

@@ -858,7 +858,8 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
     do i_xyz = 1, 3
         dQ%re = -T%re_dr(:, :, i_xyz)
         call dQ%mult_cross(omega%val*sqrt(alpha_0%val))
-        ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(c_lambda12i_c*dQ%re)
+        dQ%re = c_lambda12i_c*dQ%re
+        ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(dQ)
     end do
     if (.not. do_impl_deriv) return
     dQ_add%blacs = T%blacs
@@ -1133,14 +1134,14 @@ function contract_polarizability(alpha_full) result(alpha)
     type(mat3n3n), intent(in) :: alpha_full
     real(dp) :: alpha(alpha_full%blacs%n_atoms)
 
-    integer :: i_xyz, my_i_atom
+    integer :: i_xyz, my_j_atom
 
     alpha(:) = 0.d0
-    do my_i_atom = 1, size(alpha_full%blacs%i_atom)
-        associate (i_atom => alpha_full%blacs%i_atom(my_i_atom))
+    do my_j_atom = 1, size(alpha_full%blacs%j_atom)
+        associate (j_atom => alpha_full%blacs%j_atom(my_j_atom))
             do i_xyz = 1, 3
-                alpha(i_atom) = alpha(i_atom) + &
-                    sum(alpha_full%re(i_xyz::3, 3*(my_i_atom-1)+i_xyz))
+                alpha(j_atom) = alpha(j_atom) + &
+                    sum(alpha_full%re(i_xyz::3, 3*(my_j_atom-1)+i_xyz))
             end do
         end associate
     end do
@@ -1148,19 +1149,20 @@ function contract_polarizability(alpha_full) result(alpha)
 end function contract_polarizability
 
 
-function contract_gradients(relay) result(atomvec)
-    real(dp), intent(in) :: relay(:, :)
-    real(dp) :: atomvec(size(relay, 1)/3)
+function contract_gradients(relay) result(gradient)
+    type(mat3n3n), intent(in) :: relay
+    real(dp) :: gradient(relay%blacs%n_atoms)
 
-    integer :: i_atom
+    integer :: my_j_atom
 
-    atomvec(:) = 0.d0
-    do i_atom = 1, size(atomvec)
-        associate (A => atomvec(i_atom), i => 3*(i_atom-1))
-            A = A + 2*sum(relay(:, i+1:i+3))
+    gradient(:) = 0.d0
+    do my_j_atom = 1, size(relay%blacs%j_atom)
+        associate ( &
+                j_atom => relay%blacs%j_atom(my_j_atom), &
+                relay_sub => relay%re(:, 3*(my_j_atom-1)+1:))
+            gradient(j_atom) = gradient(j_atom) + 2*sum(relay_sub(:, :3))
         end associate
     end do
-    atomvec = atomvec
 end function contract_gradients
 
 

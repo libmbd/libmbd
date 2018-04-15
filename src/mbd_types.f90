@@ -10,8 +10,7 @@ implicit none
 
 private
 public :: mat3n3n, mat33, vecn, scalar
-public :: operator(.cprod.), add_diag, symmetrize, mult_small, multed_small, &
-    cross_self_add, cross_self_prod
+public :: operator(.cprod.)
 
 type :: mat3n3n
     real(dp), allocatable :: re(:, :)
@@ -21,8 +20,15 @@ type :: mat3n3n
     real(dp), allocatable :: re_dsigma(:, :)
     type(mbd_blacs) :: blacs
     contains
-    procedure  :: siz => mat3n3n_siz
+    procedure :: siz => mat3n3n_siz
     procedure :: init => mat3n3n_init
+    procedure :: add => mat3n3n_add
+    procedure :: add_diag => mat3n3n_add_diag
+    procedure :: add_diag_scalar => mat3n3n_add_diag_scalar
+    procedure :: mult_cross => mat3n3n_mult_cross
+    procedure :: multed_cross => mat3n3n_multed_cross
+    procedure :: mult_cross_add => mat3n3n_mult_cross_add
+    procedure :: mult_dsigma => mat3n3n_mult_dsigma
 end type
 
 type :: mat33
@@ -41,7 +47,7 @@ type :: vecn
 end type
 
 interface vecn
-    module procedure vecn_constructor_no_dr
+    module procedure vecn_constructor_no_dr_
 end interface
 
 type :: scalar
@@ -54,18 +60,9 @@ interface operator(.cprod.)
     module procedure cart_prod_
 end interface
 
-interface operator(.cadd.)
-    module procedure cart_add_
-end interface
-
-interface add_diag
-    module procedure add_diag_scalar_
-    module procedure add_diag_vec_
-end interface
-
 contains
 
-type(vecn) function vecn_constructor_no_dr(x) result(vec)
+type(vecn) function vecn_constructor_no_dr_(x) result(vec)
     real(dp), intent(in) :: x(:)
 
     vec%val = x
@@ -105,6 +102,17 @@ integer function vecn_siz(this)
     end if
 end function
 
+subroutine mat3n3n_add(this, other)
+    class(mat3n3n), intent(inout) :: this
+    class(mat3n3n), intent(in) :: other
+
+    if (allocated(this%re) .and. allocated(other%re)) then
+        this%re = this%re + other%re
+    else
+        stop 1
+    end if
+end subroutine
+
 function cart_prod_(a, b) result(c)
     real(dp), intent(in) :: a(:), b(:)
     real(dp) :: c(size(a), size(b))
@@ -118,76 +126,48 @@ function cart_prod_(a, b) result(c)
     end do
 end function
 
-function cart_add_(a, b) result(c)
-    real(dp), intent(in) :: a(:), b(:)
-    real(dp) :: c(size(a), size(b))
-
-    integer :: i, j
-
-    do i = 1, size(a)
-        do j = 1, size(b)
-            c(i, j) = a(i)+b(j)
-        end do
-    end do
-end function
-
-function cross_self_prod(a) result(c)
-    real(dp), intent(in) :: a(:)
-    real(dp) :: c(size(a), size(a))
-
-    c = cart_prod_(a, a)
-end function
-
-function cross_self_add(a) result(c)
-    real(dp), intent(in) :: a(:)
-    real(dp) :: c(size(a), size(a))
-
-    c = cart_add_(a, a)
-end function
-
-
-subroutine add_diag_scalar_(A, d)
-    type(mat3n3n), intent(inout) :: A
+subroutine mat3n3n_add_diag_scalar(this, d)
+    class(mat3n3n), intent(inout) :: this
     real(dp), intent(in) :: d
 
     integer :: i
 
-    call add_diag_vec_(A, [(d, i = 1, A%blacs%n_atoms)])
+    call mat3n3n_add_diag(this, [(d, i = 1, this%blacs%n_atoms)])
 end subroutine
 
-subroutine add_diag_vec_(A, d)
-    type(mat3n3n), intent(inout) :: A
+subroutine mat3n3n_add_diag(this, d)
+    class(mat3n3n), intent(inout) :: this
     real(dp), intent(in) :: d(:)
 
     integer :: my_i_atom, my_j_atom, i
 
-    if (allocated(A%re)) then
-        do my_i_atom = 1, size(A%blacs%i_atom)
-            do my_j_atom = 1, size(A%blacs%j_atom)
+    if (allocated(this%re)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
                 associate ( &
-                        i_atom => A%blacs%i_atom(my_i_atom), &
-                        j_atom => A%blacs%j_atom(my_j_atom), &
-                        A_diag => A%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_diag => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     if (i_atom /= j_atom) cycle
                     do i = 1, 3
-                        A_diag(i, i) = A_diag(i, i) + d(i_atom)
+                        this_diag(i, i) = this_diag(i, i) + d(i_atom)
                     end do
                 end associate
             end do
         end do
     end if
-    if (allocated(A%cplx)) then
-        do my_i_atom = 1, size(A%blacs%i_atom)
-            do my_j_atom = 1, size(A%blacs%j_atom)
+    if (allocated(this%cplx)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
                 associate ( &
-                        i_atom => A%blacs%i_atom(my_i_atom), &
-                        j_atom => A%blacs%j_atom(my_j_atom), &
-                        A_diag => A%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_diag => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     if (i_atom /= j_atom) cycle
                     do i = 1, 3
-                        A_diag(i, i) = A_diag(i, i) + d(i_atom)
+                        this_diag(i, i) = this_diag(i, i) + d(i_atom)
                     end do
                 end associate
             end do
@@ -195,31 +175,129 @@ subroutine add_diag_vec_(A, d)
     end if
 end subroutine
 
-subroutine mult_small(A, B)
-    real(dp), intent(inout) :: A(:, :)
-    real(dp), intent(in) :: B(:, :)
+subroutine mat3n3n_mult_cross(this, b, c)
+    class(mat3n3n), intent(inout) :: this
+    real(dp), intent(in) :: b(:)
+    real(dp), intent(in), optional :: c(:)
 
-    integer :: i, i3, j, j3
+    integer :: my_i_atom, my_j_atom
 
-    forall (i = 1:size(B, 1), i3 = 1:3, j = 1:size(B, 1), j3 = 1:3)
-        A((i-1)*3+i3, (j-1)*3+j3) = B(i, j)*A((i-1)*3+i3, (j-1)*3+j3)
-    end forall
+    if (allocated(this%re)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
+                associate ( &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_sub => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    if (present(c)) then
+                        this_sub(:3, :3) = this_sub(:3, :3) * &
+                            (b(i_atom)*c(j_atom)+c(i_atom)*b(j_atom))
+                    else
+                        this_sub(:3, :3) = this_sub(:3, :3)*b(i_atom)*b(j_atom)
+                    end if
+                end associate
+            end do
+        end do
+    end if
+    if (allocated(this%cplx)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
+                associate ( &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_sub => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    if (present(c)) then
+                        this_sub(:3, :3) = this_sub(:3, :3) * &
+                            (b(i_atom)*c(j_atom)+c(i_atom)*b(j_atom))
+                    else
+                        this_sub(:3, :3) = this_sub(:3, :3)*b(i_atom)*b(j_atom)
+                    end if
+                end associate
+            end do
+        end do
+    end if
 end subroutine
 
-function multed_small(A, B)
-    real(dp), intent(in) :: A(:, :)
-    real(dp), intent(in) :: B(:, :)
-    real(dp) :: multed_small(size(A, 1), size(A, 1))
+subroutine mat3n3n_mult_cross_add(this, b)
+    class(mat3n3n), intent(inout) :: this
+    real(dp), intent(in) :: b(:)
 
-    multed_small = A
-    call mult_small(multed_small, B)
-end function
+    integer :: my_i_atom, my_j_atom
 
-function symmetrize(A)
-    real(dp), intent(in) :: A(:, :)
-    real(dp) :: symmetrize(size(A, 1), size(A, 1))
+    if (allocated(this%re)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
+                associate ( &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_sub => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    this_sub(:3, :3) = this_sub(:3, :3)*(b(i_atom)+b(j_atom))
+                end associate
+            end do
+        end do
+    end if
+    if (allocated(this%cplx)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
+                associate ( &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_sub => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    this_sub(:3, :3) = this_sub(:3, :3)*(b(i_atom)+b(j_atom))
+                end associate
+            end do
+        end do
+    end if
+end subroutine
 
-    symmetrize = A + transpose(A)
+subroutine mat3n3n_mult_dsigma(this, sigma, dsigma)
+    class(mat3n3n), intent(inout) :: this
+    real(dp), intent(in) :: sigma(:), dsigma(:)
+
+    integer :: my_i_atom, my_j_atom
+
+    if (allocated(this%re)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
+                associate ( &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_sub => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    this_sub(:3, :3) = this_sub(:3, :3) * &
+                        (sigma(i_atom)*dsigma(i_atom)+sigma(j_atom)*dsigma(j_atom)) / &
+                        sqrt(sigma(i_atom)**2+sigma(j_atom)**2)
+                end associate
+            end do
+        end do
+    end if
+    if (allocated(this%cplx)) then
+        do my_i_atom = 1, size(this%blacs%i_atom)
+            do my_j_atom = 1, size(this%blacs%j_atom)
+                associate ( &
+                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        this_sub => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    this_sub(:3, :3) = this_sub(:3, :3) * &
+                        (sigma(i_atom)*dsigma(i_atom)+sigma(j_atom)*dsigma(j_atom)) / &
+                        sqrt(sigma(i_atom)**2+sigma(j_atom)**2)
+                end associate
+            end do
+        end do
+    end if
+end subroutine
+
+type(mat3n3n) function mat3n3n_multed_cross(this, b, c) result(res)
+    class(mat3n3n), intent(in) :: this
+    real(dp), intent(in) :: b(:), c(:)
+
+    res = this
+    call res%mult_cross(b, c)
 end function
 
 end module

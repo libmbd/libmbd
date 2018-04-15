@@ -11,9 +11,8 @@ use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
 use mbd_linalg, only: &
     invert, diagonalize, sdiagonalize, diagonalized, sdiagonalized, inverted, &
     sinvert
-use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.), diag, &
-    add_diag, repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), &
-    cross_self_add, cross_self_prod
+use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.)
+use mbd_parallel, only: mbd_blacs
 use mbd_defaults
 
 implicit none
@@ -84,13 +83,13 @@ end type mbd_damping
 
 type :: mbd_result
     real(dp) :: energy
-    integer :: i_kpt = 0
     real(dp), allocatable :: k_pts(:, :)
     real(dp), allocatable :: mode_enes(:)
     real(dp), allocatable :: modes(:, :)
     real(dp), allocatable :: rpa_orders(:)
     real(dp), allocatable :: mode_enes_k(:, :)
     complex(dp), allocatable :: modes_k(:, :, :)
+    complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
     real(dp), allocatable :: gradients(:, :)
 end type
@@ -269,11 +268,13 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
     type(mat33) :: Tpp
     complex(dp) :: Tpp_c(3, 3)
-    integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, n_atoms
+    integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
+        n_atoms, my_i_atom, my_j_atom
     logical :: do_ewald
 
     do_ewald = .false.
     n_atoms = sys%siz()
+    call dipmat%init(n_atoms)
     if (present(k_point)) then
         allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
     else
@@ -324,8 +325,10 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         else
             R_cell(:) = 0.d0
         end if
-        do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
+        do my_i_atom = 1, size(dipmat%blacs%i_atom)
+            i_atom = dipmat%blacs%i_atom(my_i_atom)
+            do my_j_atom = 1, size(dipmat%blacs%j_atom)
+                j_atom = dipmat%blacs%j_atom(my_j_atom)
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
@@ -384,8 +387,8 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     Tpp_c = Tpp%val*exp(-cmplx(0.d0, 1.d0, 8)*( &
                         dot_product(k_point, r)))
                 end if
-                i = 3*(i_atom-1)
-                j = 3*(j_atom-1)
+                i = 3*(my_i_atom-1)
+                j = 3*(my_j_atom-1)
                 if (present(k_point)) then
                     associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                         T = T + Tpp_c
@@ -432,9 +435,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     complex(dp) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
-        range_G_vector(3), n_atoms
+        range_G_vector(3), my_i_atom, my_j_atom
 
-    n_atoms = sys%siz()
     rec_unit_cell = 2*pi*inverted(transpose(sys%lattice))
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
@@ -463,8 +465,10 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
-        do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
+        do my_i_atom = 1, size(dipmat%blacs%i_atom)
+            i_atom = dipmat%blacs%i_atom(my_i_atom)
+            do my_j_atom = 1, size(dipmat%blacs%j_atom)
+                j_atom = dipmat%blacs%j_atom(my_j_atom)
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
                 if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
@@ -472,8 +476,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
                 else
                     Tpp = k_prefactor*cos(dot_product(G_vector, r))
                 end if
-                i = 3*(i_atom-1)
-                j = 3*(j_atom-1)
+                i = 3*(my_i_atom-1)
+                j = 3*(my_j_atom-1)
                 if (present(k_point)) then
                     associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                         T = T + Tpp_c
@@ -486,18 +490,18 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
             end do ! j_atom
         end do ! i_atom
     end do ! i_G_vector
-    call add_diag(dipmat, -4*alpha**3/(3*sqrt(pi))) ! self energy
+    call dipmat%add_diag_scalar(-4*alpha**3/(3*sqrt(pi))) ! self energy
     do_surface = .true.
     if (present(k_point)) then
         k_sq = sum(k_point**2)
         if (sqrt(k_sq) > 1.d-15) then
             do_surface = .false.
-            do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
+            do my_i_atom = 1, size(dipmat%blacs%i_atom)
+            do my_j_atom = 1, size(dipmat%blacs%j_atom)
                 do i_xyz = 1, 3
                 do j_xyz = 1, 3
-                    i = 3*(i_atom-1)+i_xyz
-                    j = 3*(j_atom-1)+j_xyz
+                    i = 3*(my_i_atom-1)+i_xyz
+                    j = 3*(my_j_atom-1)+j_xyz
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
                         *exp(-k_sq/(4*alpha**2))
                     if (present(k_point)) then
@@ -512,11 +516,11 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if ! k_sq >
     end if ! k_point present
     if (do_surface) then ! surface energy
-        do i_atom = 1, n_atoms
-        do j_atom = 1, n_atoms
+        do my_i_atom = 1, size(dipmat%blacs%i_atom)
+        do my_j_atom = 1, size(dipmat%blacs%j_atom)
             do i_xyz = 1, 3
-                i = 3*(i_atom-1)+i_xyz
-                j = 3*(j_atom-1)+i_xyz
+                i = 3*(my_i_atom-1)+i_xyz
+                j = 3*(my_j_atom-1)+i_xyz
                 if (present(k_point)) then
                     dipmat%cplx(i, j) = dipmat%cplx(i, j) + 4*pi/(3*volume)
                 else
@@ -645,57 +649,59 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_damping), intent(in) :: damp
     type(vecn) :: alpha_scs
 
-    type(mat3n3n) :: alpha_full, T
-    integer :: n_atoms, i_xyz, i_atom
+    type(mat3n3n) :: alpha_full, dQ_add, dQ
+    integer :: n_atoms, i_xyz, i_atom, my_i_atom, my_j_atom
     type(mbd_damping) :: damp_local
 
     n_atoms = sys%siz()
     damp_local = damp
     damp_local%sigma = get_sigma_selfint(alpha)
-    T = dipole_matrix(sys, damp_local)
-    if (sys%do_gradients) then
-        alpha_full = T
-    else
-        call move_alloc(T%re, alpha_full%re)
-    end if
-    call add_diag(alpha_full, repeatn(1.d0/alpha%val, 3))
+    alpha_full = dipole_matrix(sys, damp_local)
+    call alpha_full%add_diag(1.d0/alpha%val)
     call ts(sys%calc, 32)
     call sinvert(alpha_full%re, sys%calc%exc)
     if (has_exc(sys)) return
     call ts(sys%calc, -32)
-    alpha_scs%val = contract_polarizability(alpha_full%re)
+    alpha_scs%val = contract_polarizability(alpha_full)
     if (.not. sys%do_gradients) return
+    dQ = alpha_full
+    dQ_add%blacs = alpha_full%blacs
     allocate (alpha_scs%dr(n_atoms, n_atoms, 3))
     do i_atom = 1, n_atoms
-        associate (i => (i_atom-1)*3)
-            do i_xyz = 1, 3
-                T%re(:, :) = 0.d0
-                T%re(i+1:i+3, :) = T%re_dr(i+1:i+3, :, i_xyz)
-                T%re(:, i+1:i+3) = -T%re_dr(:, i+1:i+3, i_xyz)
-                if (allocated(alpha%dr)) then
-                    call add_diag( &
-                        T, &
-                        repeatn(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2, 3) &
-                    )
+        do i_xyz = 1, 3
+            dQ%re(:, :) = 0.d0
+            do my_i_atom = 1, size(dQ%blacs%i_atom)
+                if (i_atom == dQ%blacs%i_atom(my_i_atom)) then
+                    associate (i => (my_i_atom-1)*3)
+                        dQ%re(i+1:i+3, :) = dQ%re_dr(i+1:i+3, :, i_xyz)
+                    end associate
                 end if
-                if (allocated(damp%sigma%dr)) then
-                    T%re(:, :) = T%re(:, :) + multed_small( &
-                        T%re_dsigma, &
-                        cross_self_add( &
-                            damp%sigma%val*damp%sigma%dr(:, i_atom, i_xyz) &
-                        )/sqrt(cross_self_add(damp%sigma%val**2)) &
-                    )
-                end if
-                if (allocated(damp%r_vdw%dr)) then
-                    T%re(:, :) = T%re(:, :) + multed_small( &
-                        T%re_dvdw, &
-                        cross_self_add(damp%r_vdw%dr(:, i_atom, i_xyz)) &
-                    )
-                end if
-                T%re = -matmul(alpha_full%re, matmul(T%re, alpha_full%re))
-                alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T%re)
             end do
-        end associate
+            do my_j_atom = 1, size(dQ%blacs%j_atom)
+                if (i_atom == dQ%blacs%j_atom(my_j_atom)) then
+                    associate (j => (my_j_atom-1)*3)
+                        dQ%re(:, j+1:j+3) = -dQ%re_dr(:, j+1:j+3, i_xyz)
+                    end associate
+                end if
+            end do
+            if (allocated(alpha%dr)) then
+                call dQ%add_diag(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2)
+            end if
+            if (allocated(damp%sigma%dr)) then
+                dQ_add%re = dQ%re_dsigma
+                call dQ_add%mult_dsigma( &
+                    damp%sigma%val, damp%sigma%dr(:, i_atom, i_xyz) &
+                )
+                call dQ%add(dQ_add)
+            end if
+            if (allocated(damp%r_vdw%dr)) then
+                dQ_add%re = dQ%re_dvdw
+                call dQ_add%mult_cross_add(damp%r_vdw%dr(:, i_atom, i_xyz))
+                call dQ%add(dQ_add)
+            end if
+            dQ%re = -matmul(alpha_full%re, matmul(dQ%re, alpha_full%re))
+            alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(dQ)
+        end do
     end do
 end function run_scs
 
@@ -792,14 +798,15 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
 end function get_supercell_mbd_energy
 
 
-type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
-        result(ene)
+type(mbd_result) function get_single_mbd_energy( &
+        sys, alpha_0, C6, damp, k_point) result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha_0
     type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
+    real(dp), intent(in), optional :: k_point(3)
 
-    type(mat3n3n) :: relay, dQ, T
+    type(mat3n3n) :: relay, dQ, T, dQ_add
     real(dp), allocatable :: eigs(:)
     type(vecn) :: omega
     integer :: i_xyz, i, i_atom
@@ -812,28 +819,39 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
 
     n_atoms = sys%siz()
     allocate (eigs(3*n_atoms))
-    T = dipole_matrix(sys, damp)
+    T = dipole_matrix(sys, damp, k_point)
     if (do_impl_deriv) then
         relay = T
     else
-        call move_alloc(T%re, relay%re)
+        if (present(k_point)) then
+            call move_alloc(T%cplx, relay%cplx)
+        else
+            call move_alloc(T%re, relay%re)
+        end if
+        relay%blacs = T%blacs
     end if
     omega = omega_eff(C6, alpha_0)
-    call mult_small( &
-        relay%re, &
-        omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val) &
-    )
-    call add_diag(relay, repeatn(omega%val**2, 3))
+    call relay%mult_cross(omega%val*sqrt(alpha_0%val))
+    call relay%add_diag(omega%val**2)
     call ts(sys%calc, 21)
-    if (sys%get_modes .or. sys%do_gradients) then
-        call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
+    if (present(k_point)) then
         if (sys%get_modes) then
-            call move_alloc(relay%re, ene%modes)
+            call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
+            call move_alloc(relay%cplx, ene%modes_k_single)
         else
-            call move_alloc(relay%re, modes)
+            call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
         end if
     else
-        call sdiagonalize('N', relay%re, eigs, sys%calc%exc)
+        if (sys%get_modes .or. sys%do_gradients) then
+            call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
+            if (sys%get_modes) then
+                call move_alloc(relay%re, ene%modes)
+            else
+                call move_alloc(relay%re, modes)
+            end if
+        else
+            call sdiagonalize('N', relay%re, eigs, sys%calc%exc)
+        end if
     end if
     if (has_exc(sys)) return
     call ts(sys%calc, -21)
@@ -855,39 +873,36 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
         c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*modes(:, i)
     end forall
     c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
+    dQ%blacs = T%blacs
     do i_xyz = 1, 3
         dQ%re = -T%re_dr(:, :, i_xyz)
-        call mult_small( &
-            dQ%re, &
-            omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val) &
-        )
-        ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(c_lambda12i_c*dQ%re)
+        call dQ%mult_cross(omega%val*sqrt(alpha_0%val))
+        dQ%re = c_lambda12i_c*dQ%re
+        ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(dQ)
     end do
     if (.not. do_impl_deriv) return
+    dQ_add%blacs = T%blacs
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             dQ%re(:, :) = 0.d0
             if (allocated(omega%dr)) then
-                dQ%re(:, :) = dQ%re(:, :) + &
-                    2*diag(repeatn(omega%val*omega%dr(:, i_atom, i_xyz), 3)) + &
-                    multed_small(T%re, symmetrize( &
-                        omega%val*sqrt(alpha_0%val) .cprod. &
-                        omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val) &
-                    ))
+                call dQ%add_diag(2*omega%val*omega%dr(:, i_atom, i_xyz))
+                call dQ%add(T%multed_cross( &
+                    omega%val*sqrt(alpha_0%val), &
+                    omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val) &
+                ))
             end if
             if (allocated(alpha_0%dr)) then
-                dQ%re(:, :) = dQ%re(:, :) + multed_small(T%re, symmetrize( &
-                    omega%val*sqrt(alpha_0%val) .cprod. &
-                    omega%val*alpha_0%dr(:, i_atom, i_xyz) / &
-                    sqrt(alpha_0%val) &
-                )/2)
+                call dQ%add(T%multed_cross( &
+                    omega%val*sqrt(alpha_0%val), &
+                    omega%val*alpha_0%dr(:, i_atom, i_xyz)/(2*sqrt(alpha_0%val)) &
+                ))
             end if
             if (allocated(damp%r_vdw%dr)) then
-                dQ%re(:, :) = dQ%re(:, :) + multed_small( &
-                    T%re_dvdw, &
-                    cross_self_add(damp%r_vdw%dr(:, i_atom, i_xyz)) * &
-                    cross_self_prod(omega%val*sqrt(alpha_0%val)) &
-                )
+                dQ_add%re = T%re_dvdw
+                call dQ_add%mult_cross_add(damp%r_vdw%dr(:, i_atom, i_xyz))
+                call dQ_add%mult_cross(omega%val*sqrt(alpha_0%val))
+                call dQ%add(dQ_add)
             end if
             ene%gradients(i_atom, i_xyz) = ene%gradients(i_atom, i_xyz) + &
                 1.d0/4*sum(c_lambda12i_c*dQ%re)
@@ -910,6 +925,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
     integer :: i_kpt, n_kpts, n_atoms
     real(dp) :: k_point(3)
     type(vecn), allocatable :: alpha_ts(:)
+    type(mbd_result) :: ene_k
 
     n_atoms = sys%siz()
     ene%k_pts = make_k_grid(make_g_grid( &
@@ -929,73 +945,22 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
         ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0.d0 &
     )
     do i_kpt = 1, n_kpts
-        ene%i_kpt = i_kpt
         k_point = ene%k_pts(:, i_kpt)
         if (do_rpa) then
-            call get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp, ene)
+            ene_k = get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp)
+            if (sys%get_rpa_orders) then
+                ene%rpa_orders_k(:, i_kpt) = ene_k%rpa_orders
+            end if
         else
-            call get_single_reciprocal_mbd_ene( &
-                sys, alpha_0, C6, k_point, damp, ene &
-            )
+            ene_k = get_single_mbd_energy(sys, alpha_0, C6, damp, k_point)
+            if (sys%get_eigs) ene%mode_enes_k(:, i_kpt) = ene_k%mode_enes
+            if (sys%get_modes) ene%modes_k(:, :, i_kpt) = ene_k%modes_k_single
         end if
+        ene%energy = ene%energy + ene_k%energy
     end do ! k_point loop
     ene%energy = ene%energy/size(ene%k_pts, 2)
     if (sys%get_rpa_orders) ene%rpa_orders = ene%rpa_orders/n_kpts
 end function get_reciprocal_mbd_energy
-
-
-subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
-    type(mbd_system), intent(inout) :: sys
-    type(vecn), intent(in) :: alpha_0
-    type(vecn), intent(in) :: C6
-    real(dp), intent(in) :: k_point(3)
-    type(mbd_damping), intent(in) :: damp
-    type(mbd_result), intent(inout) :: ene
-
-    type(mat3n3n) :: relay
-    real(dp), allocatable :: eigs(:)
-    type(vecn) :: omega
-    integer :: i_atom, j_atom, i, j
-    integer :: n_negative_eigs, n_atoms
-
-    n_atoms = sys%siz()
-    allocate (eigs(3*sys%siz()))
-    omega = omega_eff(C6, alpha_0)
-    ! relay = T
-    relay = dipole_matrix(sys, damp, k_point)
-    do i_atom = 1, sys%siz()
-        do j_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            j = 3*(j_atom-1)
-            relay%cplx(i+1:i+3, j+1:j+3) = & ! relay = sqrt(a*a)*w*w*T
-                omega%val(i_atom)*omega%val(j_atom) &
-                *sqrt(alpha_0%val(i_atom)*alpha_0%val(j_atom))* &
-                relay%cplx(i+1:i+3, j+1:j+3)
-        end do
-    end do
-    ! relay = w^2+sqrt(a*a)*w*w*T
-    call add_diag(relay, repeatn(omega%val**2, 3))
-    call ts(sys%calc, 22)
-    if (sys%get_modes) then
-        call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
-        ene%modes_k(:, :, ene%i_kpt) = relay%cplx
-    else
-        call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
-    end if
-    if (has_exc(sys)) return
-    call ts(sys%calc, -22)
-    if (sys%get_eigs) then
-        ene%mode_enes_k(:, ene%i_kpt) = sqrt(eigs)
-        where (eigs < 0) ene%mode_enes = 0.d0
-    end if
-    n_negative_eigs = count(eigs(:) < 0)
-    if (n_negative_eigs > 0) then
-        sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
-            trim(tostr(n_negative_eigs)) // " negative eigenvalues"
-        if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
-    end if
-    ene%energy = ene%energy + 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
-end subroutine get_single_reciprocal_mbd_ene
 
 
 type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
@@ -1005,7 +970,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 
     type(mat3n3n) :: relay, AT
     complex(dp), allocatable :: eigs(:)
-    integer :: i_atom, i_grid_omega, i
+    integer :: i_grid_omega, i, my_i_atom
     integer :: n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
 
@@ -1016,20 +981,19 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
-        do i_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            relay%re(i+1:i+3, :i) = &
-                alpha(i_grid_omega)%val(i_atom)*transpose(relay%re(:i, i+1:i+3))
-        end do
-        do i_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            relay%re(i+1:i+3, i+1:) = &
-                alpha(i_grid_omega)%val(i_atom)*relay%re(i+1:i+3, i+1:)
+        do my_i_atom = 1, size(relay%blacs%i_atom)
+            associate ( &
+                    i_atom => relay%blacs%i_atom(my_i_atom), &
+                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :) &
+            )
+                relay_sub(:3, :) = relay_sub(:3, :) * &
+                    alpha(i_grid_omega)%val(i_atom)
+            end associate
         end do
         ! relay = alpha*T
         if (sys%get_rpa_orders) AT = relay
         ! relay = 1+alpha*T
-        call add_diag(relay, 1.d0)
+        call relay%add_diag_scalar(1.d0)
         call ts(sys%calc, 23)
         call diagonalize('N', relay%re, eigs, sys%calc%exc)
         call ts(sys%calc, -23)
@@ -1063,21 +1027,20 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 end function get_single_rpa_energy
 
 
-subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
+type(mbd_result) function get_single_reciprocal_rpa_ene( &
+        sys, alpha, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha(0:)
     real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
-    type(mbd_result), intent(inout) :: ene
 
     type(mat3n3n) :: relay, AT
     complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
-    real(dp) :: ene_k
 
-    ene_k = 0d0
+    ene%energy = 0d0
     damp_alpha = damp
     allocate (eigs(3*sys%siz()))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
@@ -1113,7 +1076,7 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
             sys%calc%info%neg_eig = "1+AT matrix has " // &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         end if
-        ene_k = ene_k + &
+        ene%energy = ene%energy + &
             1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 26)
@@ -1121,50 +1084,49 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
             if (has_exc(sys)) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
-                associate (ene_order => ene%rpa_orders_k(n_order, ene%i_kpt))
-                    ene_order = ene_order + &
-                        (-1.d0)/(2*pi)*(-1)**n_order * &
-                        dble(sum(eigs**n_order))/n_order * &
-                        sys%calc%omega_grid_w(i_grid_omega)
-                end associate
+                ene%rpa_orders(n_order) = ene%rpa_orders(n_order) + &
+                    (-1.d0)/(2*pi)*(-1)**n_order * &
+                    dble(sum(eigs**n_order))/n_order * &
+                    sys%calc%omega_grid_w(i_grid_omega)
             end do
         end if
     end do
-    ene%energy = ene%energy + ene_k
-end subroutine get_single_reciprocal_rpa_ene
+end function get_single_reciprocal_rpa_ene
 
 
-function contract_polarizability(alpha_3n_3n) result(alpha_n)
-    real(dp), intent(in) :: alpha_3n_3n(:, :)
-    real(dp) :: alpha_n(size(alpha_3n_3n, 1)/3)
+function contract_polarizability(alpha_full) result(alpha)
+    type(mat3n3n), intent(in) :: alpha_full
+    real(dp) :: alpha(alpha_full%blacs%n_atoms)
 
-    integer :: i_atom, i_xyz
+    integer :: i_xyz, my_j_atom
 
-    alpha_n(:) = 0.d0
-    do i_atom = 1, size(alpha_n)
-        associate (A => alpha_n(i_atom))
+    alpha(:) = 0.d0
+    do my_j_atom = 1, size(alpha_full%blacs%j_atom)
+        associate (j_atom => alpha_full%blacs%j_atom(my_j_atom))
             do i_xyz = 1, 3
-                A = A + sum(alpha_3n_3n(i_xyz::3, 3*(i_atom-1)+i_xyz))
+                alpha(j_atom) = alpha(j_atom) + &
+                    sum(alpha_full%re(i_xyz::3, 3*(my_j_atom-1)+i_xyz))
             end do
         end associate
     end do
-    alpha_n = alpha_n/3
+    alpha = alpha/3
 end function contract_polarizability
 
 
-function contract_gradients(relay) result(atomvec)
-    real(dp), intent(in) :: relay(:, :)
-    real(dp) :: atomvec(size(relay, 1)/3)
+function contract_gradients(relay) result(gradient)
+    type(mat3n3n), intent(in) :: relay
+    real(dp) :: gradient(relay%blacs%n_atoms)
 
-    integer :: i_atom
+    integer :: my_j_atom
 
-    atomvec(:) = 0.d0
-    do i_atom = 1, size(atomvec)
-        associate (A => atomvec(i_atom), i => 3*(i_atom-1))
-            A = A + 2*sum(relay(:, i+1:i+3))
+    gradient(:) = 0.d0
+    do my_j_atom = 1, size(relay%blacs%j_atom)
+        associate ( &
+                j_atom => relay%blacs%j_atom(my_j_atom), &
+                relay_sub => relay%re(:, 3*(my_j_atom-1)+1:))
+            gradient(j_atom) = gradient(j_atom) + 2*sum(relay_sub(:, :3))
         end associate
     end do
-    atomvec = atomvec
 end function contract_gradients
 
 

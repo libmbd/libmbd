@@ -14,6 +14,7 @@ use mbd_linalg, only: &
 use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.), diag, &
     add_diag, repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), &
     cross_self_add, cross_self_prod
+use mbd_parallel, only: mbd_blacs
 use mbd_defaults
 
 implicit none
@@ -269,11 +270,13 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
     type(mat33) :: Tpp
     complex(dp) :: Tpp_c(3, 3)
-    integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, n_atoms
+    integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
+        n_atoms, my_i_atom, my_j_atom
     logical :: do_ewald
 
     do_ewald = .false.
     n_atoms = sys%siz()
+    call dipmat%init(n_atoms)
     if (present(k_point)) then
         allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
     else
@@ -324,8 +327,10 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         else
             R_cell(:) = 0.d0
         end if
-        do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
+        do my_i_atom = 1, size(dipmat%blacs%i_atom)
+            i_atom = dipmat%blacs%i_atom(my_i_atom)
+            do my_j_atom = 1, size(dipmat%blacs%j_atom)
+                j_atom = dipmat%blacs%j_atom(my_j_atom)
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
@@ -384,8 +389,8 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     Tpp_c = Tpp%val*exp(-cmplx(0.d0, 1.d0, 8)*( &
                         dot_product(k_point, r)))
                 end if
-                i = 3*(i_atom-1)
-                j = 3*(j_atom-1)
+                i = 3*(my_i_atom-1)
+                j = 3*(my_j_atom-1)
                 if (present(k_point)) then
                     associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                         T = T + Tpp_c
@@ -432,9 +437,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     complex(dp) :: Tpp_c(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
-        range_G_vector(3), n_atoms
+        range_G_vector(3), my_i_atom, my_j_atom
 
-    n_atoms = sys%siz()
     rec_unit_cell = 2*pi*inverted(transpose(sys%lattice))
     volume = abs(dble(product(diagonalized(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
@@ -463,8 +467,10 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
-        do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
+        do my_i_atom = 1, size(dipmat%blacs%i_atom)
+            i_atom = dipmat%blacs%i_atom(my_i_atom)
+            do my_j_atom = 1, size(dipmat%blacs%j_atom)
+                j_atom = dipmat%blacs%j_atom(my_j_atom)
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
                 if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
@@ -472,8 +478,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
                 else
                     Tpp = k_prefactor*cos(dot_product(G_vector, r))
                 end if
-                i = 3*(i_atom-1)
-                j = 3*(j_atom-1)
+                i = 3*(my_i_atom-1)
+                j = 3*(my_j_atom-1)
                 if (present(k_point)) then
                     associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                         T = T + Tpp_c
@@ -492,12 +498,12 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         k_sq = sum(k_point**2)
         if (sqrt(k_sq) > 1.d-15) then
             do_surface = .false.
-            do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
+            do my_i_atom = 1, size(dipmat%blacs%i_atom)
+            do my_j_atom = 1, size(dipmat%blacs%j_atom)
                 do i_xyz = 1, 3
                 do j_xyz = 1, 3
-                    i = 3*(i_atom-1)+i_xyz
-                    j = 3*(j_atom-1)+j_xyz
+                    i = 3*(my_i_atom-1)+i_xyz
+                    j = 3*(my_j_atom-1)+j_xyz
                     elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
                         *exp(-k_sq/(4*alpha**2))
                     if (present(k_point)) then
@@ -512,11 +518,11 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if ! k_sq >
     end if ! k_point present
     if (do_surface) then ! surface energy
-        do i_atom = 1, n_atoms
-        do j_atom = 1, n_atoms
+        do my_i_atom = 1, size(dipmat%blacs%i_atom)
+        do my_j_atom = 1, size(dipmat%blacs%j_atom)
             do i_xyz = 1, 3
-                i = 3*(i_atom-1)+i_xyz
-                j = 3*(j_atom-1)+i_xyz
+                i = 3*(my_i_atom-1)+i_xyz
+                j = 3*(my_j_atom-1)+i_xyz
                 if (present(k_point)) then
                     dipmat%cplx(i, j) = dipmat%cplx(i, j) + 4*pi/(3*volume)
                 else
@@ -657,8 +663,9 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
         alpha_full = T
     else
         call move_alloc(T%re, alpha_full%re)
+        alpha_full%blacs = T%blacs
     end if
-    call add_diag(alpha_full, repeatn(1.d0/alpha%val, 3))
+    call add_diag(alpha_full, 1.d0/alpha%val)
     call ts(sys%calc, 32)
     call sinvert(alpha_full%re, sys%calc%exc)
     if (has_exc(sys)) return
@@ -674,8 +681,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
                 T%re(:, i+1:i+3) = -T%re_dr(:, i+1:i+3, i_xyz)
                 if (allocated(alpha%dr)) then
                     call add_diag( &
-                        T, &
-                        repeatn(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2, 3) &
+                        T, -alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2 &
                     )
                 end if
                 if (allocated(damp%sigma%dr)) then
@@ -817,13 +823,14 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
         relay = T
     else
         call move_alloc(T%re, relay%re)
+        relay%blacs = T%blacs
     end if
     omega = omega_eff(C6, alpha_0)
     call mult_small( &
         relay%re, &
         omega%val*sqrt(alpha_0%val) .cprod. omega%val*sqrt(alpha_0%val) &
     )
-    call add_diag(relay, repeatn(omega%val**2, 3))
+    call add_diag(relay, omega%val**2)
     call ts(sys%calc, 21)
     if (sys%get_modes .or. sys%do_gradients) then
         call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
@@ -855,6 +862,7 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
         c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*modes(:, i)
     end forall
     c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
+    dQ%blacs = T%blacs
     do i_xyz = 1, 3
         dQ%re = -T%re_dr(:, :, i_xyz)
         call mult_small( &
@@ -974,7 +982,7 @@ subroutine get_single_reciprocal_mbd_ene(sys, alpha_0, C6, k_point, damp, ene)
         end do
     end do
     ! relay = w^2+sqrt(a*a)*w*w*T
-    call add_diag(relay, repeatn(omega%val**2, 3))
+    call add_diag(relay, omega%val**2)
     call ts(sys%calc, 22)
     if (sys%get_modes) then
         call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)

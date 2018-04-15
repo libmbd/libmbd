@@ -4,6 +4,7 @@
 module mbd_types
 
 use mbd_common, only: dp
+use mbd_parallel, only: mbd_blacs
 
 implicit none
 
@@ -19,8 +20,10 @@ type :: mat3n3n
     real(dp), allocatable :: re_dr(:, :, :)
     real(dp), allocatable :: re_dvdw(:, :)
     real(dp), allocatable :: re_dsigma(:, :)
+    type(mbd_blacs) :: blacs
     contains
     procedure  :: siz => mat3n3n_siz
+    procedure :: init => mat3n3n_init
 end type
 
 type :: mat33
@@ -87,6 +90,17 @@ integer function mat3n3n_siz(this, ndim)
         mat3n3n_siz = 0
     end if
 end function
+
+subroutine mat3n3n_init(this, n_atoms)
+    class(mat3n3n), intent(inout) :: this
+    integer, intent(in) :: n_atoms
+
+    integer :: i
+
+    this%blacs%i_atom = [(i, i = 1, n_atoms)]
+    this%blacs%j_atom = this%blacs%i_atom
+    this%blacs%n_atoms = n_atoms
+end subroutine
 
 integer function vecn_siz(this)
     class(vecn), intent(in) :: this
@@ -155,23 +169,45 @@ subroutine add_diag_scalar_(A, d)
 
     integer :: i
 
-    call add_diag_vec_(A, [(d, i = 1, A%siz(1))])
+    call add_diag_vec_(A, [(d, i = 1, A%blacs%n_atoms)])
 end subroutine
 
 subroutine add_diag_vec_(A, d)
     type(mat3n3n), intent(inout) :: A
     real(dp), intent(in) :: d(:)
 
-    integer :: i
+    integer :: my_i_atom, my_j_atom, i
 
     if (allocated(A%re)) then
-        do i = 1, size(d)
-            A%re(i, i) = A%re(i, i) + d(i)
+        do my_i_atom = 1, size(A%blacs%i_atom)
+            do my_j_atom = 1, size(A%blacs%j_atom)
+                associate ( &
+                        i_atom => A%blacs%i_atom(my_i_atom), &
+                        j_atom => A%blacs%j_atom(my_j_atom), &
+                        A_diag => A%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    if (i_atom /= j_atom) cycle
+                    do i = 1, 3
+                        A_diag(i, i) = A_diag(i, i) + d(i_atom)
+                    end do
+                end associate
+            end do
         end do
     end if
     if (allocated(A%cplx)) then
-        do i = 1, size(d)
-            A%cplx(i, i) = A%cplx(i, i) + d(i)
+        do my_i_atom = 1, size(A%blacs%i_atom)
+            do my_j_atom = 1, size(A%blacs%j_atom)
+                associate ( &
+                        i_atom => A%blacs%i_atom(my_i_atom), &
+                        j_atom => A%blacs%j_atom(my_j_atom), &
+                        A_diag => A%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                )
+                    if (i_atom /= j_atom) cycle
+                    do i = 1, 3
+                        A_diag(i, i) = A_diag(i, i) + d(i_atom)
+                    end do
+                end associate
+            end do
         end do
     end if
 end subroutine

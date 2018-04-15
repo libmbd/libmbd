@@ -83,13 +83,13 @@ end type mbd_damping
 
 type :: mbd_result
     real(dp) :: energy
-    integer :: i_kpt = 0
     real(dp), allocatable :: k_pts(:, :)
     real(dp), allocatable :: mode_enes(:)
     real(dp), allocatable :: modes(:, :)
     real(dp), allocatable :: rpa_orders(:)
     real(dp), allocatable :: mode_enes_k(:, :)
     complex(dp), allocatable :: modes_k(:, :, :)
+    complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
     real(dp), allocatable :: gradients(:, :)
 end type
@@ -720,7 +720,7 @@ type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     is_reciprocal = sys%do_reciprocal
     if (.not. is_crystal) then
         if (.not. do_rpa) then
-            call get_single_mbd_energy(sys, alpha_0, C6, damp, ene)
+            ene = get_single_mbd_energy(sys, alpha_0, C6, damp)
         else
             allocate (alpha(0:ubound(sys%calc%omega_grid, 1)))
             alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6)
@@ -787,8 +787,8 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
         alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, C6_super)
         ene_super = get_single_rpa_energy(sys_super, alpha_ts_super, damp_super)
     else
-        call get_single_mbd_energy( &
-            sys_super, alpha_0_super, C6_super, damp_super, ene_super &
+        ene_super = get_single_mbd_energy( &
+            sys_super, alpha_0_super, C6_super, damp_super &
         )
     end if
     ene%energy = ene_super%energy/n_cells
@@ -798,17 +798,16 @@ type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
 end function get_supercell_mbd_energy
 
 
-subroutine get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
+type(mbd_result) function get_single_mbd_energy( &
+        sys, alpha_0, C6, damp, k_point) result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha_0
     type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
-    type(mbd_result), intent(inout) :: ene
     real(dp), intent(in), optional :: k_point(3)
 
     type(mat3n3n) :: relay, dQ, T, dQ_add
     real(dp), allocatable :: eigs(:)
-    real(dp) :: ene_add
     type(vecn) :: omega
     integer :: i_xyz, i, i_atom
     integer :: n_negative_eigs, n_atoms
@@ -838,7 +837,7 @@ subroutine get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
     if (present(k_point)) then
         if (sys%get_modes) then
             call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
-            ene%modes_k(:, :, ene%i_kpt) = relay%cplx
+            call move_alloc(relay%cplx, ene%modes_k_single)
         else
             call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
         end if
@@ -866,13 +865,7 @@ subroutine get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
             trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
         if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
     end if
-    ene_add = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
-    ! TODO temporary hack, turn this routine into a function
-    if (present(k_point)) then
-        ene%energy = ene%energy + ene_add
-    else
-        ene%energy = ene_add
-    end if
+    ene%energy = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
     if (.not. sys%do_gradients) return
     allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
     allocate (ene%gradients(n_atoms, 3), source=0.d0)
@@ -918,7 +911,7 @@ subroutine get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
     if (allocated(omega%dr)) then
         ene%gradients = ene%gradients - 3.d0/2*sum(omega%dr, 1)
     end if
-end subroutine get_single_mbd_energy
+end function get_single_mbd_energy
 
 
 type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
@@ -932,6 +925,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
     integer :: i_kpt, n_kpts, n_atoms
     real(dp) :: k_point(3)
     type(vecn), allocatable :: alpha_ts(:)
+    type(mbd_result) :: ene_k
 
     n_atoms = sys%siz()
     ene%k_pts = make_k_grid(make_g_grid( &
@@ -951,13 +945,18 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
         ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0.d0 &
     )
     do i_kpt = 1, n_kpts
-        ene%i_kpt = i_kpt
         k_point = ene%k_pts(:, i_kpt)
         if (do_rpa) then
-            call get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp, ene)
+            ene_k = get_single_reciprocal_rpa_ene(sys, alpha_ts, k_point, damp)
+            if (sys%get_rpa_orders) then
+                ene%rpa_orders_k(:, i_kpt) = ene_k%rpa_orders
+            end if
         else
-            call get_single_mbd_energy(sys, alpha_0, C6, damp, ene, k_point)
+            ene_k = get_single_mbd_energy(sys, alpha_0, C6, damp, k_point)
+            if (sys%get_eigs) ene%mode_enes_k(:, i_kpt) = ene_k%mode_enes
+            if (sys%get_modes) ene%modes_k(:, :, i_kpt) = ene_k%modes_k_single
         end if
+        ene%energy = ene%energy + ene_k%energy
     end do ! k_point loop
     ene%energy = ene%energy/size(ene%k_pts, 2)
     if (sys%get_rpa_orders) ene%rpa_orders = ene%rpa_orders/n_kpts
@@ -1028,21 +1027,20 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 end function get_single_rpa_energy
 
 
-subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
+type(mbd_result) function get_single_reciprocal_rpa_ene( &
+        sys, alpha, k_point, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha(0:)
     real(dp), intent(in) :: k_point(3)
     type(mbd_damping), intent(in) :: damp
-    type(mbd_result), intent(inout) :: ene
 
     type(mat3n3n) :: relay, AT
     complex(dp), allocatable :: eigs(:)
     integer :: i_atom, i_grid_omega, i
     integer :: n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
-    real(dp) :: ene_k
 
-    ene_k = 0d0
+    ene%energy = 0d0
     damp_alpha = damp
     allocate (eigs(3*sys%siz()))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
@@ -1078,7 +1076,7 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
             sys%calc%info%neg_eig = "1+AT matrix has " // &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         end if
-        ene_k = ene_k + &
+        ene%energy = ene%energy + &
             1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 26)
@@ -1086,17 +1084,14 @@ subroutine get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp, ene)
             if (has_exc(sys)) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
-                associate (ene_order => ene%rpa_orders_k(n_order, ene%i_kpt))
-                    ene_order = ene_order + &
-                        (-1.d0)/(2*pi)*(-1)**n_order * &
-                        dble(sum(eigs**n_order))/n_order * &
-                        sys%calc%omega_grid_w(i_grid_omega)
-                end associate
+                ene%rpa_orders(n_order) = ene%rpa_orders(n_order) + &
+                    (-1.d0)/(2*pi)*(-1)**n_order * &
+                    dble(sum(eigs**n_order))/n_order * &
+                    sys%calc%omega_grid_w(i_grid_omega)
             end do
         end if
     end do
-    ene%energy = ene%energy + ene_k
-end subroutine get_single_reciprocal_rpa_ene
+end function get_single_reciprocal_rpa_ene
 
 
 function contract_polarizability(alpha_full) result(alpha)

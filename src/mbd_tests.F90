@@ -236,7 +236,7 @@ subroutine test_mbd_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
     C6 = [65d0, 65d0, 65d0]
-    call get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp, ene(0))
+    ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_gradients = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
@@ -244,9 +244,7 @@ subroutine test_mbd_deriv_expl()
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                call get_single_mbd_energy( &
-                    sys, vecn(alpha_0), vecn(C6), damp, ene(i_step) &
-                )
+                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
@@ -440,7 +438,7 @@ subroutine test_mbd_deriv_impl_alpha()
     allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
     damp%beta = 0.83d0
     C6 = [65d0, 65d0, 65d0]
-    call get_single_mbd_energy(sys, alpha_0, vecn(C6), damp, ene(0))
+    ene(0) = get_single_mbd_energy(sys, alpha_0, vecn(C6), damp)
     sys%do_gradients = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
@@ -449,9 +447,7 @@ subroutine test_mbd_deriv_impl_alpha()
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
-                call get_single_mbd_energy( &
-                    sys, vecn(alpha_0_diff), vecn(C6), damp, ene(i_step) &
-                )
+                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
             end do
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
@@ -490,7 +486,7 @@ subroutine test_mbd_deriv_impl_C6()
     alpha_0 = [11.d0, 11.d0, 11.d0]
     C6%val = [65d0, 65d0, 65d0]
     allocate (C6%dr(n_atoms, n_atoms, 3), source=0.2d0)
-    call get_single_mbd_energy(sys, vecn(alpha_0), C6, damp, ene(0))
+    ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), C6, damp)
     sys%do_gradients = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
@@ -499,9 +495,7 @@ subroutine test_mbd_deriv_impl_C6()
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
-                call get_single_mbd_energy( &
-                    sys, vecn(alpha_0), vecn(C6_diff), damp, ene(i_step) &
-                )
+                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
             end do
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
@@ -541,7 +535,7 @@ subroutine test_mbd_deriv_impl_vdw()
     damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
     C6 = [65d0, 65d0, 65d0]
-    call get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp, ene(0))
+    ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_gradients = .false.
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
@@ -550,9 +544,7 @@ subroutine test_mbd_deriv_impl_vdw()
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
                 damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
-                call get_single_mbd_energy( &
-                    sys, vecn(alpha_0), vecn(C6), damp, ene(i_step) &
-                )
+                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
             end do
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do

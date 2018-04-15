@@ -6,7 +6,6 @@
 #endif
 module mbd
 
-use mbd_mpi, only: sync_sum, broadcast, MPI_COMM_WORLD
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
 use mbd_linalg, only: &
     invert, diagonalize, sdiagonalize, diagonalized, sdiagonalized, inverted, &
@@ -63,7 +62,7 @@ type :: mbd_calc
     type(mbd_timing) :: tm
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
-    integer :: comm = MPI_COMM_WORLD
+    integer :: comm = -1
     type(exception) :: exc
     type(mbd_info) :: info
 end type mbd_calc

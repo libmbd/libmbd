@@ -18,7 +18,7 @@ set(SRCS
     # src/mbd_math.f90
     # src/mbd_density.f90
     # src/mbd_repulsion.f90
-    src/mbd_mpi.f90
+    # src/mbd_mpi.f90
     src/mbd_common.f90
     src/mbd_linalg.f90
     src/mbd_types.f90

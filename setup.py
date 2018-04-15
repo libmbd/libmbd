@@ -9,6 +9,7 @@ library_dirs = ['build'] if os.path.exists('build') else []
 sources = [
     'src/mbd_common.f90',
     'src/mbd_defaults.f90',
+    'src/mbd_parallel.f90',
     'src/mbd_types.f90',
     'src/mbd_linalg.f90',
     'src/mbd.F90',

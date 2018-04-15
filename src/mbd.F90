@@ -11,8 +11,8 @@ use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
 use mbd_linalg, only: &
     invert, diagonalize, sdiagonalize, diagonalized, sdiagonalized, inverted, &
     sinvert
-use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.), diag, &
-    add_diag, repeatn, symmetrize, mult_small, multed_small, operator(.cadd.), &
+use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.), &
+    add_diag, symmetrize, mult_small, multed_small, &
     cross_self_add, cross_self_prod
 use mbd_parallel, only: mbd_blacs
 use mbd_defaults
@@ -876,12 +876,11 @@ type(mbd_result) function get_single_mbd_energy(sys, alpha_0, C6, damp) &
         do i_xyz = 1, 3
             dQ%re(:, :) = 0.d0
             if (allocated(omega%dr)) then
-                dQ%re(:, :) = dQ%re(:, :) + &
-                    2*diag(repeatn(omega%val*omega%dr(:, i_atom, i_xyz), 3)) + &
-                    multed_small(T%re, symmetrize( &
-                        omega%val*sqrt(alpha_0%val) .cprod. &
-                        omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val) &
-                    ))
+                call add_diag(dQ, 2*omega%val*omega%dr(:, i_atom, i_xyz))
+                dQ%re(:, :) = dQ%re(:, :) + multed_small(T%re, symmetrize( &
+                    omega%val*sqrt(alpha_0%val) .cprod. &
+                    omega%dr(:, i_atom, i_xyz)*sqrt(alpha_0%val) &
+                ))
             end if
             if (allocated(alpha_0%dr)) then
                 dQ%re(:, :) = dQ%re(:, :) + multed_small(T%re, symmetrize( &

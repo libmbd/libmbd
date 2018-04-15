@@ -10,9 +10,8 @@ implicit none
 
 private
 public :: mat3n3n, mat33, vecn, scalar
-public :: eye, diag, operator(.cprod.), add_diag, repeatn, &
-    symmetrize, mult_small, multed_small, operator(.cadd.), cross_self_add, &
-    cross_self_prod
+public :: operator(.cprod.), add_diag, symmetrize, mult_small, multed_small, &
+    cross_self_add, cross_self_prod
 
 type :: mat3n3n
     real(dp), allocatable :: re(:, :)
@@ -57,12 +56,6 @@ end interface
 
 interface operator(.cadd.)
     module procedure cart_add_
-end interface
-
-interface diag
-    module procedure get_diag_
-    module procedure get_diag_cmplx_
-    module procedure make_diag_
 end interface
 
 interface add_diag
@@ -110,16 +103,6 @@ integer function vecn_siz(this)
     else
         vecn_siz = 0
     end if
-end function
-
-function eye(n) result(A)
-    integer, intent(in) :: n
-    real(dp) :: A(n, n)
-
-    integer :: i
-
-    A(:, :) = 0.d0
-    forall (i = 1:n) A(i, i) = 1.d0
 end function
 
 function cart_prod_(a, b) result(c)
@@ -230,48 +213,6 @@ function multed_small(A, B)
 
     multed_small = A
     call mult_small(multed_small, B)
-end function
-
-
-function repeatn(x, n)
-    real(dp), intent(in) :: x(:)
-    integer, intent(in) :: n
-    real(dp) :: repeatn(n*size(x))
-
-    integer :: i, j
-
-    repeatn = [([(x(i), j = 1, n)], i = 1, size(x))]
-end function
-
-
-function get_diag_(A) result(d)
-    real(dp), intent(in) :: A(:, :)
-    real(dp) :: d(size(A, 1))
-
-    integer :: i
-
-    forall (i = 1:size(A, 1)) d(i) = A(i, i)
-end function
-
-
-function get_diag_cmplx_(A) result(d)
-    complex(dp), intent(in) :: A(:, :)
-    complex(dp) :: d(size(A, 1))
-
-    integer :: i
-
-    forall (i = 1:size(A, 1)) d(i) = A(i, i)
-end function
-
-
-function make_diag_(d) result(A)
-    real(dp), intent(in) :: d(:)
-    real(dp) :: A(size(d), size(d))
-
-    integer :: i
-
-    A(:, :) = 0.d0
-    forall (i = 1:size(d)) A(i, i) = d(i)
 end function
 
 function symmetrize(A)

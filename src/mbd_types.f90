@@ -296,7 +296,10 @@ type(mat3n3n) function mat3n3n_multed_cross(this, b, c) result(res)
     class(mat3n3n), intent(in) :: this
     real(dp), intent(in) :: b(:), c(:)
 
-    res = this
+    ! expanded res = this assignment because of compiler bug in gfortran 4.9
+    if (allocated(this%re)) res%re = this%re
+    if (allocated(this%cplx)) res%cplx = this%cplx
+    res%blacs = this%blacs
     call res%mult_cross(b, c)
 end function
 

@@ -649,20 +649,14 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_damping), intent(in) :: damp
     type(vecn) :: alpha_scs
 
-    type(mat3n3n) :: alpha_full, T, dQ_add
-    integer :: n_atoms, i_xyz, i_atom
+    type(mat3n3n) :: alpha_full, dQ_add, dQ
+    integer :: n_atoms, i_xyz, i_atom, my_i_atom, my_j_atom
     type(mbd_damping) :: damp_local
 
     n_atoms = sys%siz()
     damp_local = damp
     damp_local%sigma = get_sigma_selfint(alpha)
-    T = dipole_matrix(sys, damp_local)
-    if (sys%do_gradients) then
-        alpha_full = T
-    else
-        call move_alloc(T%re, alpha_full%re)
-        alpha_full%blacs = T%blacs
-    end if
+    alpha_full = dipole_matrix(sys, damp_local)
     call alpha_full%add_diag(1.d0/alpha%val)
     call ts(sys%calc, 32)
     call sinvert(alpha_full%re, sys%calc%exc)
@@ -670,33 +664,44 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     call ts(sys%calc, -32)
     alpha_scs%val = contract_polarizability(alpha_full)
     if (.not. sys%do_gradients) return
-    dQ_add%blacs = T%blacs
+    dQ = alpha_full
+    dQ_add%blacs = alpha_full%blacs
     allocate (alpha_scs%dr(n_atoms, n_atoms, 3))
     do i_atom = 1, n_atoms
-        associate (i => (i_atom-1)*3)
-            do i_xyz = 1, 3
-                T%re(:, :) = 0.d0
-                T%re(i+1:i+3, :) = T%re_dr(i+1:i+3, :, i_xyz)
-                T%re(:, i+1:i+3) = -T%re_dr(:, i+1:i+3, i_xyz)
-                if (allocated(alpha%dr)) then
-                    call T%add_diag(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2)
+        do i_xyz = 1, 3
+            dQ%re(:, :) = 0.d0
+            do my_i_atom = 1, size(dQ%blacs%i_atom)
+                if (i_atom == dQ%blacs%i_atom(my_i_atom)) then
+                    associate (i => (my_i_atom-1)*3)
+                        dQ%re(i+1:i+3, :) = dQ%re_dr(i+1:i+3, :, i_xyz)
+                    end associate
                 end if
-                if (allocated(damp%sigma%dr)) then
-                    dQ_add%re = T%re_dsigma
-                    call dQ_add%mult_dsigma( &
-                        damp%sigma%val, damp%sigma%dr(:, i_atom, i_xyz) &
-                    )
-                    call T%add(dQ_add)
-                end if
-                if (allocated(damp%r_vdw%dr)) then
-                    dQ_add%re = T%re_dvdw
-                    call dQ_add%mult_cross_add(damp%r_vdw%dr(:, i_atom, i_xyz))
-                    call T%add(dQ_add)
-                end if
-                T%re = -matmul(alpha_full%re, matmul(T%re, alpha_full%re))
-                alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(T)
             end do
-        end associate
+            do my_j_atom = 1, size(dQ%blacs%j_atom)
+                if (i_atom == dQ%blacs%j_atom(my_j_atom)) then
+                    associate (j => (my_j_atom-1)*3)
+                        dQ%re(:, j+1:j+3) = -dQ%re_dr(:, j+1:j+3, i_xyz)
+                    end associate
+                end if
+            end do
+            if (allocated(alpha%dr)) then
+                call dQ%add_diag(-alpha%dr(:, i_atom, i_xyz)/alpha%val(:)**2)
+            end if
+            if (allocated(damp%sigma%dr)) then
+                dQ_add%re = dQ%re_dsigma
+                call dQ_add%mult_dsigma( &
+                    damp%sigma%val, damp%sigma%dr(:, i_atom, i_xyz) &
+                )
+                call dQ%add(dQ_add)
+            end if
+            if (allocated(damp%r_vdw%dr)) then
+                dQ_add%re = dQ%re_dvdw
+                call dQ_add%mult_cross_add(damp%r_vdw%dr(:, i_atom, i_xyz))
+                call dQ%add(dQ_add)
+            end if
+            dQ%re = -matmul(alpha_full%re, matmul(dQ%re, alpha_full%re))
+            alpha_scs%dr(:, i_atom, i_xyz) = contract_polarizability(dQ)
+        end do
     end do
 end function run_scs
 

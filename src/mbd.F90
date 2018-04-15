@@ -1006,7 +1006,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
 
     type(mat3n3n) :: relay, AT
     complex(dp), allocatable :: eigs(:)
-    integer :: i_atom, i_grid_omega, i
+    integer :: i_grid_omega, i, my_i_atom
     integer :: n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
 
@@ -1017,15 +1017,14 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         damp_alpha%sigma = get_sigma_selfint(alpha(i_grid_omega))
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha)
-        do i_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            relay%re(i+1:i+3, :i) = &
-                alpha(i_grid_omega)%val(i_atom)*transpose(relay%re(:i, i+1:i+3))
-        end do
-        do i_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            relay%re(i+1:i+3, i+1:) = &
-                alpha(i_grid_omega)%val(i_atom)*relay%re(i+1:i+3, i+1:)
+        do my_i_atom = 1, size(relay%blacs%i_atom)
+            associate ( &
+                    i_atom => relay%blacs%i_atom(my_i_atom), &
+                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :) &
+            )
+                relay_sub(:3, :) = relay_sub(:3, :) * &
+                    alpha(i_grid_omega)%val(i_atom)
+            end associate
         end do
         ! relay = alpha*T
         if (sys%get_rpa_orders) AT = relay

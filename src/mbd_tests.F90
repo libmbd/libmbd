@@ -236,6 +236,7 @@ subroutine test_mbd_deriv_expl()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
@@ -254,6 +255,7 @@ subroutine test_mbd_deriv_expl()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 1d-9)) then
         call print_matrix('delta gradients', diff)
@@ -281,6 +283,7 @@ subroutine test_scs_deriv_expl()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip,gg'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
@@ -301,6 +304,7 @@ subroutine test_scs_deriv_expl()
             end do
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-alpha_scs(0)%dr)/gradients
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('diff x', diff(:, :, 1))
@@ -331,6 +335,7 @@ subroutine test_scs_deriv_impl_alpha
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip,gg'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
@@ -353,6 +358,7 @@ subroutine test_scs_deriv_impl_alpha
             end do
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-alpha_scs(0)%dr)/gradients
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff x', diff(:, :, 1))
@@ -383,6 +389,7 @@ subroutine test_scs_deriv_impl_vdw
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip,gg'
     rvdw = [3.55d0, 3.55d0, 3.55d0]
     damp%r_vdw%val = rvdw
@@ -406,6 +413,7 @@ subroutine test_scs_deriv_impl_vdw
             end do
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-alpha_scs(0)%dr)/gradients
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff x', diff(:, :, 1))
@@ -437,6 +445,7 @@ subroutine test_mbd_deriv_impl_alpha()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     alpha_0%val= [11.d0, 11.d0, 11.d0]
@@ -457,6 +466,7 @@ subroutine test_mbd_deriv_impl_alpha()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
@@ -485,6 +495,7 @@ subroutine test_mbd_deriv_impl_C6()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
@@ -505,6 +516,7 @@ subroutine test_mbd_deriv_impl_C6()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', diff)
@@ -533,6 +545,7 @@ subroutine test_mbd_deriv_impl_vdw()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     rvdw = [3.55d0, 3.55d0, 3.55d0]
     damp%r_vdw%val = rvdw
@@ -554,6 +567,7 @@ subroutine test_mbd_deriv_impl_vdw()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 1d-9)) then
         call print_matrix('delta gradients', diff)
@@ -582,6 +596,7 @@ subroutine test_mbd_rsscs_deriv_expl()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
     alpha_0 = [11.d0, 11.d0, 11.d0]
@@ -599,6 +614,7 @@ subroutine test_mbd_rsscs_deriv_expl()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
@@ -628,6 +644,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     alpha_0%val= [11.d0, 11.d0, 11.d0]
@@ -648,6 +665,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', diff)
@@ -676,6 +694,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
@@ -696,6 +715,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 2d-7)) then
         call print_matrix('delta gradients', diff)
@@ -724,6 +744,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
+    call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     rvdw = [3.55d0, 3.55d0, 3.55d0]
     damp%r_vdw%val = rvdw
@@ -745,6 +766,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
             gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
         end do
     end do
+    call sys%blacs_grid%destroy()
     diff = (gradients-ene(0)%gradients)/gradients
     if (failed(maxval(abs(diff)), 1d-9)) then
         call print_matrix('delta gradients', diff)

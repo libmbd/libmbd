@@ -77,6 +77,7 @@ type(c_ptr) function mbd_init_system(calc_cp, n_atoms, coords, lattice, k_grid) 
     allocate (sys)
     sys%calc => calc
     sys%coords = coords
+    call sys%blacs_grid%init()
     if (present(lattice)) then
         sys%periodic = .true.
         sys%lattice = lattice
@@ -95,6 +96,7 @@ subroutine mbd_destroy_system(sys_cp) bind(c)
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
+    call sys%blacs_grid%destroy()
     deallocate (sys)
     deallocate (sys_c)
 end subroutine mbd_destroy_system

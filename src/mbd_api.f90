@@ -146,7 +146,9 @@ subroutine mbd_get_energy(calc, energy)
 
     select case (calc%dispersion_type)
     case ('mbd')
+        call calc%sys%blacs_grid%init()
         calc%results = mbd_rsscs_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
+        call calc%sys%blacs_grid%destroy()
         energy = calc%results%energy
     case ('ts')
         energy = get_ts_energy(calc%sys, calc%alpha_0%val, calc%C6%val, calc%damp)

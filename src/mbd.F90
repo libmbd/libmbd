@@ -126,7 +126,6 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(mbd_damping) :: damp_rsscs, damp_mbd
     integer :: n_freq, i_freq
 
-    call sys%blacs_grid%init()
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
     allocate (alpha_dyn_rsscs(0:n_freq))
@@ -141,7 +140,6 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%beta = damp%beta
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0), C6_rsscs, damp_mbd)
-    call sys%blacs_grid%destroy()
 end function mbd_rsscs_energy
 
 
@@ -156,7 +154,6 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(mbd_damping) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq
 
-    call sys%blacs_grid%init()
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
     allocate (alpha_dyn_scs(0:n_freq))
@@ -172,7 +169,6 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
     mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0), C6_scs, damp_mbd)
-    call sys%blacs_grid%destroy()
 end function mbd_scs_energy
 
 

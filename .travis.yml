@@ -1,79 +1,90 @@
 language: generic
 matrix:
   include:
-  - env: WITH_CMAKE=1 PYTHON=python COVERAGE=1
+  - env: PYTHON=python CODECOV=1
     addons: &nompi
       apt:
         packages: &aptnompi
         - gfortran
         - libblas-dev
         - liblapack-dev
-  - env: WITH_PIP=1 PYTHON=python
-    addons: *nompi
-  - env: WITH_CMAKE=1 WITH_MPI4PY=1 PYTHON=python COVERAGE=1
+  - env: PYTHON=python MPI_NODES=1 CODECOV=1
     addons: &mpi
       apt:
         packages:
         - *aptnompi
         - mpi-default-dev
         - mpi-default-bin
-  - env: WITH_PIP=1 WITH_MPI4PY=1 PYTHON=python
-    addons: *mpi
+        - libscalapack-mpi-dev
+  - env: PYTHON=python WITH_PIP=1
+    addons: *nompi
   - os: osx
     env:
-    - WITH_CMAKE=1 WITH_MPI4PY=1 PYTHON=python3
+    - PYTHON=python MPI_NODES=1
+  - os: osx
+    env:
+    - PYTHON=python3 WITH_PIP=1
 before_install:
 - |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     rm -rf /usr/local/include/c++
     brew update
     brew upgrade python
-    brew install gcc mpich
+    brew install gcc python@2
+    if [[ "$MPI_NODES" ]]; then
+      brew install open-mpi scalapack
+    fi
   fi
 install:
 - |
-  if [[ "$WITH_CMAKE" ]]; then
+  if [[ "$WITH_PIP" ]]; then
+    $PYTHON -m pip install --user cffi numpy pytest
+    $PYTHON -m pip install --user .
+  else
+    CMAKE_FLAGS=()
+    if [[ "$CODECOV" ]]; then
+      CMAKE_FLAGS+=(-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage")
+    fi
+    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+      SCALAPACKLIB=-lscalapack
+    else
+      SCALAPACKLIB=-lscalapack-openmpi
+    fi
+    if [[ "$MPI_NODES" ]]; then
+      CMAKE_FLAGS+=(-DSCALAPACK=$SCALAPACKLIB)
+    fi
     mkdir build
     pushd build
-    if [[ "$COVERAGE" ]]; then
-      cmake .. -DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"
-    else
-      cmake ..
-    fi
+    cmake .. "${CMAKE_FLAGS[@]}"
     make
     popd
-    if [[ "$WITH_MPI4PY" ]]; then
+    if [[ "$MPI_NODES" ]]; then
       $PYTHON -m pip install --user -r requirements.txt
     else
       $PYTHON -m pip install --user -r <(grep -v mpi4py requirements.txt)
     fi
-    if [[ "$COVERAGE" ]]; then
+    if [[ "$CODECOV" ]]; then
       $PYTHON -m pip install --user pytest-cov
     fi
     $PYTHON setup.py build_ext -i
   fi
-- |
-  if [[ "$WITH_PIP" ]]; then
-    $PYTHON -m pip install --user cffi numpy pytest
-    [[ "$WITH_MPI4PY" ]] && $PYTHON -m pip install --user mpi4py
-    $PYTHON -m pip install --user .
-  fi
 script:
-- |
-  if [[ "$WITH_CMAKE" ]]; then
-    make -C build check
-    if [[ "$COVERAGE" ]]; then
-      $PYTHON -m pytest --cov=./ -v --durations=3
-      cp build/CMakeFiles/mbd.dir/src/*.f90.gc?? src/
-      bash <(curl -s https://codecov.io/bash) -F pytest
-    else
-      $PYTHON -m pytest -v --durations=3
-    fi
-  fi
 - |
   if [[ "$WITH_PIP" ]]; then
     cd
     $PYTHON -m pytest --pyargs pymbd -v --durations=3
+  else
+    if [[ "$MPI_NODES" ]]; then
+      PREFIX="mpirun -n $MPI_NODES"
+    fi
+    $PREFIX make -C build check
+    if [[ "$CODECOV" ]]; then
+      $PREFIX $PYTHON -m pytest --cov=./ -v --durations=3
+      cp build/CMakeFiles/mbd.dir/src/*.f90.gc?? src/
+      bash <(curl -s https://codecov.io/bash) -F pytest
+    else
+      $PREFIX $PYTHON -m pytest -v --durations=3
+    fi
   fi
 notifications:
   pushover:

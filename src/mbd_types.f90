@@ -5,6 +5,7 @@ module mbd_types
 
 use mbd_common, only: dp
 use mbd_parallel, only: mbd_blacs
+use mbd_parallel_impl, only: init_blacs
 
 implicit none
 
@@ -82,14 +83,10 @@ integer function mat3n3n_siz(this, ndim)
 end function
 
 subroutine mat3n3n_init(this, n_atoms)
-    class(mat3n3n), intent(inout) :: this
+    class(mat3n3n), intent(out) :: this
     integer, intent(in) :: n_atoms
 
-    integer :: i
-
-    this%blacs%i_atom = [(i, i = 1, n_atoms)]
-    this%blacs%j_atom = this%blacs%i_atom
-    this%blacs%n_atoms = n_atoms
+    call init_blacs(this%blacs, n_atoms)
 end subroutine
 
 integer function vecn_siz(this)

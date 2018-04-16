@@ -3,12 +3,23 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_parallel
 
+implicit none
+
+private
+public :: mbd_blacs, mbd_blacs_grid
+
 type :: mbd_blacs
   integer, allocatable :: i_atom(:)
   integer, allocatable :: j_atom(:)
   integer :: n_atoms
 end type
 
-contains
+type :: mbd_blacs_grid
+    integer :: ctx
+    integer :: nprows
+    integer :: npcols
+    integer :: my_prow
+    integer :: my_pcol
+end type
 
 end module

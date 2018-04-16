@@ -44,24 +44,6 @@ def libmbd_exists():
         shutil.rmtree(tmpdir)
 
 
-def setup_mpi():
-    try:
-        import mpi4py
-    except ImportError:
-        return
-    # patch find_executables to insert the MPI compiler before FC or
-    # --f90exec is checked
-    from numpy.distutils.fcompiler import FCompiler
-    from functools import wraps
-    _find_executables = FCompiler.find_executables
-    @wraps(FCompiler.find_executables)  # noqa
-    def find_executables(self):
-        self.executables['compiler_f90'][0] = mpi4py.get_config()['mpif90']
-        return _find_executables(self)
-    FCompiler.find_executables = find_executables
-    kwargs['define_macros'] = [('WITH_MPI', 1)]
-
-
 def update_dict(dct, update):
     for key, val in update.items():
         if key in dct:
@@ -80,7 +62,6 @@ else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info
     kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
-    setup_mpi()
     update_dict(kwargs, get_info('lapack_opt', 2))
 
 

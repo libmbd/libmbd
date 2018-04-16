@@ -30,16 +30,11 @@ add_library(mbd SHARED ${SRCS})
 target_link_libraries(mbd ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
 
 if(MPI_Fortran_FOUND)
-    target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
-    target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
-endif()
-
-if(SCALAPACK)
-    if(NOT MPI_Fortran_FOUND)
-        message(FATAL_ERROR "ScaLAPACK requested but no MPI found")
+    if(NOT SCALAPACK)
+        message(FATAL_ERROR "MPI found, but no ScaLAPACK specified")
     endif()
-    message(STATUS "ScaLAPACK requested")
-    target_link_libraries(mbd ${SCALAPACK})
+    target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES} ${SCALAPACK})
+    target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
     set_property(
         SOURCE src/mbd_parallel.F90
         APPEND PROPERTY COMPILE_DEFINITIONS WITH_SCALAPACK

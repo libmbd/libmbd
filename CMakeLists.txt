@@ -22,25 +22,21 @@ set(SRCS
     src/mbd_common.f90
     src/mbd_linalg.f90
     src/mbd_types.f90
-    src/mbd_defaults.f90)
-if(NOT ${MPI_Fortran_FOUND})
-    list(APPEND SRCS
-        src/mpi_stubs.f90)
-endif()
+    src/mbd_defaults.f90
+)
 
 add_library(mbd SHARED ${SRCS})
 
 target_link_libraries(mbd ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
 
 if(${MPI_Fortran_FOUND})
-    set_source_files_properties(src/mbd_mpi.f90
-        PROPERTIES COMPILE_FLAGS "${MPI_Fortran_COMPILE_FLAGS}")
     target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
 endif()
 
 install(TARGETS mbd
-    LIBRARY DESTINATION lib)
+    LIBRARY DESTINATION lib
+)
 
 enable_testing()
 set(CMAKE_CTEST_COMMAND ctest -V)
@@ -49,7 +45,13 @@ add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
 add_executable(mbd_tests EXCLUDE_FROM_ALL src/mbd_tests.F90)
 target_link_libraries(mbd_tests mbd)
 add_test(mbd_tests mbd_tests)
-add_executable(mbd_api_tests EXCLUDE_FROM_ALL src/mbd_api_tests.f90)
+add_executable(mbd_api_tests EXCLUDE_FROM_ALL src/mbd_api_tests.F90)
 target_link_libraries(mbd_api_tests mbd)
 add_test(mbd_api_tests mbd_api_tests)
+if(${MPI_Fortran_FOUND})
+    set_property(
+        SOURCE src/mbd_tests.F90 src/mbd_api_tests.F90
+        APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI
+    )
+endif()
 add_dependencies(check mbd_tests mbd_api_tests)

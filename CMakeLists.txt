@@ -13,8 +13,7 @@ set(SRCS
     src/mbd_c_api.f90
     src/mbd_api.f90
     src/mbd_vdw_param.f90
-    src/mbd_parallel.f90
-    src/mbd_parallel_serial.f90
+    src/mbd_parallel.F90
     # src/mbd_helper_dev.f90
     # src/mbd_math.f90
     # src/mbd_density.f90

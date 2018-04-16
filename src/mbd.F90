@@ -11,7 +11,7 @@ use mbd_linalg, only: &
     invert, diagonalize, sdiagonalize, diagonalized, sdiagonalized, inverted, &
     sinvert
 use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.)
-use mbd_parallel, only: mbd_blacs
+use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
 use mbd_defaults
 
 implicit none
@@ -107,6 +107,7 @@ type :: mbd_system
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
+    type(mbd_blacs_grid) :: blacs_grid
     contains
     procedure :: siz => system_siz
 end type mbd_system
@@ -125,6 +126,7 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     type(mbd_damping) :: damp_rsscs, damp_mbd
     integer :: n_freq, i_freq
 
+    call sys%blacs_grid%init()
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
     allocate (alpha_dyn_rsscs(0:n_freq))
@@ -139,6 +141,7 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%beta = damp%beta
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0), C6_rsscs, damp_mbd)
+    call sys%blacs_grid%destroy()
 end function mbd_rsscs_energy
 
 
@@ -153,6 +156,7 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     type(mbd_damping) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq
 
+    call sys%blacs_grid%init()
     n_freq = ubound(sys%calc%omega_grid, 1)
     allocate (alpha_dyn(0:n_freq))
     allocate (alpha_dyn_scs(0:n_freq))
@@ -168,6 +172,7 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     damp_mbd%beta = 1.d0
     damp_mbd%a = damp%a
     mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0), C6_scs, damp_mbd)
+    call sys%blacs_grid%destroy()
 end function mbd_scs_energy
 
 
@@ -273,7 +278,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
 
     do_ewald = .false.
     n_atoms = sys%siz()
-    call dipmat%init(n_atoms)
+    call dipmat%init(n_atoms, sys%blacs_grid)
     if (present(k_point)) then
         allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
     else

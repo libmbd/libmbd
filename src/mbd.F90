@@ -269,23 +269,25 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     type(mat33) :: Tpp
     complex(dp) :: Tpp_c(3, 3)
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
-        n_atoms, my_i_atom, my_j_atom
+        n_atoms, my_i_atom, my_j_atom, my_nratoms, my_ncatoms
     logical :: do_ewald
 
     do_ewald = .false.
     n_atoms = sys%siz()
     call dipmat%init(n_atoms, sys%blacs_grid)
+    my_nratoms = size(dipmat%blacs%i_atom)
+    my_ncatoms = size(dipmat%blacs%j_atom)
     if (present(k_point)) then
-        allocate (dipmat%cplx(3*n_atoms, 3*n_atoms), source=(0.d0, 0.d0))
+        allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0.d0, 0.d0))
     else
-        allocate (dipmat%re(3*n_atoms, 3*n_atoms), source=0.d0)
+        allocate (dipmat%re(3*my_nratoms, 3*my_ncatoms), source=0.d0)
         if (sys%do_gradients) then
-            allocate (dipmat%re_dr(3*n_atoms, 3*n_atoms, 3), source=0.d0)
+            allocate (dipmat%re_dr(3*my_nratoms, 3*my_ncatoms, 3), source=0.d0)
             if (allocated(damp%r_vdw%dr)) then
-                allocate (dipmat%re_dvdw(3*n_atoms, 3*n_atoms), source=0.d0)
+                allocate (dipmat%re_dvdw(3*my_nratoms, 3*my_ncatoms), source=0.d0)
             end if
             if (allocated(damp%sigma%dr)) then
-                allocate (dipmat%re_dsigma(3*n_atoms, 3*n_atoms), source=0.d0)
+                allocate (dipmat%re_dsigma(3*my_nratoms, 3*my_ncatoms), source=0.d0)
             end if
         end if
     end if

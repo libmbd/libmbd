@@ -11,7 +11,7 @@ sources = [
     'src/mbd_defaults.f90',
     'src/mbd_parallel.F90',
     'src/mbd_types.f90',
-    'src/mbd_linalg.f90',
+    'src/mbd_linalg.F90',
     'src/mbd.F90',
     'src/mbd_c_api.F90',
 ]

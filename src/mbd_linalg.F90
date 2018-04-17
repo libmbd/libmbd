@@ -5,6 +5,7 @@ module mbd_linalg
 
 use mbd_common, only: tostr, dp, exception
 use mbd_types, only: mat3n3n
+use mbd_parallel, only: mbd_blacs
 
 implicit none
 
@@ -46,6 +47,9 @@ end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
     ZGEEV, ZGEEB, DSYTRI, DSYTRF
+#ifdef WITH_SCALAPACK
+external :: PDSYEV
+#endif
 
 contains
 
@@ -180,13 +184,17 @@ end function
 
 subroutine eigh_mat3n3n_(A, eigs, exc, src, vals_only)
     type(mat3n3n), intent(inout) :: A
-    real(dp), intent(out) :: eigs(3*A%blacs%n_atoms)
+    real(dp), intent(out) :: eigs(:)
     type(exception), intent(out), optional :: exc
     type(mat3n3n), intent(in), optional :: src
     logical, intent(in), optional :: vals_only
 
     if (allocated(A%re)) then
-        call eigh(A%re, eigs, exc, src%re, vals_only)
+#ifndef WITH_SCALAPACK
+        call eigh_re_(A%re, eigs, exc, src%re, vals_only)
+#else
+        call peigh_re_(A%re, A%blacs, eigs, exc, src%re, vals_only)
+#endif
     else
         call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
     end if
@@ -194,7 +202,7 @@ end subroutine
 
 subroutine eigh_re_(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
-    real(dp), intent(out) :: eigs(size(A, 1))
+    real(dp), intent(out) :: eigs(:)
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
@@ -218,9 +226,50 @@ subroutine eigh_re_(A, eigs, exc, src, vals_only)
     endif
 end subroutine
 
+#ifdef WITH_SCALAPACK
+subroutine peigh_re_(A, blacs, eigs, exc, src, vals_only)
+    real(dp), intent(inout) :: A(:, :)
+    type(mbd_blacs), intent(in) :: blacs
+    real(dp), intent(out) :: eigs(:)
+    type(exception), intent(out), optional :: exc
+    real(dp), intent(in), optional :: src(:, :)
+    logical, intent(in), optional :: vals_only
+
+    real(dp), allocatable :: work_arr(:), vectors(:, :)
+    real(dp) :: n_work_arr
+    integer :: error_flag, n
+
+    n = 3*blacs%n_atoms
+    if (present(src)) A = src
+    if (mode(vals_only) == 'V') then
+        allocate (vectors(n, n))
+    else
+        allocate (vectors(1, 1))
+    end if
+    call PDSYEV( &
+        mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
+        1, 1, blacs%desc, n_work_arr, -1, error_flag &
+    )
+    allocate (work_arr(nint(n_work_arr)))
+    call PDSYEV( &
+        mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
+        1, 1, blacs%desc, work_arr, size(work_arr), error_flag &
+    )
+    if (error_flag /= 0) then
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'PDSYEV'
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+        end if
+        return
+    endif
+    if (mode(vals_only) == 'V') A = vectors
+end subroutine
+#endif
+
 subroutine eig_re_(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
-    complex(dp), intent(out) :: eigs(size(A, 1))
+    complex(dp), intent(out) :: eigs(:)
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
@@ -304,7 +353,7 @@ end function
 
 subroutine eigh_cplx_(A, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
-    real(dp), intent(out) :: eigs(size(A, 1))
+    real(dp), intent(out) :: eigs(:)
     type(exception), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
@@ -333,7 +382,7 @@ end subroutine
 
 subroutine eig_cplx_(A, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
-    complex(dp), intent(out) :: eigs(size(A, 1))
+    complex(dp), intent(out) :: eigs(:)
     type(exception), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
@@ -393,6 +442,31 @@ function eigvalsh_re_(A, exc, destroy)
     call eigh_re_(A_p, eigvalsh_re_, exc, vals_only=.true.)
 end function
 
+#ifdef WITH_SCALAPACK
+function peigvalsh_re_(A, blacs, exc, destroy)
+    real(dp), target, intent(in) :: A(:, :)
+    type(mbd_blacs), intent(in) :: blacs
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    real(dp) :: peigvalsh_re_(3*blacs%n_atoms)
+
+    real(dp), allocatable, target :: A_work(:, :)
+    real(dp), pointer :: A_p(:, :)
+
+    nullify (A_p)
+    if (present(destroy)) then
+        if (destroy) then
+            A_p => A
+        end if
+    end if
+    if (.not. associated(A_p)) then
+        allocate (A_work(size(A, 1), size(A, 1)), source=A)
+        A_p => A_work
+    end if
+    call peigh_re_(A_p, blacs, peigvalsh_re_, exc, vals_only=.true.)
+end function
+#endif
+
 function eigvalsh_cplx_(A, exc, destroy)
     complex(dp), target, intent(in) :: A(:, :)
     type(exception), intent(out), optional :: exc
@@ -422,7 +496,11 @@ function eigvalsh_mat3n3n_(A, exc, destroy)
     real(dp) :: eigvalsh_mat3n3n_(3*A%blacs%n_atoms)
 
     if (allocated(A%re)) then
-        eigvalsh_mat3n3n_ = eigvalsh(A%re, exc, destroy)
+#ifndef WITH_SCALAPACK
+        eigvalsh_mat3n3n_ = eigvalsh_re_(A%re, exc, destroy)
+#else
+        eigvalsh_mat3n3n_ = peigvalsh_re_(A%re, A%blacs, exc, destroy)
+#endif
     else
         eigvalsh_mat3n3n_ = eigvalsh(A%cplx, exc, destroy)
     end if

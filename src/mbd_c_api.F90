@@ -238,6 +238,7 @@ real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     call c_f_pointer(damping_p, damping)
     if (present(gradients)) sys%do_gradients = .true.
     res = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    if (sys%has_exc()) return
     calc_mbd_rsscs_energy = res%energy
     if (present(gradients)) gradients = transpose(res%gradients)
 end function calc_mbd_rsscs_energy

@@ -110,6 +110,7 @@ type :: mbd_system
     type(mbd_blacs_grid) :: blacs_grid
     contains
     procedure :: siz => system_siz
+    procedure :: has_exc => mbd_system_has_exc
 end type mbd_system
 
 contains
@@ -135,6 +136,7 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     do i_freq = 0, n_freq
         alpha_dyn_rsscs(i_freq) = run_scs(sys, alpha_dyn(i_freq), damp_rsscs)
     end do
+    if (sys%has_exc()) return
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
     damp_mbd%version = 'fermi,dip'
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
@@ -163,6 +165,7 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     do i_freq = 0, n_freq
         alpha_dyn_scs(i_freq) = run_scs(sys, alpha_dyn(i_freq), damp_scs)
     end do
+    if (sys%has_exc()) return
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
     damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_scs(0), alpha_dyn(0), 1.d0/3)
     damp_mbd%version = 'dip,1mexp'
@@ -643,11 +646,10 @@ subroutine init_eqi_grid(calc, n, a, b)
 end subroutine
 
 
-function run_scs(sys, alpha, damp) result(alpha_scs)
+type(vecn) function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha
     type(mbd_damping), intent(in) :: damp
-    type(vecn) :: alpha_scs
 
     type(mat3n3n) :: alpha_full, dQ_add, dQ
     integer :: n_atoms, i_xyz, i_atom, my_i_atom, my_j_atom
@@ -660,7 +662,7 @@ function run_scs(sys, alpha, damp) result(alpha_scs)
     call alpha_full%add_diag(1.d0/alpha%val)
     call ts(sys%calc, 32)
     call sinvert(alpha_full%re, sys%calc%exc)
-    if (has_exc(sys)) return
+    if (sys%has_exc()) return
     call ts(sys%calc, -32)
     alpha_scs%val = contract_polarizability(alpha_full)
     if (.not. sys%do_gradients) return
@@ -853,7 +855,7 @@ type(mbd_result) function get_single_mbd_energy( &
             call sdiagonalize('N', relay%re, eigs, sys%calc%exc)
         end if
     end if
-    if (has_exc(sys)) return
+    if (sys%has_exc()) return
     call ts(sys%calc, -21)
     if (sys%get_eigs) then
         ene%mode_enes = sqrt(eigs)
@@ -997,7 +999,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         call ts(sys%calc, 23)
         call diagonalize('N', relay%re, eigs, sys%calc%exc)
         call ts(sys%calc, -23)
-        if (has_exc(sys)) return
+        if (sys%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
         n_negative_eigs = 0
@@ -1014,7 +1016,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             call ts(sys%calc, 24)
             call diagonalize('N', AT%re, eigs, sys%calc%exc)
             call ts(sys%calc, -24)
-            if (has_exc(sys)) return
+            if (sys%has_exc()) return
             allocate (ene%rpa_orders(sys%calc%param%rpa_order_max))
             do n_order = 2, sys%calc%param%rpa_order_max
                 ene%rpa_orders(n_order) = ene%rpa_orders(n_order) &
@@ -1064,7 +1066,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
         end do
         call ts(sys%calc, 25)
         call diagonalize('N', relay%cplx, eigs, sys%calc%exc)
-        if (has_exc(sys)) return
+        if (sys%has_exc()) return
         call ts(sys%calc, -25)
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
@@ -1081,7 +1083,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 26)
             call diagonalize('N', AT%cplx, eigs, sys%calc%exc)
-            if (has_exc(sys)) return
+            if (sys%has_exc()) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
                 ene%rpa_orders(n_order) = ene%rpa_orders(n_order) + &
@@ -1587,10 +1589,10 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
 end function make_g_grid
 
 
-logical function has_exc(sys)
-    type(mbd_system), intent(in) :: sys
+logical function mbd_system_has_exc(sys)
+    class(mbd_system), intent(in) :: sys
 
-    has_exc = sys%calc%exc%label /= ''
+    mbd_system_has_exc = sys%calc%exc%label /= ''
 end function
 
 

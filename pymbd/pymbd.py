@@ -7,13 +7,10 @@ import pkg_resources
 import sys
 import csv
 from itertools import product
-try:
+from ._libmbd import ffi as _ffi, lib as _lib
+if _lib.with_mpi:
     from mpi4py import MPI
     MPI.COMM_WORLD
-except ImportError:
-    pass
-
-from ._libmbd import ffi as _ffi, lib as _lib
 
 ang = 1/0.529177249
 

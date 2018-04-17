@@ -10,7 +10,7 @@ set(WITH_MPI .false.)
 
 set(SRCS
     src/mbd.F90
-    src/mbd_c_api.f90
+    src/mbd_c_api.F90
     src/mbd_api.f90
     src/mbd_vdw_param.f90
     src/mbd_parallel.F90
@@ -36,7 +36,7 @@ if(MPI_Fortran_FOUND)
     target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES} ${SCALAPACK})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
     set_property(
-        SOURCE src/mbd_parallel.F90
+        SOURCE src/mbd_parallel.F90 src/mbd_c_api.F90
         APPEND PROPERTY COMPILE_DEFINITIONS WITH_SCALAPACK
     )
 endif()

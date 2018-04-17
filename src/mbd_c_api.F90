@@ -12,6 +12,12 @@ use mbd_types, only: mat3n3n, vecn
 
 implicit none
 
+#ifdef WITH_SCALAPACK
+logical(c_bool), bind(c) :: with_mpi = .true.
+#else
+logical(c_bool), bind(c) :: with_mpi = .false.
+#endif
+
 type, bind(c) :: mbd_calc_c
     integer(c_int) :: n_freq = 0
     type(c_ptr) :: omega_grid = c_null_ptr

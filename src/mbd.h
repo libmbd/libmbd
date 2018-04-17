@@ -1,5 +1,7 @@
 // vim: set ft=c:
 
+extern const _Bool with_mpi;
+
 struct MBD_calc {
     int n_freq;
     double* omega_grid;

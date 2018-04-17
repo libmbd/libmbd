@@ -19,7 +19,7 @@ private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_rsscs_energy, mbd_scs_energy, &
     get_sigma_selfint, scale_TS
-public :: get_ts_energy, init_eqi_grid, get_damping_parameters, clock_rate
+public :: get_ts_energy, get_damping_parameters, clock_rate
 #endif
 
 interface operator(.prod.)
@@ -100,7 +100,6 @@ type :: mbd_system
     integer :: k_grid(3)
     integer :: supercell(3)
     logical :: do_rpa = .false.
-    logical :: do_reciprocal = .true.
     logical :: do_gradients = .false.
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
@@ -624,26 +623,6 @@ subroutine gauss_legendre(n, r, w)
 end subroutine
 
 
-subroutine init_eqi_grid(calc, n, a, b)
-    type(mbd_calc), intent(inout) :: calc
-    integer, intent(in) :: n
-    real(dp), intent(in) :: a, b
-
-    real(dp) :: delta
-    integer :: i
-
-    if (allocated(calc%omega_grid)) deallocate(calc%omega_grid)
-    if (allocated(calc%omega_grid_w)) deallocate(calc%omega_grid_w)
-    allocate (calc%omega_grid(0:n))
-    allocate (calc%omega_grid_w(0:n))
-    calc%omega_grid(0) = 0.d0
-    calc%omega_grid_w(0) = 0.d0
-    delta = (b-a)/n
-    calc%omega_grid(1:n) = (/ (a+delta/2+i*delta, i = 0, n-1) /)
-    calc%omega_grid_w(1:n) = delta
-end subroutine
-
-
 type(vecn) function run_scs(sys, alpha, damp) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
     type(vecn), intent(in) :: alpha
@@ -712,12 +691,11 @@ type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
     type(vecn), intent(in) :: C6
     type(mbd_damping), intent(in) :: damp
 
-    logical :: do_rpa, is_reciprocal, is_crystal
+    logical :: do_rpa, is_crystal
     type(vecn), allocatable :: alpha(:)
 
     is_crystal = sys%periodic
     do_rpa = sys%do_rpa
-    is_reciprocal = sys%do_reciprocal
     if (.not. is_crystal) then
         if (.not. do_rpa) then
             ene = get_single_mbd_energy(sys, alpha_0, C6, damp)
@@ -728,74 +706,9 @@ type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp) result(ene)
             deallocate (alpha)
         end if
     else
-        if (is_reciprocal) then
-            ene = get_reciprocal_mbd_energy(sys, alpha_0, C6, damp)
-        else
-            ene = get_supercell_mbd_energy(sys, alpha_0, C6, damp)
-        end if
+        ene = get_reciprocal_mbd_energy(sys, alpha_0, C6, damp)
     end if
 end function get_mbd_energy
-
-
-type(mbd_result) function get_supercell_mbd_energy(sys, alpha_0, C6, damp) &
-        result(ene)
-    type(mbd_system), intent(inout) :: sys
-    type(vecn), intent(in) :: alpha_0
-    type(vecn), intent(in) :: C6
-    type(mbd_damping), intent(in) :: damp
-
-    logical :: do_rpa
-    real(dp) :: R_cell(3)
-    integer :: idx_cell(3), n_cells, i_atom, i, i_cell, n_atoms
-
-    type(vecn) :: alpha_0_super, C6_super
-    type(vecn), allocatable :: alpha_ts_super(:)
-    type(mbd_system) :: sys_super
-    type(mbd_damping) :: damp_super
-    type(mbd_result) :: ene_super
-
-    do_rpa = sys%do_rpa
-
-    sys_super%calc = sys%calc
-    n_cells = product(sys%supercell)
-    n_atoms = sys%siz()
-    do i = 1, 3
-        sys_super%lattice(:, i) = sys%lattice(:, i)*sys%supercell(i)
-    end do
-    allocate (sys_super%coords(3, n_cells*n_atoms))
-    allocate (alpha_0_super%val(n_cells*n_atoms))
-    allocate (C6_super%val(n_cells*n_atoms))
-    allocate (alpha_ts_super(0:ubound(sys%calc%omega_grid, 1)))
-    if (allocated(damp%r_vdw%val)) then
-        allocate (damp_super%r_vdw%val(n_cells*n_atoms))
-    end if
-    idx_cell = (/ 0, 0, -1 /)
-    do i_cell = 1, n_cells
-        call shift_cell(idx_cell, (/ 0, 0, 0 /), sys%supercell-1)
-        R_cell = matmul(sys%lattice, idx_cell)
-        do i_atom = 1, n_atoms
-            i = (i_cell-1)*n_atoms+i_atom
-            sys_super%coords(:, i) = sys%coords(:, i_atom)+R_cell
-            alpha_0_super%val(i) = alpha_0%val(i_atom)
-            C6_super%val(i) = C6%val(i_atom)
-            if (allocated(damp%R_vdw%val)) then
-                damp_super%R_vdw%val(i) = damp%R_vdw%val(i_atom)
-            end if
-        end do
-    end do
-    if (do_rpa) then
-        alpha_ts_super = alpha_dynamic_ts(sys%calc, alpha_0_super, C6_super)
-        ene_super = get_single_rpa_energy(sys_super, alpha_ts_super, damp_super)
-    else
-        ene_super = get_single_mbd_energy( &
-            sys_super, alpha_0_super, C6_super, damp_super &
-        )
-    end if
-    ene%energy = ene_super%energy/n_cells
-    if (sys%get_rpa_orders) then
-        ene%rpa_orders = ene_super%rpa_orders/n_cells
-    end if
-end function get_supercell_mbd_energy
 
 
 type(mbd_result) function get_single_mbd_energy( &

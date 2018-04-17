@@ -16,6 +16,11 @@ interface inv
     module procedure inv_cplx_
 end interface
 
+interface invh
+    module procedure invh_re_
+    module procedure invh_mat3n3n_
+end interface
+
 interface eig
     module procedure eig_re_
     module procedure eig_cplx_
@@ -30,6 +35,7 @@ end interface
 interface eigvals
     module procedure eigvals_re_
     module procedure eigvals_cplx_
+    module procedure eigvals_mat3n3n_
 end interface
 
 interface eigvalsh
@@ -116,7 +122,7 @@ subroutine inv_cplx_(A, exc, src)
     endif
 end subroutine
 
-subroutine invh(A, exc, src)
+subroutine invh_re_(A, exc, src)
     real(dp), intent(inout) :: A(:, :)
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
@@ -154,6 +160,14 @@ subroutine invh(A, exc, src)
         return
     endif
     call fill_tril(A)
+end subroutine
+
+subroutine invh_mat3n3n_(A, exc, src)
+    type(mat3n3n), intent(inout) :: A
+    type(exception), intent(out), optional :: exc
+    type(mat3n3n), intent(in), optional :: src
+
+    call invh(A%re, exc, src%re)
 end subroutine
 
 function inverse(A, exc)
@@ -411,6 +425,19 @@ function eigvalsh_mat3n3n_(A, exc, destroy)
         eigvalsh_mat3n3n_ = eigvalsh(A%re, exc, destroy)
     else
         eigvalsh_mat3n3n_ = eigvalsh(A%cplx, exc, destroy)
+    end if
+end function
+
+function eigvals_mat3n3n_(A, exc, destroy)
+    type(mat3n3n), target, intent(in) :: A
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    complex(dp) :: eigvals_mat3n3n_(3*A%blacs%n_atoms)
+
+    if (allocated(A%re)) then
+        eigvals_mat3n3n_ = eigvals(A%re, exc, destroy)
+    else
+        eigvals_mat3n3n_ = eigvals(A%cplx, exc, destroy)
     end if
 end function
 

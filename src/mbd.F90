@@ -7,7 +7,7 @@
 module mbd
 
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
-use mbd_linalg, only: inv, invh, inverse, eig, eigh, eigvals, eigvalsh
+use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh
 use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.)
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
 use mbd_defaults
@@ -659,7 +659,7 @@ type(vecn) function run_scs(sys, alpha, damp) result(alpha_scs)
     alpha_full = dipole_matrix(sys, damp_local)
     call alpha_full%add_diag(1.d0/alpha%val)
     call ts(sys%calc, 32)
-    call invh(alpha_full%re, sys%calc%exc)
+    call invh(alpha_full, sys%calc%exc)
     if (sys%has_exc()) return
     call ts(sys%calc, -32)
     alpha_scs%val = contract_polarizability(alpha_full)
@@ -983,7 +983,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1.d0)
         call ts(sys%calc, 23)
-        eigs = eigvals(relay%re, sys%calc%exc, destroy=.true.)
+        eigs = eigvals(relay, sys%calc%exc, destroy=.true.)
         call ts(sys%calc, -23)
         if (sys%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
@@ -1000,7 +1000,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 24)
-            eigs = eigvals(AT%re, sys%calc%exc, destroy=.true.)
+            eigs = eigvals(AT, sys%calc%exc, destroy=.true.)
             call ts(sys%calc, -24)
             if (sys%has_exc()) return
             allocate (ene%rpa_orders(sys%calc%param%rpa_order_max))

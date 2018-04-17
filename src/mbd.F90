@@ -7,9 +7,7 @@
 module mbd
 
 use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
-use mbd_linalg, only: &
-    invert, diagonalize, sdiagonalize, diagonalized, sdiagonalized, inverted, &
-    sinvert
+use mbd_linalg, only: inv, invh, inverse, eig, eigh, eigvals, eigvalsh
 use mbd_types, only: mat3n3n, mat33, scalar, vecn, operator(.cprod.)
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
 use mbd_defaults
@@ -298,7 +296,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
             do_ewald = .true.
-            volume = max(abs(dble(product(diagonalized(sys%lattice)))), 0.2d0)
+            volume = max(abs(dble(product(eigvals(sys%lattice)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1.d0/3)
             real_space_cutoff = &
                 6.d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
@@ -440,8 +438,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
         range_G_vector(3), my_i_atom, my_j_atom
 
-    rec_unit_cell = 2*pi*inverted(transpose(sys%lattice))
-    volume = abs(dble(product(diagonalized(sys%lattice))))
+    rec_unit_cell = 2*pi*inverse(transpose(sys%lattice))
+    volume = abs(dble(product(eigvals(sys%lattice))))
     rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
     sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
@@ -661,7 +659,7 @@ type(vecn) function run_scs(sys, alpha, damp) result(alpha_scs)
     alpha_full = dipole_matrix(sys, damp_local)
     call alpha_full%add_diag(1.d0/alpha%val)
     call ts(sys%calc, 32)
-    call sinvert(alpha_full%re, sys%calc%exc)
+    call invh(alpha_full%re, sys%calc%exc)
     if (sys%has_exc()) return
     call ts(sys%calc, -32)
     alpha_scs%val = contract_polarizability(alpha_full)
@@ -838,21 +836,22 @@ type(mbd_result) function get_single_mbd_energy( &
     call ts(sys%calc, 21)
     if (present(k_point)) then
         if (sys%get_modes) then
-            call sdiagonalize('V', relay%cplx, eigs, sys%calc%exc)
-            call move_alloc(relay%cplx, ene%modes_k_single)
+            allocate (ene%modes_k_single(3*n_atoms, 3*n_atoms))
+            call eigh(ene%modes_k_single, eigs, sys%calc%exc, src=relay%cplx)
         else
-            call sdiagonalize('N', relay%cplx, eigs, sys%calc%exc)
+            eigs = eigvalsh(relay%cplx, sys%calc%exc, destroy=.true.)
         end if
     else
         if (sys%get_modes .or. sys%do_gradients) then
-            call sdiagonalize('V', relay%re, eigs, sys%calc%exc)
             if (sys%get_modes) then
-                call move_alloc(relay%re, ene%modes)
+                allocate (ene%modes(3*n_atoms, 3*n_atoms))
+                call eigh(ene%modes, eigs, sys%calc%exc, src=relay%re)
             else
-                call move_alloc(relay%re, modes)
+                allocate (modes(3*n_atoms, 3*n_atoms))
+                call eigh(modes, eigs, sys%calc%exc, src=relay%re)
             end if
         else
-            call sdiagonalize('N', relay%re, eigs, sys%calc%exc)
+            eigs = eigvalsh(relay%re, sys%calc%exc, destroy=.true.)
         end if
     end if
     if (sys%has_exc()) return
@@ -997,7 +996,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1.d0)
         call ts(sys%calc, 23)
-        call diagonalize('N', relay%re, eigs, sys%calc%exc)
+        eigs = eigvals(relay%re, sys%calc%exc, destroy=.true.)
         call ts(sys%calc, -23)
         if (sys%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
@@ -1014,7 +1013,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 24)
-            call diagonalize('N', AT%re, eigs, sys%calc%exc)
+            eigs = eigvals(AT%re, sys%calc%exc, destroy=.true.)
             call ts(sys%calc, -24)
             if (sys%has_exc()) return
             allocate (ene%rpa_orders(sys%calc%param%rpa_order_max))
@@ -1065,7 +1064,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
             relay%cplx(i, i) = 1.d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
         call ts(sys%calc, 25)
-        call diagonalize('N', relay%cplx, eigs, sys%calc%exc)
+        eigs = eigvals(relay%cplx, sys%calc%exc, destroy=.true.)
         if (sys%has_exc()) return
         call ts(sys%calc, -25)
         ! The count construct won't work here due to a bug in Cray compiler
@@ -1082,7 +1081,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
             1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 26)
-            call diagonalize('N', AT%cplx, eigs, sys%calc%exc)
+            eigs = eigvals(AT%cplx, sys%calc%exc, destroy=.true.)
             if (sys%has_exc()) return
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
@@ -1542,7 +1541,7 @@ function supercell_circum(sys, uc, radius) result(sc)
     real(dp) :: ruc(3, 3), layer_sep(3)
     integer :: i
 
-    ruc = 2*pi*inverted(transpose(uc))
+    ruc = 2*pi*inverse(transpose(uc))
     forall (i = 1:3) &
         layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
@@ -1603,7 +1602,7 @@ function make_k_grid(g_grid, uc) result(k_grid)
     integer :: i_kpt
     real(dp) :: ruc(3, 3)
 
-    ruc = 2*pi*inverted(transpose(uc))
+    ruc = 2*pi*inverse(transpose(uc))
     do i_kpt = 1, size(g_grid, 2)
         k_grid(:, i_kpt) = matmul(ruc, g_grid(:, i_kpt))
     end do

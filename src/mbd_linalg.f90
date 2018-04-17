@@ -9,35 +9,31 @@ use mbd_types, only: mat3n3n
 implicit none
 
 private
-public :: invert, inverted, diagonalize, sdiagonalize, diagonalized, &
-    sdiagonalized, solve_lin_sys, sinvert
+public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve
 
-interface invert
-    module procedure invert_ge_dble_
-    module procedure invert_ge_cmplx_
+interface inv
+    module procedure inv_re_
+    module procedure inv_cplx_
 end interface
 
-interface sinvert
-    module procedure invert_sym_dble_
-    ! module procedure invert_he_cmplx_
+interface eig
+    module procedure eig_re_
+    module procedure eig_cplx_
 end interface
 
-interface diagonalize
-    module procedure diagonalize_ge_dble_
-    module procedure diagonalize_ge_cmplx_
+interface eigh
+    module procedure eigh_re_
+    module procedure eigh_cplx_
 end interface
 
-interface sdiagonalize
-    module procedure diagonalize_sym_dble_
-    module procedure diagonalize_he_cmplx_
+interface eigvals
+    module procedure eigvals_re_
+    module procedure eigvals_cplx_
 end interface
 
-interface diagonalized
-    module procedure diagonalized_ge_dble_
-end interface
-
-interface sdiagonalized
-    module procedure diagonalized_sym_dble_
+interface eigvalsh
+    module procedure eigvalsh_re_
+    module procedure eigvalsh_cplx_
 end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
@@ -45,26 +41,26 @@ external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
 
 contains
 
-
-subroutine invert_ge_dble_(A, exc)
+subroutine inv_re_(A, exc, src)
     real(dp), intent(inout) :: A(:, :)
     type(exception), intent(out), optional :: exc
+    real(dp), intent(in), optional :: src(:, :)
 
-    integer :: i_pivot(size(A, 1))
     real(dp), allocatable :: work_arr(:)
-    integer :: n
-    integer :: n_work_arr
+    integer, allocatable :: i_pivot(:)
+    integer :: n, n_work_arr, error_flag
     real(dp) :: n_work_arr_optim
-    integer :: error_flag
 
     n = size(A, 1)
     if (n == 0) return
+    if (present(src)) A = src
+    allocate (i_pivot(n))
     call DGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DGETRF'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
@@ -72,36 +68,35 @@ subroutine invert_ge_dble_(A, exc)
     n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
     call DGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
-    deallocate (work_arr)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DGETRI'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
 end subroutine
 
-
-subroutine invert_ge_cmplx_(A, exc)
+subroutine inv_cplx_(A, exc, src)
     complex(dp), intent(inout) :: A(:, :)
     type(exception), intent(out), optional :: exc
+    complex(dp), intent(in), optional :: src(:, :)
 
-    integer :: i_pivot(size(A, 1))
+    integer, allocatable :: i_pivot(:)
     complex(dp), allocatable :: work_arr(:)
-    integer :: n
-    integer :: n_work_arr
+    integer :: n, n_work_arr, error_flag
     complex(dp) :: n_work_arr_optim
-    integer :: error_flag
 
     n = size(A, 1)
+    if (present(src)) A = src
+    allocate (i_pivot(n))
     call ZGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'ZGETRF'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
@@ -109,31 +104,30 @@ subroutine invert_ge_cmplx_(A, exc)
     n_work_arr = nint(dble(n_work_arr_optim))
     allocate (work_arr(n_work_arr))
     call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
-    deallocate (work_arr)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'ZGETRI'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
 end subroutine
 
-
-subroutine invert_sym_dble_(A, exc)
+subroutine invh(A, exc, src)
     real(dp), intent(inout) :: A(:, :)
     type(exception), intent(out), optional :: exc
+    real(dp), intent(in), optional :: src(:, :)
 
-    integer :: i_pivot(size(A, 1))
+    integer, allocatable :: i_pivot(:)
     real(dp), allocatable :: work_arr(:)
-    integer :: n
-    integer :: n_work_arr
+    integer :: n, n_work_arr, error_flag
     real(dp) :: n_work_arr_optim
-    integer :: error_flag
 
     n = size(A, 1)
     if (n == 0) return
+    if (present(src)) A = src
+    allocate (i_pivot(n))
     call DSYTRF('U', n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
@@ -142,7 +136,7 @@ subroutine invert_sym_dble_(A, exc)
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DSYTRF'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
@@ -153,198 +147,243 @@ subroutine invert_sym_dble_(A, exc)
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DSYTRI'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
     call fill_tril(A)
 end subroutine
 
-
-function inverted(A, exc) result(A_inv)
+function inverse(A, exc)
     real(dp), intent(in) :: A(:, :)
-    real(dp) :: A_inv(size(A, 1), size(A, 2))
     type(exception), intent(out), optional :: exc
+    real(dp) :: inverse(size(A, 1), size(A, 2))
 
-    A_inv = A
-    call invert(A_inv, exc)
+    call inv(inverse, exc, src=A)
 end function
 
-
-subroutine diagonalize_sym_dble_(mode, A, eigs, exc)
-    character(len=1), intent(in) :: mode
+subroutine eigh_re_(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     real(dp), intent(out) :: eigs(size(A, 1))
     type(exception), intent(out), optional :: exc
+    real(dp), intent(in), optional :: src(:, :)
+    logical, intent(in), optional :: vals_only
 
     real(dp), allocatable :: work_arr(:)
-    integer :: n
     real(dp) :: n_work_arr
-    integer :: error_flag
+    integer :: error_flag, n
 
     n = size(A, 1)
-    call DSYEV(mode, "U", n, A, n, eigs, n_work_arr, -1, error_flag)
+    if (present(src)) A = src
+    call DSYEV(mode(vals_only), 'U', n, A, n, eigs, n_work_arr, -1, error_flag)
     allocate (work_arr(nint(n_work_arr)))
-    call DSYEV(mode, "U", n, A, n, eigs, work_arr, size(work_arr), error_flag)
-    deallocate (work_arr)
+    call DSYEV(mode(vals_only), 'U', n, A, n, eigs, work_arr, size(work_arr), error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DSYEV'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
 end subroutine
 
-
-function diagonalized_sym_dble_(A, eigvecs, exc) result(eigs)
-    real(dp), intent(in) :: A(:, :)
-    real(dp), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
-    type(exception), intent(out), optional :: exc
-    real(dp) :: eigs(size(A, 1))
-
-    real(dp), pointer :: eigvecs_p(:, :)
-    character(len=1) :: mode
-
-    if (present(eigvecs)) then
-        mode = 'V'
-        eigvecs_p => eigvecs
-    else
-        mode = 'N'
-        allocate (eigvecs_p(size(A, 1), size(A, 2)))
-    end if
-    eigvecs_p = A
-    call sdiagonalize(mode, eigvecs_p, eigs, exc)
-    if (.not. present(eigvecs)) then
-        deallocate (eigvecs_p)
-    end if
-end function
-
-
-subroutine diagonalize_ge_dble_(mode, A, eigs, exc)
-    character(len=1), intent(in) :: mode
+subroutine eig_re_(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     complex(dp), intent(out) :: eigs(size(A, 1))
     type(exception), intent(out), optional :: exc
+    real(dp), intent(in), optional :: src(:, :)
+    logical, intent(in), optional :: vals_only
 
-    real(dp), allocatable :: work_arr(:)
-    integer :: n
-    real(dp) :: n_work_arr
-    integer :: error_flag
-    real(dp) :: eigs_r(size(A, 1)), eigs_i(size(A, 1))
-    real(dp) :: dummy
-    real(dp) :: vectors(size(A, 1), size(A, 2))
+    real(dp) :: n_work_arr, dummy
+    integer :: error_flag, n
+    real(dp), allocatable :: eigs_r(:), eigs_i(:), vectors(:, :), work_arr(:)
 
     n = size(A, 1)
-    call DGEEV('N', mode, n, A, n, eigs_r, eigs_i, dummy, 1, &
-        vectors, n, n_work_arr, -1, error_flag)
+    if (present(src)) A = src
+    allocate (eigs_r(n), eigs_i(n))
+    if (mode(vals_only) == 'V') then
+        allocate (vectors(n, n))
+    else
+        allocate (vectors(1, 1))
+    end if
+    call DGEEV( &
+        'N', mode(vals_only), n, A, n, eigs_r, eigs_i, dummy, 1, &
+        vectors, n, n_work_arr, -1, error_flag &
+    )
     allocate (work_arr(nint(n_work_arr)))
-    call DGEEV('N', mode, n, A, n, eigs_r, eigs_i, dummy, 1, &
-        vectors, n, work_arr, size(work_arr), error_flag)
-    deallocate (work_arr)
+    call DGEEV( &
+        'N', mode(vals_only), n, A, n, eigs_r, eigs_i, dummy, 1, &
+        vectors, n, work_arr, size(work_arr), error_flag &
+    )
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DGEEV'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
     eigs = cmplx(eigs_r, eigs_i, 8)
-    A = vectors
+    if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
-
-function diagonalized_ge_dble_(A, eigvecs, exc) result(eigs)
-    real(dp), intent(in) :: A(:, :)
-    real(dp), intent(out), optional, target :: eigvecs(size(A, 1), size(A, 2))
+function eigvals_re_(A, exc, destroy)
+    real(dp), target, intent(in) :: A(:, :)
     type(exception), intent(out), optional :: exc
-    complex(dp) :: eigs(size(A, 1))
+    logical, intent(in), optional :: destroy
+    complex(dp) :: eigvals_re_(size(A, 1))
 
-    real(dp), pointer :: eigvecs_p(:, :)
-    character(len=1) :: mode
+    real(dp), allocatable, target :: A_work(:, :)
+    real(dp), pointer :: A_p(:, :)
 
-    if (present(eigvecs)) then
-        mode = 'V'
-        eigvecs_p => eigvecs
-    else
-        mode = 'N'
-        allocate (eigvecs_p(size(A, 1), size(A, 2)))
+    nullify (A_p)
+    if (present(destroy)) then
+        if (destroy) then
+            A_p => A
+        end if
     end if
-    eigvecs_p = A
-    call diagonalize(mode, eigvecs_p, eigs, exc)
-    if (.not. present(eigvecs)) then
-        deallocate (eigvecs_p)
+    if (.not. associated(A_p)) then
+        allocate (A_work(size(A, 1), size(A, 1)), source=A)
+        A_p => A_work
     end if
+    call eig_re_(A_p, eigvals_re_, exc, vals_only=.true.)
 end function
 
+function eigvals_cplx_(A, exc, destroy)
+    complex(dp), target, intent(in) :: A(:, :)
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    complex(dp) :: eigvals_cplx_(size(A, 1))
 
-subroutine diagonalize_he_cmplx_(mode, A, eigs, exc)
-    character(len=1), intent(in) :: mode
+    complex(dp), allocatable, target :: A_work(:, :)
+    complex(dp), pointer :: A_p(:, :)
+
+    nullify (A_p)
+    if (present(destroy)) then
+        if (destroy) then
+            A_p => A
+        end if
+    end if
+    if (.not. associated(A_p)) then
+        allocate (A_work(size(A, 1), size(A, 1)), source=A)
+        A_p => A_work
+    end if
+    call eig_cplx_(A_p, eigvals_cplx_, exc, vals_only=.true.)
+end function
+
+subroutine eigh_cplx_(A, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
     real(dp), intent(out) :: eigs(size(A, 1))
     type(exception), intent(out), optional :: exc
+    complex(dp), intent(in), optional :: src(:, :)
+    logical, intent(in), optional :: vals_only
 
     complex(dp), allocatable :: work(:)
     complex(dp) :: lwork_cmplx
     real(dp), allocatable :: rwork(:)
-    integer :: n, lwork
-    integer :: error_flag
-    integer, external :: ILAENV
+    integer :: n, lwork, error_flag
 
     n = size(A, 1)
+    if (present(src)) A = src
     allocate (rwork(max(1, 3*n-2)))
-    call ZHEEV(mode, "U", n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
+    call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
     lwork = nint(dble(lwork_cmplx))
     allocate (work(lwork))
-    call ZHEEV(mode, "U", n, A, n, eigs, work, lwork, rwork, error_flag)
-    deallocate (rwork)
-    deallocate (work)
+    call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, work, lwork, rwork, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'ZHEEV'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
 end subroutine
 
-
-subroutine diagonalize_ge_cmplx_(mode, A, eigs, exc)
-    character(len=1), intent(in) :: mode
+subroutine eig_cplx_(A, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
     complex(dp), intent(out) :: eigs(size(A, 1))
     type(exception), intent(out), optional :: exc
+    complex(dp), intent(in), optional :: src(:, :)
+    logical, intent(in), optional :: vals_only
 
     complex(dp), allocatable :: work(:)
-    real(dp) :: rwork(2*size(A, 1))
+    real(dp), allocatable :: rwork(:)
     integer :: n, lwork
     complex(dp) :: lwork_arr
     integer :: error_flag
     complex(dp) :: dummy
-    complex(dp) :: vectors(size(A, 1), size(A, 2))
+    complex(dp), allocatable :: vectors(:, :)
 
     n = size(A, 1)
-    call ZGEEV('N', mode, n, A, n, eigs, dummy, 1, &
-        vectors, n, lwork_arr, -1, rwork, error_flag)
+    if (present(src)) A = src
+    allocate (rwork(2*n))
+    if (mode(vals_only) == 'V') allocate (vectors(n, n))
+    call ZGEEV( &
+        'N', mode(vals_only), n, A, n, eigs, dummy, 1, &
+        vectors, n, lwork_arr, -1, rwork, error_flag &
+    )
     lwork = nint(dble(lwork_arr))
     allocate (work(lwork))
-    call ZGEEV('N', mode, n, A, n, eigs, dummy, 1, &
-        vectors, n, work, lwork, rwork, error_flag)
-    deallocate (work)
+    call ZGEEV( &
+        'N', mode(vals_only), n, A, n, eigs, dummy, 1, &
+        vectors, n, work, lwork, rwork, error_flag &
+    )
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'ZGEEV'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
-    A = vectors
+    if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
+function eigvalsh_re_(A, exc, destroy)
+    real(dp), target, intent(in) :: A(:, :)
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    real(dp) :: eigvalsh_re_(size(A, 1))
+
+    real(dp), allocatable, target :: A_work(:, :)
+    real(dp), pointer :: A_p(:, :)
+
+    nullify (A_p)
+    if (present(destroy)) then
+        if (destroy) then
+            A_p => A
+        end if
+    end if
+    if (.not. associated(A_p)) then
+        allocate (A_work(size(A, 1), size(A, 1)), source=A)
+        A_p => A_work
+    end if
+    call eigh_re_(A_p, eigvalsh_re_, exc, vals_only=.true.)
+end function
+
+function eigvalsh_cplx_(A, exc, destroy)
+    complex(dp), target, intent(in) :: A(:, :)
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    real(dp) :: eigvalsh_cplx_(size(A, 1))
+
+    complex(dp), allocatable, target :: A_work(:, :)
+    complex(dp), pointer :: A_p(:, :)
+
+    nullify (A_p)
+    if (present(destroy)) then
+        if (destroy) then
+            A_p => A
+        end if
+    end if
+    if (.not. associated(A_p)) then
+        allocate (A_work(size(A, 1), size(A, 1)), source=A)
+        A_p => A_work
+    end if
+    call eigh_cplx_(A_p, eigvalsh_cplx_, exc, vals_only=.true.)
+end function
 
 subroutine fill_tril(A)
     real(dp), intent(inout) :: A(:, :)
@@ -358,9 +397,8 @@ subroutine fill_tril(A)
     end do
 end subroutine
 
-
-function solve_lin_sys(A, b, exc) result(x)
-    real(dp), intent(in) :: A(:, :), b(size(A, 1))
+function solve(A, b, exc) result(x)
+    real(dp), intent(in) :: A(:, :), b(:)
     real(dp) :: x(size(b))
     type(exception), intent(out), optional :: exc
 
@@ -377,10 +415,19 @@ function solve_lin_sys(A, b, exc) result(x)
         if (present(exc)) then
             exc%label = 'linalg'
             exc%origin = 'DGESV'
-            exc%msg = "Failed with code " // trim(tostr(error_flag))
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
         return
     endif
+end function
+
+character(len=1) function mode(vals_only)
+    logical, intent(in), optional :: vals_only
+
+    mode = 'V'
+    if (present(vals_only)) then
+        if (vals_only) mode = 'N'
+    end if
 end function
 
 end module mbd_linalg

@@ -24,6 +24,7 @@ end interface
 interface eigh
     module procedure eigh_re_
     module procedure eigh_cplx_
+    module procedure eigh_mat3n3n_
 end interface
 
 interface eigvals
@@ -34,6 +35,7 @@ end interface
 interface eigvalsh
     module procedure eigvalsh_re_
     module procedure eigvalsh_cplx_
+    module procedure eigvalsh_mat3n3n_
 end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
@@ -161,6 +163,20 @@ function inverse(A, exc)
 
     call inv(inverse, exc, src=A)
 end function
+
+subroutine eigh_mat3n3n_(A, eigs, exc, src, vals_only)
+    type(mat3n3n), intent(inout) :: A
+    real(dp), intent(out) :: eigs(3*A%blacs%n_atoms)
+    type(exception), intent(out), optional :: exc
+    type(mat3n3n), intent(in), optional :: src
+    logical, intent(in), optional :: vals_only
+
+    if (allocated(A%re)) then
+        call eigh(A%re, eigs, exc, src%re, vals_only)
+    else
+        call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
+    end if
+end subroutine
 
 subroutine eigh_re_(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
@@ -383,6 +399,19 @@ function eigvalsh_cplx_(A, exc, destroy)
         A_p => A_work
     end if
     call eigh_cplx_(A_p, eigvalsh_cplx_, exc, vals_only=.true.)
+end function
+
+function eigvalsh_mat3n3n_(A, exc, destroy)
+    type(mat3n3n), target, intent(in) :: A
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    real(dp) :: eigvalsh_mat3n3n_(3*A%blacs%n_atoms)
+
+    if (allocated(A%re)) then
+        eigvalsh_mat3n3n_ = eigvalsh(A%re, exc, destroy)
+    else
+        eigvalsh_mat3n3n_ = eigvalsh(A%cplx, exc, destroy)
+    end if
 end function
 
 subroutine fill_tril(A)

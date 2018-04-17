@@ -806,13 +806,13 @@ type(mbd_result) function get_single_mbd_energy( &
     type(mbd_damping), intent(in) :: damp
     real(dp), intent(in), optional :: k_point(3)
 
-    type(mat3n3n) :: relay, dQ, T, dQ_add
+    type(mat3n3n) :: relay, dQ, T, dQ_add, modes
     real(dp), allocatable :: eigs(:)
     type(vecn) :: omega
     integer :: i_xyz, i, i_atom
     integer :: n_negative_eigs, n_atoms
     logical :: do_impl_deriv
-    real(dp), allocatable :: c_lambda12i_c(:, :), modes(:, :)
+    real(dp), allocatable :: c_lambda12i_c(:, :)
 
     do_impl_deriv = allocated(alpha_0%dr) .or. allocated(C6%dr) .or. &
         allocated(damp%r_vdw%dr) .or. allocated(damp%sigma%dr)
@@ -828,25 +828,18 @@ type(mbd_result) function get_single_mbd_energy( &
     call relay%mult_cross(omega%val*sqrt(alpha_0%val))
     call relay%add_diag(omega%val**2)
     call ts(sys%calc, 21)
-    if (present(k_point)) then
+    if (sys%get_modes .or. sys%do_gradients) then
+        call modes%alloc_from(relay)
+        call eigh(modes, eigs, sys%calc%exc, src=relay)
         if (sys%get_modes) then
-            allocate (ene%modes_k_single(3*n_atoms, 3*n_atoms))
-            call eigh(ene%modes_k_single, eigs, sys%calc%exc, src=relay%cplx)
-        else
-            eigs = eigvalsh(relay%cplx, sys%calc%exc, destroy=.true.)
+            if (allocated(modes%re)) then
+                call move_alloc(modes%re, ene%modes)
+            else
+                call move_alloc(modes%cplx, ene%modes_k_single)
+            end if
         end if
     else
-        if (sys%get_modes .or. sys%do_gradients) then
-            if (sys%get_modes) then
-                allocate (ene%modes(3*n_atoms, 3*n_atoms))
-                call eigh(ene%modes, eigs, sys%calc%exc, src=relay%re)
-            else
-                allocate (modes(3*n_atoms, 3*n_atoms))
-                call eigh(modes, eigs, sys%calc%exc, src=relay%re)
-            end if
-        else
-            eigs = eigvalsh(relay%re, sys%calc%exc, destroy=.true.)
-        end if
+        eigs = eigvalsh(relay, sys%calc%exc, destroy=.true.)
     end if
     if (sys%has_exc()) return
     call ts(sys%calc, -21)
@@ -865,7 +858,7 @@ type(mbd_result) function get_single_mbd_energy( &
     allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
     allocate (ene%gradients(n_atoms, 3), source=0.d0)
     forall (i = 1:3*n_atoms)
-        c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*modes(:, i)
+        c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*modes%re(:, i)
     end forall
     c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
     dQ%blacs = T%blacs

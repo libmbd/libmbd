@@ -816,19 +816,13 @@ type(mbd_result) function get_single_mbd_energy( &
 
     do_impl_deriv = allocated(alpha_0%dr) .or. allocated(C6%dr) .or. &
         allocated(damp%r_vdw%dr) .or. allocated(damp%sigma%dr)
-
     n_atoms = sys%siz()
     allocate (eigs(3*n_atoms))
     T = dipole_matrix(sys, damp, k_point)
     if (do_impl_deriv) then
-        relay = T
+        call relay%copy_from(T)
     else
-        if (present(k_point)) then
-            call move_alloc(T%cplx, relay%cplx)
-        else
-            call move_alloc(T%re, relay%re)
-        end if
-        relay%blacs = T%blacs
+        call relay%move_from(T)
     end if
     omega = omega_eff(C6, alpha_0)
     call relay%mult_cross(omega%val*sqrt(alpha_0%val))

@@ -29,6 +29,8 @@ type :: mat3n3n
     procedure :: multed_cross => mat3n3n_multed_cross
     procedure :: mult_cross_add => mat3n3n_mult_cross_add
     procedure :: mult_dsigma => mat3n3n_mult_dsigma
+    procedure :: copy_from => mat3n3n_copy_from
+    procedure :: move_from => mat3n3n_move_from
 end type
 
 type :: mat33
@@ -87,6 +89,30 @@ subroutine mat3n3n_init(this, n_atoms, blacs_grid)
     type(mbd_blacs_grid), intent(in) :: blacs_grid
 
     call this%blacs%init(n_atoms, blacs_grid)
+end subroutine
+
+subroutine mat3n3n_copy_from(this, other)
+    class(mat3n3n), intent(out) :: this
+    type(mat3n3n), intent(in) :: other
+
+    if (allocated(other%re)) then
+        this%re = other%re
+    else
+        this%cplx = other%cplx
+    end if
+    this%blacs = other%blacs
+end subroutine
+
+subroutine mat3n3n_move_from(this, other)
+    class(mat3n3n), intent(out) :: this
+    type(mat3n3n), intent(inout) :: other
+
+    if (allocated(other%re)) then
+        call move_alloc(other%re, this%re)
+    else
+        call move_alloc(other%cplx, this%cplx)
+    end if
+    this%blacs = other%blacs
 end subroutine
 
 integer function vecn_siz(this)

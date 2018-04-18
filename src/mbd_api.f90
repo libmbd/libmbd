@@ -15,12 +15,7 @@ implicit none
 
 private
 public :: mbd_input, mbd_calc  ! types
-public :: &  ! subroutines
-    mbd_init, mbd_update_coords, mbd_update_lattice_vectors, &
-    mbd_update_vdw_params_custom, mbd_update_vdw_params_from_ratios, &
-    mbd_get_energy, mbd_get_gradients, mbd_get_lattice_derivs, &
-    mbd_get_spectrum_modes, mbd_get_damping_parameters, &
-    mbd_get_free_vdw_params
+public :: mbd_get_damping_parameters, mbd_get_free_vdw_params  ! subroutines
 
 type :: mbd_input
     integer :: comm  ! MPI communicator
@@ -59,72 +54,83 @@ type mbd_calc
     character(len=30) :: dispersion_type
     type(mbd_calc_inner) :: calc
     type(mbd_result) :: results
+contains
+    procedure :: init => mbd_calc_init
+    procedure :: update_coords => mbd_calc_update_coords
+    procedure :: update_lattice_vectors => mbd_calc_update_lattice_vectors
+    procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
+    procedure :: update_vdw_params_from_ratios => &
+        mbd_calc_update_vdw_params_from_ratios
+    procedure :: get_energy => mbd_calc_get_energy
+    procedure :: get_gradients => mbd_calc_get_gradients
+    procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
+    procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
 end type
 
 contains
 
 
-subroutine mbd_init(calc, input)
-    type(mbd_calc), target, intent(out) :: calc
+subroutine mbd_calc_init(this, input)
+    class(mbd_calc), target, intent(out) :: this
     type(mbd_input), intent(in) :: input
 
-    calc%sys%calc => calc%calc
-    calc%sys%calc%comm = input%comm
-    calc%dispersion_type = input%dispersion_type
-    calc%sys%do_gradients = input%calculate_forces
+    this%sys%calc => this%calc
+    this%sys%calc%comm = input%comm
+    this%dispersion_type = input%dispersion_type
+    this%sys%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
-        calc%sys%get_eigs = .true.
-        calc%sys%get_modes = .true.
+        this%sys%get_eigs = .true.
+        this%sys%get_modes = .true.
     end if
-    calc%sys%calc%param%ts_energy_accuracy = input%ts_ene_acc
+    this%sys%calc%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
-    calc%sys%calc%param%n_frequency_grid = input%n_omega_grid
-    calc%sys%calc%param%k_grid_shift = input%k_grid_shift
-    calc%damp%beta = input%mbd_beta
-    calc%damp%a = input%mbd_a
-    calc%damp%ts_d = input%ts_d
-    calc%damp%ts_sr = input%ts_sr
-    calc%sys%k_grid = input%k_grid
-    calc%sys%vacuum_axis = input%vacuum_axis
-    call init_grid(calc%calc)
+    this%sys%calc%param%n_frequency_grid = input%n_omega_grid
+    this%sys%calc%param%k_grid_shift = input%k_grid_shift
+    this%damp%beta = input%mbd_beta
+    this%damp%a = input%mbd_a
+    this%damp%ts_d = input%ts_d
+    this%damp%ts_sr = input%ts_sr
+    this%sys%k_grid = input%k_grid
+    this%sys%vacuum_axis = input%vacuum_axis
+    call init_grid(this%calc)
 end subroutine
 
 
-subroutine mbd_update_coords(calc, coords)
-    type(mbd_calc), intent(inout) :: calc
+subroutine mbd_calc_update_coords(this, coords)
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
 
-    allocate (calc%sys%coords(3, size(coords, 2)))
-    calc%sys%coords = coords
+    allocate (this%sys%coords(3, size(coords, 2)))
+    this%sys%coords = coords
 end subroutine
 
 
-subroutine mbd_update_lattice_vectors(calc, latt_vecs)
-    type(mbd_calc), intent(inout) :: calc
+subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: latt_vecs(:, :)
 
-    calc%sys%lattice = latt_vecs
+    this%sys%lattice = latt_vecs
 end subroutine
 
 
-subroutine mbd_update_vdw_params_custom(calc, alpha_0, C6, r_vdw, dalpha_0, dC6, dr_vdw)
-    type(mbd_calc), intent(inout) :: calc
+subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw, dalpha_0, dC6, dr_vdw)
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: r_vdw(:)
     real(dp), intent(in), optional :: dalpha_0(:, :, :), dC6(:, :, :), dr_vdw(:, :, :)
 
-    calc%alpha_0%val = alpha_0
-    calc%C6%val = C6
-    calc%damp%r_vdw%val = r_vdw
-    if (present(dalpha_0)) calc%alpha_0%dr = dalpha_0
-    if (present(dC6)) calc%C6%dr = dC6
-    if (present(dr_vdw)) calc%damp%r_vdw%dr = dr_vdw
+    this%alpha_0%val = alpha_0
+    this%C6%val = C6
+    this%damp%r_vdw%val = r_vdw
+    if (present(dalpha_0)) this%alpha_0%dr = dalpha_0
+    if (present(dC6)) this%C6%dr = dC6
+    if (present(dr_vdw)) this%damp%r_vdw%dr = dr_vdw
 end subroutine
 
 
-subroutine mbd_update_vdw_params_from_ratios(calc, ratios, free_values, dratios)
-    type(mbd_calc), intent(inout) :: calc
+subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios, free_values, dratios)
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: ratios(:)
     real(dp), intent(in) :: free_values(:, :)
     real(dp), intent(in), optional :: dratios(:, :, :)
@@ -134,53 +140,53 @@ subroutine mbd_update_vdw_params_from_ratios(calc, ratios, free_values, dratios)
     allocate (ones%val(size(ratios)), source=1d0)
     vols%val = ratios
     if (present(dratios)) vols%dr = dratios
-    calc%alpha_0 = scale_TS(vecn(free_values(1, :)), vols, ones, 1d0)
-    calc%C6 = scale_TS(vecn(free_values(2, :)), vols, ones, 2d0)
-    calc%damp%r_vdw = scale_TS(vecn(free_values(3, :)), vols, ones, 1d0/3)
+    this%alpha_0 = scale_TS(vecn(free_values(1, :)), vols, ones, 1d0)
+    this%C6 = scale_TS(vecn(free_values(2, :)), vols, ones, 2d0)
+    this%damp%r_vdw = scale_TS(vecn(free_values(3, :)), vols, ones, 1d0/3)
 end subroutine
 
 
-subroutine mbd_get_energy(calc, energy)
-    type(mbd_calc), intent(inout) :: calc
+subroutine mbd_calc_get_energy(this, energy)
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(out) :: energy
 
-    select case (calc%dispersion_type)
+    select case (this%dispersion_type)
     case ('mbd')
-        call calc%sys%blacs_grid%init()
-        calc%results = mbd_rsscs_energy(calc%sys, calc%alpha_0, calc%C6, calc%damp)
-        call calc%sys%blacs_grid%destroy()
-        energy = calc%results%energy
+        call this%sys%blacs_grid%init()
+        this%results = mbd_rsscs_energy(this%sys, this%alpha_0, this%C6, this%damp)
+        call this%sys%blacs_grid%destroy()
+        energy = this%results%energy
     case ('ts')
-        energy = get_ts_energy(calc%sys, calc%alpha_0%val, calc%C6%val, calc%damp)
+        energy = get_ts_energy(this%sys, this%alpha_0%val, this%C6%val, this%damp)
     end select
 end subroutine
 
 
-subroutine mbd_get_gradients(calc, gradients)  ! 3 by N  dE/dR
-    type(mbd_calc), intent(in) :: calc
+subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
+    class(mbd_calc), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
 
-    gradients = transpose(calc%results%gradients)
+    gradients = transpose(this%results%gradients)
 end subroutine
 
 
-subroutine mbd_get_lattice_derivs(calc, latt_derivs)  ! 3 by 3  (dE/d{abc}_i)
-    type(mbd_calc), intent(in) :: calc
+subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)  ! 3 by 3  (dE/d{abc}_i)
+    class(mbd_calc), intent(in) :: this
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
 end subroutine
 
 
-subroutine mbd_get_spectrum_modes(calc, spectrum, modes)
-    type(mbd_calc), intent(inout) :: calc
+subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(out) :: spectrum(:)
     real(dp), intent(out), optional :: modes(:, :)
     ! TODO document that this can be called only once
 
-    spectrum = calc%results%mode_enes
+    spectrum = this%results%mode_enes
     if (present(modes)) then
-        modes = calc%results%modes
+        modes = this%results%modes
     end if
 end subroutine
 

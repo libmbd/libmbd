@@ -3,9 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_api_tests
 
-use mbd_api, only: mbd_input, mbd_calc, mbd_init, mbd_update_coords, &
-    mbd_update_vdw_params_custom, mbd_update_vdw_params_from_ratios, &
-    mbd_get_energy, mbd_get_gradients, mbd_get_damping_parameters, &
+use mbd_api, only: mbd_input, mbd_calc, mbd_get_damping_parameters, &
     mbd_get_free_vdw_params
 
 implicit none
@@ -33,16 +31,16 @@ failed = .false.
 allocate (free_values(3, 2))
 call mbd_get_free_vdw_params(['Ar', 'Ar'], 'ts', free_values)
 call mbd_get_damping_parameters('pbe', inp%mbd_beta, inp%ts_d)
-call mbd_init(calc, inp)
-call mbd_update_coords(calc, reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2]))
-call mbd_update_vdw_params_custom(calc, [11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
-call mbd_get_energy(calc, energy)
+call calc%init(inp)
+call calc%update_coords(reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2]))
+call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+call calc%get_energy(energy)
 call check('Ar2 energy', energy, -2.4329456747018696d-4, 1d-10)
 allocate (gradients(3, 2))
-call mbd_get_gradients(calc, gradients)
+call calc%get_gradients(gradients)
 call check('Ar2 sum(abs(gradients))', sum(abs(gradients)), 2.3279742219399908d-4, 1d-10)
-call mbd_update_vdw_params_from_ratios(calc, [1d0, 1d0], free_values)
-call mbd_get_energy(calc, energy)
+call calc%update_vdw_params_from_ratios([1d0, 1d0], free_values)
+call calc%get_energy(energy)
 call check('Ar2 energy 2', energy, -0.0002462647623815428d0, 1d-10)
 
 #ifdef WITH_SCALAPACK

@@ -81,7 +81,7 @@ with open('src/mbd.h') as f:
 
 setup(
     name='pymbd',
-    version='0.3.2',
+    version='0.4.0a1',
     description='Many-body dispersion method',
     author='Jan Hermann',
     author_email='dev@janhermann.cz',
@@ -89,7 +89,7 @@ setup(
     packages=['pymbd'],
     package_data={'pymbd': ['vdw-params.csv']},
     classifiers=[
-        'Development Status :: 4 - Beta',
+        'Development Status :: 3 - Alpha',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)',

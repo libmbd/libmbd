@@ -5,7 +5,14 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from pymbd import ang, MBDCalc, from_volumes, numerical_gradients
+from pymbd import ang, MBDCalc, from_volumes, numerical_gradients, with_mpi
+
+if with_mpi:
+    from mpi4py import MPI
+    n_tasks = MPI.COMM_WORLD.Get_size()
+else:
+    n_tasks = 1
+no_scalapack = pytest.mark.skipif(n_tasks > 1, reason="doesn't support scalapack")
 
 benzene_dimer = [(
     np.array([
@@ -75,6 +82,7 @@ def test_argon_dimer_plain(calc):
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
 
+@no_scalapack
 def test_argon_dimer_rpa(calc):
     ene = calc.mbd_energy(
         [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,

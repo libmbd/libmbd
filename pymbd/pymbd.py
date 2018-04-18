@@ -9,9 +9,9 @@ import csv
 from itertools import product
 from ._libmbd import ffi as _ffi, lib as _lib
 if _lib.with_mpi:
-    from mpi4py import MPI
-    MPI.COMM_WORLD
+    from mpi4py import MPI  # noqa
 
+with_mpi = _lib.with_mpi
 ang = 1/0.529177249
 
 

@@ -43,6 +43,7 @@ type :: mbd_input
     integer :: k_grid(3)  ! number of k-points along reciprocal axes
     ! is there vacuum along some axes in a periodic calculation
     logical :: vacuum_axis(3) = [.false., .false., .false.]
+    real(dp), allocatable :: free_values(:, :)
 end type
 
 type mbd_calc
@@ -54,6 +55,7 @@ type mbd_calc
     character(len=30) :: dispersion_type
     type(mbd_calc_inner) :: calc
     type(mbd_result) :: results
+    real(dp), allocatable :: free_values(:, :)
 contains
     procedure :: init => mbd_calc_init
     procedure :: update_coords => mbd_calc_update_coords
@@ -93,6 +95,7 @@ subroutine mbd_calc_init(this, input)
     this%sys%k_grid = input%k_grid
     this%sys%vacuum_axis = input%vacuum_axis
     call init_grid(this%calc)
+    this%free_values = input%free_values
 end subroutine
 
 
@@ -129,10 +132,9 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw, dalpha_0,
 end subroutine
 
 
-subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios, free_values, dratios)
+subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios, dratios)
     class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: ratios(:)
-    real(dp), intent(in) :: free_values(:, :)
     real(dp), intent(in), optional :: dratios(:, :, :)
 
     type(vecn) :: vols, ones
@@ -140,9 +142,9 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios, free_values, dra
     allocate (ones%val(size(ratios)), source=1d0)
     vols%val = ratios
     if (present(dratios)) vols%dr = dratios
-    this%alpha_0 = scale_TS(vecn(free_values(1, :)), vols, ones, 1d0)
-    this%C6 = scale_TS(vecn(free_values(2, :)), vols, ones, 2d0)
-    this%damp%r_vdw = scale_TS(vecn(free_values(3, :)), vols, ones, 1d0/3)
+    this%alpha_0 = scale_TS(vecn(this%free_values(1, :)), vols, ones, 1d0)
+    this%C6 = scale_TS(vecn(this%free_values(2, :)), vols, ones, 2d0)
+    this%damp%r_vdw = scale_TS(vecn(this%free_values(3, :)), vols, ones, 1d0/3)
 end subroutine
 
 
@@ -201,15 +203,16 @@ subroutine mbd_get_damping_parameters(xc, mbd_beta, ts_sr)
 end subroutine
 
 
-subroutine mbd_get_free_vdw_params(atom_types, table_type, free_values)
+function mbd_get_free_vdw_params(atom_types, table_type) result(free_values)
     character(len=*), intent(in) :: atom_types(:)  ! e.g. ['Ar', 'Ar']
     character(len=*), intent(in) :: table_type  ! either "ts" or "ts_surf"
-    real(dp), intent(out) :: free_values(:, :)  ! 3 by N (alpha_0, C6, R_vdw)
+    ! 3 by N (alpha_0, C6, R_vdw)
+    real(dp) :: free_values(3, size(atom_types))
 
     select case (table_type)
     case ('ts')
         free_values = default_vdw_params(:, species_index(atom_types))
     end select
-end subroutine
+end function
 
 end module

@@ -116,6 +116,7 @@ def test_benzene_dimer(calc):
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
+@no_scalapack
 def test_benzene_gradients(calc):
     coords, species, vols = benzene_dimer[0]
     ene, gradients = calc.mbd_energy_species(
@@ -128,6 +129,7 @@ def test_benzene_gradients(calc):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
 
 
+@no_scalapack
 def test_benzene_dimer_python(calc):
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
@@ -139,6 +141,7 @@ def test_benzene_dimer_python(calc):
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
+@no_scalapack
 def test_benzene_gradients_plain(calc):
     coords, species, vols = benzene_dimer[0]
     ene, gradients = calc.mbd_energy_species(
@@ -182,6 +185,7 @@ def test_benzene(calc):
     assert ene == approx(-0.007002398506090302, rel=1e-10)
 
 
+@no_scalapack
 def test_benzene_rpa(calc):
     coords, species, vols = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vols)
@@ -189,6 +193,7 @@ def test_benzene_rpa(calc):
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
+@no_scalapack
 def test_ethylcarbamate(calc):
     enes = [
         calc.mbd_energy_species(
@@ -201,6 +206,7 @@ def test_ethylcarbamate(calc):
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
+@no_scalapack
 def test_ethylcarbamate_python(calc):
     enes = [
         calc.pymbd_energy_species(
@@ -213,6 +219,7 @@ def test_ethylcarbamate_python(calc):
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
+@no_scalapack
 def test_ethylcarbamate_scs(calc):
     enes = [
         calc.mbd_energy_species(

@@ -110,6 +110,10 @@ type :: mbd_system
     procedure :: has_exc => mbd_system_has_exc
 end type mbd_system
 
+#ifdef WITH_SCALAPACK
+external :: DGSUM2D
+#endif
+
 contains
 
 
@@ -1001,8 +1005,9 @@ function contract_polarizability(alpha_full) result(alpha)
     type(mat3n3n), intent(in) :: alpha_full
     real(dp) :: alpha(alpha_full%blacs%n_atoms)
 
-    integer :: i_xyz, my_j_atom
+    integer :: i_xyz, my_j_atom, n_atoms
 
+    n_atoms = alpha_full%blacs%n_atoms
     alpha(:) = 0.d0
     do my_j_atom = 1, size(alpha_full%blacs%j_atom)
         associate (j_atom => alpha_full%blacs%j_atom(my_j_atom))
@@ -1013,6 +1018,9 @@ function contract_polarizability(alpha_full) result(alpha)
         end associate
     end do
     alpha = alpha/3
+#ifdef WITH_SCALAPACK
+    call DGSUM2D(alpha_full%blacs%grid%ctx, 'A', ' ', n_atoms, 1, alpha, n_atoms, -1, -1)
+#endif
 end function contract_polarizability
 
 

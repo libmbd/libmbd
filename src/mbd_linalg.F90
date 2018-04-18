@@ -48,7 +48,7 @@ end interface
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
     ZGEEV, ZGEEB, DSYTRI, DSYTRF
 #ifdef WITH_SCALAPACK
-external :: PDSYEV
+external :: PDSYEV, PDGETRF, PDGETRI
 #endif
 
 contains
@@ -166,12 +166,62 @@ subroutine invh_re_(A, exc, src)
     call fill_tril(A)
 end subroutine
 
+#ifdef WITH_SCALAPACK
+subroutine pinvh_re_(A, blacs, exc, src)
+    real(dp), intent(inout) :: A(:, :)
+    type(mbd_blacs), intent(in) :: blacs
+    type(exception), intent(out), optional :: exc
+    real(dp), intent(in), optional :: src(:, :)
+
+    integer, allocatable :: i_pivot(:), iwork_arr(:)
+    real(dp), allocatable :: work_arr(:)
+    integer :: n, n_work_arr, error_flag, n_iwork_arr
+    real(dp) :: n_work_arr_optim
+
+    n = 3*blacs%n_atoms
+    if (n == 0) return
+    if (present(src)) A = src
+    allocate (i_pivot(n))
+    call PDGETRF(n, n, A, 1, 1, blacs%desc, i_pivot, error_flag)
+    ! call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
+    if (error_flag /= 0) then
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'PDGETRF'
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+        end if
+        return
+    endif
+    call PDGETRI( &
+        n, A, 1, 1, blacs%desc, i_pivot, &
+        n_work_arr_optim, -1, n_iwork_arr, -1, error_flag &
+    )
+    n_work_arr = nint(n_work_arr_optim)
+    allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr))
+    call PDGETRI( &
+        n, A, 1, 1, blacs%desc, i_pivot, &
+        work_arr, n_work_arr, iwork_arr, n_iwork_arr, error_flag)
+    if (error_flag /= 0) then
+        if (present(exc)) then
+            exc%label = 'linalg'
+            exc%origin = 'PDSYTRI'
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+        end if
+        return
+    endif
+end subroutine
+#endif
+
 subroutine invh_mat3n3n_(A, exc, src)
     type(mat3n3n), intent(inout) :: A
     type(exception), intent(out), optional :: exc
     type(mat3n3n), intent(in), optional :: src
 
-    call invh(A%re, exc, src%re)
+#ifndef WITH_SCALAPACK
+    call invh_re_(A%re, exc, src%re)
+#else
+    call pinvh_re_(A%re, A%blacs, exc, src%re)
+#endif
 end subroutine
 
 function inverse(A, exc)

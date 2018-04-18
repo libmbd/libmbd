@@ -11,7 +11,7 @@ use mbd_common, only: diff7
 
 implicit none
 
-#ifdef WITH_MPI
+#ifdef WITH_SCALAPACK
 external :: MPI_INIT, MPI_FINALIZE
 integer :: err
 #endif
@@ -19,7 +19,7 @@ integer :: err
 integer :: n_failed, n_all
 type(mbd_calc), target :: calc
 
-#ifdef WITH_MPI
+#ifdef WITH_SCALAPACK
 call MPI_INIT(err)
 #endif
 
@@ -45,7 +45,7 @@ write (6, *) &
     trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
 if (n_failed /= 0) stop 1
 
-#ifdef WITH_MPI
+#ifdef WITH_SCALAPACK
 call MPI_FINALIZE(err)
 #endif
 

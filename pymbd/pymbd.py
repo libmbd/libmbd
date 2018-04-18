@@ -8,10 +8,10 @@ import sys
 import csv
 from itertools import product
 from ._libmbd import ffi as _ffi, lib as _lib
-if _lib.with_mpi:
+if _lib.with_scalapack:
     from mpi4py import MPI  # noqa
 
-with_mpi = _lib.with_mpi
+with_scalapack = _lib.with_scalapack
 ang = 1/0.529177249
 
 

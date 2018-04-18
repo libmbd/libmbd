@@ -1,6 +1,6 @@
 // vim: set ft=c:
 
-extern const _Bool with_mpi;
+extern const _Bool with_scalapack;
 
 struct MBD_calc {
     int n_freq;

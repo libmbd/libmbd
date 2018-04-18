@@ -10,7 +10,7 @@ use mbd_api, only: mbd_input, mbd_calc, mbd_init, mbd_update_coords, &
 
 implicit none
 
-#ifdef WITH_MPI
+#ifdef WITH_SCALAPACK
 external :: MPI_INIT, MPI_FINALIZE
 integer :: err
 #endif
@@ -24,7 +24,7 @@ real(dp) :: energy
 real(dp), allocatable :: gradients(:, :), free_values(:, :)
 logical :: failed
 
-#ifdef WITH_MPI
+#ifdef WITH_SCALAPACK
 call MPI_INIT(err)
 #endif
 
@@ -45,7 +45,7 @@ call mbd_update_vdw_params_from_ratios(calc, [1d0, 1d0], free_values)
 call mbd_get_energy(calc, energy)
 call check('Ar2 energy 2', energy, -0.0002462647623815428d0, 1d-10)
 
-#ifdef WITH_MPI
+#ifdef WITH_SCALAPACK
 call MPI_FINALIZE(err)
 #endif
 

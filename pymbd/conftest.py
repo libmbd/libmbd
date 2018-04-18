@@ -1,6 +1,6 @@
-from pymbd import with_mpi
+from pymbd import with_scalapack
 
-if with_mpi:
+if with_scalapack:
     from mpi4py import MPI
     from functools import wraps
     import py._io.terminalwriter

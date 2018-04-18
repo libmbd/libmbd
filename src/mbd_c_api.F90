@@ -13,9 +13,9 @@ use mbd_types, only: mat3n3n, vecn
 implicit none
 
 #ifdef WITH_SCALAPACK
-logical(c_bool), bind(c) :: with_mpi = .true.
+logical(c_bool), bind(c) :: with_scalapack = .true.
 #else
-logical(c_bool), bind(c) :: with_mpi = .false.
+logical(c_bool), bind(c) :: with_scalapack = .false.
 #endif
 
 type, bind(c) :: mbd_calc_c

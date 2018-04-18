@@ -5,9 +5,9 @@ import numpy as np
 import pytest
 from pytest import approx
 
-from pymbd import ang, MBDCalc, from_volumes, numerical_gradients, with_mpi
+from pymbd import ang, MBDCalc, from_volumes, numerical_gradients, with_scalapack
 
-if with_mpi:
+if with_scalapack:
     from mpi4py import MPI
     n_tasks = MPI.COMM_WORLD.Get_size()
 else:

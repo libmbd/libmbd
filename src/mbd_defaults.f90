@@ -11,7 +11,7 @@ real(dp), parameter :: TS_ENERGY_ACCURACY = 1d-6
 real(dp), parameter :: TS_FORCES_ACCURACY = 1d-7
 integer, parameter :: N_FREQUENCY_GRID = 15
 real(dp), parameter :: K_GRID_SHIFT = 0.5d0
-real(dp), parameter :: TS_DAMPING_D = 20.d0
-real(dp), parameter :: MBD_DAMPING_A = 6.d0
+real(dp), parameter :: TS_DAMPING_D = 20d0
+real(dp), parameter :: MBD_DAMPING_A = 6d0
 
 end module

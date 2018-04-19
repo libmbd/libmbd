@@ -13,7 +13,7 @@ external :: MPI_INIT, MPI_FINALIZE
 integer :: err
 #endif
 
-integer, parameter :: dp = kind(0.d0)
+integer, parameter :: dp = kind(0d0)
 real(dp), parameter :: ang = 1.8897259886d0
 
 type(mbd_input) :: inp

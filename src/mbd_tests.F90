@@ -101,7 +101,7 @@ subroutine test_T_bare_deriv()
     r = [1.12d0, -2.12d0, 0.12d0]
     T = T_bare_v2(r, deriv=.true.)
     T_diff_anl = T%dr(:, :, :)
-    diff = 0.d0
+    diff = 0d0
     do c = 1, 3
         do i_step = -3, 3
             if (i_step == 0) cycle
@@ -134,7 +134,7 @@ subroutine test_T_GG_deriv_expl()
     sigma = 1.2d0
     T = T_erf_coulomb(r, sigma, deriv=.true.)
     T_diff_anl = T%dr
-    diff = 0.d0
+    diff = 0d0
     do c = 1, 3
         do i_step = -3, 3
             if (i_step == 0) cycle
@@ -197,12 +197,12 @@ subroutine test_T_fermi_deriv_impl()
     r = [1.02d0, -2.22d0, 0.15d0]
     rvdw = 2.5d0
     drvdw_dr = -0.3d0
-    T = damping_fermi(r, rvdw, 6.d0, .true.).prod.T_bare_v2(r, .true.)
+    T = damping_fermi(r, rvdw, 6d0, .true.).prod.T_bare_v2(r, .true.)
     T_diff_anl = T%dvdw(:, :)*drvdw_dr
     do i_step = -3, 3
         if (i_step == 0) cycle
         rvdw_diff =rvdw+i_step*delta*drvdw_dr
-        T = damping_fermi(r, rvdw_diff, 6.d0, .false.).prod.T_bare_v2(r, .false.)
+        T = damping_fermi(r, rvdw_diff, 6d0, .false.).prod.T_bare_v2(r, .false.)
         T_diff_num(:, :, i_step) = T%val
     end do
     forall (a = 1:3, b = 1:3)
@@ -228,11 +228,11 @@ subroutine test_mbd_deriv_expl()
 
     delta = 0.05d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -240,7 +240,7 @@ subroutine test_mbd_deriv_expl()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     C6 = [65d0, 65d0, 65d0]
     ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_gradients = .false.
@@ -275,11 +275,11 @@ subroutine test_scs_deriv_expl()
 
     delta = 0.05d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -287,7 +287,7 @@ subroutine test_scs_deriv_expl()
     damp%version = 'fermi,dip,gg'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
     sys%do_gradients = .false.
     do i_atom = 1, n_atoms
@@ -327,11 +327,11 @@ subroutine test_scs_deriv_impl_alpha
 
     delta = 0.1d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -339,7 +339,7 @@ subroutine test_scs_deriv_impl_alpha
     damp%version = 'fermi,dip,gg'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
-    alpha_0%val = [11.d0, 11.d0, 11.d0]
+    alpha_0%val = [11d0, 11d0, 11d0]
     allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
     alpha_scs(0) = run_scs(sys, alpha_0, damp)
     sys%do_gradients = .false.
@@ -381,11 +381,11 @@ subroutine test_scs_deriv_impl_vdw
 
     delta = 0.1d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -395,7 +395,7 @@ subroutine test_scs_deriv_impl_vdw
     damp%r_vdw%val = rvdw
     allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=0.2d0)
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
     sys%do_gradients = .false.
     do i_atom = 1, n_atoms
@@ -437,18 +437,18 @@ subroutine test_mbd_deriv_impl_alpha()
 
     delta = 1d-2
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    alpha_0%val= [11.d0, 11.d0, 11.d0]
+    alpha_0%val= [11d0, 11d0, 11d0]
     allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
     damp%beta = 0.83d0
     C6 = [65d0, 65d0, 65d0]
@@ -488,10 +488,10 @@ subroutine test_mbd_deriv_impl_C6()
 
     delta = 0.03d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -499,7 +499,7 @@ subroutine test_mbd_deriv_impl_C6()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     C6%val = [65d0, 65d0, 65d0]
     allocate (C6%dr(n_atoms, n_atoms, 3), source=0.2d0)
     ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), C6, damp)
@@ -538,10 +538,10 @@ subroutine test_mbd_deriv_impl_vdw()
 
     delta = 1d-3
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -551,7 +551,7 @@ subroutine test_mbd_deriv_impl_vdw()
     damp%r_vdw%val = rvdw
     allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=5d0)
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     C6 = [65d0, 65d0, 65d0]
     ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_gradients = .false.
@@ -588,18 +588,18 @@ subroutine test_mbd_rsscs_deriv_expl()
 
     delta = 0.03d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     C6 = [65d0, 65d0, 65d0]
     ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_gradients = .false.
@@ -636,18 +636,18 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
 
     delta = 1d-2
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1.d0*ang
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(1, 3) = 1d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    alpha_0%val= [11.d0, 11.d0, 11.d0]
+    alpha_0%val= [11d0, 11d0, 11d0]
     allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
     damp%beta = 0.83d0
     C6 = [65d0, 65d0, 65d0]
@@ -687,10 +687,10 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
 
     delta = 0.03d0
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -698,7 +698,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     damp%version = 'fermi,dip'
     damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     C6%val = [65d0, 65d0, 65d0]
     allocate (C6%dr(n_atoms, n_atoms, 3), source=0.2d0)
     ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), C6, damp)
@@ -737,10 +737,10 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
 
     delta = 1d-3
     n_atoms = 3
-    allocate (coords(3, n_atoms), source=0.d0)
+    allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4.d0*ang
-    coords(3, 2) = 4.d0*ang
+    coords(2, 1) = 4d0*ang
+    coords(3, 2) = 4d0*ang
     sys%calc => calc
     sys%coords = coords
     sys%do_gradients = .true.
@@ -750,7 +750,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     damp%r_vdw%val = rvdw
     allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=5d0)
     damp%beta = 0.83d0
-    alpha_0 = [11.d0, 11.d0, 11.d0]
+    alpha_0 = [11d0, 11d0, 11d0]
     C6 = [65d0, 65d0, 65d0]
     ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
     sys%do_gradients = .false.

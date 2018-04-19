@@ -31,11 +31,11 @@ integer, parameter :: n_timestamps = 100
 
 type :: mbd_param
     real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
-    real(dp) :: ts_cutoff_radius = 50.d0*ang
-    real(dp) :: dipole_low_dim_cutoff = 100.d0*ang
-    real(dp) :: dipole_cutoff = 400.d0*ang  ! used only when Ewald is off
-    real(dp) :: ewald_real_cutoff_scaling = 1.d0
-    real(dp) :: ewald_rec_cutoff_scaling = 1.d0
+    real(dp) :: ts_cutoff_radius = 50d0*ang
+    real(dp) :: dipole_low_dim_cutoff = 100d0*ang
+    real(dp) :: dipole_cutoff = 400d0*ang  ! used only when Ewald is off
+    real(dp) :: ewald_real_cutoff_scaling = 1d0
+    real(dp) :: ewald_rec_cutoff_scaling = 1d0
     real(dp) :: k_grid_shift = K_GRID_SHIFT
     logical :: ewald_on = .true.
     logical :: zero_negative_eigs = .false.
@@ -67,11 +67,11 @@ end type mbd_calc
 
 type :: mbd_damping
     character(len=20) :: version
-    real(dp) :: beta = 0.d0
+    real(dp) :: beta = 0d0
     real(dp) :: a = MBD_DAMPING_A
     real(dp) :: ts_d = TS_DAMPING_D
-    real(dp) :: ts_sr = 0.d0
-    real(dp) :: mayer_scaling = 1.d0
+    real(dp) :: ts_sr = 0d0
+    real(dp) :: mayer_scaling = 1d0
     type(vecn) :: r_vdw
     type(vecn) :: sigma
     real(dp), allocatable :: damping_custom(:, :)
@@ -95,7 +95,7 @@ type :: mbd_system
     type(mbd_calc), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
     logical :: periodic = .false.
-    logical :: vacuum_axis(3) = (/ .false., .false., .false. /)
+    logical :: vacuum_axis(3) = [.false., .false., .false.]
     real(dp) :: lattice(3, 3)  ! vectors in columns
     integer :: k_grid(3)
     integer :: supercell(3)
@@ -140,7 +140,7 @@ type(mbd_result) function mbd_rsscs_energy(sys, alpha_0, C6, damp)
     if (sys%has_exc()) return
     C6_rsscs = get_C6_from_alpha(sys%calc, alpha_dyn_rsscs)
     damp_mbd%version = 'fermi,dip'
-    damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1.d0/3)
+    damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_rsscs(0), alpha_dyn(0), 1d0/3)
     damp_mbd%beta = damp%beta
     mbd_rsscs_energy = get_mbd_energy(sys, alpha_dyn_rsscs(0), C6_rsscs, damp_mbd)
 end function mbd_rsscs_energy
@@ -168,9 +168,9 @@ type(mbd_result) function mbd_scs_energy(sys, alpha_0, C6, damp)
     end do
     if (sys%has_exc()) return
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs)
-    damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_scs(0), alpha_dyn(0), 1.d0/3)
+    damp_mbd%r_vdw = scale_TS(damp%R_vdw, alpha_dyn_scs(0), alpha_dyn(0), 1d0/3)
     damp_mbd%version = 'dip,1mexp'
-    damp_mbd%beta = 1.d0
+    damp_mbd%beta = 1d0
     damp_mbd%a = damp%a
     mbd_scs_energy = get_mbd_energy(sys, alpha_dyn_scs(0), C6_scs, damp_mbd)
 end function mbd_scs_energy
@@ -186,27 +186,27 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
     real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3)
     type(scalar) :: f_damp
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
-    real(dp), parameter :: shell_thickness = 10.d0
+    real(dp), parameter :: shell_thickness = 10d0
     logical :: is_crystal
 
     is_crystal = sys%periodic
-    ene = 0.d0
+    ene = 0d0
     i_shell = 0
     do
         i_shell = i_shell+1
-        ene_shell = 0.d0
+        ene_shell = 0d0
         if (is_crystal) then
             range_cell = supercell_circum(sys, sys%lattice, i_shell*shell_thickness)
         else
-            range_cell = (/ 0, 0, 0 /)
+            range_cell = [0, 0, 0]
         end if
-        idx_cell = (/ 0, 0, -1 /)
+        idx_cell = [0, 0, -1]
         do i_cell = 1, product(1+2*range_cell)
             call shift_cell(idx_cell, -range_cell, range_cell)
             if (is_crystal) then
                 R_cell = matmul(sys%lattice, idx_cell)
             else
-                R_cell = (/ 0.d0, 0.d0, 0.d0 /)
+                R_cell = [0d0, 0d0, 0d0]
             end if
             do i_atom = 1, sys%siz()
                 do j_atom = 1, i_atom
@@ -282,16 +282,16 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
     my_nratoms = size(dipmat%blacs%i_atom)
     my_ncatoms = size(dipmat%blacs%j_atom)
     if (present(k_point)) then
-        allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0.d0, 0.d0))
+        allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0d0, 0d0))
     else
-        allocate (dipmat%re(3*my_nratoms, 3*my_ncatoms), source=0.d0)
+        allocate (dipmat%re(3*my_nratoms, 3*my_ncatoms), source=0d0)
         if (sys%do_gradients) then
-            allocate (dipmat%re_dr(3*my_nratoms, 3*my_ncatoms, 3), source=0.d0)
+            allocate (dipmat%re_dr(3*my_nratoms, 3*my_ncatoms, 3), source=0d0)
             if (allocated(damp%r_vdw%dr)) then
-                allocate (dipmat%re_dvdw(3*my_nratoms, 3*my_ncatoms), source=0.d0)
+                allocate (dipmat%re_dvdw(3*my_nratoms, 3*my_ncatoms), source=0d0)
             end if
             if (allocated(damp%sigma%dr)) then
-                allocate (dipmat%re_dsigma(3*my_nratoms, 3*my_ncatoms), source=0.d0)
+                allocate (dipmat%re_dsigma(3*my_nratoms, 3*my_ncatoms), source=0d0)
             end if
         end if
     end if
@@ -302,9 +302,9 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
         else if (sys%calc%param%ewald_on) then
             do_ewald = .true.
             volume = max(abs(dble(product(eigvals(sys%lattice)))), 0.2d0)
-            ewald_alpha = 2.5d0/(volume)**(1.d0/3)
+            ewald_alpha = 2.5d0/(volume)**(1d0/3)
             real_space_cutoff = &
-                6.d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
+                6d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
             sys%calc%info%ewald_alpha = &
                 'Ewald: using alpha = ' // trim(tostr(ewald_alpha)) // &
                 ', real cutoff = ' // trim(tostr(real_space_cutoff))
@@ -323,13 +323,13 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
             trim(tostr(1+2*range_cell(3)))
     end if
     call ts(sys%calc, 11)
-    idx_cell = (/ 0, 0, -1 /)
+    idx_cell = [0, 0, -1]
     do i_cell = 1, product(1+2*range_cell)
         call shift_cell(idx_cell, -range_cell, range_cell)
         if (sys%periodic) then
             R_cell = matmul(sys%lattice, idx_cell)
         else
-            R_cell(:) = 0.d0
+            R_cell(:) = 0d0
         end if
         do my_i_atom = 1, size(dipmat%blacs%i_atom)
             i_atom = dipmat%blacs%i_atom(my_i_atom)
@@ -378,7 +378,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                         )).prod.T_erf_coulomb(r, sigma_ij, sys%do_gradients)
                         do_ewald = .false.
                     case ("custom,dip,gg")
-                        f_ij = 1.d0-damp%damping_custom(i_atom, j_atom)
+                        f_ij = 1d0-damp%damping_custom(i_atom, j_atom)
                         Tpp = T_erf_coulomb(r, sigma_ij, sys%do_gradients)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
@@ -390,7 +390,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, k_point) result(dipmat)
                     Tpp%val = Tpp%val+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
                 if (present(k_point)) then
-                    Tpp_c = Tpp%val*exp(-cmplx(0.d0, 1.d0, 8)*( &
+                    Tpp_c = Tpp%val*exp(-cmplx(0d0, 1d0, 8)*( &
                         dot_product(k_point, r)))
                 end if
                 i = 3*(my_i_atom-1)
@@ -445,7 +445,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
 
     rec_unit_cell = 2*pi*inverse(transpose(sys%lattice))
     volume = abs(dble(product(eigvals(sys%lattice))))
-    rec_space_cutoff = 10.d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
+    rec_space_cutoff = 10d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
     sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
         trim(tostr(rec_space_cutoff))
@@ -455,7 +455,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         trim(tostr(1+2*range_G_vector(2))) // 'x' // &
         trim(tostr(1+2*range_G_vector(3)))
     call ts(sys%calc, 12)
-    idx_G_vector = (/ 0, 0, -1 /)
+    idx_G_vector = [0, 0, -1]
     do i_G_vector = 1, product(1+2*range_G_vector)
         call shift_cell(idx_G_vector, -range_G_vector, range_G_vector)
         if (i_G_vector == 1) cycle
@@ -477,7 +477,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
                 j_atom = dipmat%blacs%j_atom(my_j_atom)
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
                 if (present(k_point)) then
-                    Tpp_c = k_prefactor*exp(cmplx(0.d0, 1.d0, 8) &
+                    Tpp_c = k_prefactor*exp(cmplx(0d0, 1d0, 8) &
                         *dot_product(G_vector, r))
                 else
                     Tpp = k_prefactor*cos(dot_product(G_vector, r))
@@ -548,8 +548,8 @@ subroutine init_grid(calc)
     n = calc%param%n_frequency_grid
     allocate (calc%omega_grid(0:n))
     allocate (calc%omega_grid_w(0:n))
-    calc%omega_grid(0) = 0.d0
-    calc%omega_grid_w(0) = 0.d0
+    calc%omega_grid(0) = 0d0
+    calc%omega_grid_w(0) = 0d0
     call get_omega_grid(n, 0.6d0, calc%omega_grid(1:n), calc%omega_grid_w(1:n))
     calc%info%freq_n = &
         "Initialized a radial integration grid of " // trim(tostr(n)) // &
@@ -565,9 +565,9 @@ real(dp) function test_frequency_grid(calc) result(error)
 
     type(vecn) :: alpha(0:ubound(calc%omega_grid, 1)), C6
 
-    alpha = alpha_dynamic_ts(calc, vecn([21.d0]), vecn([99.5d0]))
+    alpha = alpha_dynamic_ts(calc, vecn([21d0]), vecn([99.5d0]))
     C6 = get_C6_from_alpha(calc, alpha)
-    error = abs(C6%val(1)/99.5d0-1.d0)
+    error = abs(C6%val(1)/99.5d0-1d0)
 end function
 
 
@@ -595,15 +595,15 @@ subroutine gauss_legendre(n, r, w)
     real(q) :: Pk(0:n), Pk1(0:n-1), Pk2(0:n-2)
 
     if (n == 1) then
-        r(1) = 0.d0
-        w(1) = 2.d0
+        r(1) = 0d0
+        w(1) = 2d0
         return
     end if
     Pk2(0) = 1._q  ! k = 0
-    Pk1(0:1) = (/ 0._q, 1._q /)  ! k = 1
+    Pk1(0:1) = [0._q, 1._q]  ! k = 1
     do k = 2, n
         Pk(0:k) = ((2*k-1) * &
-            (/ 0.0_q, Pk1(0:k-1) /)-(k-1)*(/ Pk2(0:k-2), 0._q, 0._q /))/k
+            [0._q, Pk1(0:k-1)]-(k-1)*[Pk2(0:k-2), 0._q, 0._q])/k
         if (k < n) then
             Pk2(0:k-1) = Pk1(0:k-1)
             Pk1(0:k) = Pk(0:k)
@@ -642,7 +642,7 @@ type(vecn) function run_scs(sys, alpha, damp) result(alpha_scs)
     damp_local = damp
     damp_local%sigma = get_sigma_selfint(alpha)
     alpha_full = dipole_matrix(sys, damp_local)
-    call alpha_full%add_diag(1.d0/alpha%val)
+    call alpha_full%add_diag(1d0/alpha%val)
     call ts(sys%calc, 32)
     call invh(alpha_full, sys%calc%exc)
     if (sys%has_exc()) return
@@ -654,7 +654,7 @@ type(vecn) function run_scs(sys, alpha, damp) result(alpha_scs)
     allocate (alpha_scs%dr(n_atoms, n_atoms, 3))
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            dQ%re(:, :) = 0.d0
+            dQ%re(:, :) = 0d0
             do my_i_atom = 1, size(dQ%blacs%i_atom)
                 if (i_atom == dQ%blacs%i_atom(my_i_atom)) then
                     associate (i => (my_i_atom-1)*3)
@@ -764,20 +764,20 @@ type(mbd_result) function get_single_mbd_energy( &
     call ts(sys%calc, -21)
     if (sys%get_eigs) then
         ene%mode_enes = sqrt(eigs)
-        where (eigs < 0) ene%mode_enes = 0.d0
+        where (eigs < 0) ene%mode_enes = 0d0
     end if
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
             trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
-        if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0.d0
+        if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0d0
     end if
-    ene%energy = 1.d0/2*sum(sqrt(eigs))-3.d0/2*sum(omega%val)
+    ene%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega%val)
     if (.not. sys%do_gradients) return
     allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
-    allocate (ene%gradients(n_atoms, 3), source=0.d0)
+    allocate (ene%gradients(n_atoms, 3), source=0d0)
     forall (i = 1:3*n_atoms)
-        c_lambda12i_c(:, i) = eigs(i)**(-1.d0/4)*modes%re(:, i)
+        c_lambda12i_c(:, i) = eigs(i)**(-1d0/4)*modes%re(:, i)
     end forall
     c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
     dQ%blacs = T%blacs
@@ -785,13 +785,13 @@ type(mbd_result) function get_single_mbd_energy( &
         dQ%re = -T%re_dr(:, :, i_xyz)
         call dQ%mult_cross(omega%val*sqrt(alpha_0%val))
         dQ%re = c_lambda12i_c*dQ%re
-        ene%gradients(:, i_xyz) = 1.d0/4*contract_gradients(dQ)
+        ene%gradients(:, i_xyz) = 1d0/4*contract_gradients(dQ)
     end do
     if (.not. do_impl_deriv) return
     dQ_add%blacs = T%blacs
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
-            dQ%re(:, :) = 0.d0
+            dQ%re(:, :) = 0d0
             if (allocated(omega%dr)) then
                 call dQ%add_diag(2*omega%val*omega%dr(:, i_atom, i_xyz))
                 call dQ%add(T%multed_cross( &
@@ -812,11 +812,11 @@ type(mbd_result) function get_single_mbd_energy( &
                 call dQ%add(dQ_add)
             end if
             ene%gradients(i_atom, i_xyz) = ene%gradients(i_atom, i_xyz) + &
-                1.d0/4*sum(c_lambda12i_c*dQ%re)
+                1d0/4*sum(c_lambda12i_c*dQ%re)
         end do
     end do
     if (allocated(omega%dr)) then
-        ene%gradients = ene%gradients - 3.d0/2*sum(omega%dr, 1)
+        ene%gradients = ene%gradients - 3d0/2*sum(omega%dr, 1)
     end if
 end function get_single_mbd_energy
 
@@ -843,13 +843,13 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) &
 
     allocate (alpha_ts(0:ubound(sys%calc%omega_grid, 1)))
     alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6)
-    ene%energy = 0.d0
+    ene%energy = 0d0
     if (sys%get_eigs) &
-        allocate (ene%mode_enes_k(3*n_atoms, n_kpts), source=0.d0)
+        allocate (ene%mode_enes_k(3*n_atoms, n_kpts), source=0d0)
     if (sys%get_modes) &
-        allocate (ene%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0.d0, 0.d0))
+        allocate (ene%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
     if (sys%get_rpa_orders) allocate ( &
-        ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0.d0 &
+        ene%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0d0 &
     )
     do i_kpt = 1, n_kpts
         k_point = ene%k_pts(:, i_kpt)
@@ -881,7 +881,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
     integer :: n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
 
-    ene%energy = 0.d0
+    ene%energy = 0d0
     damp_alpha = damp
     allocate (eigs(3*sys%siz()))
     do i_grid_omega = 0, ubound(sys%calc%omega_grid, 1)
@@ -900,7 +900,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
         ! relay = alpha*T
         if (sys%get_rpa_orders) AT = relay
         ! relay = 1+alpha*T
-        call relay%add_diag_scalar(1.d0)
+        call relay%add_diag_scalar(1d0)
         call ts(sys%calc, 23)
         eigs = eigvals(relay, sys%calc%exc, destroy=.true.)
         call ts(sys%calc, -23)
@@ -916,7 +916,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         end if
         ene%energy = ene%energy + &
-            1.d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
+            1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 24)
             eigs = eigvals(AT, sys%calc%exc, destroy=.true.)
@@ -925,7 +925,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(ene)
             allocate (ene%rpa_orders(sys%calc%param%rpa_order_max))
             do n_order = 2, sys%calc%param%rpa_order_max
                 ene%rpa_orders(n_order) = ene%rpa_orders(n_order) &
-                    +(-1.d0/(2*pi)*(-1)**n_order &
+                    +(-1d0/(2*pi)*(-1)**n_order &
                     *sum(dble(eigs)**n_order)/n_order) &
                     *sys%calc%omega_grid_w(i_grid_omega)
             end do
@@ -967,7 +967,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
         ! relay = alpha*T
         if (sys%get_rpa_orders) AT = relay
         do i = 1, 3*sys%siz()
-            relay%cplx(i, i) = 1.d0+relay%cplx(i, i) ! relay = 1+alpha*T
+            relay%cplx(i, i) = 1d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
         call ts(sys%calc, 25)
         eigs = eigvals(relay%cplx, sys%calc%exc, destroy=.true.)
@@ -984,7 +984,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
         end if
         ene%energy = ene%energy + &
-            1.d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
+            1d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_grid_omega)
         if (sys%get_rpa_orders) then
             call ts(sys%calc, 26)
             eigs = eigvals(AT%cplx, sys%calc%exc, destroy=.true.)
@@ -992,7 +992,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene( &
             call ts(sys%calc, -26)
             do n_order = 2, sys%calc%param%rpa_order_max
                 ene%rpa_orders(n_order) = ene%rpa_orders(n_order) + &
-                    (-1.d0)/(2*pi)*(-1)**n_order * &
+                    (-1d0)/(2*pi)*(-1)**n_order * &
                     dble(sum(eigs**n_order))/n_order * &
                     sys%calc%omega_grid_w(i_grid_omega)
             end do
@@ -1008,7 +1008,7 @@ function contract_polarizability(alpha_full) result(alpha)
     integer :: i_xyz, my_j_atom, n_atoms
 
     n_atoms = alpha_full%blacs%n_atoms
-    alpha(:) = 0.d0
+    alpha(:) = 0d0
     do my_j_atom = 1, size(alpha_full%blacs%j_atom)
         associate (j_atom => alpha_full%blacs%j_atom(my_j_atom))
             do i_xyz = 1, 3
@@ -1030,7 +1030,7 @@ function contract_gradients(relay) result(gradient)
 
     integer :: my_j_atom
 
-    gradient(:) = 0.d0
+    gradient(:) = 0d0
     do my_j_atom = 1, size(relay%blacs%j_atom)
         associate ( &
                 j_atom => relay%blacs%j_atom(my_j_atom), &
@@ -1051,9 +1051,9 @@ function T_bare(rxyz) result(T)
     r_sq = sum(rxyz(:)**2)
     r_5 = sqrt(r_sq)**5
     do i = 1, 3
-        T(i, i) = (3.d0*rxyz(i)**2-r_sq)/r_5
+        T(i, i) = (3d0*rxyz(i)**2-r_sq)/r_5
         do j = i+1, 3
-            T(i, j) = 3.d0*rxyz(i)*rxyz(j)/r_5
+            T(i, j) = 3d0*rxyz(i)*rxyz(j)/r_5
             T(j, i) = T(i, j)
         end do
     end do
@@ -1114,7 +1114,7 @@ end function
 real(dp) elemental function C_erfc(r, a) result(C)
     real(dp), intent(in) :: r, a
 
-    C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3.d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
+    C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
 end function
 
 
@@ -1148,7 +1148,7 @@ type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
 
     r_1 = sqrt(sum(r**2))
     eta = r_1/s_vdw
-    f%val = 1.d0/(1+exp(-d*(eta-1)))
+    f%val = 1d0/(1+exp(-d*(eta-1)))
     pre = d/(2+2*cosh(d-d*eta))
     if (deriv) then
         f%dr = pre*r/(r_1*s_vdw)
@@ -1185,9 +1185,9 @@ type(mat33) function T_damped__(f, T) result(fT)
 
     fT%val = f%val*T%val
     if (allocated(f%dr) .or. allocated(T%dr)) &
-        allocate (fT%dr(3, 3, 3), source=0.d0)
+        allocate (fT%dr(3, 3, 3), source=0d0)
     if (allocated(f%dvdw) .or. allocated(T%dvdw)) &
-        allocate (fT%dvdw(3, 3), source=0.d0)
+        allocate (fT%dvdw(3, 3), source=0d0)
     if (allocated(f%dr)) forall (c = 1:3) fT%dr(:, :, c) = f%dr(c)*T%val
     if (allocated(T%dr)) fT%dr = fT%dr + f%val*T%dr
     if (allocated(f%dvdw)) fT%dvdw = f%dvdw*T%val
@@ -1233,7 +1233,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     real(dp) :: r_sigma, zeta_1, zeta_2
 
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
-    zeta_1 = 1.d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
+    zeta_1 = 1d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
     T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
 end function
@@ -1246,14 +1246,14 @@ subroutine get_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
         ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
         mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta
 
-    ts_d = 20.d0
-    ts_s_r = 1.d0
-    mbd_scs_a = 2.d0
-    mbd_ts_a = 6.d0
-    mbd_ts_erf_beta = 1.d0
-    mbd_ts_fermi_beta = 1.d0
-    mbd_rsscs_a = 6.d0
-    mbd_rsscs_beta = 1.d0
+    ts_d = 20d0
+    ts_s_r = 1d0
+    mbd_scs_a = 2d0
+    mbd_ts_a = 6d0
+    mbd_ts_erf_beta = 1d0
+    mbd_ts_fermi_beta = 1d0
+    mbd_rsscs_a = 6d0
+    mbd_rsscs_beta = 1d0
     select case (xc)
         case ("pbe")
             ts_s_r = 0.94d0
@@ -1319,7 +1319,7 @@ type(vecn) function alpha_osc(alpha_0, omega, u) result(alpha)
     alpha%val = alpha_0%val/(1+(u/omega%val)**2)
     n_atoms = size(alpha_0%val)
     if (allocated(alpha_0%dr) .or. allocated(omega%dr)) then
-        allocate (alpha%dr(n_atoms, n_atoms, 3), source=0.d0)
+        allocate (alpha%dr(n_atoms, n_atoms, 3), source=0d0)
     end if
     if (allocated(alpha_0%dr)) then
         do i = 1, n_atoms
@@ -1329,8 +1329,8 @@ type(vecn) function alpha_osc(alpha_0, omega, u) result(alpha)
     if (allocated(omega%dr)) then
         do i = 1, n_atoms
             alpha%dr(i, :, :) = alpha%dr(i, :, :) + &
-                alpha%val(i)*2.d0/omega%val(i)*omega%dr(i, :, :) / &
-                (1.d0+(omega%val(i)/u)**2)
+                alpha%val(i)*2d0/omega%val(i)*omega%dr(i, :, :) / &
+                (1d0+(omega%val(i)/u)**2)
         end do
     end if
 end function
@@ -1347,7 +1347,7 @@ type(vecn) function scale_TS(X, alpha_0_sc, alpha_0, q) result(X_sc)
     n_atoms = X%siz()
     if (allocated(X%dr) .or. allocated(alpha_0_sc%dr) .or. &
             allocated(alpha_0%dr)) then
-        allocate (X_sc%dr(n_atoms, n_atoms, 3), source=0.d0)
+        allocate (X_sc%dr(n_atoms, n_atoms, 3), source=0d0)
     end if
     if (allocated(X%dr)) then
         do i = 1, n_atoms
@@ -1383,10 +1383,10 @@ type(vecn) function omega_eff(C6, alpha) result(omega)
 
     integer :: i, n_atoms
 
-    omega%val = 4.d0/3*C6%val/alpha%val**2
+    omega%val = 4d0/3*C6%val/alpha%val**2
     n_atoms = C6%siz()
     if (allocated(C6%dr) .or. allocated(alpha%dr)) then
-        allocate (omega%dr(n_atoms, n_atoms, 3), source=0.d0)
+        allocate (omega%dr(n_atoms, n_atoms, 3), source=0d0)
     end if
     if (allocated(C6%dr)) then
         do i = 1, n_atoms
@@ -1407,7 +1407,7 @@ type(vecn) function get_sigma_selfint(alpha) result(sigma)
 
     integer :: i, n_atoms
 
-    sigma%val = (sqrt(2.d0/pi)*alpha%val/3.d0)**(1.d0/3)
+    sigma%val = (sqrt(2d0/pi)*alpha%val/3d0)**(1d0/3)
     if (allocated(alpha%dr)) then
         n_atoms = alpha%siz()
         allocate (sigma%dr(n_atoms, n_atoms, 3))
@@ -1425,17 +1425,17 @@ type(vecn) function get_C6_from_alpha(calc, alpha) result(C6)
     integer :: i_atom, i_freq, n_atoms
 
     n_atoms = alpha(0)%siz()
-    allocate (C6%val(n_atoms), source=0.d0)
+    allocate (C6%val(n_atoms), source=0d0)
     do i_freq = 0, ubound(alpha, 1)
         C6%val = C6%val + &
-            3.d0/pi*alpha(i_freq)%val**2*calc%omega_grid_w(i_freq)
+            3d0/pi*alpha(i_freq)%val**2*calc%omega_grid_w(i_freq)
     end do
     if (allocated(alpha(0)%dr)) then
-        allocate (C6%dr(n_atoms, n_atoms, 3), source=0.d0)
+        allocate (C6%dr(n_atoms, n_atoms, 3), source=0d0)
         do i_freq = 0, ubound(alpha, 1)
             do i_atom = 1, n_atoms
                 C6%dr(i_atom, :, :) = C6%dr(i_atom, :, :) + &
-                    6.d0/pi*alpha(i_freq)%val(i_atom) * &
+                    6d0/pi*alpha(i_freq)%val(i_atom) * &
                     alpha(i_freq)%dr(i_atom, :, :)*calc%omega_grid_w(i_freq)
             end do
         end do
@@ -1485,10 +1485,10 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
     integer :: g_kpt(3), i_kpt, kpt_range(3)
     real(dp) :: g_kpt_shifted(3)
 
-    g_kpt = (/ 0, 0, -1 /)
-    kpt_range = (/ n1, n2, n3 /)
+    g_kpt = [0, 0, -1]
+    kpt_range = [n1, n2, n3]
     do i_kpt = 1, n1*n2*n3
-        call shift_cell (g_kpt, (/ 0, 0, 0 /), kpt_range-1)
+        call shift_cell (g_kpt, [0, 0, 0], kpt_range-1)
         g_kpt_shifted = dble(g_kpt)+calc%param%k_grid_shift
         where (2*g_kpt_shifted > kpt_range)
             g_kpt_shifted = g_kpt_shifted-dble(kpt_range)

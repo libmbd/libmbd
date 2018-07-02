@@ -6,8 +6,7 @@ from __future__ import division, print_function
 import numpy as np
 
 from .pymbd import _array, from_volumes
-from ._libmbd import ffi as _ffi
-from ._libmbd import lib as _lib
+from ._libmbd import ffi as _ffi, lib as _lib
 
 with_scalapack = _lib.with_scalapack
 if with_scalapack:
@@ -16,37 +15,34 @@ if with_scalapack:
 
 class MBDCalc(object):
     def __init__(self, n_freq=15):
-        self.__calc = None
+        self._calc_obj = None
         self.n_freq = n_freq
 
     def __enter__(self):
-        self.__calc = _lib.mbd_init_calc(self.n_freq)
+        self._calc_obj = _lib.mbd_init_calc(self.n_freq)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         _lib.mbd_destroy_calc(self._calc)
-        self.__calc = None
+        self._calc_obj = None
 
     @property
     def _calc(self):
-        if not self.__calc:
+        if not self._calc_obj:
             raise RuntimeError('MBDCalc must be used as a context manager')
-        return self.__calc
+        return self._calc_obj
 
     @property
     def omega_grid(self):
         return (
-            _ndarray(self._calc.omega_grid, (self._calc.n_freq+1,)).copy(),
-            _ndarray(self._calc.omega_grid_w, (self._calc.n_freq+1,)).copy(),
+            _ndarray(self._calc.omega_grid, (self.n_freq+1,)).copy(),
+            _ndarray(self._calc.omega_grid_w, (self.n_freq+1,)).copy(),
         )
 
     def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
                   lattice=None, d=20., damping='fermi'):
-        coords = _array(coords, dtype=float)
-        alpha_0 = _array(alpha_0, dtype=float)
-        C6 = _array(C6, dtype=float)
-        R_vdw = _array(R_vdw, dtype=float)
-        lattice = _array(lattice, dtype=float)
+        coords, alpha_0, C6, R_vdw, lattice = \
+            map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
             self._calc,
@@ -56,7 +52,7 @@ class MBDCalc(object):
             _ffi.NULL,
         )
         damping = _lib.mbd_init_damping(
-            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d,
+            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
         )
         ene = _lib.calc_ts_energy(
             system,
@@ -74,11 +70,8 @@ class MBDCalc(object):
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,
                    damping='fermi,dip'):
-        coords = _array(coords, dtype=float)
-        alpha_0 = _array(alpha_0, dtype=float)
-        C6 = _array(C6, dtype=float)
-        R_vdw = _array(R_vdw, dtype=float)
-        lattice = _array(lattice, dtype=float)
+        coords, alpha_0, C6, R_vdw, lattice = \
+            map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         k_grid = _array(k_grid, dtype='i4')
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
@@ -108,11 +101,8 @@ class MBDCalc(object):
 
     def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,
                       R_vdw=None, sigma=None, a=6.):
-        coords = _array(coords, dtype=float)
-        R_vdw = _array(R_vdw, dtype=float)
-        sigma = _array(sigma, dtype=float)
-        lattice = _array(lattice, dtype=float)
-        k_point = _array(k_point, dtype=float)
+        coords, R_vdw, sigma, lattice, k_point = \
+            map(_array, (coords, R_vdw, sigma, lattice, k_point))
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
             self._calc,
@@ -151,13 +141,9 @@ class MBDCalc(object):
 
 
 def _ndarray(ptr, shape=None, dtype='float'):
+    buffer_size = (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
     return np.ndarray(
-        buffer=_ffi.buffer(
-            ptr,
-            (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
-        ),
-        shape=shape,
-        dtype=dtype,
+        buffer=_ffi.buffer(ptr, buffer_size), shape=shape, dtype=dtype,
     )
 
 

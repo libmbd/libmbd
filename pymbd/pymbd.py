@@ -8,8 +8,8 @@ import sys
 from itertools import product
 
 import numpy as np
-import pkg_resources
 from numpy.polynomial.legendre import leggauss
+from pkg_resources import resource_string
 
 from scipy.special import erf, erfc
 
@@ -18,10 +18,7 @@ ang = 1/0.529177249
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
                nfreq=15):
-    coords = _array(coords, dtype=float)
-    alpha_0 = _array(alpha_0, dtype=float)
-    C6 = _array(C6, dtype=float)
-    R_vdw = _array(R_vdw, dtype=float)
+    coords, alpha_0, C6, R_vdw = map(_array, (coords, alpha_0, C6, R_vdw))
     freq, freq_w = freq_grid(nfreq)
     omega = 4/3*C6/alpha_0**2
     alpha_dyn = [alpha_0/(1+(u/omega)**2) for u in freq]
@@ -41,12 +38,12 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
     omega_rsscs = 4/3*C6_rsscs/alpha_dyn_rsscs[0, :]**2
     pre = np.repeat(omega_rsscs*np.sqrt(alpha_dyn_rsscs[0, :]), 3)
     if lattice is None:
-        k_grid = [None]
+        k_points = [None]
     else:
         assert k_grid is not None
-        k_grid = get_kgrid(lattice, k_grid)
-    ene = 0
-    for k_point in k_grid:
+        k_points = get_kpts(lattice, k_grid)
+    ene = 0.
+    for k_point in k_points:
         eigs = np.linalg.eigvalsh(
             np.diag(np.repeat(omega_rsscs**2, 3)) +
             np.outer(pre, pre)*dipole_matrix(
@@ -54,8 +51,8 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
                 lattice=lattice, k_point=k_point
             )
         )
-        ene += np.sum(np.sqrt(eigs))/2-3*np.sum(omega_rsscs)/2
-    ene /= len(k_grid)
+        ene += np.sum(np.sqrt(eigs))/2
+    ene = ene/len(k_points)-3*np.sum(omega_rsscs)/2
     return ene
 
 
@@ -77,21 +74,21 @@ def dipole_matrix(coords, damping, beta=0., lattice=None, k_point=None,
     n = len(coords)
     dtype = float if k_point is None else complex
     dipmat = np.zeros((n, n, 3, 3), dtype=dtype)
+    if R_vdw is not None:
+        S_vdw = beta*(R_vdw[:, None]+R_vdw[None, :])
+    if sigma is not None:
+        sigma_ij = np.sqrt(sigma[:, None]**2+sigma[None, :]**2)
     for idx_cell in product(*(range(-i, i+1) for i in range_cell)):
         R_cell = lattice.T.dot(idx_cell) if lattice is not None else np.zeros(3)
         Rs = coords[:, None, :]-coords[None, :, :]+R_cell
         dists = np.sqrt(np.sum(Rs**2, -1))
-        if R_vdw is not None:
-            S_vdw = beta*(R_vdw[:, None]+R_vdw[None, :])
-        if sigma is not None:
-            sigma_ij = np.sqrt(sigma[:, None]**2+sigma[None, :]**2)
         if damping == 'fermi,dip':
             T = damping_fermi(dists, S_vdw, a)[:, :, None, None]*T_bare(Rs)
         elif damping == 'fermi,dip,gg':
             T = (1-damping_fermi(dists, S_vdw, a)[:, :, None, None]) * \
                 T_erf_coulomb(Rs, sigma_ij)
         else:
-            raise ValueError('Unsupported damping: {0}'.format(damping))
+            raise ValueError('Unsupported damping: {}'.format(damping))
         if do_ewald:
             T += T_erfc(Rs, ewald_alpha)-T_bare(Rs)
         if k_point is not None:
@@ -100,11 +97,8 @@ def dipole_matrix(coords, damping, beta=0., lattice=None, k_point=None,
         dipmat += T
     if do_ewald:
         dipmat += dipole_matrix_ewald(coords, lattice, ewald_alpha, k_point)
-    n_atoms = np.shape(coords)[0]
-    return np.reshape(
-        np.transpose(dipmat, (0, 2, 1, 3)),
-        (3*n_atoms, 3*n_atoms)
-    )
+    n = len(coords)
+    return np.reshape(np.transpose(dipmat, (0, 2, 1, 3)), (3*n, 3*n))
 
 
 def dipole_matrix_ewald(coords, lattice, alpha, k_point=None):
@@ -177,7 +171,10 @@ def T_erfc(R, a):
     R_3 = np.where(R_1 > 0, R_1**3, np.inf)
     R_5 = np.where(R_1 > 0, R_1**5, np.inf)
     B = (erfc(a*R_1)+(2*a*R_1/np.sqrt(np.pi))*np.exp(-(a*R_1)**2))/R_3
-    C = (3*erfc(a*R_1)+(2*a*R_1/np.sqrt(np.pi))*(3+2*(a*R_1)**2)*np.exp(-(a*R_1)**2))/R_5
+    C = (
+        3*erfc(a*R_1) +
+        (2*a*R_1/np.sqrt(np.pi))*(3+2*(a*R_1)**2)*np.exp(-(a*R_1)**2)
+    )/R_5
     return -C[:, :, None, None]*R[:, :, :, None]*R[:, :, None, :] + \
         B[:, :, None, None]*np.eye(3)
 
@@ -194,15 +191,13 @@ def from_volumes(species, volumes, kind='TS'):
     return alpha_0, C6, R_vdw
 
 
-def get_kgrid(lattice, k_grid, shift=0.5):
-    k_grid = np.array(k_grid)
-    lattice = np.array(lattice)
-    idx_grid = np.array(list(product(*map(range, k_grid))))+shift
-    idx_grid /= k_grid
-    idx_grid = np.where(idx_grid > 0.5, idx_grid-1, idx_grid)
-    recp_lattice = 2*np.pi*np.linalg.inv(lattice.T)
-    k_grid = idx_grid.dot(recp_lattice)
-    return k_grid
+def get_kpts(lattice, k_grid, shift=0.5):
+    k_grid, lattice = map(np.array, (k_grid, lattice))
+    k_idxs = (np.array(list(product(*map(range, k_grid))))+shift)/k_grid
+    k_idxs = np.where(k_idxs > 0.5, k_idxs-1, k_idxs)
+    rlattice = 2*np.pi*np.linalg.inv(lattice.T)
+    k_points = k_idxs.dot(rlattice)
+    return k_points
 
 
 def freq_grid(n, L=0.6):
@@ -214,17 +209,16 @@ def freq_grid(n, L=0.6):
 
 def _array(obj, *args, **kwargs):
     if obj is not None:
+        kwargs.setdefault('dtype', float)
         return np.array(obj, *args, **kwargs)
 
 
 def _get_vdw_params():
-    csv_lines = pkg_resources.resource_string(__name__, 'vdw-params.csv').split(b'\n')
+    csv_lines = resource_string(__name__, 'vdw-params.csv').split(b'\n')
     if sys.version_info[0] > 2:
         csv_lines = [l.decode() for l in csv_lines]
     reader = csv.DictReader(csv_lines, quoting=csv.QUOTE_NONNUMERIC)
-    vdw_params = {}
-    for row in reader:
-        vdw_params[row.pop('symbol')] = row
+    vdw_params = {row.pop('symbol'): row for row in reader}
     return vdw_params
 
 

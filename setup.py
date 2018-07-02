@@ -103,6 +103,6 @@ setup(
         'Topic :: Scientific/Engineering :: Physics',
     ],
     license='Mozilla Public License 2.0',
-    install_requires=['cffi', 'numpy'],
+    install_requires=['cffi', 'numpy', 'scipy'],
     ext_modules=[ffibuilder.distutils_extension()],
 )

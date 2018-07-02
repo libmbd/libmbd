@@ -1,4 +1,4 @@
-from pymbd import with_scalapack
+from .fortran import with_scalapack
 
 if with_scalapack:
     from mpi4py import MPI

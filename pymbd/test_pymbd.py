@@ -2,10 +2,13 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 import numpy as np
+
 import pytest
 from pytest import approx
 
-from pymbd import ang, MBDCalc, from_volumes, numerical_gradients, with_scalapack
+from . import ang, from_volumes, mbd_energy_species
+from .fortran import MBDCalc, with_scalapack
+from .utils import numerical_gradients
 
 if with_scalapack:
     from mpi4py import MPI
@@ -130,11 +133,11 @@ def test_benzene_gradients(calc):
 
 
 @no_scalapack
-def test_benzene_dimer_python(calc):
+def test_benzene_dimer_python():
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        calc.pymbd_energy_species(coords, species, vols, 0.83)
+        mbd_energy_species(coords, species, vols, 0.83)
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
@@ -209,7 +212,7 @@ def test_ethylcarbamate(calc):
 @no_scalapack
 def test_ethylcarbamate_python(calc):
     enes = [
-        calc.pymbd_energy_species(
+        mbd_energy_species(
             coords, species, vols, 0.83,
             lattice=lattice, k_grid=k_grid
         )

@@ -1,8 +1,9 @@
+/.tox/
 /build
 /dist
 /.cache/
+/.pytest_cache/
 /*.egg-info/
 *.pyc
 *.so
 *.so.dSYM
-*.mod

@@ -18,9 +18,9 @@ matrix:
         - libscalapack-mpi-dev
   - env: PYTHON=python WITH_PIP=1
     addons: *nompi
-  - os: osx
-    env:
-    - PYTHON=python MPI_NODES=1
+  # - os: osx
+  #   env:
+  #   - PYTHON=python MPI_NODES=1
   - os: osx
     env:
     - PYTHON=python3 WITH_PIP=1

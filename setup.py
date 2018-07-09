@@ -85,7 +85,7 @@ setup(
     description='Many-body dispersion method',
     author='Jan Hermann',
     author_email='dev@janhermann.cz',
-    url='https://github.com/azag0/pymbd',
+    url='https://github.com/azag0/libmbd',
     packages=['pymbd'],
     package_data={'pymbd': ['vdw-params.csv']},
     classifiers=[

@@ -4,10 +4,9 @@
 module mbd_api
 
 use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
-    mbd_rsscs_energy, get_ts_energy, get_damping_parameters, init_grid, &
-    mbd_result, scale_TS
+    mbd_scs_energy, get_ts_energy, get_damping_parameters, init_grid, &
+    mbd_result, mbd_gradients, scale_TS
 use mbd_common, only: dp
-use mbd_types, only: vecn
 use mbd_vdw_param, only: default_vdw_params, species_index
 use mbd_defaults
 
@@ -50,11 +49,13 @@ type mbd_calc
     private
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    type(vecn) :: alpha_0
-    type(vecn) :: C6
+    real(dp), allocatable :: alpha_0(:)
+    real(dp), allocatable :: C6(:)
     character(len=30) :: dispersion_type
     type(mbd_calc_inner) :: calc
     type(mbd_result) :: results
+    type(mbd_gradients) :: denergy
+    logical :: do_gradients
     real(dp), allocatable :: free_values(:, :)
 contains
     procedure :: init => mbd_calc_init
@@ -79,7 +80,7 @@ subroutine mbd_calc_init(this, input)
     this%sys%calc => this%calc
     this%sys%calc%comm = input%comm
     this%dispersion_type = input%dispersion_type
-    this%sys%do_gradients = input%calculate_forces
+    this%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
         this%sys%get_eigs = .true.
         this%sys%get_modes = .true.
@@ -116,35 +117,29 @@ subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
 end subroutine
 
 
-subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw, dalpha_0, dC6, dr_vdw)
+subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: r_vdw(:)
-    real(dp), intent(in), optional :: dalpha_0(:, :, :), dC6(:, :, :), dr_vdw(:, :, :)
 
-    this%alpha_0%val = alpha_0
-    this%C6%val = C6
-    this%damp%r_vdw%val = r_vdw
-    if (present(dalpha_0)) this%alpha_0%dr = dalpha_0
-    if (present(dC6)) this%C6%dr = dC6
-    if (present(dr_vdw)) this%damp%r_vdw%dr = dr_vdw
+    this%alpha_0 = alpha_0
+    this%C6 = C6
+    this%damp%r_vdw= r_vdw
 end subroutine
 
 
-subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios, dratios)
+subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: ratios(:)
-    real(dp), intent(in), optional :: dratios(:, :, :)
 
-    type(vecn) :: vols, ones
+    real(dp), allocatable :: ones(:)
+    type(mbd_gradients) :: dX
 
-    allocate (ones%val(size(ratios)), source=1d0)
-    vols%val = ratios
-    if (present(dratios)) vols%dr = dratios
-    this%alpha_0 = scale_TS(vecn(this%free_values(1, :)), vols, ones, 1d0)
-    this%C6 = scale_TS(vecn(this%free_values(2, :)), vols, ones, 2d0)
-    this%damp%r_vdw = scale_TS(vecn(this%free_values(3, :)), vols, ones, 1d0/3)
+    allocate (ones(size(ratios)), source=1d0)
+    this%alpha_0 = scale_TS(this%free_values(1, :), ratios, ones, 1d0, dX)
+    this%C6 = scale_TS(this%free_values(2, :), ratios, ones, 2d0, dX)
+    this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3, dX)
 end subroutine
 
 
@@ -155,11 +150,15 @@ subroutine mbd_calc_get_energy(this, energy)
     select case (this%dispersion_type)
     case ('mbd')
         call this%sys%blacs_grid%init()
-        this%results = mbd_rsscs_energy(this%sys, this%alpha_0, this%C6, this%damp)
+        if (this%do_gradients) then
+            if (allocated(this%denergy%dcoords)) deallocate(this%denergy%dcoords)
+            allocate (this%denergy%dcoords(this%sys%siz(), 3))
+        end if
+        this%results = mbd_scs_energy(this%sys, 'rsscs', this%alpha_0, this%C6, this%damp, this%denergy)
         call this%sys%blacs_grid%destroy()
         energy = this%results%energy
     case ('ts')
-        energy = get_ts_energy(this%sys, this%alpha_0%val, this%C6%val, this%damp)
+        energy = get_ts_energy(this%sys, this%alpha_0, this%C6, this%damp)
     end select
 end subroutine
 
@@ -168,7 +167,7 @@ subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     class(mbd_calc), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
 
-    gradients = transpose(this%results%gradients)
+    gradients = transpose(this%denergy%dcoords)
 end subroutine
 
 

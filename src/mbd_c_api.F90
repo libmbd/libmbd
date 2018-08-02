@@ -6,9 +6,10 @@ module mbd_c_api
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
 use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
-    mbd_rsscs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy, mbd_result
+    mbd_scs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy, mbd_result, &
+    mbd_gradients
 use mbd_common, only: dp
-use mbd_types, only: mat3n3n, vecn
+use mbd_types, only: mat3n3n
 
 implicit none
 
@@ -119,8 +120,8 @@ type(c_ptr) function mbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a)
 
     allocate (damping)
     damping%version = f_string(version_c)
-    if (present(r_vdw)) damping%r_vdw%val = r_vdw
-    if (present(sigma)) damping%sigma%val = sigma
+    if (present(r_vdw)) damping%r_vdw = r_vdw
+    if (present(sigma)) damping%sigma = sigma
     damping%beta = beta
     damping%a = a
     damping%ts_sr = beta
@@ -134,8 +135,8 @@ subroutine mbd_destroy_damping(damping_p) bind(c)
     type(mbd_damping), pointer :: damping
 
     call c_f_pointer(damping_p, damping)
-    if (allocated(damping%r_vdw%val)) deallocate (damping%r_vdw%val)
-    if (allocated(damping%sigma%val)) deallocate (damping%sigma%val)
+    if (allocated(damping%r_vdw)) deallocate (damping%r_vdw)
+    if (allocated(damping%sigma)) deallocate (damping%sigma)
     deallocate (damping)
 end subroutine mbd_destroy_damping
 
@@ -189,14 +190,15 @@ real(c_double) function calc_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
     type(mbd_result) :: res
+    type(mbd_gradients) :: dene
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    if (present(gradients)) sys%do_gradients = .true.
-    res = get_mbd_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    if (present(gradients)) allocate (dene%dcoords(n_atoms, 3))
+    res = get_mbd_energy(sys, alpha_0, C6, damping, dene)
     calc_mbd_energy = res%energy
-    if (present(gradients)) gradients = transpose(res%gradients)
+    if (present(gradients)) gradients = transpose(dene%dcoords)
 end function calc_mbd_energy
 
 real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
@@ -211,12 +213,13 @@ real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     type(mbd_system) :: sys2
     type(mbd_damping), pointer :: damping
     type(mbd_result) :: res
+    type(mbd_gradients) :: dene
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
     sys2 = sys
     sys2%do_rpa = .true.
-    res = get_mbd_energy(sys2, vecn(alpha_0), vecn(C6), damping)
+    res = get_mbd_energy(sys2, alpha_0, C6, damping, dene)
     calc_rpa_energy = res%energy
 end function calc_rpa_energy
 
@@ -232,15 +235,16 @@ real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
     type(mbd_result) :: res
+    type(mbd_gradients) :: dene
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    if (present(gradients)) sys%do_gradients = .true.
-    res = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    if (present(gradients)) allocate (dene%dcoords(n_atoms, 3))
+    res = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damping, dene)
     if (sys%has_exc()) return
     calc_mbd_rsscs_energy = res%energy
-    if (present(gradients)) gradients = transpose(res%gradients)
+    if (present(gradients)) gradients = transpose(dene%dcoords)
 end function calc_mbd_rsscs_energy
 
 real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
@@ -254,10 +258,11 @@ real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, dampin
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damping
     type(mbd_result) :: res
+    type(mbd_gradients) :: dene
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    res = mbd_scs_energy(sys, vecn(alpha_0), vecn(C6), damping)
+    res = mbd_scs_energy(sys, 'scs', alpha_0, C6, damping, dene)
     calc_mbd_scs_energy = res%energy
 end function calc_mbd_scs_energy
 
@@ -277,7 +282,7 @@ subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
     sys => get_mbd_system(sys_cp)
     n_atoms = size(sys%coords, 2)
     call c_f_pointer(damping_p, damp)
-    dipmat = dipole_matrix(sys, damp, k_point)
+    dipmat = dipole_matrix(sys, damp, .false., k_point)
     if (present(k_point)) then
         call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
         dipmat_cplx = transpose(dipmat%cplx)

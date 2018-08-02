@@ -223,41 +223,44 @@ subroutine test_mbd_deriv_expl()
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    type(mbd_result) :: ene(-3:3)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    real(dp), allocatable :: gradients_anl(:, :)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
-    delta = 0.05d0
+    delta = 0.01d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    C6 = [65d0, 65d0, 65d0]
-    ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dcoords(n_atoms, 3))
+    res(0) = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
+    gradients_anl = dene%dcoords
+    deallocate (dene%dcoords)
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
+                res(i_step) = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
             end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+            gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
-    if (failed(maxval(abs(diff)), 1d-9)) then
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
 end subroutine test_mbd_deriv_expl
@@ -267,46 +270,54 @@ subroutine test_scs_deriv_expl()
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :, :)
+    real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :)
     real(dp), allocatable :: diff(:, :, :)
     real(dp), allocatable :: alpha_0(:)
     integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
-    type(vecn) :: alpha_scs(-3:3)
+    real(dp), allocatable :: alpha_scs(:, :)
+    type(mbd_gradients), allocatable :: dalpha_scs(:)
 
     delta = 0.05d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms, n_atoms, 3), gradients_anl(n_atoms, n_atoms, 3))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip,gg'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    do i_atom = 1, n_atoms
+        allocate (dalpha_scs(i_atom)%dcoords(n_atoms, 3))
+    end do
+    alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
+    do j_atom = 1, n_atoms
+        gradients_anl(j_atom, :, :) = dalpha_scs(j_atom)%dcoords
+        deallocate (dalpha_scs(j_atom)%dcoords)
+    end do
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                alpha_scs(i_step) = run_scs(sys, vecn(alpha_0), damp)
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom) + &
+                    i_step*delta
+                alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
             end do
             do j_atom = 1, n_atoms
                 gradients(j_atom, i_atom, i_xyz) = &
-                    diff7([(alpha_scs(i_step)%val(j_atom), i_step = -3, 3)], delta)
+                    diff7(alpha_scs(j_atom, :), delta)
             end do
         end do
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-alpha_scs(0)%dr)/gradients
-    if (failed(maxval(abs(diff)), 1d-7)) then
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('diff x', diff(:, :, 1))
         call print_matrix('diff y', diff(:, :, 2))
         call print_matrix('diff z', diff(:, :, 3))
@@ -317,53 +328,50 @@ subroutine test_scs_deriv_impl_alpha
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :, :)
-    real(dp), allocatable :: diff(:, :, :)
-    type(vecn) :: alpha_0
-    real(dp), allocatable :: alpha_0_diff(:)
-    integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
-    type(vecn) :: alpha_scs(-3:3)
+    real(dp), allocatable :: coords(:, :), gradients(:, :), &
+        gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_0_diff(:), &
+        alpha_scs(:, :)
+    integer :: i_atom, n_atoms, i_step, j_atom
+    type(mbd_gradients), allocatable :: dalpha_scs(:)
 
     delta = 0.1d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms, n_atoms), gradients_anl(n_atoms, n_atoms))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip,gg'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    alpha_0%val = [11d0, 11d0, 11d0]
-    allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
-    alpha_scs(0) = run_scs(sys, alpha_0, damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
-                alpha_scs(i_step) = run_scs(sys, vecn(alpha_0_diff), damp)
-            end do
-            do j_atom = 1, n_atoms
-                gradients(j_atom, i_atom, i_xyz) = &
-                    diff7([(alpha_scs(i_step)%val(j_atom), i_step = -3, 3)], delta)
-            end do
+        allocate (dalpha_scs(i_atom)%dalpha(n_atoms))
+    end do
+    alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
+    do i_atom = 1, n_atoms
+        gradients_anl(i_atom, :) = dalpha_scs(i_atom)%dalpha
+        deallocate (dalpha_scs(i_atom)%dalpha)
+    end do
+    do i_atom = 1, n_atoms
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            alpha_0_diff = alpha_0
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            alpha_scs(:, i_step) = run_scs(sys, alpha_0_diff, damp, dalpha_scs)
+        end do
+        do j_atom = 1, n_atoms
+            gradients(j_atom, i_atom) = diff7(alpha_scs(j_atom, :), delta)
         end do
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-alpha_scs(0)%dr)/gradients
+    diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
-        call print_matrix('diff x', diff(:, :, 1))
-        call print_matrix('diff y', diff(:, :, 2))
-        call print_matrix('diff z', diff(:, :, 3))
+        call print_matrix('diff', diff)
     end if
 end subroutine test_scs_deriv_impl_alpha
 
@@ -371,54 +379,52 @@ subroutine test_scs_deriv_impl_vdw
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :, :)
-    real(dp), allocatable :: diff(:, :, :)
-    real(dp), allocatable :: alpha_0(:)
-    real(dp), allocatable :: rvdw(:)
+    real(dp), allocatable :: coords(:, :), gradients(:, :), &
+        gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_scs(:, :), rvdw(:)
     integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
-    type(vecn) :: alpha_scs(-3:3)
+    type(mbd_gradients), allocatable :: dalpha_scs(:)
 
     delta = 0.1d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms, n_atoms), gradients_anl(n_atoms, n_atoms))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip,gg'
-    rvdw = [3.55d0, 3.55d0, 3.55d0]
-    damp%r_vdw%val = rvdw
-    allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=0.2d0)
+    rvdw = [3.55d0, 3.5d0, 3.56d0]
+    damp%r_vdw = rvdw
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    alpha_scs(0) = run_scs(sys, vecn(alpha_0), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    do i_atom = 1, n_atoms
+        allocate (dalpha_scs(i_atom)%dr_vdw(n_atoms))
+    end do
+    alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
+    do i_atom = 1, n_atoms
+        gradients_anl(i_atom, :) = dalpha_scs(i_atom)%dr_vdw
+        deallocate (dalpha_scs(i_atom)%dr_vdw)
+    end do
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
-                alpha_scs(i_step) = run_scs(sys, vecn(alpha_0), damp)
+                damp%r_vdw = rvdw
+                damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+                alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
             end do
             do j_atom = 1, n_atoms
-                gradients(j_atom, i_atom, i_xyz) = &
-                    diff7([(alpha_scs(i_step)%val(j_atom), i_step = -3, 3)], delta)
+                gradients(j_atom, i_atom) = diff7(alpha_scs(j_atom, :), delta)
             end do
         end do
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-alpha_scs(0)%dr)/gradients
+    diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
-        call print_matrix('diff x', diff(:, :, 1))
-        call print_matrix('diff y', diff(:, :, 2))
-        call print_matrix('diff z', diff(:, :, 3))
+        call print_matrix('diff', diff(:, :))
     end if
 end subroutine test_scs_deriv_impl_vdw
 
@@ -426,50 +432,43 @@ subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
-    real(dp), allocatable :: diff(:, :)
-    type(vecn) :: alpha_0
-    real(dp), allocatable :: alpha_0_diff(:)
-    real(dp), allocatable :: C6(:)
-    type(mbd_result) :: ene(-3:3)
-    integer :: i_atom, n_atoms, i_xyz, i_step
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    integer :: i_atom, n_atoms, i_step
 
-    delta = 1d-2
+    delta = 0.1d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    alpha_0%val= [11d0, 11d0, 11d0]
-    allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    C6 = [65d0, 65d0, 65d0]
-    ene(0) = get_single_mbd_energy(sys, alpha_0, vecn(C6), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dalpha(n_atoms))
+    res(0) = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
+    call move_alloc(dene%dalpha, gradients_anl)
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
-                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
-            end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            alpha_0_diff = alpha_0
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            res(i_step) = get_single_mbd_energy(sys, alpha_0_diff, C6, damp, dene)
         end do
+        gradients(i_atom) = diff7(res%energy, delta)
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
-    if (failed(maxval(abs(diff)), 1d-8)) then
-        call print_matrix('delta gradients', diff)
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-6)) then
+        call print_matrix('diff', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_deriv_impl_alpha
 
@@ -477,49 +476,43 @@ subroutine test_mbd_deriv_impl_C6()
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
-    real(dp), allocatable :: diff(:, :)
-    type(vecn) :: C6
-    real(dp), allocatable :: C6_diff(:)
-    real(dp), allocatable :: alpha_0(:)
-    type(mbd_result) :: ene(-3:3)
-    integer :: i_atom, n_atoms, i_xyz, i_step
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    integer :: i_atom, n_atoms, i_step
 
     delta = 0.03d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    C6%val = [65d0, 65d0, 65d0]
-    allocate (C6%dr(n_atoms, n_atoms, 3), source=0.2d0)
-    ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), C6, damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dC6(n_atoms))
+    res(0) = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
+    call move_alloc(dene%dC6, gradients_anl)
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
-                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
-            end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            C6_diff = C6
+            C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
+            res(i_step) = get_single_mbd_energy(sys, alpha_0, C6_diff, damp, dene)
         end do
+        gradients(i_atom) = diff7(res%energy, delta)
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
+    diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 2d-8)) then
-        call print_matrix('delta gradients', diff)
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_deriv_impl_C6
 
@@ -527,50 +520,43 @@ subroutine test_mbd_deriv_impl_vdw()
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
-    real(dp), allocatable :: diff(:, :)
-    real(dp), allocatable :: rvdw(:)
-    real(dp), allocatable :: alpha_0(:)
-    real(dp), allocatable :: C6(:)
-    type(mbd_result) :: ene(-3:3)
-    integer :: i_atom, n_atoms, i_xyz, i_step
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    integer :: i_atom, n_atoms, i_step
 
     delta = 1d-3
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms))
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    rvdw = [3.55d0, 3.55d0, 3.55d0]
-    damp%r_vdw%val = rvdw
-    allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=5d0)
+    r_vdw = [3.55d0, 3.5d0, 3.56d0]
+    damp%r_vdw = r_vdw
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    C6 = [65d0, 65d0, 65d0]
-    ene(0) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dr_vdw(n_atoms))
+    res(0) = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
+    call move_alloc(dene%dr_vdw, gradients_anl)
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
-                ene(i_step) = get_single_mbd_energy(sys, vecn(alpha_0), vecn(C6), damp)
-            end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            damp%r_vdw = r_vdw
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            res(i_step) = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
         end do
+        gradients(i_atom) = diff7(res%energy, delta)
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
-    if (failed(maxval(abs(diff)), 1d-9)) then
-        call print_matrix('delta gradients', diff)
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-8)) then
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_deriv_impl_vdw
 
@@ -579,43 +565,45 @@ subroutine test_mbd_rsscs_deriv_expl()
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
+    real(dp), allocatable :: gradients(:, :), gradients_anl(:, :)
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    type(mbd_result) :: ene(-3:3)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
     integer :: i_atom, n_atoms, i_xyz, i_step
 
-    delta = 0.03d0
+    delta = 0.01d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
     allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
+    coords(1, 3) = 1d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    C6 = [65d0, 65d0, 65d0]
-    ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dcoords(n_atoms, 3))
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
+    call move_alloc(dene%dcoords, gradients_anl)
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
+                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom) + &
+                    i_step*delta
+                res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
             end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+            gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
+    diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
@@ -625,50 +613,43 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
-    real(dp), allocatable :: diff(:, :)
-    type(vecn) :: alpha_0
-    real(dp), allocatable :: alpha_0_diff(:)
-    real(dp), allocatable :: C6(:)
-    type(mbd_result) :: ene(-3:3)
-    integer :: i_atom, n_atoms, i_xyz, i_step
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    integer :: i_atom, n_atoms, i_step
 
-    delta = 1d-2
+    delta = 3d-2
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, 3))
-    coords(1, 3) = 1d0*ang
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
-    alpha_0%val= [11d0, 11d0, 11d0]
-    allocate (alpha_0%dr(n_atoms, n_atoms, 3), source=0.2d0)
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    C6 = [65d0, 65d0, 65d0]
-    ene(0) = mbd_rsscs_energy(sys, alpha_0, vecn(C6), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dalpha(n_atoms))
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
+    call move_alloc(dene%dalpha, gradients_anl)
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                alpha_0_diff = alpha_0%val + alpha_0%dr(:, i_atom, i_xyz)*i_step*delta
-                ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0_diff), vecn(C6), damp)
-            end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            alpha_0_diff = alpha_0
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0_diff, C6, damp, dene)
         end do
+        gradients(i_atom) = diff7(res%energy, delta)
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
+    diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-7)) then
-        call print_matrix('delta gradients', diff)
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_rsscs_deriv_impl_alpha
 
@@ -676,49 +657,43 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
-    real(dp), allocatable :: diff(:, :)
-    type(vecn) :: C6
-    real(dp), allocatable :: C6_diff(:)
-    real(dp), allocatable :: alpha_0(:)
-    type(mbd_result) :: ene(-3:3)
-    integer :: i_atom, n_atoms, i_xyz, i_step
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    integer :: i_atom, n_atoms, i_step
 
-    delta = 0.03d0
+    delta = 0.01d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    damp%r_vdw%val = [3.55d0, 3.55d0, 3.55d0]
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    C6%val = [65d0, 65d0, 65d0]
-    allocate (C6%dr(n_atoms, n_atoms, 3), source=0.2d0)
-    ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), C6, damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dC6(n_atoms))
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
+    call move_alloc(dene%dC6, gradients_anl)
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                C6_diff = C6%val + C6%dr(:, i_atom, i_xyz)*i_step*delta
-                ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6_diff), damp)
-            end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            C6_diff = C6
+            C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
+            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6_diff, damp, dene)
         end do
+        gradients(i_atom) = diff7(res%energy, delta)
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
-    if (failed(maxval(abs(diff)), 2d-7)) then
-        call print_matrix('delta gradients', diff)
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 2d-8)) then
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_rsscs_deriv_impl_C6
 
@@ -726,50 +701,43 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     real(dp) :: delta
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
-    real(dp), allocatable :: coords(:, :)
-    real(dp), allocatable :: gradients(:, :)
-    real(dp), allocatable :: diff(:, :)
-    real(dp), allocatable :: rvdw(:)
-    real(dp), allocatable :: alpha_0(:)
-    real(dp), allocatable :: C6(:)
-    type(mbd_result) :: ene(-3:3)
-    integer :: i_atom, n_atoms, i_xyz, i_step
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
+    type(mbd_result) :: res(-3:3)
+    type(mbd_gradients) :: dene
+    integer :: i_atom, n_atoms, i_step
 
-    delta = 1d-3
+    delta = 1d-2
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, 3))
-    coords(2, 1) = 4d0*ang
-    coords(3, 2) = 4d0*ang
+    allocate (gradients(n_atoms))
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
     sys%calc => calc
     sys%coords = coords
-    sys%do_gradients = .true.
     call sys%blacs_grid%init()
     damp%version = 'fermi,dip'
-    rvdw = [3.55d0, 3.55d0, 3.55d0]
-    damp%r_vdw%val = rvdw
-    allocate (damp%r_vdw%dr(n_atoms, n_atoms, 3), source=5d0)
+    r_vdw = [3.55d0, 3.5d0, 3.56d0]
+    damp%r_vdw = r_vdw
     damp%beta = 0.83d0
-    alpha_0 = [11d0, 11d0, 11d0]
-    C6 = [65d0, 65d0, 65d0]
-    ene(0) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
-    sys%do_gradients = .false.
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    allocate (dene%dr_vdw(n_atoms))
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
+    call move_alloc(dene%dr_vdw, gradients_anl)
     do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                damp%r_vdw%val = rvdw + damp%r_vdw%dr(:, i_atom, i_xyz)*i_step*delta
-                ene(i_step) = mbd_rsscs_energy(sys, vecn(alpha_0), vecn(C6), damp)
-            end do
-            gradients(i_atom, i_xyz) = diff7(ene%energy, delta)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            damp%r_vdw = r_vdw
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
         end do
+        gradients(i_atom) = diff7(res%energy, delta)
     end do
     call sys%blacs_grid%destroy()
-    diff = (gradients-ene(0)%gradients)/gradients
-    if (failed(maxval(abs(diff)), 1d-9)) then
-        call print_matrix('delta gradients', diff)
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-8)) then
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_rsscs_deriv_impl_vdw
 

@@ -1,0 +1,18 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+cffi = "*"
+numpy = "*"
+scipy = "*"
+"mpi4py" = "*"
+
+[dev-packages]
+pytest = "*"
+ipykernel = "*"
+"e1839a8" = {editable = true, path = "."}
+
+[requires]
+python_version = "3.7"

@@ -59,10 +59,10 @@ install:
     make
     popd
     if [[ "$MPI_NODES" ]]; then
-      $PYTHON -m pip install --user -r requirements.txt
-    else
-      $PYTHON -m pip install --user -r <(grep -v mpi4py requirements.txt)
+      $PYTHON -m pip install --user mpi4py
     fi
+    $PYTHON -m pip install --user cffi numpy pytest
+    $PYTHON -m pip install --user -e .
     if [[ "$CODECOV" ]]; then
       $PYTHON -m pip install --user pytest-cov
     fi

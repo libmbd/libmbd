@@ -49,7 +49,8 @@ This is the recommended way for developing or if installing via pip runs into pr
 ```
 git clone https://github.com/azag0/pymbd.git && cd pymbd
 mkdir build && pushd build && cmake .. && make && popd
-pip install -r requirements.txt
+pip install cffi numpy
+pip install -e .
 python setup.py build_ext -i
 ```
 

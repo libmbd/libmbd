@@ -80,18 +80,26 @@ real(dp) pure function diff7(x, delta)
 end function
 
 
-subroutine print_matrix(label, A)
+subroutine print_matrix(label, A, prec)
     character(len=*), intent(in) :: label
     real(dp), intent(in) :: A(:, :)
+    integer, optional, intent(in) :: prec
 
-    integer :: m, n, i, j
+    integer :: m, n, i, j, prec_
+    character(len=10) :: fm
 
+    if (present(prec)) then
+        prec_ = prec
+    else
+        prec_ = 3
+    end if
     m = size(A, 1)
     n = size(A, 2)
+    write (fm, '("(g",i2,".",i1,")")') prec_+8, prec_
     write (6, '(A,":")') label
     do i = 1, m
         do j = 1, n
-            write (6, "(g10.3)", advance="no") A(i, j)
+            write (6, fm, advance="no") A(i, j)
         end do
         write (6, *)
     end do

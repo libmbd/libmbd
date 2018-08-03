@@ -6,7 +6,7 @@
 #endif
 module mbd
 
-use mbd_common, only: tostr, nan, print_matrix, dp, pi, exception
+use mbd_common, only: tostr, print_matrix, dp, pi, exception
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh
 use mbd_types, only: mat3n3n, mat33, scalar, operator(.cprod.)
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs

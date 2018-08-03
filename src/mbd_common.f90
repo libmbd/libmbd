@@ -6,10 +6,9 @@ module mbd_common
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, nan, dp, lower, pi, exception, diff7
+public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, exception, diff7
 
 integer, parameter :: dp = kind(0.d0)
-real(dp), parameter :: nan = transfer(-2251799813685248_8, 1d0)
 real(dp), parameter :: pi = acos(-1.d0)
 
 interface tostr

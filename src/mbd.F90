@@ -87,9 +87,9 @@ type :: mbd_result
 end type
 
 type :: mbd_gradients
-    real(dp), allocatable :: dcoords(:, :)
+    real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
     real(dp), allocatable :: dalpha(:)
-    real(dp), allocatable :: dalpha_dyn(:, :)
+    real(dp), allocatable :: dalpha_dyn(:, :)  ! n_atoms by 0:n_freq
     real(dp), allocatable :: dC6(:)
     real(dp), allocatable :: dr_vdw(:)
     real(dp), allocatable :: domega(:)
@@ -126,7 +126,8 @@ external :: DGSUM2D
 contains
 
 
-type(mbd_result) function mbd_scs_energy(sys, variant, alpha_0, C6, damp, dene) result(res)
+type(mbd_result) function mbd_scs_energy( &
+        sys, variant, alpha_0, C6, damp, dene) result(res)
     type(mbd_system), intent(inout) :: sys
     character(len=*), intent(in) :: variant
     real(dp), intent(in) :: alpha_0(:)
@@ -163,9 +164,7 @@ type(mbd_result) function mbd_scs_energy(sys, variant, alpha_0, C6, damp, dene) 
         )
     end do
     if (sys%has_exc()) return
-    C6_scs = get_C6_from_alpha(&
-        sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs &
-    )
+    C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs)
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs &
@@ -442,7 +441,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
-                        Tpp%val = damp%potential_custom(i_atom, j_atom, :, :)
+                        Tpp%val = damp%potential_custom(:, :, i_atom, j_atom)
                     case ("dip,gg")
                         Tpp = T_erf_coulomb(r, sigma_ij, grad)
                     case ("fermi,dip,gg")
@@ -545,7 +544,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if
         k_sq = sum(k_total**2)
         if (sqrt(k_sq) > rec_space_cutoff) cycle
-        k_prefactor(:, :) = 4*pi/volume*exp(-k_sq/(4*alpha**2))
+        k_prefactor = 4*pi/volume*exp(-k_sq/(4*alpha**2))
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
@@ -717,7 +716,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     real(dp) :: alpha_scs(size(alpha))
 
     type(mat3n3n) :: alpha_full, dQ, T
-    integer :: n_atoms, i_xyz, i_atom, j_atom, j_xyz
+    integer :: n_atoms, i_xyz, i_atom, j_xyz
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :)
@@ -753,19 +752,8 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
                 B_prime(:, j_xyz) = sum(dQ%re(j_xyz::3, :), 1)
             end do
             do i_atom = 1, n_atoms
-                do j_atom = 1, n_atoms
-                    associate ( &
-                            dQ_sub => dQ%re(3*(i_atom-1)+1:, 3*(j_atom-1)+1:), &
-                            alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:), &
-                            B_prime_sub => B_prime(3*(j_atom-1)+1:, :), &
-                            alpha_full_sub => alpha_full%re(3*(j_atom-1)+1:, 3*(i_atom-1)+1:) &
-                    )
-                        dalpha_scs(i_atom)%dcoords(j_atom, i_xyz) = -1d0/3 * ( &
-                            sum(dQ_sub(:3, :3)*alpha_prime_sub(:, :3)) + &
-                            sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3)) &
-                        )
-                    end associate
-                end do
+                dalpha_scs(i_atom)%dcoords(:, i_xyz) = &
+                    contract_gradients(i_atom, dQ)
             end do
         end do
     end if
@@ -782,19 +770,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             B_prime(:, j_xyz) = sum(dQ%re(j_xyz::3, :), 1)
         end do
         do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
-                associate ( &
-                        dQ_sub => dQ%re(3*(i_atom-1)+1:, 3*(j_atom-1)+1:), &
-                        alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:), &
-                        B_prime_sub => B_prime(3*(j_atom-1)+1:, :), &
-                        alpha_full_sub => alpha_full%re(3*(j_atom-1)+1:, 3*(i_atom-1)+1:) &
-                )
-                    dalpha_scs(i_atom)%dalpha(j_atom) = -1d0/3 * ( &
-                        sum(dQ_sub(:3, :3)*alpha_prime_sub(:, :3)) + &
-                        sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3)) &
-                    )
-                end associate
-            end do
+            dalpha_scs(i_atom)%dalpha = contract_gradients(i_atom, dQ)
         end do
     end if
     if (allocated(dalpha_scs(1)%dr_vdw)) then
@@ -804,21 +780,33 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             B_prime(:, j_xyz) = sum(dQ%re(j_xyz::3, :), 1)
         end do
         do i_atom = 1, n_atoms
-            do j_atom = 1, n_atoms
-                associate ( &
-                        dQ_sub => dQ%re(3*(i_atom-1)+1:, 3*(j_atom-1)+1:), &
-                        alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:), &
-                        B_prime_sub => B_prime(3*(j_atom-1)+1:, :), &
-                        alpha_full_sub => alpha_full%re(3*(j_atom-1)+1:, 3*(i_atom-1)+1:) &
-                )
-                    dalpha_scs(i_atom)%dr_vdw(j_atom) = -1d0/3 * ( &
-                        sum(dQ_sub(:3, :3)*alpha_prime_sub(:, :3)) + &
-                        sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3)) &
-                    )
-                end associate
-            end do
+            dalpha_scs(i_atom)%dr_vdw = contract_gradients(i_atom, dQ)
         end do
     end if
+
+    contains
+
+    function contract_gradients(i_atom, relay) result(gradient)
+        integer, intent(in) :: i_atom
+        type(mat3n3n), intent(in) :: relay
+        real(dp) :: gradient(relay%blacs%n_atoms)
+
+        integer :: j_atom
+
+        do j_atom = 1, dQ%blacs%n_atoms
+            associate ( &
+                    relay_sub => relay%re(3*(i_atom-1)+1:, 3*(j_atom-1)+1:), &
+                    alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:), &
+                    B_prime_sub => B_prime(3*(j_atom-1)+1:, :), &
+                    alpha_full_sub => alpha_full%re(3*(j_atom-1)+1:, 3*(i_atom-1)+1:) &
+            )
+                gradient(j_atom) = -1d0/3 * ( &
+                    sum(relay_sub(:3, :3)*alpha_prime_sub(:, :3)) + &
+                    sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3)) &
+                )
+            end associate
+        end do
+    end function
 end function run_scs
 
 
@@ -948,6 +936,24 @@ type(mbd_result) function get_single_mbd_energy( &
         dQ%re = c_lambda12i_c*dQ%re
         dene%dr_vdw = 1d0/2*contract_gradients(dQ)
     end if
+
+    contains
+
+    function contract_gradients(relay) result(gradient)
+        type(mat3n3n), intent(in) :: relay
+        real(dp) :: gradient(relay%blacs%n_atoms)
+
+        integer :: my_i_atom
+
+        gradient(:) = 0d0
+        do my_i_atom = 1, size(relay%blacs%i_atom)
+            associate ( &
+                    i_atom => relay%blacs%i_atom(my_i_atom), &
+                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :))
+                gradient(i_atom) = gradient(i_atom) + sum(relay_sub(:3, :))
+            end associate
+        end do
+    end function
 end function get_single_mbd_energy
 
 
@@ -1153,23 +1159,6 @@ function contract_polarizability(alpha_full) result(alpha)
     call DGSUM2D(alpha_full%blacs%grid%ctx, 'A', ' ', n_atoms, 1, alpha, n_atoms, -1, -1)
 #endif
 end function contract_polarizability
-
-
-function contract_gradients(relay) result(gradient)
-    type(mat3n3n), intent(in) :: relay
-    real(dp) :: gradient(relay%blacs%n_atoms)
-
-    integer :: my_i_atom
-
-    gradient(:) = 0d0
-    do my_i_atom = 1, size(relay%blacs%i_atom)
-        associate ( &
-                i_atom => relay%blacs%i_atom(my_i_atom), &
-                relay_sub => relay%re(3*(my_i_atom-1)+1:, :))
-            gradient(i_atom) = gradient(i_atom) + sum(relay_sub(:3, :))
-        end associate
-    end do
-end function contract_gradients
 
 
 function T_bare(rxyz) result(T)

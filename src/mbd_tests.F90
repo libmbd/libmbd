@@ -197,12 +197,12 @@ subroutine test_T_fermi_deriv_impl()
     r = [1.02d0, -2.22d0, 0.15d0]
     rvdw = 2.5d0
     drvdw_dr = -0.3d0
-    T = damping_fermi(r, rvdw, 6d0, .true.).prod.T_bare_v2(r, .true.)
+    T = T_damped(damping_fermi(r, rvdw, 6d0, .true.), T_bare_v2(r, .true.))
     T_diff_anl = T%dvdw(:, :)*drvdw_dr
     do i_step = -3, 3
         if (i_step == 0) cycle
         rvdw_diff =rvdw+i_step*delta*drvdw_dr
-        T = damping_fermi(r, rvdw_diff, 6d0, .false.).prod.T_bare_v2(r, .false.)
+        T = T_damped(damping_fermi(r, rvdw_diff, 6d0, .false.), T_bare_v2(r, .false.))
         T_diff_num(:, :, i_step) = T%val
     end do
     forall (a = 1:3, b = 1:3)

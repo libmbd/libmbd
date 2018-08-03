@@ -10,7 +10,6 @@ implicit none
 
 private
 public :: mat3n3n, mat33, scalar
-public :: operator(.cprod.)
 
 type :: mat3n3n
     real(dp), allocatable :: re(:, :)
@@ -47,10 +46,6 @@ type :: scalar
     real(dp), allocatable :: dr(:)  ! explicit derivative
     real(dp), allocatable :: dvdw
 end type
-
-interface operator(.cprod.)
-    module procedure cart_prod_
-end interface
 
 contains
 
@@ -132,19 +127,6 @@ subroutine mat3n3n_add(this, other)
         stop 1
     end if
 end subroutine
-
-function cart_prod_(a, b) result(c)
-    real(dp), intent(in) :: a(:), b(:)
-    real(dp) :: c(size(a), size(b))
-
-    integer :: i, j
-
-    do i = 1, size(a)
-        do j = 1, size(b)
-            c(i, j) = a(i)*b(j)
-        end do
-    end do
-end function
 
 subroutine mat3n3n_add_diag_scalar(this, d)
     class(mat3n3n), intent(inout) :: this

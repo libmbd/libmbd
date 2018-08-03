@@ -7,9 +7,9 @@
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, exception
-use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh
-use mbd_types, only: mat3n3n, mat33, scalar, operator(.cprod.)
-use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
+use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, cprod
+use mbd_types, only: mat3n3n, mat33, scalar
+use mbd_parallel, only: mbd_blacs_grid
 use mbd_defaults
 
 implicit none
@@ -21,10 +21,6 @@ public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
     get_sigma_selfint, scale_TS, get_ts_energy, get_damping_parameters, &
     clock_rate, mbd_gradients
 #endif
-
-interface operator(.prod.)
-    module procedure T_damped__
-end interface
 
 real(dp), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
@@ -436,13 +432,13 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
                     case ("dip,1mexp")
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")
-                        Tpp = damping_fermi( &
+                        Tpp = T_damped(damping_fermi( &
                             r, damp%beta*R_vdw_ij, damp%a, grad &
-                        ).prod.T_bare_v2(r, grad)
+                        ), T_bare_v2(r, grad))
                     case ("sqrtfermi,dip")
-                        Tpp = damping_sqrtfermi( &
+                        Tpp = T_damped(damping_sqrtfermi( &
                             r, damp%beta*R_vdw_ij, damp%a, grad &
-                        ).prod.T_bare_v2(r, grad)
+                        ), T_bare_v2(r, grad))
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
@@ -450,14 +446,14 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
                     case ("dip,gg")
                         Tpp = T_erf_coulomb(r, sigma_ij, grad)
                     case ("fermi,dip,gg")
-                        Tpp = op1minus(damping_fermi( &
+                        Tpp = T_damped(op1minus(damping_fermi( &
                             r, damp%beta*R_vdw_ij, damp%a, grad &
-                        )).prod.T_erf_coulomb(r, sigma_ij, grad)
+                        )), T_erf_coulomb(r, sigma_ij, grad))
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
-                        Tpp = op1minus(damping_sqrtfermi( &
+                        Tpp = T_damped(op1minus(damping_sqrtfermi( &
                             r, damp%beta*R_vdw_ij, damp%a, grad &
-                        )).prod.T_erf_coulomb(r, sigma_ij, grad)
+                        )), T_erf_coulomb(r, sigma_ij, grad))
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         f_ij = 1d0-damp%damping_custom(i_atom, j_atom)
@@ -1312,7 +1308,7 @@ type(scalar) function op1minus(f)
 end function
 
 
-type(mat33) function T_damped__(f, T) result(fT)
+type(mat33) function T_damped(f, T) result(fT)
     type(scalar), intent(in) :: f
     type(mat33), intent(in) :: T
 
@@ -1344,7 +1340,7 @@ type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     bare = T_bare_v2(r, deriv)
     r_1 = sqrt(sum(r**2))
     r_5 = r_1**5
-    rr_r5 = (r.cprod.r)/r_5
+    rr_r5 = cprod(r, r)/r_5
     zeta = r_1/sigma
     theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
     erf_theta = erf(zeta)-theta
@@ -1370,7 +1366,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
-    T = zeta_1*T_bare(rxyz)-zeta_2*(rxyz .cprod. rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*cprod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function
 
 

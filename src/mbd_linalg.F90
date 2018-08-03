@@ -10,7 +10,7 @@ use mbd_parallel, only: mbd_blacs
 implicit none
 
 private
-public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve
+public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve, cprod
 
 interface inv
     module procedure inv_re_
@@ -603,6 +603,19 @@ function solve(A, b, exc) result(x)
         end if
         return
     endif
+end function
+
+function cprod(a, b) result(c)
+    real(dp), intent(in) :: a(:), b(:)
+    real(dp) :: c(size(a), size(b))
+
+    integer :: i, j
+
+    do i = 1, size(a)
+        do j = 1, size(b)
+            c(i, j) = a(i)*b(j)
+        end do
+    end do
 end function
 
 character(len=1) function mode(vals_only)

@@ -10,7 +10,12 @@ E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-3\sum_i\frac{\omega_
 $$
 
 $$
-\partial E_\text{MBD}=\frac14\operatorname{Tr}\big(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T\partial\mathbf Q)-3\sum_i\frac{\partial\omega_i}2
+\begin{equation}
+\begin{aligned}
+\partial E_\text{MBD}&=\frac14\operatorname{Tr}\big(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T\partial\mathbf Q)-3\sum_i\frac{\partial\omega_i}2\\
+\frac{\partial E_\text{MBD}}{\partial X_i}&=\frac12\sum_{p\zeta}(\mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T)_{p,i\zeta}\frac{\partial Q_{p,i\zeta}}{\partial X_i}-\frac32\frac{\partial\omega_i}{\partial X_i}
+\end{aligned}
+\end{equation}
 $$
 
 $$
@@ -73,7 +78,9 @@ $$
 \begin{equation}
 \begin{gathered}
 \bar\alpha_i=\tfrac13\operatorname{Tr}\big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad \boldsymbol{\bar\alpha}=(\boldsymbol\alpha^{-1}+\mathbf T_\text{GG})^{-1} \\
-\partial\boldsymbol{\bar\alpha}=-\boldsymbol{\bar\alpha}(\partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG})\boldsymbol{\bar\alpha}
+\partial\boldsymbol{\bar\alpha}=-\boldsymbol{\bar\alpha}(\partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG})\boldsymbol{\bar\alpha},\qquad
+\frac{\partial\bar\alpha_i}{\partial X_j}=-\frac13\sum_{\zeta\eta}\big(B_{i\zeta,j\eta}\bar\alpha'_{\zeta,j\eta}+B'_{j\eta,\zeta}\bar\alpha_{j\eta,i\zeta}\big) \\
+\mathbf B=\boldsymbol{\bar\alpha}\mathbf A,\quad A_{i\zeta,j\eta}=\frac{\partial(\alpha_i^{-1})}{\partial X_i}\delta_{ij}\delta_{\zeta\eta}+\frac{\partial T^\text{GG}_{i\zeta,j\eta}}{\partial X_i},\quad \bar\alpha'_{\zeta,p}=\sum_i\bar\alpha_{i\zeta,p},\quad B'_{p,\zeta}=\sum_iB_{p,i\zeta}
 \end{gathered}
 \end{equation}
 $$

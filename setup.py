@@ -105,4 +105,7 @@ setup(
     license='Mozilla Public License 2.0',
     install_requires=['cffi', 'numpy', 'scipy'],
     ext_modules=[ffibuilder.distutils_extension()],
+    extras_require={
+        'MPI': ['mpi4py'],
+    },
 )

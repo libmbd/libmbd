@@ -19,7 +19,7 @@ private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_scs_energy, &
     get_sigma_selfint, scale_TS, get_ts_energy, get_damping_parameters, &
-    clock_rate, mbd_gradients
+    clock_rate, mbd_gradients, damping_fermi
 #endif
 
 real(dp), parameter :: ang = 1.8897259886d0

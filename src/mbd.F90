@@ -77,10 +77,10 @@ end type mbd_damping
 type :: mbd_result
     real(dp) :: energy
     real(dp), allocatable :: k_pts(:, :)
-    real(dp), allocatable :: mode_enes(:)
+    real(dp), allocatable :: mode_eigs(:)
     real(dp), allocatable :: modes(:, :)
     real(dp), allocatable :: rpa_orders(:)
-    real(dp), allocatable :: mode_enes_k(:, :)
+    real(dp), allocatable :: mode_eigs_k(:, :)
     complex(dp), allocatable :: modes_k(:, :, :)
     complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
@@ -888,10 +888,7 @@ type(mbd_result) function get_single_mbd_energy( &
     end if
     if (sys%has_exc()) return
     call ts(sys%calc, -21)
-    if (sys%get_eigs) then
-        res%mode_enes = sqrt(eigs)
-        where (eigs < 0) res%mode_enes = 0d0
-    end if
+    if (sys%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
@@ -983,7 +980,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_ts)
     res%energy = 0d0
     if (sys%get_eigs) &
-        allocate (res%mode_enes_k(3*n_atoms, n_kpts), source=0d0)
+        allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
     if (sys%get_modes) &
         allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
     if (sys%get_rpa_orders) allocate ( &
@@ -998,7 +995,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
             end if
         else
             res_k = get_single_mbd_energy(sys, alpha_0, C6, damp, dene_k, k_point)
-            if (sys%get_eigs) res%mode_enes_k(:, i_kpt) = res_k%mode_enes
+            if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
             if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
         end if
         res%energy = res%energy + res_k%energy

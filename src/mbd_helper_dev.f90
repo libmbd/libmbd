@@ -42,6 +42,29 @@ end if
 !
 end function derivlegendre
 !
+subroutine simpson1by3(n, x, w)
+implicit none
+integer :: i, n
+double precision, dimension(n) :: x, w
+double precision:: h, delta
+
+delta = 1.d-6
+h=2.0*(1.d0-delta)/((n-1)*1.d0)
+do i = 1, n
+ x(i)=-(1.d0-delta)+h*(i-1)
+ if(2*(i-(i/2))==i)then
+  w(i) = 2.d0*h/3.d0
+ else
+  w(i) = 4.d0*h/3.d0
+ end if
+end do
+w(1)= 1.d0*h/3.d0
+w(n)= w(1)
+end subroutine simpson1by3
+
+
+
+
 subroutine gl_points(n, x, w)
 implicit none
 ! provides Gauss-Legendre abcissa and weights
@@ -106,9 +129,9 @@ subroutine det(A, dt)
 ! provides determinant dt of matrix A
 implicit none
 integer :: n, info, i
-double precision, dimension(:, :) :: A
-double precision :: dt
-integer, dimension(size(A, 1)) :: ipiv
+double precision, dimension(:, :), intent(in) :: A
+double precision, intent(out) :: dt
+integer, dimension(size(A, 1)**2) :: ipiv
 dt = 1.d0
 n = size(A, 1)
 !do i = 1, n
@@ -173,25 +196,57 @@ function Matrix_invert(A)result(Ainv)
 ! Provides matrix inversion of A
 implicit none
 double precision, dimension(:,:), intent(in) :: A
-double precision, dimension(size(A, 1),size(A, 1)):: Ainv
-
+double precision, dimension(size(A, 1),size(A, 1)):: Ainv, Testmat
 integer :: n, info
 integer, dimension(size(A,1)) :: ipiv
-double precision, dimension(size(A,1)**2) :: work
+double precision, dimension(size(A,1)) :: work
+
 ipiv= 1
 work = 0.d0
 n = size(A, 1)
 Ainv = 0.d0
-if (n>1)then
-call DGETRI(n, A, n, ipiv, work, n**2, info)
-if(info /=0)then
- print*, "Matrix inversion failed ... Aborting, info =", info
+!if (n>1)then
+!call dgetrf(n, n, A, n, ipiv, info)
+!if(info /=0)then
+!print*, "Matrix inversion failed ... Aborting, info =", info
+!stop
+!end if
+!call DGETRI(n, A, n, ipiv, work, n**2, info)
+!if(info /=0)then
+! print*, "Matrix inversion failed ... Aborting, info =", info
+! stop
+!end if
+! Ainv= A
+!else if (n == 1)then
+! Ainv= A
+!end if
+
+Testmat = A
+
+call DGETRF(N,N,A,N,IPIV,info)
+if(info .eq. 0) then
+!write(*,*)"succeded"
+else
+ write(*,*)"failed"
+end if
+
+call DGETRI(N,A,N,IPIV,WORK,N,info)
+if(info .eq. 0) then
+!write(*,*)"succeded"
+else
+ write(*,*)"Inversion failed ... aborting!"
  stop
 end if
- Ainv= A
-else if (n == 1)then
- Ainv= A
-end if
+Ainv=A
+!Testmat = matmul(Ainv, Testmat)
+!print*, "Shape of A", shape(A)
+!print*, "(Testmat)^{-1}"
+!print*, "======================"
+!do k = 1, size(A, 1)
+! write(*,'(1x,6(E10.4,1x))')Ainv(k, :)
+!end do
+!call printmat(Ainv,"A inverse")
+!print*, "======================"
 
 end function Matrix_invert
 !
@@ -225,7 +280,7 @@ integer :: i, n
 if(present(message))print*, message
 n = size(A, 1)
 write (fmt, *) n
-fmt = "(1x,"//trim(adjustl(fmt))//"f8.4)"
+fmt = "(1x,"//trim(adjustl(fmt))//"(E13.5E4 ,1x))"
 !print*, fmt
 !stop
 do i = 1, n
@@ -233,4 +288,18 @@ do i = 1, n
 end do
 end subroutine printmat
 
+function is_symmetric(matrix)result(symm)
+implicit none
+double precision, dimension(:, :), intent(in) :: matrix
+logical :: symm
+integer :: i, j
+symm = .true.
+do i = 1, size(matrix, 1)
+ do j = i+1, size(matrix, 1)
+  if(dabs(matrix(i, j)-matrix(j, i))>=1.d-8)then
+   symm = .false.
+  end if
+ end do
+end do
+end function is_symmetric
 end module

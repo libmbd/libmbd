@@ -149,6 +149,45 @@ class MBDCalc(object):
         return self.ts_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
 
+def full_coulomb(coords, C, w, w0, a0, rvdw0, alpha, beta, version, dampswitch):
+    n = len(coords)
+    ecoul, en, ee, nn = (np.array(0.) for _ in range(4))
+    _lib.calc_full_coulomb(
+        n,
+        _cast('double*', coords),
+        _cast('double*', C),
+        _cast('double*', w),
+        _cast('double*', w0),
+        _cast('double*', a0),
+        _cast('double*', rvdw0),
+        alpha,
+        beta,
+        version.encode(),
+        dampswitch,
+        _cast('double*', ecoul),
+        _cast('double*', en),
+        _cast('double*', ee),
+        _cast('double*', nn),
+    )
+    return float(ecoul), float(en), float(ee), float(nn)
+
+
+def get_dipole_energy(version, R, a0, w, w_t, r0, beta, alpha, C):
+    n = len(R)
+    return _lib.calc_get_dipole_energy(
+        n,
+        version.encode(),
+        _cast('double*', R),
+        _cast('double*', a0),
+        _cast('double*', w),
+        _cast('double*', w_t),
+        _cast('double*', r0),
+        beta,
+        alpha,
+        _cast('double*', C),
+    )
+
+
 def _ndarray(ptr, shape=None, dtype='float'):
     buffer_size = (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
     return np.ndarray(

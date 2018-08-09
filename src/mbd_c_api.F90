@@ -10,6 +10,7 @@ use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
     mbd_gradients
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
+use mbd_repulsion, only: full_coulomb, get_dipole_energy
 
 implicit none
 
@@ -297,6 +298,34 @@ subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
         dipmat_re = transpose(dipmat%re)
     end if
 end subroutine calc_dipole_matrix
+
+subroutine calc_full_coulomb(n, coords, C, w, w0, a0, rvdw0, alpha, beta, &
+        version, dampswitch, ecoul, en, ee, nn) bind(c)
+    integer(c_int), value, intent(in) :: n
+    real(c_double), intent(in) :: &
+        coords(n, 3), C(3*n, 3*n), w(3*n), w0(n), a0(n), rvdw0(n)
+    real(c_double), value, intent(in) :: alpha, beta, dampswitch
+    character(c_char), intent(in) :: version(20)
+    real(c_double), intent(out) :: ecoul, en, ee, nn
+
+    call full_coulomb( &
+        n, coords, C, w, w0, a0, rvdw0, &
+        alpha, beta, f_string(version), dampswitch, ecoul, en, ee, nn &
+    )
+end subroutine calc_full_coulomb
+
+real(c_double) function calc_get_dipole_energy(n, version, R, a0, w, w_t, r0, &
+        beta, alpha, C) result(ene) bind(c)
+    integer(c_int), value, intent(in) :: n
+    real(c_double), intent(in) :: &
+        R(n, 3), C(3*n, 3*n), w_t(3*n), w(n), a0(n), r0(n)
+    real(c_double), value, intent(in) :: alpha, beta
+    character(c_char), intent(in) :: version(20)
+
+    ene = get_dipole_energy( &
+        f_string(version), R, a0, w, w_t,r0, beta, alpha, C &
+    )
+end function calc_get_dipole_energy
 
 function f_string(str_c) result(str_f)
     character(kind=c_char), intent(in) :: str_c(*)

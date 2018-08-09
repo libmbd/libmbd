@@ -69,7 +69,7 @@ class MBDCalc(object):
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='calc_mbd_rsscs_energy', force=False,
-                   damping='fermi,dip'):
+                   damping='fermi,dip', spectrum=False):
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         k_grid = _array(k_grid, dtype='i4')
@@ -85,7 +85,8 @@ class MBDCalc(object):
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
         )
         gradients = np.zeros((n_atoms, 3)) if force else None
-        ene = getattr(_lib, func)(
+        eigs, modes = None, None
+        args = (
             system,
             n_atoms,
             _cast('double*', alpha_0),
@@ -93,8 +94,16 @@ class MBDCalc(object):
             damping,
             _cast('double*', gradients),
         )
+        if func == 'calc_mbd_rsscs_energy':
+            if spectrum:
+                eigs = np.zeros(3*n_atoms)
+                modes = np.zeros((3*n_atoms, 3*n_atoms), order='F')
+            args += (_cast('double*', eigs), _cast('double*', modes))
+        ene = getattr(_lib, func)(*args)
         _lib.mbd_destroy_damping(damping)
         _lib.mbd_destroy_system(system)
+        if spectrum:
+            ene = ene, eigs, modes
         if force:
             return ene, gradients
         return ene

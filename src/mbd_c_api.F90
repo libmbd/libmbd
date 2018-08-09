@@ -223,13 +223,15 @@ real(c_double) function calc_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     calc_rpa_energy = res%energy
 end function calc_rpa_energy
 
-real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
+real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients, eigvals, eigvecs) bind(c)
     type(c_ptr), intent(in), value :: sys_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
     type(c_ptr), intent(in), value :: damping_p
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
+    real(c_double), intent(out), optional :: eigvals(3*n_atoms)
+    real(c_double), intent(out), optional :: eigvecs(3*n_atoms, 3*n_atoms)
 
     type(mbd_system_c), pointer :: sys_c
     type(mbd_system), pointer :: sys
@@ -241,10 +243,14 @@ real(c_double) function calc_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
     if (present(gradients)) allocate (dene%dcoords(n_atoms, 3))
+    sys%get_eigs = present(eigvals)
+    sys%get_modes = present(eigvecs)
     res = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damping, dene)
     if (sys%has_exc()) return
     calc_mbd_rsscs_energy = res%energy
     if (present(gradients)) gradients = transpose(dene%dcoords)
+    if (present(eigvals)) eigvals = res%mode_eigs
+    if (present(eigvecs)) eigvecs = res%modes
 end function calc_mbd_rsscs_energy
 
 real(c_double) function calc_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)

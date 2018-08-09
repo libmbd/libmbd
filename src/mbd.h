@@ -66,7 +66,9 @@ double calc_mbd_rsscs_energy(
     double* alpha_0,
     double* C6,
     struct MBD_damping* damping,
-    double* gradients
+    double* gradients,
+    double* eigvals,
+    double* eigvecs
 );
 
 double calc_mbd_scs_energy(

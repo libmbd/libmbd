@@ -3,10 +3,10 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_math
 
-use mbd_linalg, only: eye, inverted, diag, invert
+use mbd_linalg, only: eye, inverse, diag, inv
 use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint
 use mbd_common, only: dp, pi
-use mbd_types, only: mat3n3n, vecn
+use mbd_types, only: mat3n3n
 
 implicit none
 
@@ -49,7 +49,7 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
         det_K_plus_U2 = get_det(work)
         ! call print_matrix('K', K)
         ! call print_matrix('K+U2', work)
-        call invert(work)  ! work is (K+U2)^-1
+        call inv(work)  ! work is (K+U2)^-1
         ! call print_matrix('(K+U2)^-1', work)
         work = Ks-matmul(Ks, matmul(work, Ks)) ! work is K-K*(K+U2)^-1*K
         ! call print_matrix('K-K*(K+U2)^-1*K', work)
@@ -115,17 +115,17 @@ real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
             AB(:) = (/ (3*(A-1)+i, i = 1, 3),  (3*(B-1)+i, i = 1, 3) /)
             notAB(:) = (/ (i, i = 1, 3*(A-1)),  (i, i = 3*A+1, 3*(B-1)), (i, i = 3*B+1, 3*N) /)
             Opp(:, :) = O(notAB, notAB)
-            OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(inverted(O(notAB, notAB)), O(notAB, AB)))
+            OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(inverse(O(notAB, notAB)), O(notAB, AB)))
             forall (i = 1:6, j = 1:6) OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
             call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=coul)
             ene_ABi(1) = 1.d0/sqrt(get_det(OAB))*coul
             K(:, :) = 0.d0
             K(1:3, 1:3) = point_charge*eye(3)
-            K(4:6, 4:6) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverted(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
+            K(4:6, 4:6) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
             ene_ABi(2) = -1.d0/sqrt(get_det(OAB(1:3, 1:3))*get_det(K(4:6, 4:6))/m(B)**3)*coul
             K(:, :) = 0.d0
-            K(1:3, 1:3) = m(A)*(OAB(1:3, 1:3)-matmul(OAB(1:3, 4:6), matmul(inverted(OAB(4:6, 4:6)), OAB(4:6, 1:3))))
+            K(1:3, 1:3) = m(A)*(OAB(1:3, 1:3)-matmul(OAB(1:3, 4:6), matmul(inverse(OAB(4:6, 4:6)), OAB(4:6, 1:3))))
             K(4:6, 4:6) = point_charge*eye(3)
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
             ene_ABi(3) = -1.d0/sqrt(get_det(OAB(4:6, 4:6))*get_det(K(1:3, 1:3))/m(A)**3)*coul
@@ -149,11 +149,12 @@ real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
     integer :: A, B, i, j, N
     type(mat3n3n) :: T
     type(mbd_damping) :: damp
+    real(dp), allocatable :: dummy(:)
 
     N = size(sys%coords, 1)
     damp%version = 'dip,gg'
-    damp%sigma = get_sigma_selfint(vecn(a0))
-    T = dipole_matrix(sys, damp)
+    damp%sigma = get_sigma_selfint(a0, dummy)
+    T = dipole_matrix(sys, damp, grad=.false.)
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

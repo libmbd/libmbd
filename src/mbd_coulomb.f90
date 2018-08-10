@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-module mbd_math
+module mbd_coulomb
 
 use mbd_linalg, only: eye, inverse, diag, inv, eye
 use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint, &

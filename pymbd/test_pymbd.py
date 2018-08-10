@@ -7,7 +7,7 @@ import pytest
 from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDCalc, with_scalapack, full_coulomb
+from .fortran import MBDCalc, with_scalapack
 from .utils import numerical_gradients
 
 if with_scalapack:
@@ -301,15 +301,17 @@ def test_mbd_coulomb(calc):
         ev = np.sqrt(ev)
         a_0, c6_0, r_0 = from_volumes(species, hratio)
         w0 = 4*c6_0/(3*a_0**2)
-        ecoul, _, _, _ = full_coulomb(
-            coords_f, C, ev, w0, a_0, r_0, alpha1, beta1, 'fermi', 1.
+        q = np.ones_like(a_0)
+        m = 1/(a_0*w0**2)
+        ecoul = calc.coulomb_energy(
+            coords, q, m, ev, 'fermi', r_0, beta1, alpha1, C
         )
         edip = calc.get_dipole_energy(
             'fermi,dip', coords_f, a_0, w0, ev, r_0, beta1, alpha1, C)
         C = np.identity(len(ev))
         ww = np.repeat(w0, 3)
-        ecoul_non, _, _, _ = full_coulomb(
-            coords_f, C, ww, w0, a_0, r_0, alpha1, beta1, 'fermi', 1.
+        ecoul_non = calc.coulomb_energy(
+            coords, q, m, ww, 'fermi', r_0, beta1, alpha1, C
         )
         edip_non = calc.get_dipole_energy(
             'fermi,dip', coords_f, a_0, w0, ev, r_0, beta1, alpha1, C

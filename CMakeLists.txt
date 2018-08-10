@@ -11,9 +11,8 @@ set(SRCS
     src/mbd_api.f90
     src/mbd_vdw_param.f90
     src/mbd_parallel.F90
-    src/mbd_math.f90
+    src/mbd_coulomb.f90
     # src/mbd_density.f90
-    src/mbd_repulsion.f90
     src/mbd_common.f90
     src/mbd_linalg.F90
     src/mbd_types.f90

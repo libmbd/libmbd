@@ -87,24 +87,6 @@ double calc_dipole_matrix(
     double* dipmat
 );
 
-void calc_full_coulomb(
-    int n,
-    double* coords,
-    double* C,
-    double* w,
-    double* w0,
-    double* a0,
-    double* rvdw0,
-    double alpha,
-    double beta,
-    char* version,
-    double dampswitch,
-    double* ecoul,
-    double* en,
-    double* ee,
-    double* nn
-);
-
 double calc_coulomb_energy(
     struct MBD_system* sys,
     int n_atoms,

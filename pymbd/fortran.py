@@ -187,29 +187,6 @@ class MBDCalc(object):
         )
 
 
-def full_coulomb(coords, C, w, w0, a0, rvdw0, alpha, beta, version, dampswitch):
-    n = len(coords)
-    ecoul, en, ee, nn = (np.array(0.) for _ in range(4))
-    _lib.calc_full_coulomb(
-        n,
-        _cast('double*', coords),
-        _cast('double*', C),
-        _cast('double*', w),
-        _cast('double*', w0),
-        _cast('double*', a0),
-        _cast('double*', rvdw0),
-        alpha,
-        beta,
-        version.encode(),
-        dampswitch,
-        _cast('double*', ecoul),
-        _cast('double*', en),
-        _cast('double*', ee),
-        _cast('double*', nn),
-    )
-    return float(ecoul), float(en), float(ee), float(nn)
-
-
 def _ndarray(ptr, shape=None, dtype='float'):
     buffer_size = (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
     return np.ndarray(

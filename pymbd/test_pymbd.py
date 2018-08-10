@@ -290,31 +290,30 @@ def test_ethylcarbamate_ts(calc):
 
 
 def test_mbd_coulomb(calc):
-    alpha1 = 14.4
-    beta1 = 2.0
+    a = 14.4
+    beta = 2.0
     enes = []
-    for coords, species, hratio in peptide_meoh:
-        coords_f = np.asfortranarray(coords)
-        mbden, ev, C = calc.mbd_energy_species(
-            coords, species, hratio, beta=0.83, spectrum=True
+    for coords, species, vols in peptide_meoh:
+        _, eigs, C = calc.mbd_energy_species(
+            coords, species, vols, beta=0.83, spectrum=True
         )
-        ev = np.sqrt(ev)
-        a_0, c6_0, r_0 = from_volumes(species, hratio)
-        w0 = 4*c6_0/(3*a_0**2)
-        q = np.ones_like(a_0)
-        m = 1/(a_0*w0**2)
+        omega_t = np.sqrt(eigs)
+        alpha_0, C6, R_vdw = from_volumes(species, vols)
+        omega = 4*C6/(3*alpha_0**2)
+        charges = np.ones_like(alpha_0)
+        masses = 1/(alpha_0*omega**2)
         ecoul = calc.coulomb_energy(
-            coords, q, m, ev, 'fermi', r_0, beta1, alpha1, C
+            coords, charges, masses, omega_t, 'fermi', R_vdw, beta, a, C
         )
-        edip = calc.get_dipole_energy(
-            'fermi,dip', coords_f, a_0, w0, ev, r_0, beta1, alpha1, C)
-        C = np.identity(len(ev))
-        ww = np.repeat(w0, 3)
+        edip = calc.dipole_energy(
+            coords, alpha_0, omega, omega_t, 'fermi,dip', R_vdw, beta, a, C)
+        C = np.identity(len(omega_t))
+        omega_non = np.repeat(omega, 3)
         ecoul_non = calc.coulomb_energy(
-            coords, q, m, ww, 'fermi', r_0, beta1, alpha1, C
+            coords, charges, masses, omega_non, 'fermi', R_vdw, beta, a, C
         )
-        edip_non = calc.get_dipole_energy(
-            'fermi,dip', coords_f, a_0, w0, ev, r_0, beta1, alpha1, C
+        edip_non = calc.dipole_energy(
+            coords, alpha_0, omega, omega_t, 'fermi,dip', R_vdw, beta, a, C
         )
         enes.append(ecoul-edip-(ecoul_non-edip_non))
     ene_int = enes[2]-enes[0]-enes[1]

@@ -10,7 +10,7 @@ use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
     mbd_gradients
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
-use mbd_coulomb, only: get_dipole_energy_coupled_osc, get_coulomb_energy_coupled_osc
+use mbd_coulomb, only: dipole_energy, coulomb_energy
 
 implicit none
 
@@ -299,46 +299,45 @@ subroutine calc_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
     end if
 end subroutine calc_dipole_matrix
 
-real(c_double) function calc_coulomb_energy(sys_cp, n_atoms, q, m, w_t, version, r0, beta, alpha, C) result(ene) bind(c)
+real(c_double) function cmbd_coulomb_energy( &
+        sys_cp, n_atoms, q, m, w_t, version, r_vdw, beta, a, C) bind(c)
     type(c_ptr), value :: sys_cp
     integer(c_int), value, intent(in) :: n_atoms
-    real(c_double), value, intent(in) :: alpha, beta
+    real(c_double), value, intent(in) :: a, beta
     real(c_double), intent(in) ::  C(3*n_atoms, 3*n_atoms), &
-        w_t(3*n_atoms), q(n_atoms), m(n_atoms), r0(n_atoms)
+        w_t(3*n_atoms), q(n_atoms), m(n_atoms), r_vdw(n_atoms)
     character(c_char), intent(in) :: version(20)
 
     type(mbd_system), pointer :: sys
     type(mbd_damping) :: damp
 
     damp%version = f_string(version)
-    damp%r_vdw = r0
-    damp%ts_d = alpha
+    damp%r_vdw = r_vdw
+    damp%ts_d = a
     damp%ts_sr = beta
     sys => get_mbd_system(sys_cp)
-    ene = get_coulomb_energy_coupled_osc(sys, q, m, w_t, C, damp)
-end function calc_coulomb_energy
+    cmbd_coulomb_energy = coulomb_energy(sys, q, m, w_t, C, damp)
+end function cmbd_coulomb_energy
 
-real(c_double) function calc_get_dipole_energy(calc_cp, n, version, R, a0, w, &
-        w_t, r0, beta, alpha, C) result(ene) bind(c)
-    type(c_ptr), value :: calc_cp
-    integer(c_int), value, intent(in) :: n
-    real(c_double), intent(in) :: &
-        R(n, 3), C(3*n, 3*n), w_t(3*n), w(n), a0(n), r0(n)
-    real(c_double), value, intent(in) :: alpha, beta
+real(c_double) function cmbd_dipole_energy( &
+        sys_cp, n_atoms, a0, w, w_t, version, r_vdw, beta, a, C) bind(c)
+    type(c_ptr), value :: sys_cp
+    integer(c_int), value, intent(in) :: n_atoms
+    real(c_double), intent(in) :: C(3*n_atoms, 3*n_atoms), &
+        w_t(3*n_atoms), w(n_atoms), a0(n_atoms), r_vdw(n_atoms)
+    real(c_double), value, intent(in) :: a, beta
     character(c_char), intent(in) :: version(20)
 
+    type(mbd_system), pointer :: sys
     type(mbd_damping) :: damp
-    type(mbd_system) :: sys
 
-    sys%calc => get_mbd_calc(calc_cp)
-    allocate (sys%coords(3, n))
-    sys%coords = transpose(R)
     damp%version = f_string(version)
-    damp%r_vdw = r0
+    damp%r_vdw = r_vdw
     damp%beta = beta
-    damp%a = alpha
-    ene = get_dipole_energy_coupled_osc(sys, a0, w, w_t, C, damp)
-end function calc_get_dipole_energy
+    damp%a = a
+    sys => get_mbd_system(sys_cp)
+    cmbd_dipole_energy = dipole_energy(sys, a0, w, w_t, C, damp)
+end function cmbd_dipole_energy
 
 function f_string(str_c) result(str_f)
     character(kind=c_char), intent(in) :: str_c(*)

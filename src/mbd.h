@@ -87,29 +87,28 @@ double calc_dipole_matrix(
     double* dipmat
 );
 
-double calc_coulomb_energy(
+double cmbd_coulomb_energy(
     struct MBD_system* sys,
     int n_atoms,
     double* q,
     double* m,
     double* w_t,
     char* version,
-    double* r0,
+    double* r_vdw,
     double beta,
-    double alpha,
+    double a,
     double* C
 );
 
-double calc_get_dipole_energy(
-    struct MBD_calc* calc,
-    int n,
-    char* version,
-    double* R,
+double cmbd_dipole_energy(
+    struct MBD_system* sys,
+    int n_atoms,
     double* a0,
     double* w,
     double* w_t,
-    double* r0,
+    char* version,
+    double* r_vdw,
     double beta,
-    double alpha,
+    double a,
     double* C
 );

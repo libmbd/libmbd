@@ -12,7 +12,7 @@ implicit none
 
 private
 
-public :: get_coulomb_energy_coupled_osc, get_dipole_energy_coupled_osc
+public :: coulomb_energy, dipole_energy
 
 integer :: n_pts_coulomb = 500
 real(dp) :: L_coulomb = 10d0
@@ -105,8 +105,7 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
-real(dp) function get_coulomb_energy_coupled_osc( &
-        sys, q, m, w_t, C, damp) result(ene)
+real(dp) function coulomb_energy(sys, q, m, w_t, C, damp)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: q(:), m(:), w_t(:), C(:, :)
     type(mbd_damping), intent(in) :: damp
@@ -122,7 +121,7 @@ real(dp) function get_coulomb_energy_coupled_osc( &
     O = matmul(matmul(C, diag(w_t)), transpose(C))
     N = sys%siz()
     prod_w_t = product(w_t)
-    ene = 0.d0
+    coulomb_energy = 0.d0
     do A = 1, N
         do B = A+1, N
             RA = sys%coords(:, A)
@@ -159,12 +158,12 @@ real(dp) function get_coulomb_energy_coupled_osc( &
             case default
                 f_damp%val = 1d0
             end select
-            ene = ene + f_damp%val*q(A)*q(B)*sum(ene_ABi)
+            coulomb_energy = coulomb_energy + f_damp%val*q(A)*q(B)*sum(ene_ABi)
         end do
     end do
 end function
 
-real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C, damp) result(ene)
+real(dp) function dipole_energy(sys, a0, w, w_t, C, damp)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: a0(:), w(:), w_t(:), C(:, :)
     type(mbd_damping), intent(in) :: damp
@@ -183,7 +182,7 @@ real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C, damp) result
         end do
     end do
     T%re = matmul(matmul(transpose(C), T%re), C)
-    ene = sum(diag(T%re)/(4*w_t))
+    dipole_energy = sum(diag(T%re)/(4*w_t))
 end function
 
 subroutine simpson1by3(n, x, w)

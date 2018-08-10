@@ -148,23 +148,7 @@ class MBDCalc(object):
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.ts_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
-    def get_dipole_energy(self, version, R, a0, w, w_t, r0, beta, alpha, C):
-        n = len(R)
-        return _lib.calc_get_dipole_energy(
-            self._calc,
-            n,
-            version.encode(),
-            _cast('double*', R),
-            _cast('double*', a0),
-            _cast('double*', w),
-            _cast('double*', w_t),
-            _cast('double*', r0),
-            beta,
-            alpha,
-            _cast('double*', C),
-        )
-
-    def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, alpha, C):
+    def dipole_energy(self, coords, a0, w, w_t, version, r_vdw, beta, a, C):
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
             self._calc,
@@ -173,7 +157,29 @@ class MBDCalc(object):
             _ffi.NULL,
             _ffi.NULL,
         )
-        return _lib.calc_coulomb_energy(
+        return _lib.cmbd_dipole_energy(
+            system,
+            n_atoms,
+            _cast('double*', a0),
+            _cast('double*', w),
+            _cast('double*', w_t),
+            version.encode(),
+            _cast('double*', r_vdw),
+            beta,
+            a,
+            _cast('double*', C),
+        )
+
+    def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, a, C):
+        n_atoms = len(coords)
+        system = _lib.mbd_init_system(
+            self._calc,
+            n_atoms,
+            _cast('double*', coords),
+            _ffi.NULL,
+            _ffi.NULL,
+        )
+        return _lib.cmbd_coulomb_energy(
             system,
             n_atoms,
             _cast('double*', q),
@@ -182,7 +188,7 @@ class MBDCalc(object):
             version.encode(),
             _cast('double*', r_vdw),
             beta,
-            alpha,
+            a,
             _cast('double*', C),
         )
 

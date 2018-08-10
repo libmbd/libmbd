@@ -99,9 +99,9 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
-real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
-    real(dp), intent(in) :: R(:, :), q(size(R, 1)), m(size(R, 1)), w_t(3*size(R, 1))
-    real(dp), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
+real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
+    type(mbd_system), intent(inout) :: sys
+    real(dp), intent(in) :: q(:), m(:), w_t(:), C(:, :)
 
     real(dp) :: O(size(C, 1), size(C, 1))
     real(dp) :: Opp(size(C, 1)-6, size(C, 1)-6)
@@ -114,13 +114,13 @@ real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
     integer :: i2A(6)
 
     O = matmul(matmul(C, diag(w_t)), transpose(C))
-    N = size(R, 1)
+    N = sys%siz()
     prod_w_t = product(w_t)
     ene = 0.d0
     do A = 1, N
         do B = A+1, N
-            RA = R(A, :)
-            RB = R(B, :)
+            RA = sys%coords(:, A)
+            RB = sys%coords(:, B)
             AB(:) = (/ (3*(A-1)+i, i = 1, 3),  (3*(B-1)+i, i = 1, 3) /)
             notAB(:) = (/ (i, i = 1, 3*(A-1)),  (i, i = 3*A+1, 3*(B-1)), (i, i = 3*B+1, 3*N) /)
             Opp(:, :) = O(notAB, notAB)

@@ -164,6 +164,24 @@ class MBDCalc(object):
             _cast('double*', C),
         )
 
+    def coulomb_energy(self, coords, q, m, w_t, C):
+        n_atoms = len(coords)
+        system = _lib.mbd_init_system(
+            self._calc,
+            n_atoms,
+            _cast('double*', coords),
+            _ffi.NULL,
+            _ffi.NULL,
+        )
+        return _lib.calc_coulomb_energy(
+            system,
+            n_atoms,
+            _cast('double*', q),
+            _cast('double*', m),
+            _cast('double*', w_t),
+            _cast('double*', C),
+        )
+
 
 def full_coulomb(coords, C, w, w0, a0, rvdw0, alpha, beta, version, dampswitch):
     n = len(coords)

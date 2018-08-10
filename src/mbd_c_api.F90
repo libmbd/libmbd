@@ -11,7 +11,7 @@ use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
 use mbd_repulsion, only: full_coulomb
-use mbd_math, only: get_dipole_energy_coupled_osc
+use mbd_math, only: get_dipole_energy_coupled_osc, get_coulomb_energy_coupled_osc
 
 implicit none
 
@@ -314,6 +314,18 @@ subroutine calc_full_coulomb(n, coords, C, w, w0, a0, rvdw0, alpha, beta, &
         alpha, beta, f_string(version), dampswitch, ecoul, en, ee, nn &
     )
 end subroutine calc_full_coulomb
+
+real(c_double) function calc_coulomb_energy(sys_cp, n_atoms, q, m, w_t, C) result(ene) bind(c)
+    type(c_ptr), value :: sys_cp
+    integer(c_int), value, intent(in) :: n_atoms
+    real(c_double), intent(in) :: &
+        C(3*n_atoms, 3*n_atoms), w_t(3*n_atoms), q(n_atoms), m(n_atoms)
+
+    type(mbd_system), pointer :: sys
+
+    sys => get_mbd_system(sys_cp)
+    ene = get_coulomb_energy_coupled_osc(sys, q, m, w_t, C)
+end function calc_coulomb_energy
 
 real(c_double) function calc_get_dipole_energy(calc_cp, n, version, R, a0, w, &
         w_t, r0, beta, alpha, C) result(ene) bind(c)

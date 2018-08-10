@@ -105,6 +105,15 @@ void calc_full_coulomb(
     double* nn
 );
 
+double calc_coulomb_energy(
+    struct MBD_system* sys,
+    int n_atoms,
+    double* q,
+    double* m,
+    double* w_t,
+    double* C
+);
+
 double calc_get_dipole_energy(
     struct MBD_calc* calc,
     int n,

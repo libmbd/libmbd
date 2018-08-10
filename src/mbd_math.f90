@@ -20,49 +20,43 @@ external :: DGETRF
 contains
 
 subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
-    real(dp), intent(in) :: R1(3), R2(3), K(6, 6)
+    real(dp), intent(in) :: R1(3), R2(3), K(:, :)
     real(dp), intent(out), optional :: dip(3, 3), coul
 
-    real(dp), dimension(n_pts_coulomb) :: u, w, x
-    real(dp) :: R(6), s, det_K
+    real(dp), allocatable :: u(:), w(:), x(:)
+    real(dp) :: R(6), det_K
     integer :: i
-    real(dp) :: det_K_plus_U2, coul_u, dot, dist
-    real(dp) :: work(6, 6), Ks(6, 6)
-    real(dp), dimension(3, 3) :: K11, K12, K22, dip_u
+    real(dp) :: det_K_plus_U2, coul_u, dot, dist, work(6, 6)
+    real(dp), dimension(:, :), allocatable :: K11, K12, K22, dip_u
 
-    ! print *, "det(K)", get_det(K)
-    s = 1d0  ! get_det(K)**(-1.d0/6)
-    Ks = s*K
     dist = sqrt(sum((R1-R2)**2))
+    allocate (x(n_pts_coulomb), w(n_pts_coulomb))
     select case (quadrature)
     case ('original')
-        w(:) = 1.d0/n_pts_coulomb
+        w = 1d0/n_pts_coulomb
         forall (i = 1:n_pts_coulomb) x(i) = w(1)/2+(i-1)*w(1)
-        u = log(1.d0/(1.d0-x))*sqrt(s)*L_coulomb/dist
-        w = 1.d0/(1.d0-x)*w*sqrt(s)*L_coulomb/dist
-        ! u = x/(1.d0-x)
-        ! w = 1.d0/(1.d0-x)**2*w
+        u = log(1d0/(1d0-x))*L_coulomb/dist
+        w = 1d0/(1d0-x)*w*L_coulomb/dist
     case ('simpson')
         call simpson1by3(n_pts_coulomb, x, w)
         u = (1d0-x)/(1d0+x)
         w = 2*w/(1d0+x)**2
     end select
-    R(1:3) = R1/sqrt(s)
-    R(4:6) = R2/sqrt(s)
-    if (present(coul)) coul = 0.d0
-    if (present(dip)) dip(:, :) = 0.d0
+    R(1:3) = R1
+    R(4:6) = R2
+    if (present(coul)) coul = 0d0
+    if (present(dip)) then
+        dip(:, :) = 0d0
+        allocate (K11(3, 3), K12(3, 3), K22(3, 3), dip_u(3, 3))
+    end if
     do i = 1, n_pts_coulomb
-        work = Ks
+        work = K
         call add_U2(work, u(i)**2)  ! work is K+U2
         det_K_plus_U2 = get_det(work)
-        ! call print_matrix('K', K)
-        ! call print_matrix('K+U2', work)
         call inv(work)  ! work is (K+U2)^-1
-        ! call print_matrix('(K+U2)^-1', work)
-        work = Ks-matmul(Ks, matmul(work, Ks)) ! work is K-K*(K+U2)^-1*K
-        ! call print_matrix('K-K*(K+U2)^-1*K', work)
+        work = K-matmul(K, matmul(work, K)) ! work is K-K*(K+U2)^-1*K
         dot = dot_product(R, matmul(work, R))
-        coul_u = 1.d0/sqrt(det_K_plus_U2)*exp(-dot)*w(i)
+        coul_u = 1d0/sqrt(det_K_plus_U2)*exp(-dot)*w(i)
         if (present(coul)) coul = coul + coul_u
         if (present(dip)) then
             K11 = work(1:3, 1:3)
@@ -71,11 +65,9 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
             dip_u = (-2*K12+4*get_outer( &
                 matmul(K11, R1)+matmul(K12, R2), &
                 matmul(K12, R1)+matmul(K22, R2) &
-            )/s)*coul_u
+            ))*coul_u
             dip = dip + dip_u
         end if
-        ! print *, "u =", u(i)**2, "w =", w(i), "1/sqrt(det(K+U2)) =", 1.d0/sqrt(det_K_plus_U2), &
-        !     "dot =", dot, "exp =", exp(-dot), "add =", coul_u
     end do
     det_K = get_det(K)
     if (present(coul)) coul = 2.d0/sqrt(pi)*coul*sqrt(det_K)
@@ -139,14 +131,12 @@ real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
             K(4:6, 4:6) = point_charge*eye(3)
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
             ene_ABi(3) = -coul
-            print *, A, B, ene_ABi(1:3)/(2/sqrt(pi)*sqrt(prod_w_t))
             K(:, :) = 0.d0
             K(1:3, 1:3) = point_charge*eye(3)
             K(4:6, 4:6) = point_charge*eye(3)
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
             ene_ABi(4) = coul
             ene_AB = q(A)*q(B)*sum(ene_ABi)
-            ! print *, q(A)*q(B)*sqrt(prod_w_t)*ene_ABi
             ene = ene + ene_AB
         end do
     end do
@@ -187,16 +177,6 @@ real(dp) function get_det(A) result(D)
     D = product((/ (LU(i, i), i = 1, n) /))
 end function
 
-subroutine swap_ints(a, b)
-    integer, intent(inout) :: a, b
-
-    integer :: c
-
-    c = a
-    a = b
-    b = c
-end subroutine
-
 function get_outer(a, b) result(C)
     real(dp), intent(in) :: a(:), b(:)
     real(dp) :: C(size(a), size(b))
@@ -207,23 +187,24 @@ function get_outer(a, b) result(C)
 end function
 
 subroutine simpson1by3(n, x, w)
-implicit none
-integer :: i, n
-double precision, dimension(n) :: x, w
-double precision:: h, delta
+    integer, intent(in) :: n
+    real(dp), intent(out) :: x(n), w(n)
 
-delta = 1.d-6
-h=2.0*(1.d0-delta)/((n-1)*1.d0)
-do i = 1, n
- x(i)=-(1.d0-delta)+h*(i-1)
- if(2*(i-(i/2))==i)then
-  w(i) = 2.d0*h/3.d0
- else
-  w(i) = 4.d0*h/3.d0
- end if
-end do
-w(1)= 1.d0*h/3.d0
-w(n)= w(1)
-end subroutine simpson1by3
+    integer :: i
+    real(dp) :: h, delta
+
+    delta = 1d-6
+    h = 2*(1d0-delta)/(n-1)
+    do i = 1, n
+        x(i) = -(1d0-delta)+h*(i-1)
+        if (2*(i-(i/2)) == i) then
+            w(i) = 2*h/3
+        else
+            w(i) = 4*h/3
+        end if
+    end do
+    w(1) = h/3
+    w(n)= w(1)
+end subroutine
 
 end module

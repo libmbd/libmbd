@@ -13,6 +13,7 @@ implicit none
 integer, parameter :: n_pts_coulomb = 50
 real(dp), parameter :: L_coulomb = 10.d0
 real(dp), parameter :: point_charge = 100.d0
+character(len=20) :: quadrature = 'simpson'
 
 external :: DGETRF
 
@@ -32,13 +33,20 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
     ! print *, "det(K)", get_det(K)
     s = 1d0  ! get_det(K)**(-1.d0/6)
     Ks = s*K
-    w(:) = 1.d0/n_pts_coulomb
-    forall (i = 1:n_pts_coulomb) x(i) = w(1)/2+(i-1)*w(1)
-    ! u = x/(1.d0-x)
-    ! w = 1.d0/(1.d0-x)**2*w
     dist = sqrt(sum((R1-R2)**2))
-    u = log(1.d0/(1.d0-x))*sqrt(s)*L_coulomb/dist
-    w = 1.d0/(1.d0-x)*w*sqrt(s)*L_coulomb/dist
+    select case (quadrature)
+    case ('original')
+        w(:) = 1.d0/n_pts_coulomb
+        forall (i = 1:n_pts_coulomb) x(i) = w(1)/2+(i-1)*w(1)
+        u = log(1.d0/(1.d0-x))*sqrt(s)*L_coulomb/dist
+        w = 1.d0/(1.d0-x)*w*sqrt(s)*L_coulomb/dist
+        ! u = x/(1.d0-x)
+        ! w = 1.d0/(1.d0-x)**2*w
+    case ('simpson')
+        call simpson1by3(n_pts_coulomb, x, w)
+        u = (1d0-x)/(1d0+x)
+        w = 2*w/(1d0+x)**2
+    end select
     R(1:3) = R1/sqrt(s)
     R(4:6) = R2/sqrt(s)
     if (present(coul)) coul = 0.d0
@@ -197,5 +205,25 @@ function get_outer(a, b) result(C)
 
     forall (i = 1:size(a), j = 1:size(b)) C(i, j) = a(i)*b(j)
 end function
+
+subroutine simpson1by3(n, x, w)
+implicit none
+integer :: i, n
+double precision, dimension(n) :: x, w
+double precision:: h, delta
+
+delta = 1.d-6
+h=2.0*(1.d0-delta)/((n-1)*1.d0)
+do i = 1, n
+ x(i)=-(1.d0-delta)+h*(i-1)
+ if(2*(i-(i/2))==i)then
+  w(i) = 2.d0*h/3.d0
+ else
+  w(i) = 4.d0*h/3.d0
+ end if
+end do
+w(1)= 1.d0*h/3.d0
+w(n)= w(1)
+end subroutine simpson1by3
 
 end module

@@ -10,7 +10,7 @@ use mbd_types, only: mat3n3n
 
 implicit none
 
-integer, parameter :: n_pts_coulomb = 50
+integer, parameter :: n_pts_coulomb = 500
 real(dp), parameter :: L_coulomb = 10.d0
 real(dp), parameter :: point_charge = 100.d0
 character(len=20) :: quadrature = 'simpson'

@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_math
 
-use mbd_linalg, only: eye, inverse, diag, inv
+use mbd_linalg, only: eye, inverse, diag, inv, eye
 use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint
 use mbd_common, only: dp, pi
 use mbd_types, only: mat3n3n
@@ -12,7 +12,6 @@ implicit none
 
 integer, parameter :: n_pts_coulomb = 500
 real(dp), parameter :: L_coulomb = 10.d0
-real(dp), parameter :: point_charge = 100.d0
 character(len=20) :: quadrature = 'simpson'
 
 external :: DGETRF
@@ -50,11 +49,24 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
         allocate (K11(3, 3), K12(3, 3), K22(3, 3), dip_u(3, 3))
     end if
     do i = 1, n_pts_coulomb
-        work = K
-        call add_U2(work, u(i)**2)  ! work is K+U2
-        det_K_plus_U2 = get_det(work)
-        call inv(work)  ! work is (K+U2)^-1
-        work = K-matmul(K, matmul(work, K)) ! work is K-K*(K+U2)^-1*K
+        select case (size(K, 1))
+        case (3)
+            work(1:3, 1:3) = K
+            work(4:6, 1:3) = eye(3)*u(i)**2
+            work = -matmul( &
+                work(:, 1:3), &
+                matmul(inverse(K+eye(3)*u(i)**2), transpose(work(:, 1:3))) &
+            )
+            work(1:3, 1:3) = work(1:3, 1:3) + K
+            work(4:6, 4:6) = work(4:6, 4:6) + eye(3)*u(i)**2
+            det_K_plus_U2 = get_det(K+eye(3)*u(i)**2)
+        case (6)
+            work = K
+            call add_U2(work, u(i)**2)  ! work is K+U2
+            det_K_plus_U2 = get_det(work)
+            call inv(work)  ! work is (K+U2)^-1
+            work = K-matmul(K, matmul(work, K)) ! work is K-K*(K+U2)^-1*K
+        end select
         dot = dot_product(R, matmul(work, R))
         coul_u = 1d0/sqrt(det_K_plus_U2)*exp(-dot)*w(i)
         if (present(coul)) coul = coul + coul_u
@@ -121,21 +133,13 @@ real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
             forall (i = 1:6, j = 1:6) OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
             call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=coul)
             ene_ABi(1) = coul
-            K(:, :) = 0.d0
-            K(1:3, 1:3) = point_charge*eye(3)
-            K(4:6, 4:6) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
-            call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
+            K(1:3, 1:3) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
+            call calc_coulomb_coupled_gauss(RA, RB, K(1:3, 1:3), coul=coul)
             ene_ABi(2) = -coul
-            K(:, :) = 0.d0
             K(1:3, 1:3) = m(A)*(OAB(1:3, 1:3)-matmul(OAB(1:3, 4:6), matmul(inverse(OAB(4:6, 4:6)), OAB(4:6, 1:3))))
-            K(4:6, 4:6) = point_charge*eye(3)
-            call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
+            call calc_coulomb_coupled_gauss(RA, RB, K(1:3, 1:3), coul=coul)
             ene_ABi(3) = -coul
-            K(:, :) = 0.d0
-            K(1:3, 1:3) = point_charge*eye(3)
-            K(4:6, 4:6) = point_charge*eye(3)
-            call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
-            ene_ABi(4) = coul
+            ene_ABi(4) = 1d0/sqrt(sum((RA-RB)**2))
             ene_AB = q(A)*q(B)*sum(ene_ABi)
             ene = ene + ene_AB
         end do

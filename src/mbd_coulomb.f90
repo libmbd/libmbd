@@ -3,19 +3,20 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_coulomb
 
-use mbd_linalg, only: eye, inverse, diag, inv, eye
-use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint, &
-    damping_fermi
+use mbd_linalg, only: eye, inverse, diag, inv, eye, det, outer
+use mbd, only: dipole_matrix, mbd_system, mbd_damping, damping_fermi
 use mbd_common, only: dp, pi
 use mbd_types, only: mat3n3n, scalar
 
 implicit none
 
+private
+
+public :: get_coulomb_energy_coupled_osc, get_dipole_energy_coupled_osc
+
 integer :: n_pts_coulomb = 500
 real(dp) :: L_coulomb = 10d0
 character(len=20) :: quadrature = 'simpson'
-
-external :: DGETRF
 
 contains
 
@@ -60,11 +61,11 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
             )
             work(1:3, 1:3) = work(1:3, 1:3) + K
             work(4:6, 4:6) = work(4:6, 4:6) + eye(3)*u(i)**2
-            det_K_plus_U2 = get_det(K+eye(3)*u(i)**2)
+            det_K_plus_U2 = det(K+eye(3)*u(i)**2)
         case (6)
             work = K
             call add_U2(work, u(i)**2)  ! work is K+U2
-            det_K_plus_U2 = get_det(work)
+            det_K_plus_U2 = det(work)
             call inv(work)  ! work is (K+U2)^-1
             work = K-matmul(K, matmul(work, K)) ! work is K-K*(K+U2)^-1*K
         end select
@@ -75,14 +76,14 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
             K11 = work(1:3, 1:3)
             K12 = work(1:3, 4:6)
             K22 = work(4:6, 4:6)
-            dip_u = (-2*K12+4*get_outer( &
+            dip_u = (-2*K12+4*outer( &
                 matmul(K11, R1)+matmul(K12, R2), &
                 matmul(K12, R1)+matmul(K22, R2) &
             ))*coul_u
             dip = dip + dip_u
         end if
     end do
-    det_K = get_det(K)
+    det_K = det(K)
     if (present(coul)) coul = 2.d0/sqrt(pi)*coul*sqrt(det_K)
     if (present(dip)) dip = 2.d0/sqrt(pi)*dip*sqrt(det_K)
 
@@ -183,28 +184,6 @@ real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C, damp) result
     end do
     T%re = matmul(matmul(transpose(C), T%re), C)
     ene = sum(diag(T%re)/(4*w_t))
-end function
-
-real(dp) function get_det(A) result(D)
-    real(dp), intent(in) :: A(:, :)
-
-    integer :: n, i, info
-    real(dp) :: LU(size(A, 1), size(A, 1))
-    integer :: ipiv(size(A, 1))
-
-    n = size(A, 1)
-    LU = A
-    call DGETRF(n, n, LU, n, ipiv, info)
-    D = product([(LU(i, i), i = 1, n)])
-end function
-
-function get_outer(a, b) result(C)
-    real(dp), intent(in) :: a(:), b(:)
-    real(dp) :: C(size(a), size(b))
-
-    integer :: i, j
-
-    forall (i = 1:size(a), j = 1:size(b)) C(i, j) = a(i)*b(j)
 end function
 
 subroutine simpson1by3(n, x, w)

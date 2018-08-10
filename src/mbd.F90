@@ -7,7 +7,7 @@
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, exception
-use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, cprod
+use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer
 use mbd_types, only: mat3n3n, mat33, scalar
 use mbd_parallel, only: mbd_blacs_grid
 use mbd_defaults
@@ -1326,7 +1326,7 @@ type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     bare = T_bare_v2(r, deriv)
     r_1 = sqrt(sum(r**2))
     r_5 = r_1**5
-    rr_r5 = cprod(r, r)/r_5
+    rr_r5 = outer(r, r)/r_5
     zeta = r_1/sigma
     theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
     erf_theta = erf(zeta)-theta
@@ -1352,7 +1352,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
-    T = zeta_1*T_bare(rxyz)-zeta_2*cprod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*outer(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function
 
 

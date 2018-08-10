@@ -10,8 +10,8 @@ use mbd_parallel, only: mbd_blacs
 implicit none
 
 private
-public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve, cprod, &
-    eye, diag
+public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve, outer, &
+    eye, diag, det
 
 interface diag
     module procedure get_diag_
@@ -612,7 +612,21 @@ function solve(A, b, exc) result(x)
     endif
 end function
 
-function cprod(a, b) result(c)
+real(dp) function det(A) result(D)
+    real(dp), intent(in) :: A(:, :)
+
+    integer :: n, i, info
+    real(dp), allocatable :: LU(:, :)
+    integer, allocatable :: ipiv(:)
+
+    n = size(A, 1)
+    allocate (ipiv(n))
+    LU = A
+    call DGETRF(n, n, LU, n, ipiv, info)
+    D = product([(LU(i, i), i = 1, n)])
+end function
+
+function outer(a, b) result(c)
     real(dp), intent(in) :: a(:), b(:)
     real(dp) :: c(size(a), size(b))
 

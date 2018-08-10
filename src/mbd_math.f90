@@ -23,14 +23,14 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
     real(dp), intent(out), optional :: dip(3, 3), coul
 
     real(dp), dimension(n_pts_coulomb) :: u, w, x
-    real(dp) :: R(6), s
+    real(dp) :: R(6), s, det_K
     integer :: i
     real(dp) :: det_K_plus_U2, coul_u, dot, dist
     real(dp) :: work(6, 6), Ks(6, 6)
     real(dp), dimension(3, 3) :: K11, K12, K22, dip_u
 
     ! print *, "det(K)", get_det(K)
-    s = get_det(K)**(-1.d0/6)
+    s = 1d0  ! get_det(K)**(-1.d0/6)
     Ks = s*K
     w(:) = 1.d0/n_pts_coulomb
     forall (i = 1:n_pts_coulomb) x(i) = w(1)/2+(i-1)*w(1)
@@ -69,8 +69,9 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
         ! print *, "u =", u(i)**2, "w =", w(i), "1/sqrt(det(K+U2)) =", 1.d0/sqrt(det_K_plus_U2), &
         !     "dot =", dot, "exp =", exp(-dot), "add =", coul_u
     end do
-    if (present(coul)) coul = 2.d0/sqrt(pi)*coul/sqrt(s)
-    if (present(dip)) dip = 2.d0/sqrt(pi)*dip*s**(-3.d0/2)
+    det_K = get_det(K)
+    if (present(coul)) coul = 2.d0/sqrt(pi)*coul*sqrt(det_K)
+    if (present(dip)) dip = 2.d0/sqrt(pi)*dip*sqrt(det_K)
 
     contains
 
@@ -102,7 +103,7 @@ real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
     integer :: AB(6), notAB(size(C, 1)-6)
     real(dp) :: ene_AB, ene_ABi(4)
     real(dp) :: prod_w_t, coul
-    integer :: i2A(6) = (/ 1, 1, 1, 2, 2, 2 /)
+    integer :: i2A(6)
 
     O = matmul(matmul(C, diag(w_t)), transpose(C))
     N = size(R, 1)
@@ -116,25 +117,27 @@ real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
             notAB(:) = (/ (i, i = 1, 3*(A-1)),  (i, i = 3*A+1, 3*(B-1)), (i, i = 3*B+1, 3*N) /)
             Opp(:, :) = O(notAB, notAB)
             OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(inverse(O(notAB, notAB)), O(notAB, AB)))
+            i2A = [(A, i = 1, 3), (B, i = 1, 3)]
             forall (i = 1:6, j = 1:6) OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
             call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=coul)
-            ene_ABi(1) = 1.d0/sqrt(get_det(OAB))*coul
+            ene_ABi(1) = coul
             K(:, :) = 0.d0
             K(1:3, 1:3) = point_charge*eye(3)
             K(4:6, 4:6) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
-            ene_ABi(2) = -1.d0/sqrt(get_det(OAB(1:3, 1:3))*get_det(K(4:6, 4:6))/m(B)**3)*coul
+            ene_ABi(2) = -coul
             K(:, :) = 0.d0
             K(1:3, 1:3) = m(A)*(OAB(1:3, 1:3)-matmul(OAB(1:3, 4:6), matmul(inverse(OAB(4:6, 4:6)), OAB(4:6, 1:3))))
             K(4:6, 4:6) = point_charge*eye(3)
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
-            ene_ABi(3) = -1.d0/sqrt(get_det(OAB(4:6, 4:6))*get_det(K(1:3, 1:3))/m(A)**3)*coul
+            ene_ABi(3) = -coul
+            print *, A, B, ene_ABi(1:3)/(2/sqrt(pi)*sqrt(prod_w_t))
             K(:, :) = 0.d0
             K(1:3, 1:3) = point_charge*eye(3)
             K(4:6, 4:6) = point_charge*eye(3)
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=coul)
-            ene_ABi(4) = 1.d0/sqrt(get_det(OAB))*coul
-            ene_AB = q(A)*q(B)*sqrt(prod_w_t)*sum(ene_ABi)
+            ene_ABi(4) = coul
+            ene_AB = q(A)*q(B)*sum(ene_ABi)
             ! print *, q(A)*q(B)*sqrt(prod_w_t)*ene_ABi
             ene = ene + ene_AB
         end do

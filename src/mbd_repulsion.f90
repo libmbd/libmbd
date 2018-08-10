@@ -1,8 +1,8 @@
 module mbd_repulsion
-use mbd_linalg, only: inverse, diag
+use mbd_linalg, only: inverse
 use mbd_math, only: get_det
-use mbd_types, only: scalar, mat3n3n
-use mbd, only: dipole_matrix, damping_fermi, mbd_system, mbd_damping
+use mbd_types, only: scalar
+use mbd, only: damping_fermi
 use mbd_common, only: pi, dp
 
 external :: DGETRI, DGETRF
@@ -300,37 +300,6 @@ TempU2 = matrix_embed(3, -i_matrix(3),6,1, 4)
 BigU2= BigU2+ TempU2
 BigU2= (u**2.d0)*BigU2
 end subroutine U2
-
-real(8) function get_dipole_energy(version,R, a0, w, w_t,r0, beta, alpha, C) result(ene)
-real(8), intent(in) :: R(:, :), a0(size(R, 1)), w(size(R, 1)), w_t(3*size(R, 1)), r0(size(R, 1))
-character(len=*), intent(in) :: version
-real(8), intent(in) :: C(3*size(R, 1), 3*size(R, 1))
-double precision, intent(in) :: beta, alpha
-type(mat3n3n) :: T
-type(mbd_system) :: sys
-type(mbd_damping) :: damp
-integer :: A, B, i, j, N
-
-N = size(R, 1)
-allocate (sys%coords(3, N))
-sys%coords = transpose(R)
-damp%version = version
-damp%r_vdw = r0
-damp%beta = beta
-damp%a = alpha
-T = dipole_matrix(sys, damp, .false.)
-do  A = 1, N
- do B = 1, N
-  i = 3*(A-1)
-  j = 3*(B-1)
-  T%re(i+1:i+3, j+1:j+3) = w(A)*w(B)*sqrt(a0(A)*a0(B))*T%re(i+1:i+3, j+1:j+3)
- end do
-end do
-! call print_matrix('T', T)
-T%re = matmul(matmul(transpose(C), T%re), C)
-! call print_matrix('T_t', T)
-ene = sum(diag(T%re)/(4*w_t))
-end function
 
 recursive function legendre(n, x)result(res)
 ! Provides P_n(x)

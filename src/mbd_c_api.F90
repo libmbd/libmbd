@@ -10,7 +10,8 @@ use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
     mbd_gradients
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
-use mbd_repulsion, only: full_coulomb, get_dipole_energy
+use mbd_repulsion, only: full_coulomb
+use mbd_math, only: get_dipole_energy_coupled_osc
 
 implicit none
 
@@ -314,17 +315,26 @@ subroutine calc_full_coulomb(n, coords, C, w, w0, a0, rvdw0, alpha, beta, &
     )
 end subroutine calc_full_coulomb
 
-real(c_double) function calc_get_dipole_energy(n, version, R, a0, w, w_t, r0, &
-        beta, alpha, C) result(ene) bind(c)
+real(c_double) function calc_get_dipole_energy(calc_cp, n, version, R, a0, w, &
+        w_t, r0, beta, alpha, C) result(ene) bind(c)
+    type(c_ptr), value :: calc_cp
     integer(c_int), value, intent(in) :: n
     real(c_double), intent(in) :: &
         R(n, 3), C(3*n, 3*n), w_t(3*n), w(n), a0(n), r0(n)
     real(c_double), value, intent(in) :: alpha, beta
     character(c_char), intent(in) :: version(20)
 
-    ene = get_dipole_energy( &
-        f_string(version), R, a0, w, w_t,r0, beta, alpha, C &
-    )
+    type(mbd_damping) :: damp
+    type(mbd_system) :: sys
+
+    sys%calc => get_mbd_calc(calc_cp)
+    allocate (sys%coords(3, n))
+    sys%coords = transpose(R)
+    damp%version = f_string(version)
+    damp%r_vdw = r0
+    damp%beta = beta
+    damp%a = alpha
+    ene = get_dipole_energy_coupled_osc(sys, a0, w, w_t, C, damp)
 end function calc_get_dipole_energy
 
 function f_string(str_c) result(str_f)

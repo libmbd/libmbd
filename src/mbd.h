@@ -106,6 +106,7 @@ void calc_full_coulomb(
 );
 
 double calc_get_dipole_energy(
+    struct MBD_calc* calc,
     int n,
     char* version,
     double* R,

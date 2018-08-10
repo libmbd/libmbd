@@ -148,6 +148,22 @@ class MBDCalc(object):
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.ts_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
+    def get_dipole_energy(self, version, R, a0, w, w_t, r0, beta, alpha, C):
+        n = len(R)
+        return _lib.calc_get_dipole_energy(
+            self._calc,
+            n,
+            version.encode(),
+            _cast('double*', R),
+            _cast('double*', a0),
+            _cast('double*', w),
+            _cast('double*', w_t),
+            _cast('double*', r0),
+            beta,
+            alpha,
+            _cast('double*', C),
+        )
+
 
 def full_coulomb(coords, C, w, w0, a0, rvdw0, alpha, beta, version, dampswitch):
     n = len(coords)
@@ -170,22 +186,6 @@ def full_coulomb(coords, C, w, w0, a0, rvdw0, alpha, beta, version, dampswitch):
         _cast('double*', nn),
     )
     return float(ecoul), float(en), float(ee), float(nn)
-
-
-def get_dipole_energy(version, R, a0, w, w_t, r0, beta, alpha, C):
-    n = len(R)
-    return _lib.calc_get_dipole_energy(
-        n,
-        version.encode(),
-        _cast('double*', R),
-        _cast('double*', a0),
-        _cast('double*', w),
-        _cast('double*', w_t),
-        _cast('double*', r0),
-        beta,
-        alpha,
-        _cast('double*', C),
-    )
 
 
 def _ndarray(ptr, shape=None, dtype='float'):

@@ -4,9 +4,10 @@
 module mbd_math
 
 use mbd_linalg, only: eye, inverse, diag, inv, eye
-use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint
+use mbd, only: dipole_matrix, mbd_system, mbd_damping, get_sigma_selfint, &
+    damping_fermi
 use mbd_common, only: dp, pi
-use mbd_types, only: mat3n3n
+use mbd_types, only: mat3n3n, scalar
 
 implicit none
 
@@ -103,12 +104,16 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
-real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
+real(dp) function get_coulomb_energy_coupled_osc( &
+        sys, q, m, w_t, C, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: q(:), m(:), w_t(:), C(:, :)
+    type(mbd_damping), intent(in) :: damp
 
     real(dp), allocatable :: O(:, :)
-    real(dp) :: OAB(6, 6), OABm(6, 6), RA(3), RB(3), ene_ABi(4), prod_w_t, K(3, 3)
+    real(dp) :: OAB(6, 6), OABm(6, 6), RA(3), RB(3), ene_ABi(4), prod_w_t, &
+        K(3, 3), s_vdw
+    type(scalar) :: f_damp
     integer, allocatable :: notAB(:)
     integer :: N, A, B, i, j, AB(6), i2A(6)
 
@@ -146,7 +151,14 @@ real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
             call calc_coulomb_coupled_gauss(RA, RB, K, coul=ene_ABi(3))
             ene_ABi(2:3) = -ene_ABi(2:3)
             ene_ABi(4) = 1d0/sqrt(sum((RA-RB)**2))
-            ene = ene + q(A)*q(B)*sum(ene_ABi)
+            select case (damp%version)
+            case ('fermi')
+                s_vdw = damp%ts_sr*sum(damp%r_vdw([A, B]))
+                f_damp = damping_fermi(RA-RB, s_vdw, damp%ts_d, .false.)
+            case default
+                f_damp%val = 1d0
+            end select
+            ene = f_damp%val*(ene + q(A)*q(B)*sum(ene_ABi))
         end do
     end do
 end function

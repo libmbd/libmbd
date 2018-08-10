@@ -315,16 +315,23 @@ subroutine calc_full_coulomb(n, coords, C, w, w0, a0, rvdw0, alpha, beta, &
     )
 end subroutine calc_full_coulomb
 
-real(c_double) function calc_coulomb_energy(sys_cp, n_atoms, q, m, w_t, C) result(ene) bind(c)
+real(c_double) function calc_coulomb_energy(sys_cp, n_atoms, q, m, w_t, version, r0, beta, alpha, C) result(ene) bind(c)
     type(c_ptr), value :: sys_cp
     integer(c_int), value, intent(in) :: n_atoms
-    real(c_double), intent(in) :: &
-        C(3*n_atoms, 3*n_atoms), w_t(3*n_atoms), q(n_atoms), m(n_atoms)
+    real(c_double), value, intent(in) :: alpha, beta
+    real(c_double), intent(in) ::  C(3*n_atoms, 3*n_atoms), &
+        w_t(3*n_atoms), q(n_atoms), m(n_atoms), r0(n_atoms)
+    character(c_char), intent(in) :: version(20)
 
     type(mbd_system), pointer :: sys
+    type(mbd_damping) :: damp
 
+    damp%version = f_string(version)
+    damp%r_vdw = r0
+    damp%ts_d = alpha
+    damp%ts_sr = beta
     sys => get_mbd_system(sys_cp)
-    ene = get_coulomb_energy_coupled_osc(sys, q, m, w_t, C)
+    ene = get_coulomb_energy_coupled_osc(sys, q, m, w_t, C, damp)
 end function calc_coulomb_energy
 
 real(c_double) function calc_get_dipole_energy(calc_cp, n, version, R, a0, w, &

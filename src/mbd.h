@@ -111,6 +111,10 @@ double calc_coulomb_energy(
     double* q,
     double* m,
     double* w_t,
+    char* version,
+    double* r0,
+    double beta,
+    double alpha,
     double* C
 );
 

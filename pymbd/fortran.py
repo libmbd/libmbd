@@ -164,7 +164,7 @@ class MBDCalc(object):
             _cast('double*', C),
         )
 
-    def coulomb_energy(self, coords, q, m, w_t, C):
+    def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, alpha, C):
         n_atoms = len(coords)
         system = _lib.mbd_init_system(
             self._calc,
@@ -179,6 +179,10 @@ class MBDCalc(object):
             _cast('double*', q),
             _cast('double*', m),
             _cast('double*', w_t),
+            version.encode(),
+            _cast('double*', r_vdw),
+            beta,
+            alpha,
             _cast('double*', C),
         )
 

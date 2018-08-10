@@ -7,7 +7,7 @@ import pytest
 from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDCalc, with_scalapack
+from .fortran import MBDCalc, with_scalapack, full_coulomb, get_dipole_energy
 from .utils import numerical_gradients
 
 if with_scalapack:
@@ -68,6 +68,48 @@ ethylcarbamate = [(
     list('HHHHHHHCCCNOO'),
     [0.581, 0.607, 0.642, 0.646, 0.607, 0.596, 0.597, 0.762, 0.799, 0.845,
      0.824, 0.974, 0.896]
+)]
+
+peptide_meoh = [(
+    np.array([
+        (2.137, 0.252, 0.453), (2.857, 0.879, 0.544),
+        (2.656, -1.053, 0.687), (1.823, -1.742, 0.582),
+        (3.422, -1.322, -0.039), (3.064, -1.154, 1.693)
+    ])*ang,
+    list('OHCHHH'),
+    [0.9114, 0.5960, 0.7523, 0.5886, 0.5850, 0.5850]
+), (
+    np.array([
+        (-0.849, -0.339, 2.491), (0.184, -0.011, 2.416),
+        (-0.882, -1.342, 2.912), (-1.390, 0.316, 3.168),
+        (-1.564, -0.353, 1.159), (-2.749, -0.651, 1.056),
+        (-0.801, -0.027, 0.088), (0.161, 0.240, 0.218),
+        (-1.385, -0.002, -1.234), (-1.891, -0.942, -1.440),
+        (-2.119, 0.796, -1.330), (-0.594, 0.149, -1.963)
+    ])*ang,
+    list('CHHHCONHCHHH'),
+    [
+        0.7657, 0.6027, 0.6062, 0.6077, 0.8343, 0.9815,
+        0.8325, 0.5931, 0.7592, 0.6286, 0.6133, 0.5698
+    ]
+), (
+    np.array([
+        (-0.849, -0.339, 2.491), (0.184, -0.011, 2.416),
+        (-0.882, -1.342, 2.912), (-1.390, 0.316, 3.168),
+        (-1.564, -0.353, 1.159), (-2.749, -0.651, 1.056),
+        (-0.801, -0.027, 0.088), (0.161, 0.240, 0.218),
+        (-1.385, -0.002, -1.234), (-1.891, -0.942, -1.440),
+        (-2.119, 0.796, -1.330), (-0.594, 0.149, -1.963),
+        (2.137, 0.252, 0.453), (2.857, 0.879, 0.544),
+        (2.656, -1.053, 0.687), (1.823, -1.742, 0.582),
+        (3.422, -1.322, -0.039), (3.064, -1.154, 1.693)
+    ])*ang,
+    list('CHHHCONHCHHHOHCHHH'),
+    [
+        0.7767, 0.6594, 0.6193, 0.6167, 0.8414, 0.9898, 0.8462,
+        0.7213, 0.7668, 0.6367, 0.6211, 0.5915, 0.8615, 0.5511,
+        0.7415, 0.6022, 0.5701, 0.5759
+    ]
 )]
 
 
@@ -245,3 +287,33 @@ def test_ethylcarbamate_ts(calc):
     ]
     ene_int = enes[0]-2*enes[1]
     assert ene_int == approx(-0.052171811689150846, rel=1e-10)
+
+
+def test_mbd_coulomb(calc):
+    alpha1 = 14.4
+    beta1 = 2.0
+    enes = []
+    for coords, species, hratio in peptide_meoh:
+        coords_f = np.asfortranarray(coords)
+        mbden, ev, C = calc.mbd_energy_species(
+            coords, species, hratio, beta=0.83, spectrum=True
+        )
+        ev = np.sqrt(ev)
+        a_0, c6_0, r_0 = from_volumes(species, hratio)
+        w0 = 4*c6_0/(3*a_0**2)
+        ecoul, _, _, _ = full_coulomb(
+            coords_f, C, ev, w0, a_0, r_0, alpha1, beta1, 'fermi', 1.
+        )
+        edip = get_dipole_energy(
+            'fermi,dip', coords_f, a_0, w0, ev, r_0, beta1, alpha1, C)
+        C = np.identity(len(ev))
+        ww = np.repeat(w0, 3)
+        ecoul_non, _, _, _ = full_coulomb(
+            coords_f, C, ww, w0, a_0, r_0, alpha1, beta1, 'fermi', 1.
+        )
+        edip_non = get_dipole_energy(
+            'fermi,dip', coords_f, a_0, w0, ev, r_0, beta1, alpha1, C
+        )
+        enes.append(ecoul-edip-(ecoul_non-edip_non))
+    ene_int = enes[2]-enes[0]-enes[1]
+    assert ene_int == approx(0.02650982207201126/627.503, rel=1e-10)

@@ -10,8 +10,8 @@ use mbd_types, only: mat3n3n
 
 implicit none
 
-integer, parameter :: n_pts_coulomb = 500
-real(dp), parameter :: L_coulomb = 10.d0
+integer :: n_pts_coulomb = 500
+real(dp) :: L_coulomb = 10d0
 character(len=20) :: quadrature = 'simpson'
 
 external :: DGETRF
@@ -107,16 +107,12 @@ real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: q(:), m(:), w_t(:), C(:, :)
 
-    real(dp) :: O(size(C, 1), size(C, 1))
-    real(dp) :: Opp(size(C, 1)-6, size(C, 1)-6)
-    real(dp) :: OAB(6, 6), OABm(6, 6), K(6, 6)
-    real(dp) :: RA(3), RB(3)
-    integer :: N, A, B, i, j
-    integer :: AB(6), notAB(size(C, 1)-6)
-    real(dp) :: ene_AB, ene_ABi(4)
-    real(dp) :: prod_w_t, coul
-    integer :: i2A(6)
+    real(dp), allocatable :: O(:, :)
+    real(dp) :: OAB(6, 6), OABm(6, 6), RA(3), RB(3), ene_ABi(4), prod_w_t, K(3, 3)
+    integer, allocatable :: notAB(:)
+    integer :: N, A, B, i, j, AB(6), i2A(6)
 
+    allocate (notAB(size(C, 1)-6))
     O = matmul(matmul(C, diag(w_t)), transpose(C))
     N = sys%siz()
     prod_w_t = product(w_t)
@@ -125,23 +121,32 @@ real(dp) function get_coulomb_energy_coupled_osc(sys, q, m, w_t, C) result(ene)
         do B = A+1, N
             RA = sys%coords(:, A)
             RB = sys%coords(:, B)
-            AB(:) = (/ (3*(A-1)+i, i = 1, 3),  (3*(B-1)+i, i = 1, 3) /)
-            notAB(:) = (/ (i, i = 1, 3*(A-1)),  (i, i = 3*A+1, 3*(B-1)), (i, i = 3*B+1, 3*N) /)
-            Opp(:, :) = O(notAB, notAB)
-            OAB = O(AB, AB)-matmul(O(AB, notAB), matmul(inverse(O(notAB, notAB)), O(notAB, AB)))
+            AB(:) = [(3*(A-1)+i, i = 1, 3), (3*(B-1)+i, i = 1, 3)]
+            notAB(:) = [ &
+                (i, i = 1, 3*(A-1)), &
+                (i, i = 3*A+1, 3*(B-1)), &
+                (i, i = 3*B+1, 3*N) &
+            ]
+            OAB = O(AB, AB) - matmul( &
+                O(AB, notAB), &
+                matmul(inverse(O(notAB, notAB)), O(notAB, AB)) &
+            )
             i2A = [(A, i = 1, 3), (B, i = 1, 3)]
-            forall (i = 1:6, j = 1:6) OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
-            call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=coul)
-            ene_ABi(1) = coul
-            K(1:3, 1:3) = m(B)*(OAB(4:6, 4:6)-matmul(OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6))))
-            call calc_coulomb_coupled_gauss(RA, RB, K(1:3, 1:3), coul=coul)
-            ene_ABi(2) = -coul
-            K(1:3, 1:3) = m(A)*(OAB(1:3, 1:3)-matmul(OAB(1:3, 4:6), matmul(inverse(OAB(4:6, 4:6)), OAB(4:6, 1:3))))
-            call calc_coulomb_coupled_gauss(RA, RB, K(1:3, 1:3), coul=coul)
-            ene_ABi(3) = -coul
+            forall (i = 1:6, j = 1:6)
+                OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
+            end forall
+            call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=ene_ABi(1))
+            K = m(B)*(OAB(4:6, 4:6) - matmul( &
+                OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6)) &
+            ))
+            call calc_coulomb_coupled_gauss(RA, RB, K, coul=ene_ABi(2))
+            K = m(A)*(OAB(1:3, 1:3) - matmul( &
+                OAB(1:3, 4:6), matmul(inverse(OAB(4:6, 4:6)), OAB(4:6, 1:3)) &
+            ))
+            call calc_coulomb_coupled_gauss(RA, RB, K, coul=ene_ABi(3))
+            ene_ABi(2:3) = -ene_ABi(2:3)
             ene_ABi(4) = 1d0/sqrt(sum((RA-RB)**2))
-            ene_AB = q(A)*q(B)*sum(ene_ABi)
-            ene = ene + ene_AB
+            ene = ene + q(A)*q(B)*sum(ene_ABi)
         end do
     end do
 end function
@@ -178,7 +183,7 @@ real(dp) function get_det(A) result(D)
     n = size(A, 1)
     LU = A
     call DGETRF(n, n, LU, n, ipiv, info)
-    D = product((/ (LU(i, i), i = 1, n) /))
+    D = product([(LU(i, i), i = 1, n)])
 end function
 
 function get_outer(a, b) result(C)

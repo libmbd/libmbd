@@ -158,7 +158,7 @@ real(dp) function get_coulomb_energy_coupled_osc( &
             case default
                 f_damp%val = 1d0
             end select
-            ene = f_damp%val*(ene + q(A)*q(B)*sum(ene_ABi))
+            ene = ene + f_damp%val*q(A)*q(B)*sum(ene_ABi)
         end do
     end do
 end function

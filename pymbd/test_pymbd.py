@@ -318,4 +318,4 @@ def test_mbd_coulomb(calc):
         )
         enes.append(ecoul-edip-(ecoul_non-edip_non))
     ene_int = enes[2]-enes[0]-enes[1]
-    assert ene_int == approx(0.02650982207201126/627.503, rel=1e-10)
+    assert ene_int == approx(0.0002460638172163822/627.503, rel=1e-10)

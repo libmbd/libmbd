@@ -141,30 +141,25 @@ real(dp) function get_coulomb_energy_coupled_osc(R, q, m, w_t, C) result(ene)
     end do
 end function
 
-real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C) result(ene)
+real(dp) function get_dipole_energy_coupled_osc(sys, a0, w, w_t, C, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: a0(size(sys%coords, 1)), w(size(sys%coords, 1)), w_t(3*size(sys%coords, 1))
-    real(dp), intent(in) :: C(3*size(sys%coords, 1), 3*size(sys%coords, 1))
+    real(dp), intent(in) :: a0(:), w(:), w_t(:), C(:, :)
+    type(mbd_damping), intent(in) :: damp
 
     integer :: A, B, i, j, N
     type(mat3n3n) :: T
-    type(mbd_damping) :: damp
-    real(dp), allocatable :: dummy(:)
 
-    N = size(sys%coords, 1)
-    damp%version = 'dip,gg'
-    damp%sigma = get_sigma_selfint(a0, dummy)
+    N = sys%siz()
     T = dipole_matrix(sys, damp, grad=.false.)
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)
             j = 3*(B-1)
-            T%re(i+1:i+3, j+1:j+3) = w(A)*w(B)*sqrt(a0(A)*a0(B))*T%re(i+1:i+3, j+1:j+3)
+            T%re(i+1:i+3, j+1:j+3) = &
+                w(A)*w(B)*sqrt(a0(A)*a0(B))*T%re(i+1:i+3, j+1:j+3)
         end do
     end do
-    ! call print_matrix('T', T)
     T%re = matmul(matmul(transpose(C), T%re), C)
-    ! call print_matrix('T_t', T)
     ene = sum(diag(T%re)/(4*w_t))
 end function
 

@@ -482,7 +482,7 @@ if (rpos+n-1 > Bign .or. cpos+n-1 > Bign) then
  stop
 end if
 Bigmatrix = 0.d0
-Bigmatrix(rpos:, cpos:) =matA
+Bigmatrix(rpos:rpos+(n-1), cpos:cpos+(n-1)) =matA
 
 end function matrix_embed
 !

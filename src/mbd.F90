@@ -142,7 +142,7 @@ type(mbd_result) function mbd_scs_energy( &
     type(mbd_gradients) :: dene_mbd, dr_vdw_scs
     type(mbd_damping) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom
-    character(len=:), allocatable :: damping_types(:)
+    character(len=15) :: damping_types(2)
 
     select case (variant)
     case ('scs')

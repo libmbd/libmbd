@@ -13,6 +13,7 @@ sources = [
     'src/mbd_types.f90',
     'src/mbd_linalg.F90',
     'src/mbd.F90',
+    'src/mbd_coulomb.f90',
     'src/mbd_c_api.F90',
 ]
 

@@ -185,7 +185,7 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     real(dp), intent(out), optional :: modes(:, :)
     ! TODO document that this can be called only once
 
-    spectrum = this%results%mode_enes
+    spectrum = this%results%mode_eigs
     if (present(modes)) then
         modes = this%results%modes
     end if

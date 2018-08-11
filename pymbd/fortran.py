@@ -8,7 +8,7 @@ import numpy as np
 from .pymbd import _array, from_volumes
 from ._libmbd import ffi as _ffi, lib as _lib
 
-with_scalapack = _lib.with_scalapack
+with_scalapack = _lib.cmbd_with_scalapack
 if with_scalapack:
     from mpi4py import MPI  # noqa
 
@@ -19,11 +19,11 @@ class MBDCalc(object):
         self.n_freq = n_freq
 
     def __enter__(self):
-        self._calc_obj = _lib.mbd_init_calc(self.n_freq)
+        self._calc_obj = _lib.cmbd_init_calc(self.n_freq)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        _lib.mbd_destroy_calc(self._calc)
+        _lib.cmbd_destroy_calc(self._calc)
         self._calc_obj = None
 
     @property
@@ -44,17 +44,17 @@ class MBDCalc(object):
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         n_atoms = len(coords)
-        system = _lib.mbd_init_system(
+        system = _lib.cmbd_init_system(
             self._calc,
             n_atoms,
             _cast('double*', coords),
             _cast('double*', lattice),
             _ffi.NULL,
         )
-        damping = _lib.mbd_init_damping(
+        damping = _lib.cmbd_init_damping(
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
         )
-        ene = _lib.calc_ts_energy(
+        ene = _lib.cmbd_ts_energy(
             system,
             n_atoms,
             _cast('double*', alpha_0),
@@ -62,30 +62,31 @@ class MBDCalc(object):
             damping,
             _ffi.NULL,
         )
-        _lib.mbd_destroy_damping(damping)
-        _lib.mbd_destroy_system(system)
+        _lib.cmbd_destroy_damping(damping)
+        _lib.cmbd_destroy_system(system)
         return ene
 
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
-                   a=6., func='calc_mbd_rsscs_energy', force=False,
-                   damping='fermi,dip'):
+                   a=6., func='mbd_rsscs_energy', force=False,
+                   damping='fermi,dip', spectrum=False):
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         k_grid = _array(k_grid, dtype='i4')
         n_atoms = len(coords)
-        system = _lib.mbd_init_system(
+        system = _lib.cmbd_init_system(
             self._calc,
             n_atoms,
             _cast('double*', coords),
             _cast('double*', lattice),
             _cast('int*', k_grid),
         )
-        damping = _lib.mbd_init_damping(
+        damping = _lib.cmbd_init_damping(
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
         )
         gradients = np.zeros((n_atoms, 3)) if force else None
-        ene = getattr(_lib, func)(
+        eigs, modes = None, None
+        args = (
             system,
             n_atoms,
             _cast('double*', alpha_0),
@@ -93,8 +94,16 @@ class MBDCalc(object):
             damping,
             _cast('double*', gradients),
         )
-        _lib.mbd_destroy_damping(damping)
-        _lib.mbd_destroy_system(system)
+        if func == 'mbd_rsscs_energy':
+            if spectrum:
+                eigs = np.zeros(3*n_atoms)
+                modes = np.zeros((3*n_atoms, 3*n_atoms), order='F')
+            args += (_cast('double*', eigs), _cast('double*', modes))
+        ene = getattr(_lib, 'cmbd_' + func)(*args)
+        _lib.cmbd_destroy_damping(damping)
+        _lib.cmbd_destroy_system(system)
+        if spectrum:
+            ene = ene, eigs, modes
         if force:
             return ene, gradients
         return ene
@@ -104,14 +113,14 @@ class MBDCalc(object):
         coords, R_vdw, sigma, lattice, k_point = \
             map(_array, (coords, R_vdw, sigma, lattice, k_point))
         n_atoms = len(coords)
-        system = _lib.mbd_init_system(
+        system = _lib.cmbd_init_system(
             self._calc,
             n_atoms,
             _cast('double*', coords),
             _cast('double*', lattice),
             _ffi.NULL,
         )
-        damping = _lib.mbd_init_damping(
+        damping = _lib.cmbd_init_damping(
             n_atoms, damping.encode(),
             _cast('double*', R_vdw),
             _cast('double*', sigma),
@@ -121,14 +130,14 @@ class MBDCalc(object):
             (3*n_atoms, 3*n_atoms),
             dtype=float if k_point is None else complex,
         )
-        _lib.calc_dipole_matrix(
+        _lib.cmbd_dipole_matrix(
             system,
             damping,
             _cast('double*', k_point),
             _cast('double*', dipmat),
         )
-        _lib.mbd_destroy_damping(damping)
-        _lib.mbd_destroy_system(system)
+        _lib.cmbd_destroy_damping(damping)
+        _lib.cmbd_destroy_system(system)
         return dipmat
 
     def mbd_energy_species(self, coords, species, vols, beta, **kwargs):
@@ -138,6 +147,50 @@ class MBDCalc(object):
     def ts_energy_species(self, coords, species, vols, beta, **kwargs):
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.ts_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
+
+    def dipole_energy(self, coords, a0, w, w_t, version, r_vdw, beta, a, C):
+        n_atoms = len(coords)
+        system = _lib.cmbd_init_system(
+            self._calc,
+            n_atoms,
+            _cast('double*', coords),
+            _ffi.NULL,
+            _ffi.NULL,
+        )
+        return _lib.cmbd_dipole_energy(
+            system,
+            n_atoms,
+            _cast('double*', a0),
+            _cast('double*', w),
+            _cast('double*', w_t),
+            version.encode(),
+            _cast('double*', r_vdw),
+            beta,
+            a,
+            _cast('double*', C),
+        )
+
+    def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, a, C):
+        n_atoms = len(coords)
+        system = _lib.cmbd_init_system(
+            self._calc,
+            n_atoms,
+            _cast('double*', coords),
+            _ffi.NULL,
+            _ffi.NULL,
+        )
+        return _lib.cmbd_coulomb_energy(
+            system,
+            n_atoms,
+            _cast('double*', q),
+            _cast('double*', m),
+            _cast('double*', w_t),
+            version.encode(),
+            _cast('double*', r_vdw),
+            beta,
+            a,
+            _cast('double*', C),
+        )
 
 
 def _ndarray(ptr, shape=None, dtype='float'):

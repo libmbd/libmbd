@@ -7,7 +7,7 @@
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, exception
-use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, cprod
+use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer
 use mbd_types, only: mat3n3n, mat33, scalar
 use mbd_parallel, only: mbd_blacs_grid
 use mbd_defaults
@@ -19,7 +19,7 @@ private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
     init_grid, get_mbd_energy, dipole_matrix, mbd_scs_energy, &
     get_sigma_selfint, scale_TS, get_ts_energy, get_damping_parameters, &
-    clock_rate, mbd_gradients
+    clock_rate, mbd_gradients, damping_fermi
 #endif
 
 real(dp), parameter :: ang = 1.8897259886d0
@@ -77,10 +77,10 @@ end type mbd_damping
 type :: mbd_result
     real(dp) :: energy
     real(dp), allocatable :: k_pts(:, :)
-    real(dp), allocatable :: mode_enes(:)
+    real(dp), allocatable :: mode_eigs(:)
     real(dp), allocatable :: modes(:, :)
     real(dp), allocatable :: rpa_orders(:)
-    real(dp), allocatable :: mode_enes_k(:, :)
+    real(dp), allocatable :: mode_eigs_k(:, :)
     complex(dp), allocatable :: modes_k(:, :, :)
     complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
@@ -888,10 +888,7 @@ type(mbd_result) function get_single_mbd_energy( &
     end if
     if (sys%has_exc()) return
     call ts(sys%calc, -21)
-    if (sys%get_eigs) then
-        res%mode_enes = sqrt(eigs)
-        where (eigs < 0) res%mode_enes = 0d0
-    end if
+    if (sys%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
@@ -983,7 +980,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_ts)
     res%energy = 0d0
     if (sys%get_eigs) &
-        allocate (res%mode_enes_k(3*n_atoms, n_kpts), source=0d0)
+        allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
     if (sys%get_modes) &
         allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
     if (sys%get_rpa_orders) allocate ( &
@@ -998,7 +995,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
             end if
         else
             res_k = get_single_mbd_energy(sys, alpha_0, C6, damp, dene_k, k_point)
-            if (sys%get_eigs) res%mode_enes_k(:, i_kpt) = res_k%mode_enes
+            if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
             if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
         end if
         res%energy = res%energy + res_k%energy
@@ -1329,7 +1326,7 @@ type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     bare = T_bare_v2(r, deriv)
     r_1 = sqrt(sum(r**2))
     r_5 = r_1**5
-    rr_r5 = cprod(r, r)/r_5
+    rr_r5 = outer(r, r)/r_5
     zeta = r_1/sigma
     theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
     erf_theta = erf(zeta)-theta
@@ -1355,7 +1352,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     r_sigma = (sqrt(sum(rxyz**2))/sigma)**a
     zeta_1 = 1d0-exp(-r_sigma)-a*r_sigma*exp(-r_sigma)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
-    T = zeta_1*T_bare(rxyz)-zeta_2*cprod(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
+    T = zeta_1*T_bare(rxyz)-zeta_2*outer(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function
 
 

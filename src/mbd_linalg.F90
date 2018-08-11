@@ -10,7 +10,14 @@ use mbd_parallel, only: mbd_blacs
 implicit none
 
 private
-public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve, cprod
+public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve, outer, &
+    eye, diag, det
+
+interface diag
+    module procedure get_diag_
+    module procedure get_diag_cmplx_
+    module procedure make_diag_
+end interface
 
 interface inv
     module procedure inv_re_
@@ -605,7 +612,21 @@ function solve(A, b, exc) result(x)
     endif
 end function
 
-function cprod(a, b) result(c)
+real(dp) function det(A) result(D)
+    real(dp), intent(in) :: A(:, :)
+
+    integer :: n, i, info
+    real(dp), allocatable :: LU(:, :)
+    integer, allocatable :: ipiv(:)
+
+    n = size(A, 1)
+    allocate (ipiv(n))
+    LU = A
+    call DGETRF(n, n, LU, n, ipiv, info)
+    D = product([(LU(i, i), i = 1, n)])
+end function
+
+function outer(a, b) result(c)
     real(dp), intent(in) :: a(:), b(:)
     real(dp) :: c(size(a), size(b))
 
@@ -616,6 +637,44 @@ function cprod(a, b) result(c)
             c(i, j) = a(i)*b(j)
         end do
     end do
+end function
+
+function eye(n) result(A)
+    integer, intent(in) :: n
+    real(dp) :: A(n, n)
+
+    integer :: i
+
+    A(:, :) = 0.d0
+    forall (i = 1:n) A(i, i) = 1.d0
+end function
+
+function get_diag_(A) result(d)
+    real(8), intent(in) :: A(:, :)
+    real(8) :: d(size(A, 1))
+
+    integer :: i
+
+    forall (i = 1:size(A, 1)) d(i) = A(i, i)
+end function
+
+function get_diag_cmplx_(A) result(d)
+    complex(dp), intent(in) :: A(:, :)
+    complex(dp) :: d(size(A, 1))
+
+    integer :: i
+
+    forall (i = 1:size(A, 1)) d(i) = A(i, i)
+end function
+
+function make_diag_(d) result(A)
+    real(dp), intent(in) :: d(:)
+    real(dp) :: A(size(d), size(d))
+
+    integer :: i
+
+    A(:, :) = 0.d0
+    forall (i = 1:size(d)) A(i, i) = d(i)
 end function
 
 character(len=1) function mode(vals_only)

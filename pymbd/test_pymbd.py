@@ -122,7 +122,7 @@ def calc():
 def test_argon_dimer_plain(calc):
     ene = calc.mbd_energy(
         [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
-        func='calc_mbd_energy'
+        func='mbd_energy'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
@@ -131,7 +131,7 @@ def test_argon_dimer_plain(calc):
 def test_argon_dimer_rpa(calc):
     ene = calc.mbd_energy(
         [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
-        func='calc_rpa_energy'
+        func='rpa_energy'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
@@ -191,11 +191,11 @@ def test_benzene_gradients_plain(calc):
     coords, species, vols = benzene_dimer[0]
     ene, gradients = calc.mbd_energy_species(
         coords, species, vols, 0.83,
-        func='calc_mbd_energy', force=True
+        func='mbd_energy', force=True
     )
     num_gradients = numerical_gradients(
         calc.mbd_energy_species, coords, species, vols, 0.83,
-        func='calc_mbd_energy'
+        func='mbd_energy'
     )
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
@@ -205,7 +205,7 @@ def test_benzene_dimer_scs(calc):
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        calc.mbd_energy_species(coords, species, vols, 1, a=2.56, func='calc_mbd_scs_energy')
+        calc.mbd_energy_species(coords, species, vols, 1, a=2.56, func='mbd_scs_energy')
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
@@ -226,7 +226,7 @@ def test_benzene_dimer_ts(calc):
 def test_benzene(calc):
     coords, species, vols = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vols)
-    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='calc_mbd_energy')
+    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='mbd_energy')
     assert ene == approx(-0.007002398506090302, rel=1e-10)
 
 
@@ -234,7 +234,7 @@ def test_benzene(calc):
 def test_benzene_rpa(calc):
     coords, species, vols = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vols)
-    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='calc_rpa_energy')
+    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='rpa_energy')
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
@@ -270,7 +270,7 @@ def test_ethylcarbamate_scs(calc):
         calc.mbd_energy_species(
             coords, species, vols, 1, a=2.56,
             lattice=lattice, k_grid=k_grid,
-            func='calc_mbd_scs_energy'
+            func='mbd_scs_energy'
         )
         for coords, lattice, k_grid, species, vols in ethylcarbamate
     ]

@@ -5,8 +5,8 @@ module mbd_c_api
 
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
-use mbd, only: mbd_system, mbd_calc, mbd_damping, get_mbd_energy, init_grid, &
-    mbd_scs_energy, mbd_scs_energy, dipole_matrix, get_ts_energy, mbd_result, &
+use mbd, only: mbd_system, mbd_calc, mbd_damping, mbd_energy, init_grid, &
+    mbd_scs_energy, mbd_scs_energy, dipole_matrix, ts_energy, mbd_result, &
     mbd_gradients
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
@@ -177,7 +177,7 @@ real(c_double) function cmbd_ts_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    cmbd_ts_energy = get_ts_energy(sys, alpha_0, C6, damping)
+    cmbd_ts_energy = ts_energy(sys, alpha_0, C6, damping)
 end function cmbd_ts_energy
 
 real(c_double) function cmbd_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p, gradients) bind(c)
@@ -198,7 +198,7 @@ real(c_double) function cmbd_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
     if (present(gradients)) allocate (dene%dcoords(n_atoms, 3))
-    res = get_mbd_energy(sys, alpha_0, C6, damping, dene)
+    res = mbd_energy(sys, alpha_0, C6, damping, dene)
     cmbd_mbd_energy = res%energy
     if (present(gradients)) gradients = transpose(dene%dcoords)
 end function cmbd_mbd_energy
@@ -221,7 +221,7 @@ real(c_double) function cmbd_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     call c_f_pointer(damping_p, damping)
     sys2 = sys
     sys2%do_rpa = .true.
-    res = get_mbd_energy(sys2, alpha_0, C6, damping, dene)
+    res = mbd_energy(sys2, alpha_0, C6, damping, dene)
     cmbd_rpa_energy = res%energy
 end function cmbd_rpa_energy
 

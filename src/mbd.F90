@@ -17,8 +17,8 @@ implicit none
 #ifndef MODULE_UNIT_TESTS
 private
 public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
-    init_grid, get_mbd_energy, dipole_matrix, mbd_scs_energy, &
-    get_sigma_selfint, scale_TS, get_ts_energy, get_damping_parameters, &
+    init_grid, mbd_energy, dipole_matrix, mbd_scs_energy, &
+    sigma_selfint, scale_TS, ts_energy, set_damping_parameters, &
     clock_rate, mbd_gradients, damping_fermi
 #endif
 
@@ -170,7 +170,7 @@ type(mbd_result) function mbd_scs_energy( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs &
     )
     damp_mbd%version = damping_types(2)
-    res = get_mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd)
+    res = mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd)
     if (.not. dene%has_grad()) return
     freq_w = sys%calc%omega_grid_w
     freq_w(0) = 1d0
@@ -256,7 +256,7 @@ type(mbd_result) function mbd_scs_energy( &
 end function mbd_scs_energy
 
 
-function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
+function ts_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
@@ -340,7 +340,7 @@ function get_ts_energy(sys, alpha_0, C6, damp) result(ene)
             exit
         endif
     end do ! i_shell
-end function get_ts_energy
+end function ts_energy
 
 
 type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
@@ -724,7 +724,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     n_atoms = sys%siz()
     damp_local = damp
     if (allocated(dalpha_scs(1)%dalpha)) allocate (dsigma_dalpha(n_atoms))
-    damp_local%sigma = get_sigma_selfint(alpha, dsigma_dalpha)
+    damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha)
     T = dipole_matrix(sys, damp_local, dalpha_scs(1)%has_grad())
     if (dalpha_scs(1)%has_grad()) then
         call alpha_full%copy_from(T)
@@ -810,7 +810,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
 end function run_scs
 
 
-type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
+type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
@@ -841,7 +841,7 @@ type(mbd_result) function get_mbd_energy(sys, alpha_0, C6, damp, dene) result(re
     else
         res = get_reciprocal_mbd_energy(sys, alpha_0, C6, damp)
     end if
-end function get_mbd_energy
+end function mbd_energy
 
 
 type(mbd_result) function get_single_mbd_energy( &
@@ -1020,7 +1020,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
     damp_alpha = damp
     allocate (eigs(3*sys%siz()))
     do i_freq = 0, ubound(sys%calc%omega_grid, 1)
-        damp_alpha%sigma = get_sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
+        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, .false.)
         do my_i_atom = 1, size(relay%blacs%i_atom)
@@ -1085,7 +1085,7 @@ type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, dam
     damp_alpha = damp
     allocate (eigs(3*sys%siz()))
     do i_freq = 0, ubound(sys%calc%omega_grid, 1)
-        damp_alpha%sigma = get_sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
+        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, .false., k_point)
         do i_atom = 1, sys%siz()
@@ -1356,7 +1356,7 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
 end function
 
 
-subroutine get_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
+subroutine set_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
         mbd_ts_erf_beta, mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta)
     character(len=*), intent(in) :: xc
     real(dp), intent(out) :: &
@@ -1399,7 +1399,7 @@ subroutine get_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
         case ("am05")
             ts_s_r = 0.84d0
     endselect
-end subroutine get_damping_parameters
+end subroutine set_damping_parameters
 
 
 elemental function terf(r, r0, a)
@@ -1494,7 +1494,7 @@ function omega_eff(C6, alpha, domega) result(omega)
 end function
 
 
-function get_sigma_selfint(alpha, dsigma_dalpha) result(sigma)
+function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
     real(dp), intent(in) :: alpha(:)
     real(dp), intent(inout), allocatable :: dsigma_dalpha(:)
     real(dp) :: sigma(size(alpha))

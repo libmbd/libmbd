@@ -4,7 +4,7 @@
 module mbd_api
 
 use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
-    mbd_scs_energy, get_ts_energy, get_damping_parameters, init_grid, &
+    mbd_scs_energy, ts_energy, set_damping_parameters, init_grid, &
     mbd_result, mbd_gradients, scale_TS
 use mbd_common, only: dp
 use mbd_vdw_param, only: default_vdw_params, species_index
@@ -158,7 +158,7 @@ subroutine mbd_calc_get_energy(this, energy)
         call this%sys%blacs_grid%destroy()
         energy = this%results%energy
     case ('ts')
-        energy = get_ts_energy(this%sys, this%alpha_0, this%C6, this%damp)
+        energy = ts_energy(this%sys, this%alpha_0, this%C6, this%damp)
     end select
 end subroutine
 
@@ -198,7 +198,7 @@ subroutine mbd_get_damping_parameters(xc, mbd_beta, ts_sr)
 
     real(dp) :: d1, d2, d3, d4, d5, d6
 
-    call get_damping_parameters(xc, d1, ts_sr, d2, d3, d4, d5, d6, mbd_beta)
+    call set_damping_parameters(xc, d1, ts_sr, d2, d3, d4, d5, d6, mbd_beta)
 end subroutine
 
 

@@ -26,6 +26,7 @@ matrix:
     - PYTHON=python3 WITH_PIP=1
 before_install:
 - |
+  set -e
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     rm -rf /usr/local/include/c++
     brew update
@@ -35,8 +36,10 @@ before_install:
       brew install open-mpi scalapack
     fi
   fi
+  set +e
 install:
 - |
+  set -e
   if [[ "$WITH_PIP" ]]; then
     $PYTHON -m pip install --user cffi numpy pytest
     $PYTHON -m pip install --user .
@@ -68,8 +71,10 @@ install:
     fi
     $PYTHON setup.py build_ext -i
   fi
+  set +e
 script:
 - |
+  set -e
   if [[ "$WITH_PIP" ]]; then
     cd
     $PYTHON -m pytest --pyargs pymbd -v --durations=3
@@ -86,6 +91,7 @@ script:
       $PREFIX $PYTHON -m pytest -v --durations=3
     fi
   fi
+  set +e
 notifications:
   pushover:
     api_key:

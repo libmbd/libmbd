@@ -5,7 +5,8 @@ import cffi
 import shutil
 from setuptools import setup
 
-library_dirs = ['build'] if os.path.exists('build') else []
+blddir = os.environ.get('MBDBLDDIR', 'build')
+library_dirs = [blddir] if os.path.exists(blddir) else []
 sources = [
     'src/mbd_common.f90',
     'src/mbd_defaults.f90',
@@ -56,9 +57,9 @@ def update_dict(dct, update):
 if libmbd_exists():
     kwargs = {'libraries': ['mbd']}
     if sys.platform == 'darwin':
-        kwargs['extra_link_args'] = ['-rpath', os.path.realpath('build')]
+        kwargs['extra_link_args'] = ['-rpath', os.path.realpath(blddir)]
     else:
-        kwargs['runtime_library_dirs'] = [os.path.realpath('build')]
+        kwargs['runtime_library_dirs'] = [os.path.realpath(blddir)]
 else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info

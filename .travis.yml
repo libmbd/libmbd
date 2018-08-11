@@ -18,80 +18,36 @@ matrix:
         - libscalapack-mpi-dev
   - env: PYTHON=python WITH_PIP=1
     addons: *nompi
-  # - os: osx
-  #   env:
-  #   - PYTHON=python MPI_NODES=1
+  - &osx_fail
+    os: osx
+    env:
+    - PYTHON=python MPI_NODES=1
   - os: osx
     env:
     - PYTHON=python3 WITH_PIP=1
+  allow_failures:
+  - *osx_fail
 before_install:
 - |
-  set -e
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-    rm -rf /usr/local/include/c++
-    brew update
-    brew upgrade python
-    brew install gcc python@2
-    if [[ "$MPI_NODES" ]]; then
-      brew install open-mpi scalapack
-    fi
+      rm -rf /usr/local/include/c++
+      brew update
+      brew upgrade python
+      brew install gcc python@2
+      if [[ "$MPI_NODES" ]]; then
+          brew install open-mpi scalapack
+      fi
   fi
-  set +e
 install:
-- |
-  set -e
-  if [[ "$WITH_PIP" ]]; then
-    $PYTHON -m pip install --user cffi numpy pytest
-    $PYTHON -m pip install --user .
-  else
-    CMAKE_FLAGS=()
-    if [[ "$CODECOV" ]]; then
-      CMAKE_FLAGS+=(-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage")
-    fi
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      SCALAPACKLIB=-lscalapack
-    else
-      SCALAPACKLIB=-lscalapack-openmpi
-    fi
-    if [[ "$MPI_NODES" ]]; then
-      CMAKE_FLAGS+=(-DSCALAPACK=$SCALAPACKLIB)
-    fi
-    mkdir build
-    pushd build
-    cmake .. "${CMAKE_FLAGS[@]}"
-    make
-    popd
-    if [[ "$MPI_NODES" ]]; then
-      $PYTHON -m pip install --user mpi4py
-    fi
-    $PYTHON -m pip install --user cffi numpy pytest
-    $PYTHON -m pip install --user -e .
-    if [[ "$CODECOV" ]]; then
-      $PYTHON -m pip install --user pytest-cov
-    fi
-    $PYTHON setup.py build_ext -i
-  fi
-  set +e
+- ./.travis/install.sh
 script:
+- ./.travis/script.sh
+after_success:
 - |
-  set -e
-  if [[ "$WITH_PIP" ]]; then
-    cd
-    $PYTHON -m pytest --pyargs pymbd -v --durations=3
-  else
-    if [[ "$MPI_NODES" ]]; then
-      PREFIX="mpirun -n $MPI_NODES"
-    fi
-    $PREFIX make -C build check
-    if [[ "$CODECOV" ]]; then
-      $PREFIX $PYTHON -m pytest --cov=./ -v --durations=3
+  if [[ "$CODECOV" ]]; then
       cp build/CMakeFiles/mbd.dir/src/*.f90.gc?? src/
       bash <(curl -s https://codecov.io/bash) -F pytest
-    else
-      $PREFIX $PYTHON -m pytest -v --durations=3
-    fi
   fi
-  set +e
 notifications:
   pushover:
     api_key:

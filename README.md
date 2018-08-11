@@ -11,29 +11,30 @@ Python 2/3 package for calculating [many-body dispersion](http://dx.doi.org/10.1
 
 Most functionality is implemented in the Fortran module in `src/mbd.F90`.
 
-## Installation
+## Installing
 
-There are two basic ways how to install pymbd.
+There are two basic ways how to install pymbd. The pip-based installation is easier and intended for basic usage. The cmake-based installation is best for development.
 
-Both ways require a Fortran compiler, Lapack, CFFI, and Numpy. Optional MPI support requires mpi4py installed from source. All these need to be installed before installing pymbd.
+Both ways require a Fortran compiler, Lapack, cFFI, and Numpy. All these need to be installed before installing pymbd.
 
 On Ubuntu:
 
 ```bash
-apt-get install gfortran libblas-dev liblapack-dev [mpi-default-dev mpi-default-bin]
+apt-get install gfortran libblas-dev liblapack-dev
+pip install cffi numpy
 ```
 
 On macOS:
 
 ```bash
-brew install gcc [mpich]
+brew install gcc
+pip install cffi numpy
 ```
 
 ### Using pip
 
 ```
-pip install cffi numpy [mpi4py]
-pip install git+https://github.com/azag0/pymbd.git
+pip install git+https://github.com/azag0/libmbd.git
 ```
 
 If you have pytest installed, you can run tests with
@@ -47,11 +48,10 @@ pytest --pyargs pymbd -v --durations=3
 This is the recommended way for developing or if installing via pip runs into problems.
 
 ```
-git clone https://github.com/azag0/pymbd.git && cd pymbd
+git clone https://github.com/azag0/libmbd.git && cd libmbd
 mkdir build && pushd build && cmake .. && make && popd
-pip install cffi numpy
-pip install -e .
 python setup.py build_ext -i
+pip install -e .
 ```
 
 Tests can be run with
@@ -65,4 +65,4 @@ pytest -v --durations=3
 
 Pymbd doesn't have any input files, it is called directly from Python scripts. 
 
-For examples, see the [tests](https://github.com/azag0/pymbd/blob/master/pymbd/test_pymbd.py).
+For examples, see the [tests](https://github.com/azag0/libmbd/blob/master/pymbd/test_pymbd.py).

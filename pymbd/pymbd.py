@@ -16,9 +16,7 @@ from scipy.special import erf, erfc
 ang = 1/0.529177249
 
 
-def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
-               nfreq=15):
-    coords, alpha_0, C6, R_vdw = map(_array, (coords, alpha_0, C6, R_vdw))
+def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
     freq, freq_w = freq_grid(nfreq)
     omega = 4/3*C6/alpha_0**2
     alpha_dyn = [alpha_0/(1+(u/omega)**2) for u in freq]
@@ -35,8 +33,16 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
     alpha_dyn_rsscs = np.stack(alpha_dyn_rsscs)
     C6_rsscs = 3/np.pi*np.sum(freq_w[:, None]*alpha_dyn_rsscs**2, 0)
     R_vdw_rsscs = R_vdw*(alpha_dyn_rsscs[0, :]/alpha_0)**(1/3)
-    omega_rsscs = 4/3*C6_rsscs/alpha_dyn_rsscs[0, :]**2
-    pre = np.repeat(omega_rsscs*np.sqrt(alpha_dyn_rsscs[0, :]), 3)
+    return alpha_dyn_rsscs[0], C6_rsscs, R_vdw_rsscs
+
+
+def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
+               nfreq=15):
+    alpha_0_rsscs, C6_rsscs, R_vdw_rsscs = screening(
+        coords, alpha_0, C6, R_vdw, beta, lattice=lattice, nfreq=15
+    )
+    omega_rsscs = 4/3*C6_rsscs/alpha_0_rsscs**2
+    pre = np.repeat(omega_rsscs*np.sqrt(alpha_0_rsscs), 3)
     if lattice is None:
         k_points = [None]
     else:

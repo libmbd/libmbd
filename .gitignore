@@ -4,6 +4,7 @@
 /.cache/
 /.pytest_cache/
 /*.egg-info/
+/docs/build/
 *.pyc
 *.so
 *.so.dSYM

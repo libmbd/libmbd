@@ -46,6 +46,15 @@ if(MPI_Fortran_FOUND)
     if(NOT SCALAPACK)
         message(FATAL_ERROR "MPI found, but no ScaLAPACK specified")
     endif()
+    # -flat_namespace (Darwin-specific) is causing a crash (seg fault) when the
+    # Fortran library is called from Python and one writes into a character
+    # variable, but only when the kind is the default one. It causes the
+    # written to variable to appear as being four times shorter than it is.
+    # Only mention of anything possibly related I could find is at
+    #
+    #   https://trac.mpich.org/projects/mpich/ticket/1590
+    string(REPLACE "-Wl,-flat_namespace" "" MPI_Fortran_LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
+    string(STRIP "${MPI_Fortran_LINK_FLAGS}" MPI_Fortran_LINK_FLAGS)
     target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES} ${SCALAPACK})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
     set_property(

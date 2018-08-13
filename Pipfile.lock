@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3a3cda81f794f82295936f8239c15f284339dbaf9fb03bcb1e30aa4aa79f4067"
+            "sha256": "ce83da2f62390dc72db4fc58e8e11b04deb4552741a86ffdffa2c06729ed7eaf"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -115,10 +115,10 @@
         },
         "certifi": {
             "hashes": [
-                "sha256:13e698f54293db9f89122b0581843a782ad0934a4fe0172d2a980ba77fc61bb7",
-                "sha256:9fa520c1bacfb634fa7af20a76bcbd3d5fb390481724c597da32c719a7dca4b0"
+                "sha256:4c1d68a1408dd090d2f3a869aa94c3947cc1d967821d1ed303208c9f41f0f2f4",
+                "sha256:b6e8b28b2b7e771a41ecdd12d4d43262ecab52adebbafa42c77d6b57fb6ad3a4"
             ],
-            "version": "==2018.4.16"
+            "version": "==2018.8.13"
         },
         "cffi": {
             "hashes": [
@@ -182,6 +182,9 @@
         },
         "e1839a8": {
             "editable": true,
+            "extras": [
+                "mpi"
+            ],
             "path": "."
         },
         "idna": {
@@ -262,6 +265,22 @@
                 "sha256:fcbfeaea0be121980e15bc97b3817b5202ca73d0eae185b4550cbfce2a3ebb3d"
             ],
             "version": "==4.3.0"
+        },
+        "mpi4py": {
+            "hashes": [
+                "sha256:07ce2c7141febdc7b6b3381e6f17b4f4aae143623f00d3026ac5a8855aca05fc",
+                "sha256:23891cd238bf2a43fa40fadd27d3c6be8cccae8aebd5900426041ab88dad4ce6",
+                "sha256:29b67865e4652d312d647ce27c7b1f551fa9405b6e75f0f65af10bba59356fc2",
+                "sha256:37c442239da3dd038025e374d9f641d691e1a11efac60747e9b753addc5f6b77",
+                "sha256:64c24fc4be52cb00257ec7de5fdef5a60050b1d0309ca8432324129527412379",
+                "sha256:6860f603cecf9fc1644ad11ece53ad038024af61ac09c6d80692c1ff13f4fe12",
+                "sha256:6ac28f9f1c86d19c2a5907b59d496195f87680c1ffd6aa56d59a60c0e8caa925",
+                "sha256:6c163158aa5b8fdd3baa4808e1c5fe31c934d8cf01626ada13a1b3b590bb6b9d",
+                "sha256:aefde48f7d9670c7325b878a681c347e51ee46b5a7da242a0301cdd33f983de0",
+                "sha256:b457b02d85bdd9a4775a097fac5234a20397b43e073f14d9e29b6cd78c68efd7",
+                "sha256:f6d1be1cf7e015f93d807eb59c294a140b139a11d59d218cc35e08fff938252a"
+            ],
+            "version": "==3.0.0"
         },
         "numpy": {
             "hashes": [

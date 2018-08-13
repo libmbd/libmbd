@@ -289,6 +289,7 @@ def test_ethylcarbamate_ts(calc):
     assert ene_int == approx(-0.052171811689150846, rel=1e-10)
 
 
+@no_scalapack
 def test_mbd_coulomb(calc):
     a = 14.4
     beta = 2.0

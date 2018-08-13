@@ -307,7 +307,7 @@ subroutine peigh_re_(A, blacs, eigs, exc, src, vals_only)
     n = 3*blacs%n_atoms
     if (present(src)) A = src
     if (mode(vals_only) == 'V') then
-        allocate (vectors(n, n))
+        allocate (vectors(size(A, 1), size(A, 2)))
     else
         allocate (vectors(1, 1))
     end if

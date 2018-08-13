@@ -26,6 +26,7 @@ type :: mat3n3n
     procedure :: add_diag_scalar => mat3n3n_add_diag_scalar
     procedure :: mult_cross => mat3n3n_mult_cross
     procedure :: mult_rows => mat3n3n_mult_rows
+    procedure :: mult_cols_3n => mat3n3n_mult_cols_3n
     procedure :: mult_col => mat3n3n_mult_col
     procedure :: copy_from => mat3n3n_copy_from
     procedure :: move_from => mat3n3n_move_from
@@ -245,6 +246,34 @@ subroutine mat3n3n_mult_rows(this, b)
                     this_sub => this%cplx(3*(my_i_atom-1)+1:, :) &
             )
                 this_sub(:3, :) = this_sub(:3, :)*b(i_atom)
+            end associate
+        end do
+    end if
+end subroutine
+
+subroutine mat3n3n_mult_cols_3n(this, b)
+    class(mat3n3n), intent(inout) :: this
+    real(dp), intent(in) :: b(:)
+
+    integer :: my_j_atom, i
+
+    if (allocated(this%re)) then
+        do my_j_atom = 1, size(this%blacs%j_atom)
+            associate ( &
+                    b_sub => b(3*(this%blacs%j_atom(my_j_atom)-1)+1:), &
+                    this_sub => this%re(:, 3*(my_j_atom-1)+1:) &
+            )
+                forall (i = 1:3) this_sub(:, i) = this_sub(:, i)*b_sub(i)
+            end associate
+        end do
+    end if
+    if (allocated(this%cplx)) then
+        do my_j_atom = 1, size(this%blacs%j_atom)
+            associate ( &
+                    b_sub => b(3*(this%blacs%j_atom(my_j_atom)-1)+1:), &
+                    this_sub => this%cplx(:, 3*(my_j_atom-1)+1:) &
+            )
+                forall (i = 1:3) this_sub(:, i) = this_sub(:, i)*b_sub(i)
             end associate
         end do
     end if

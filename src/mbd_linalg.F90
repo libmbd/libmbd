@@ -11,12 +11,17 @@ implicit none
 
 private
 public :: inv, invh, inverse, eig, eigh, eigvals, eigvalsh, solve, outer, &
-    eye, diag, det
+    eye, diag, det, mmul
 
 interface diag
     module procedure get_diag_
     module procedure get_diag_cmplx_
     module procedure make_diag_
+end interface
+
+interface mmul
+    module procedure mmul_re_
+    module procedure mmul_mat3n3n_
 end interface
 
 interface inv
@@ -53,12 +58,70 @@ interface eigvalsh
 end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-    ZGEEV, DSYTRI, DSYTRF
+    ZGEEV, DSYTRI, DSYTRF, DGEMM
 #ifdef WITH_SCALAPACK
-external :: PDSYEV, PDGETRF, PDGETRI
+external :: PDSYEV, PDGETRF, PDGETRI, PDGEMM
 #endif
 
 contains
+
+function mmul_re_(A, B, transA, transB) result(C)
+    real(dp), intent(in) :: A(:, :), B(:, :)
+    logical, intent(in), optional :: transA, transB
+    real(dp) :: C(size(A, 1), size(B, 2))
+
+    character :: transA_, transB_
+    integer :: n
+
+    transA_= 'N'
+    transB_ = 'N'
+    if (present(transA)) then
+        if (transA) transA_ = 'T'
+    end if
+    if (present(transB)) then
+        if (transB) transB_ = 'T'
+    end if
+    n = size(A, 1)
+    call DGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
+end function
+
+#ifdef WITH_SCALAPACK
+function pmmul_re_(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
+    real(dp), intent(in) :: A(:, :), B(:, :)
+    type(mbd_blacs), intent(in) :: blacsA, blacsB, blacsC
+    logical, intent(in), optional :: transA, transB
+    real(dp) :: C(size(A, 1), size(B, 2))
+
+    character :: transA_, transB_
+    integer :: n
+
+    transA_= 'N'
+    transB_ = 'N'
+    if (present(transA)) then
+        if (transA) transA_ = 'T'
+    end if
+    if (present(transB)) then
+        if (transB) transB_ = 'T'
+    end if
+    n = size(A, 1)
+    call PDGEMM( &
+        transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
+        B, 1, 1, blacsB%desc, 0d0, C, 1, 1, blacsC%desc &
+    )
+end function
+#endif
+
+type(mat3n3n) function mmul_mat3n3n_(A, B, transA, transB) result(C)
+    type(mat3n3n), intent(in) :: A, B
+    logical, intent(in), optional :: transA, transB
+
+    C%blacs = A%blacs
+#ifndef WITH_SCALAPACK
+    C%re = mmul_re_(A%re, B%re, transA, transB)
+#else
+    C%re = pmmul_re_(A%re, A%blacs, B%re, B%blacs, transA, transB, C%blacs)
+#endif
+end function
 
 subroutine inv_re_(A, exc, src)
     real(dp), intent(inout) :: A(:, :)

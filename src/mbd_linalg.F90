@@ -225,9 +225,17 @@ subroutine invh_mat3n3n_(A, exc, src)
     type(mat3n3n), intent(in), optional :: src
 
 #ifndef WITH_SCALAPACK
-    call invh_re_(A%re, exc, src%re)
+    if (present(src)) then
+        call invh_re_(A%re, exc, src%re)
+    else
+        call invh_re_(A%re, exc)
+    end if
 #else
-    call pinvh_re_(A%re, A%blacs, exc, src%re)
+    if (present(src)) then
+        call pinvh_re_(A%re, A%blacs, exc, src%re)
+    else
+        call pinvh_re_(A%re, A%blacs, exc)
+    end if
 #endif
 end subroutine
 

@@ -692,7 +692,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     end do
     call sys%blacs_grid%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
-    if (failed(maxval(abs(diff)), 2d-8)) then
+    if (failed(maxval(abs(diff)), 5d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine test_mbd_rsscs_deriv_impl_C6

@@ -186,7 +186,6 @@ def test_benzene_dimer_python():
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
-@no_scalapack
 def test_benzene_gradients_plain(calc):
     coords, species, vols = benzene_dimer[0]
     ene, gradients = calc.mbd_energy_species(

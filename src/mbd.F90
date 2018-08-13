@@ -7,7 +7,7 @@
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, exception
-use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer
+use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar
 use mbd_parallel, only: mbd_blacs_grid
 use mbd_defaults
@@ -853,10 +853,10 @@ type(mbd_result) function get_single_mbd_energy( &
     type(mbd_gradients), intent(inout) :: dene
     real(dp), intent(in), optional :: k_point(3)
 
-    type(mat3n3n) :: relay, dQ, T, modes
-    real(dp), allocatable :: eigs(:), omega(:), c_lambda12i_c(:, :)
+    type(mat3n3n) :: relay, dQ, T, modes, c_lambda12i_c
+    real(dp), allocatable :: eigs(:), omega(:)
     type(mbd_gradients) :: domega
-    integer :: i_xyz, i, n_negative_eigs, n_atoms
+    integer :: i_xyz, n_negative_eigs, n_atoms
     logical :: grad
 
     n_atoms = sys%siz()
@@ -897,17 +897,15 @@ type(mbd_result) function get_single_mbd_energy( &
     end if
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
     if (.not. grad) return
-    allocate (c_lambda12i_c(3*n_atoms, 3*n_atoms))
-    forall (i = 1:3*n_atoms)
-        c_lambda12i_c(:, i) = eigs(i)**(-1d0/4)*modes%re(:, i)
-    end forall
-    c_lambda12i_c = matmul(c_lambda12i_c, transpose(c_lambda12i_c))
+    call c_lambda12i_c%copy_from(modes)
+    call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
+    c_lambda12i_c = mmul(c_lambda12i_c, c_lambda12i_c, transB=.true.)
     call dQ%init_from(T)
     if (allocated(dene%dcoords)) then
         do i_xyz = 1, 3
             dQ%re = T%re_dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
-            dQ%re = c_lambda12i_c*dQ%re
+            dQ%re = c_lambda12i_c%re*dQ%re
             dene%dcoords(:, i_xyz) = 1d0/2*contract_gradients(dQ)
         end do
     end if
@@ -916,7 +914,7 @@ type(mbd_result) function get_single_mbd_energy( &
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
         call dQ%add_diag(omega*domega%dalpha)
-        dQ%re = c_lambda12i_c*dQ%re
+        dQ%re = c_lambda12i_c%re*dQ%re
         dene%dalpha = 1d0/2*contract_gradients(dQ)-3d0/2*domega%dalpha
     end if
     if (allocated(dene%dC6)) then
@@ -924,13 +922,13 @@ type(mbd_result) function get_single_mbd_energy( &
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(domega%dC6/omega)
         call dQ%add_diag(omega*domega%dC6)
-        dQ%re = c_lambda12i_c*dQ%re
+        dQ%re = c_lambda12i_c%re*dQ%re
         dene%dC6 = 1d0/2*contract_gradients(dQ)-3d0/2*domega%dC6
     end if
     if (allocated(dene%dr_vdw)) then
         dQ%re = T%re_dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
-        dQ%re = c_lambda12i_c*dQ%re
+        dQ%re = c_lambda12i_c%re*dQ%re
         dene%dr_vdw = 1d0/2*contract_gradients(dQ)
     end if
 
@@ -950,6 +948,12 @@ type(mbd_result) function get_single_mbd_energy( &
                 gradient(i_atom) = gradient(i_atom) + sum(relay_sub(:3, :))
             end associate
         end do
+#ifdef WITH_SCALAPACK
+        call DGSUM2D( &
+            relay%blacs%grid%ctx, 'A', ' ', &
+            n_atoms, 1, gradient, n_atoms, -1, -1 &
+        )
+#endif
     end function
 end function get_single_mbd_energy
 

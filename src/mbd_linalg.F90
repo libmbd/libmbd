@@ -53,7 +53,7 @@ interface eigvalsh
 end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-    ZGEEV, ZGEEB, DSYTRI, DSYTRF
+    ZGEEV, DSYTRI, DSYTRF
 #ifdef WITH_SCALAPACK
 external :: PDSYEV, PDGETRF, PDGETRI
 #endif

@@ -16,6 +16,10 @@ matrix:
         - mpi-default-dev
         - mpi-default-bin
         - libscalapack-mpi-dev
+  - env: PYTHON=python MPI_NODES=2
+    addons: *mpi
+  - env: PYTHON=python MPI_NODES=4
+    addons: *mpi
   - env: PYTHON=python WITH_PIP=1
     addons: *nompi
   - &osx_fail

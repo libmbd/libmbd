@@ -103,7 +103,7 @@ function pmmul_re_(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     if (present(transB)) then
         if (transB) transB_ = 'T'
     end if
-    n = size(A, 1)
+    n = 3*blacsA%n_atoms
     call PDGEMM( &
         transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
         B, 1, 1, blacsB%desc, 0d0, C, 1, 1, blacsC%desc &

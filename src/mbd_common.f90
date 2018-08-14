@@ -6,7 +6,8 @@ module mbd_common
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, exception, diff7
+public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, exception, diff7, &
+    findval
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
@@ -122,5 +123,19 @@ elemental pure function lower(str)
     end do
 end function
 
+
+integer pure function findval(array, val)
+    integer, intent(in) :: array(:), val
+
+    integer :: i
+
+    findval = 0
+    do i = 1, size(array)
+        if (val == array(i)) then
+            findval = i
+            return
+        end if
+    end do
+end function
 
 end module

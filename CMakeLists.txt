@@ -15,7 +15,7 @@ set(SRCS
     # src/mbd_density.f90
     src/mbd_common.f90
     src/mbd_linalg.F90
-    src/mbd_types.f90
+    src/mbd_types.F90
     src/mbd_defaults.f90
 )
 
@@ -59,7 +59,7 @@ if(MPI_Fortran_FOUND)
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
     set_property(
         SOURCE src/mbd_parallel.F90 src/mbd_c_api.F90 src/mbd_linalg.F90
-            src/mbd.F90 src/mbd_tests.F90 src/mbd_api_tests.F90
+            src/mbd.F90 src/mbd_tests.F90 src/mbd_api_tests.F90 src/mbd_types.F90
         APPEND PROPERTY COMPILE_DEFINITIONS WITH_SCALAPACK
     )
 endif()

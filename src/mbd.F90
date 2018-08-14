@@ -6,7 +6,7 @@
 #endif
 module mbd
 
-use mbd_common, only: tostr, print_matrix, dp, pi, exception
+use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar
 use mbd_parallel, only: mbd_blacs_grid
@@ -725,10 +725,11 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     real(dp) :: alpha_scs(size(alpha))
 
     type(mat3n3n) :: alpha_full, dQ, T
-    integer :: n_atoms, i_xyz, i_atom, j_xyz
+    integer :: n_atoms, i_xyz, i_atom, j_xyz, j_atom, my_i_atom, my_j_atom, &
+        i_atom_2
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
-        alpha_prime(:, :), B_prime(:, :)
+        alpha_prime(:, :), B_prime(:, :), grads_i(:)
 
     n_atoms = sys%siz()
     damp_local = damp
@@ -747,22 +748,50 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     call ts(sys%calc, -32)
     alpha_scs = contract_polarizability(alpha_full)
     if (.not. dalpha_scs(1)%has_grad()) return
-    allocate (alpha_prime(3, 3*n_atoms))
-    allocate (B_prime(3*n_atoms, 3))
-    do i_xyz = 1, 3
-        alpha_prime(i_xyz, :) = sum(alpha_full%re(:, i_xyz::3), 2)
-    end do
+    allocate (alpha_prime(3, 3*n_atoms), B_prime(3*n_atoms, 3), source=0d0)
+    allocate (grads_i(n_atoms))
+    call alpha_full%contract_transp('R', alpha_prime)
     call dQ%init_from(T)
     if (allocated(dalpha_scs(1)%dcoords)) then
         do i_xyz = 1, 3
             dQ%re = -T%re_dr(:, :, i_xyz)
-            dQ%re = matmul(alpha_full%re, dQ%re)
-            do j_xyz = 1, 3
-                B_prime(:, j_xyz) = sum(dQ%re(j_xyz::3, :), 1)
-            end do
+            dQ = mmul(alpha_full, dQ)
+            call dQ%contract_transp('C', B_prime)
             do i_atom = 1, n_atoms
-                dalpha_scs(i_atom)%dcoords(:, i_xyz) = &
-                    contract_gradients(i_atom, dQ)
+                grads_i(:) = 0d0
+                my_i_atom = findval(dQ%blacs%i_atom, i_atom)
+                if (my_i_atom > 0) then
+                    do my_j_atom = 1, size(dQ%blacs%j_atom)
+                        j_atom = dQ%blacs%j_atom(my_j_atom)
+                        associate ( &
+                                dQ_sub => dQ%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
+                                alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:) &
+                        )
+                            grads_i(j_atom) = -1d0/3 * &
+                                sum(dQ_sub(:3, :3)*alpha_prime_sub(:, :3))
+                        end associate
+                    end do
+                end if
+                my_j_atom = findval(dQ%blacs%j_atom, i_atom)
+                if (my_j_atom > 0) then
+                    do my_i_atom = 1, size(dQ%blacs%i_atom)
+                        i_atom_2 = dQ%blacs%i_atom(my_i_atom)
+                        associate ( &
+                                B_prime_sub => B_prime(3*(i_atom_2-1)+1:, :), &
+                                alpha_full_sub => alpha_full%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                        )
+                            grads_i(i_atom_2) = grads_i(i_atom_2) - 1d0/3 * &
+                                sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3))
+                        end associate
+                    end do
+                end if
+#ifdef WITH_SCALAPACK
+                call DGSUM2D( &
+                    dQ%blacs%grid%ctx, 'A', ' ', &
+                    n_atoms, 1, grads_i, n_atoms, -1, -1 &
+                )
+#endif
+                dalpha_scs(i_atom)%dcoords(:, i_xyz) = grads_i
             end do
         end do
     end if

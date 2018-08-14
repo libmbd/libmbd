@@ -9,10 +9,13 @@ program mbd_tests
 use mbd
 use mbd_common, only: diff7
 
+#ifdef WITH_SCALAPACK
+use mpi
+#endif
+
 implicit none
 
 #ifdef WITH_SCALAPACK
-external :: MPI_INIT, MPI_FINALIZE
 integer :: err
 #endif
 

@@ -57,6 +57,7 @@ if(MPI_Fortran_FOUND)
     string(STRIP "${MPI_Fortran_LINK_FLAGS}" MPI_Fortran_LINK_FLAGS)
     target_link_libraries(mbd ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES} ${SCALAPACK})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
+    target_include_directories(mbd_tests PRIVATE ${MPI_Fortran_INCLUDE_PATH})
     set_property(
         SOURCE src/mbd_parallel.F90 src/mbd_c_api.F90 src/mbd_linalg.F90
             src/mbd.F90 src/mbd_tests.F90 src/mbd_api_tests.F90 src/mbd_types.F90

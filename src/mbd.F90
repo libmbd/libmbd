@@ -11,6 +11,9 @@ use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar
 use mbd_parallel, only: mbd_blacs_grid
 use mbd_defaults
+#ifdef WITH_SCALAPACK
+use mpi
+#endif
 
 implicit none
 
@@ -56,9 +59,15 @@ type :: mbd_calc
     type(mbd_timing) :: tm
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
+#ifdef WITH_SCALAPACK
+    integer :: comm = MPI_COMM_WORLD
+#else
     integer :: comm = -1
+#endif
     type(exception) :: exc
     type(mbd_info) :: info
+    contains
+    procedure :: rank => calc_rank
 end type mbd_calc
 
 type :: mbd_damping
@@ -1663,6 +1672,18 @@ logical function gradients_has_grad(this)
     gradients_has_grad = allocated(this%dcoords) .or. &
         allocated(this%dalpha) .or. allocated(this%dC6) .or. &
         allocated(this%dr_vdw) .or. allocated(this%domega)
+end function
+
+integer function calc_rank(this)
+    class(mbd_calc), intent(in) :: this
+
+    integer :: ierr
+
+#ifdef WITH_SCALAPACK
+    call MPI_COMM_RANK(this%comm, calc_rank, ierr)
+#else
+    calc_rank = 0
+#endif
 end function
 
 end module mbd

@@ -3,13 +3,13 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_types
 
-use mbd_common, only: dp
+use mbd_common, only: dp, findval
 use mbd_parallel, only: mbd_blacs, mbd_blacs_grid
 
 implicit none
 
 private
-public :: mat3n3n, mat33, scalar
+public :: mat3n3n, mat33, scalar, contract_cross_33
 
 type :: mat3n3n
     real(dp), allocatable :: re(:, :)
@@ -349,5 +349,45 @@ subroutine mat3n3n_contract_transp(this, dir, res)
     )
 #endif
 end subroutine
+
+function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
+    integer, intent(in) :: k_atom
+    type(mat3n3n), intent(in) :: A, B
+    real(dp), intent(in) :: A_prime(:, :), B_prime(:, :)
+    real(dp) :: res(A%blacs%n_atoms)
+
+    integer :: my_i_atom, my_j_atom, i_atom, j_atom, n_atoms
+
+    res(:) = 0d0
+    my_i_atom = findval(A%blacs%i_atom, k_atom)
+    if (my_i_atom > 0) then
+        do my_j_atom = 1, size(A%blacs%j_atom)
+            j_atom = A%blacs%j_atom(my_j_atom)
+            associate ( &
+                    A_sub => A%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
+                    A_prime_sub => A_prime(:, 3*(j_atom-1)+1:) &
+            )
+                res(j_atom) = -1d0/3*sum(A_sub(:3, :3)*A_prime_sub(:, :3))
+            end associate
+        end do
+    end if
+    my_j_atom = findval(A%blacs%j_atom, k_atom)
+    if (my_j_atom > 0) then
+        do my_i_atom = 1, size(A%blacs%i_atom)
+            i_atom = A%blacs%i_atom(my_i_atom)
+            associate ( &
+                    B_sub => B%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
+                    B_prime_sub => B_prime(3*(i_atom-1)+1:, :) &
+            )
+                res(i_atom) = res(i_atom) + &
+                    (-1d0/3)*sum(B_prime_sub(:3, :)*B_sub(:3, :3))
+            end associate
+        end do
+    end if
+#ifdef WITH_SCALAPACK
+    n_atoms = A%blacs%n_atoms
+    call DGSUM2D(A%blacs%ctx, 'A', ' ', n_atoms, 1, res, n_atoms, -1, -1)
+#endif
+end function
 
 end module

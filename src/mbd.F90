@@ -8,7 +8,7 @@ module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
-use mbd_types, only: mat3n3n, mat33, scalar
+use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
 use mbd_defaults
 #ifdef WITH_SCALAPACK
@@ -760,40 +760,9 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             dQ = mmul(alpha_full, dQ)
             call dQ%contract_transp('C', B_prime)
             do i_atom = 1, n_atoms
-                grads_i(:) = 0d0
-                my_i_atom = findval(dQ%blacs%i_atom, i_atom)
-                if (my_i_atom > 0) then
-                    do my_j_atom = 1, size(dQ%blacs%j_atom)
-                        j_atom = dQ%blacs%j_atom(my_j_atom)
-                        associate ( &
-                                dQ_sub => dQ%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
-                                alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:) &
-                        )
-                            grads_i(j_atom) = -1d0/3 * &
-                                sum(dQ_sub(:3, :3)*alpha_prime_sub(:, :3))
-                        end associate
-                    end do
-                end if
-                my_j_atom = findval(dQ%blacs%j_atom, i_atom)
-                if (my_j_atom > 0) then
-                    do my_i_atom = 1, size(dQ%blacs%i_atom)
-                        i_atom_2 = dQ%blacs%i_atom(my_i_atom)
-                        associate ( &
-                                B_prime_sub => B_prime(3*(i_atom_2-1)+1:, :), &
-                                alpha_full_sub => alpha_full%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
-                        )
-                            grads_i(i_atom_2) = grads_i(i_atom_2) - 1d0/3 * &
-                                sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3))
-                        end associate
-                    end do
-                end if
-#ifdef WITH_SCALAPACK
-                call DGSUM2D( &
-                    dQ%blacs%ctx, 'A', ' ', &
-                    n_atoms, 1, grads_i, n_atoms, -1, -1 &
+                dalpha_scs(i_atom)%dcoords(:, i_xyz) = contract_cross_33( &
+                    i_atom, dQ, alpha_prime, alpha_full, B_prime &
                 )
-#endif
-                dalpha_scs(i_atom)%dcoords(:, i_xyz) = grads_i
             end do
         end do
     end if

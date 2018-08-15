@@ -9,7 +9,7 @@ module mbd
 use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar
-use mbd_parallel, only: mbd_blacs_grid
+use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
 use mbd_defaults
 #ifdef WITH_SCALAPACK
 use mpi
@@ -66,6 +66,7 @@ type :: mbd_calc
 #endif
     type(exception) :: exc
     type(mbd_info) :: info
+    type(mbd_blacs_grid) :: blacs_grid
     contains
     procedure :: rank => calc_rank
 end type mbd_calc
@@ -122,10 +123,11 @@ type :: mbd_system
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
-    type(mbd_blacs_grid) :: blacs_grid
+    type(mbd_blacs) :: blacs
     contains
     procedure :: siz => system_siz
     procedure :: has_exc => mbd_system_has_exc
+    procedure :: init => system_init
 end type mbd_system
 
 #ifdef WITH_SCALAPACK
@@ -368,7 +370,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
 
     do_ewald = .false.
     n_atoms = sys%siz()
-    call dipmat%init(n_atoms, sys%blacs_grid)
+    call dipmat%init(sys%blacs)
     my_nratoms = size(dipmat%blacs%i_atom)
     my_ncatoms = size(dipmat%blacs%j_atom)
     if (present(k_point)) then
@@ -787,7 +789,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
                 end if
 #ifdef WITH_SCALAPACK
                 call DGSUM2D( &
-                    dQ%blacs%grid%ctx, 'A', ' ', &
+                    dQ%blacs%ctx, 'A', ' ', &
                     n_atoms, 1, grads_i, n_atoms, -1, -1 &
                 )
 #endif
@@ -988,7 +990,7 @@ type(mbd_result) function get_single_mbd_energy( &
         end do
 #ifdef WITH_SCALAPACK
         call DGSUM2D( &
-            relay%blacs%grid%ctx, 'A', ' ', &
+            relay%blacs%ctx, 'A', ' ', &
             n_atoms, 1, gradient, n_atoms, -1, -1 &
         )
 #endif
@@ -1195,7 +1197,7 @@ function contract_polarizability(alpha_full) result(alpha)
     end do
     alpha = alpha/3
 #ifdef WITH_SCALAPACK
-    call DGSUM2D(alpha_full%blacs%grid%ctx, 'A', ' ', n_atoms, 1, alpha, n_atoms, -1, -1)
+    call DGSUM2D(alpha_full%blacs%ctx, 'A', ' ', n_atoms, 1, alpha, n_atoms, -1, -1)
 #endif
 end function contract_polarizability
 
@@ -1627,6 +1629,15 @@ logical function mbd_system_has_exc(sys)
 
     mbd_system_has_exc = sys%calc%exc%label /= ''
 end function
+
+
+subroutine system_init(this, calc)
+    class(mbd_system), intent(inout) :: this
+    type(mbd_calc), target, intent(in) :: calc
+
+    this%calc => calc
+    call this%blacs%init(this%siz(), calc%blacs_grid)
+end subroutine
 
 
 function make_k_grid(g_grid, uc) result(k_grid)

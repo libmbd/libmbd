@@ -68,12 +68,11 @@ integer function mat3n3n_siz(this, ndim)
     end if
 end function
 
-subroutine mat3n3n_init(this, n_atoms, blacs_grid)
+subroutine mat3n3n_init(this, blacs)
     class(mat3n3n), intent(out) :: this
-    integer, intent(in) :: n_atoms
-    type(mbd_blacs_grid), intent(in) :: blacs_grid
+    type(mbd_blacs), intent(in) :: blacs
 
-    call this%blacs%init(n_atoms, blacs_grid)
+    this%blacs = blacs
 end subroutine
 
 subroutine mat3n3n_init_from(this, other)
@@ -345,7 +344,7 @@ subroutine mat3n3n_contract_transp(this, dir, res)
     end do
 #ifdef WITH_SCALAPACK
     call DGSUM2D( &
-        this%blacs%grid%ctx, 'A', ' ', &
+        this%blacs%ctx, 'A', ' ', &
         size(res, 1), size(res, 2), res, size(res, 1), -1, -1 &
     )
 #endif

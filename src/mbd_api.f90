@@ -59,6 +59,7 @@ type mbd_calc
     real(dp), allocatable :: free_values(:, :)
 contains
     procedure :: init => mbd_calc_init
+    procedure :: destroy => mbd_calc_destroy
     procedure :: update_coords => mbd_calc_update_coords
     procedure :: update_lattice_vectors => mbd_calc_update_lattice_vectors
     procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
@@ -77,18 +78,17 @@ subroutine mbd_calc_init(this, input)
     class(mbd_calc), target, intent(out) :: this
     type(mbd_input), intent(in) :: input
 
-    this%sys%calc => this%calc
-    this%sys%calc%comm = input%comm
+    this%calc%comm = input%comm
     this%dispersion_type = input%dispersion_type
     this%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
         this%sys%get_eigs = .true.
         this%sys%get_modes = .true.
     end if
-    this%sys%calc%param%ts_energy_accuracy = input%ts_ene_acc
+    this%calc%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
-    this%sys%calc%param%n_frequency_grid = input%n_omega_grid
-    this%sys%calc%param%k_grid_shift = input%k_grid_shift
+    this%calc%param%n_frequency_grid = input%n_omega_grid
+    this%calc%param%k_grid_shift = input%k_grid_shift
     this%damp%beta = input%mbd_beta
     this%damp%a = input%mbd_a
     this%damp%ts_d = input%ts_d
@@ -97,6 +97,14 @@ subroutine mbd_calc_init(this, input)
     this%sys%vacuum_axis = input%vacuum_axis
     call init_grid(this%calc)
     this%free_values = input%free_values
+    call this%calc%blacs_grid%init()
+end subroutine
+
+
+subroutine mbd_calc_destroy(this)
+    class(mbd_calc), target, intent(out) :: this
+
+    call this%calc%blacs_grid%destroy()
 end subroutine
 
 
@@ -104,8 +112,10 @@ subroutine mbd_calc_update_coords(this, coords)
     class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
 
-    allocate (this%sys%coords(3, size(coords, 2)))
+    if (.not. allocated(this%sys%coords)) &
+        allocate (this%sys%coords(3, size(coords, 2)))
     this%sys%coords = coords
+    call this%sys%init(this%calc)
 end subroutine
 
 
@@ -149,13 +159,11 @@ subroutine mbd_calc_get_energy(this, energy)
 
     select case (this%dispersion_type)
     case ('mbd')
-        call this%sys%blacs_grid%init()
         if (this%do_gradients) then
             if (allocated(this%denergy%dcoords)) deallocate(this%denergy%dcoords)
             allocate (this%denergy%dcoords(this%sys%siz(), 3))
         end if
         this%results = mbd_scs_energy(this%sys, 'rsscs', this%alpha_0, this%C6, this%damp, this%denergy)
-        call this%sys%blacs_grid%destroy()
         energy = this%results%energy
     case ('ts')
         energy = ts_energy(this%sys, this%alpha_0, this%C6, this%damp)

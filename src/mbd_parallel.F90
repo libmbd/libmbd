@@ -24,7 +24,7 @@ type :: mbd_blacs
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
     integer :: desc(9)
-    type(mbd_blacs_grid) :: grid
+    integer :: ctx
 contains
     procedure :: init => mbd_blacs_init
 end type
@@ -70,7 +70,7 @@ subroutine mbd_blacs_init(this, n_atoms, grid)
 
     integer :: blocksize, my_nratoms, my_ncatoms, ierr
 
-    this%grid = grid
+    this%ctx = grid%ctx
     this%n_atoms = n_atoms
     blocksize = 3
     my_nratoms = NUMROC(n_atoms, blocksize/3, grid%my_prow, 0, grid%nprows)

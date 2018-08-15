@@ -41,6 +41,7 @@ call check('Ar2 sum(abs(gradients))', sum(abs(gradients)), 2.3279742219399908d-4
 call calc%update_vdw_params_from_ratios([1d0, 1d0])
 call calc%get_energy(energy)
 call check('Ar2 energy 2', energy, -0.0002462647623815428d0, 1d-10)
+call calc%destroy()
 
 #ifdef WITH_SCALAPACK
 call MPI_FINALIZE(err)

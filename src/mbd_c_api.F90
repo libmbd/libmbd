@@ -42,6 +42,7 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     allocate (calc)
     calc%param%n_frequency_grid = n_freq
     call init_grid(calc)
+    call calc%blacs_grid%init()
     allocate (calc_c)
     calc_c%n_freq = ubound(calc%omega_grid, 1)
     calc_c%omega_grid = c_loc(calc%omega_grid)
@@ -58,6 +59,7 @@ subroutine cmbd_destroy_calc(calc_cp) bind(c)
 
     call c_f_pointer(calc_cp, calc_c)
     call c_f_pointer(calc_c%mbd_calc_f, calc)
+    call calc%blacs_grid%destroy()
     deallocate (calc)
     deallocate (calc_c)
 end subroutine cmbd_destroy_calc
@@ -76,9 +78,8 @@ type(c_ptr) function cmbd_init_system( &
 
     calc => get_mbd_calc(calc_cp)
     allocate (sys)
-    sys%calc => calc
     sys%coords = coords
-    call sys%blacs_grid%init()
+    call sys%init(calc)
     if (present(lattice)) then
         sys%periodic = .true.
         sys%lattice = lattice
@@ -97,7 +98,6 @@ subroutine cmbd_destroy_system(sys_cp) bind(c)
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
-    call sys%blacs_grid%destroy()
     deallocate (sys)
     deallocate (sys_c)
 end subroutine cmbd_destroy_system

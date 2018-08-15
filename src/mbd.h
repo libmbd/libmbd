@@ -9,7 +9,6 @@ struct cmbd_calc {
 };
 
 struct cmbd_calc* cmbd_init_calc(int n_freq);
-void cmbd_set_parallel(struct cmbd_calc* calc);
 void cmbd_destroy_calc(struct cmbd_calc* calc);
 
 struct cmbd_system* cmbd_init_system(

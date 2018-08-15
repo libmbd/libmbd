@@ -50,14 +50,6 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     cmbd_init_calc = c_loc(calc_c)
 end function cmbd_init_calc
 
-subroutine cmbd_set_parallel(calc_cp) bind(c)
-    type(c_ptr), value :: calc_cp
-
-    type(mbd_calc), pointer :: calc
-
-    calc => get_mbd_calc(calc_cp)
-end subroutine cmbd_set_parallel
-
 subroutine cmbd_destroy_calc(calc_cp) bind(c)
     type(c_ptr), value :: calc_cp
 

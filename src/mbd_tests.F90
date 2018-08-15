@@ -46,7 +46,7 @@ call exec_test('MBD@rsscs derivative implicit alpha')
 call exec_test('MBD@rsscs derivative implicit C6')
 call exec_test('MBD@rsscs derivative implicit Rvdw')
 call calc%blacs_grid%destroy()
-write (6, *) &
+if (calc%rank() == 0) write (6, *) &
     trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
 if (n_failed /= 0) stop 1
 
@@ -59,7 +59,8 @@ contains
 subroutine exec_test(test_name)
     character(len=*), intent(in) :: test_name
 
-    write (6, '(A,A,A)', advance='no') 'Executing test "', test_name, '"... '
+    if (calc%rank() == 0) write (6, '(A,A,A)', advance='no') &
+        'Executing test "', test_name, '"... '
     select case (test_name)
     case ('T_bare derivative'); call test_T_bare_deriv()
     case ('T_GG derivative explicit'); call test_T_GG_deriv_expl()
@@ -84,12 +85,15 @@ logical function failed(diff, thre)
     real(dp), intent(in) :: diff, thre
 
     failed = abs(diff) > thre
-    write (6, '(A,G10.3,A,G10.3,A)', advance='no') 'diff:', diff, ', threshold:', thre, ': '
-    if (failed) then
-        n_failed = n_failed + 1
-        write (6, *) 'FAILED!'
-    else
-        write (6, *) 'OK'
+    if (calc%rank() == 0) write (6, '(A,G10.3,A,G10.3,A)', advance='no') &
+        'diff:', diff, ', threshold:', thre, ': '
+    if (failed) n_failed = n_failed + 1
+    if (calc%rank() == 0) then
+        if (failed) then
+            write (6, *) 'FAILED!'
+        else
+            write (6, *) 'OK'
+        end if
     end if
 end function
 

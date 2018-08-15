@@ -727,8 +727,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     real(dp) :: alpha_scs(size(alpha))
 
     type(mat3n3n) :: alpha_full, dQ, T
-    integer :: n_atoms, i_xyz, i_atom, j_xyz, j_atom, my_i_atom, my_j_atom, &
-        i_atom_2
+    integer :: n_atoms, i_xyz, i_atom
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:)
@@ -774,48 +773,24 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             call dQ%mult_col(i_atom, dsij_dsi)
         end do
         call dQ%add_diag(-0.5d0/alpha**2)
-        dQ%re = matmul(alpha_full%re, dQ%re)
-        do j_xyz = 1, 3
-            B_prime(:, j_xyz) = sum(dQ%re(j_xyz::3, :), 1)
-        end do
+        dQ = mmul(alpha_full, dQ)
+        call dQ%contract_transp('C', B_prime)
         do i_atom = 1, n_atoms
-            dalpha_scs(i_atom)%dalpha = contract_gradients(i_atom, dQ)
+            dalpha_scs(i_atom)%dalpha = contract_cross_33( &
+                i_atom, dQ, alpha_prime, alpha_full, B_prime &
+            )
         end do
     end if
     if (allocated(dalpha_scs(1)%dr_vdw)) then
         dQ%re = T%re_dvdw
-        dQ%re = matmul(alpha_full%re, dQ%re)
-        do j_xyz = 1, 3
-            B_prime(:, j_xyz) = sum(dQ%re(j_xyz::3, :), 1)
-        end do
+        dQ = mmul(alpha_full, dQ)
+        call dQ%contract_transp('C', B_prime)
         do i_atom = 1, n_atoms
-            dalpha_scs(i_atom)%dr_vdw = contract_gradients(i_atom, dQ)
+            dalpha_scs(i_atom)%dr_vdw = contract_cross_33( &
+                i_atom, dQ, alpha_prime, alpha_full, B_prime &
+            )
         end do
     end if
-
-    contains
-
-    function contract_gradients(i_atom, relay) result(gradient)
-        integer, intent(in) :: i_atom
-        type(mat3n3n), intent(in) :: relay
-        real(dp) :: gradient(relay%blacs%n_atoms)
-
-        integer :: j_atom
-
-        do j_atom = 1, dQ%blacs%n_atoms
-            associate ( &
-                    relay_sub => relay%re(3*(i_atom-1)+1:, 3*(j_atom-1)+1:), &
-                    alpha_prime_sub => alpha_prime(:, 3*(j_atom-1)+1:), &
-                    B_prime_sub => B_prime(3*(j_atom-1)+1:, :), &
-                    alpha_full_sub => alpha_full%re(3*(j_atom-1)+1:, 3*(i_atom-1)+1:) &
-            )
-                gradient(j_atom) = -1d0/3 * ( &
-                    sum(relay_sub(:3, :3)*alpha_prime_sub(:, :3)) + &
-                    sum(B_prime_sub(:3, :)*alpha_full_sub(:3, :3)) &
-                )
-            end associate
-        end do
-    end function
 end function run_scs
 
 

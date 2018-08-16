@@ -30,6 +30,7 @@ type :: mat3n3n
     procedure :: mult_col => mat3n3n_mult_col
     procedure :: contract_n_transp => mat3n3n_contract_n_transp
     procedure :: contract_n33diag_cols => mat3n3n_contract_n33diag_cols
+    procedure :: contract_n33_rows => mat3n3n_contract_n33_rows
     procedure :: copy_from => mat3n3n_copy_from
     procedure :: move_from => mat3n3n_move_from
     procedure :: init_from => mat3n3n_init_from
@@ -406,6 +407,25 @@ function mat3n3n_contract_n33diag_cols(A) result(res)
         end do
     end do
     res = res/3
+#ifdef WITH_SCALAPACK
+    n_atoms = A%blacs%n_atoms
+    call DGSUM2D(A%blacs%ctx, 'A', ' ', n_atoms, 1, res, n_atoms, -1, -1)
+#endif
+end function
+
+function mat3n3n_contract_n33_rows(A) result(res)
+    class(mat3n3n), intent(in) :: A
+    real(dp) :: res(A%blacs%n_atoms)
+
+    integer :: my_i_atom, n_atoms, i_atom
+
+    res(:) = 0d0
+    do my_i_atom = 1, size(A%blacs%i_atom)
+        i_atom = A%blacs%i_atom(my_i_atom)
+        associate (A_sub => A%re(3*(my_i_atom-1)+1:, :))
+            res(i_atom) = res(i_atom) + sum(A_sub(:3, :))
+        end associate
+    end do
 #ifdef WITH_SCALAPACK
     n_atoms = A%blacs%n_atoms
     call DGSUM2D(A%blacs%ctx, 'A', ' ', n_atoms, 1, res, n_atoms, -1, -1)

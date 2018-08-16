@@ -130,10 +130,6 @@ type :: mbd_system
     procedure :: init => system_init
 end type mbd_system
 
-#ifdef WITH_SCALAPACK
-external :: DGSUM2D
-#endif
-
 contains
 
 
@@ -890,7 +886,7 @@ type(mbd_result) function get_single_mbd_energy( &
             dQ%re = T%re_dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
             dQ%re = c_lambda12i_c%re*dQ%re
-            dene%dcoords(:, i_xyz) = 1d0/2*contract_gradients(dQ)
+            dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
         end do
     end if
     if (allocated(dene%dalpha)) then
@@ -899,7 +895,7 @@ type(mbd_result) function get_single_mbd_energy( &
         call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
         call dQ%add_diag(omega*domega%dalpha)
         dQ%re = c_lambda12i_c%re*dQ%re
-        dene%dalpha = 1d0/2*contract_gradients(dQ)-3d0/2*domega%dalpha
+        dene%dalpha = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dalpha
     end if
     if (allocated(dene%dC6)) then
         dQ%re = T%re
@@ -907,38 +903,14 @@ type(mbd_result) function get_single_mbd_energy( &
         call dQ%mult_rows(domega%dC6/omega)
         call dQ%add_diag(omega*domega%dC6)
         dQ%re = c_lambda12i_c%re*dQ%re
-        dene%dC6 = 1d0/2*contract_gradients(dQ)-3d0/2*domega%dC6
+        dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
     end if
     if (allocated(dene%dr_vdw)) then
         dQ%re = T%re_dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
         dQ%re = c_lambda12i_c%re*dQ%re
-        dene%dr_vdw = 1d0/2*contract_gradients(dQ)
+        dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
     end if
-
-    contains
-
-    function contract_gradients(relay) result(gradient)
-        type(mat3n3n), intent(in) :: relay
-        real(dp) :: gradient(relay%blacs%n_atoms)
-
-        integer :: my_i_atom
-
-        gradient(:) = 0d0
-        do my_i_atom = 1, size(relay%blacs%i_atom)
-            associate ( &
-                    i_atom => relay%blacs%i_atom(my_i_atom), &
-                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :))
-                gradient(i_atom) = gradient(i_atom) + sum(relay_sub(:3, :))
-            end associate
-        end do
-#ifdef WITH_SCALAPACK
-        call DGSUM2D( &
-            relay%blacs%ctx, 'A', ' ', &
-            n_atoms, 1, gradient, n_atoms, -1, -1 &
-        )
-#endif
-    end function
 end function get_single_mbd_energy
 
 

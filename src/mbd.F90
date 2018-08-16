@@ -747,7 +747,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     call invh(alpha_full, sys%calc%exc)
     if (sys%has_exc()) return
     call ts(sys%calc, -32)
-    alpha_scs = contract_polarizability(alpha_full)
+    alpha_scs = alpha_full%contract_n33diag_cols()
     if (.not. dalpha_scs(1)%has_grad()) return
     allocate (alpha_prime(3, 3*n_atoms), B_prime(3*n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
@@ -1121,29 +1121,6 @@ type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, dam
         end if
     end do
 end function get_single_reciprocal_rpa_ene
-
-
-function contract_polarizability(alpha_full) result(alpha)
-    type(mat3n3n), intent(in) :: alpha_full
-    real(dp) :: alpha(alpha_full%blacs%n_atoms)
-
-    integer :: i_xyz, my_j_atom, n_atoms
-
-    n_atoms = alpha_full%blacs%n_atoms
-    alpha(:) = 0d0
-    do my_j_atom = 1, size(alpha_full%blacs%j_atom)
-        associate (j_atom => alpha_full%blacs%j_atom(my_j_atom))
-            do i_xyz = 1, 3
-                alpha(j_atom) = alpha(j_atom) + &
-                    sum(alpha_full%re(i_xyz::3, 3*(my_j_atom-1)+i_xyz))
-            end do
-        end associate
-    end do
-    alpha = alpha/3
-#ifdef WITH_SCALAPACK
-    call DGSUM2D(alpha_full%blacs%ctx, 'A', ' ', n_atoms, 1, alpha, n_atoms, -1, -1)
-#endif
-end function contract_polarizability
 
 
 function T_bare(rxyz) result(T)

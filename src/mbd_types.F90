@@ -28,7 +28,7 @@ type :: mat3n3n
     procedure :: mult_rows => mat3n3n_mult_rows
     procedure :: mult_cols_3n => mat3n3n_mult_cols_3n
     procedure :: mult_col => mat3n3n_mult_col
-    procedure :: contract_transp => mat3n3n_contract_transp
+    procedure :: contract_n_transp => mat3n3n_contract_n_transp
     procedure :: contract_n33diag_cols => mat3n3n_contract_n33diag_cols
     procedure :: copy_from => mat3n3n_copy_from
     procedure :: move_from => mat3n3n_move_from
@@ -319,7 +319,7 @@ subroutine mat3n3n_mult_col(this, idx, a)
     end if
 end subroutine
 
-subroutine mat3n3n_contract_transp(this, dir, res)
+subroutine mat3n3n_contract_n_transp(this, dir, res)
     class(mat3n3n), intent(in) :: this
     character(len=*), intent(in) :: dir
     real(dp), intent(out), target :: res(:, :)

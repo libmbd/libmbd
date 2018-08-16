@@ -751,13 +751,13 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     if (.not. dalpha_scs(1)%has_grad()) return
     allocate (alpha_prime(3, 3*n_atoms), B_prime(3*n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
-    call alpha_full%contract_transp('R', alpha_prime)
+    call alpha_full%contract_n_transp('R', alpha_prime)
     call dQ%init_from(T)
     if (allocated(dalpha_scs(1)%dcoords)) then
         do i_xyz = 1, 3
             dQ%re = -T%re_dr(:, :, i_xyz)
             dQ = mmul(alpha_full, dQ)
-            call dQ%contract_transp('C', B_prime)
+            call dQ%contract_n_transp('C', B_prime)
             do i_atom = 1, n_atoms
                 dalpha_scs(i_atom)%dcoords(:, i_xyz) = contract_cross_33( &
                     i_atom, dQ, alpha_prime, alpha_full, B_prime &
@@ -774,7 +774,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         end do
         call dQ%add_diag(-0.5d0/alpha**2)
         dQ = mmul(alpha_full, dQ)
-        call dQ%contract_transp('C', B_prime)
+        call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms
             dalpha_scs(i_atom)%dalpha = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
@@ -784,7 +784,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     if (allocated(dalpha_scs(1)%dr_vdw)) then
         dQ%re = T%re_dvdw
         dQ = mmul(alpha_full, dQ)
-        call dQ%contract_transp('C', B_prime)
+        call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms
             dalpha_scs(i_atom)%dr_vdw = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &

@@ -4,7 +4,7 @@
 module mbd_types
 
 use mbd_common, only: dp, findval
-use mbd_parallel, only: mbd_blacs, mbd_blacs_grid
+use mbd_parallel, only: mbd_blacs, mbd_blacs_grid, all_reduce
 
 implicit none
 
@@ -50,10 +50,6 @@ type :: scalar
     real(dp), allocatable :: dr(:)  ! explicit derivative
     real(dp), allocatable :: dvdw
 end type
-
-#ifdef WITH_SCALAPACK
-external :: DGSUM2D
-#endif
 
 contains
 
@@ -344,12 +340,7 @@ subroutine mat3n3n_contract_n_transp(this, dir, res)
             end associate
         end do
     end do
-#ifdef WITH_SCALAPACK
-    call DGSUM2D( &
-        this%blacs%ctx, 'A', ' ', &
-        size(res, 1), size(res, 2), res, size(res, 1), -1, -1 &
-    )
-#endif
+    call all_reduce(res, this%blacs)
 end subroutine
 
 function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
@@ -358,7 +349,7 @@ function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
     real(dp), intent(in) :: A_prime(:, :), B_prime(:, :)
     real(dp) :: res(A%blacs%n_atoms)
 
-    integer :: my_i_atom, my_j_atom, i_atom, j_atom, n_atoms
+    integer :: my_i_atom, my_j_atom, i_atom, j_atom
 
     res(:) = 0d0
     my_i_atom = findval(A%blacs%i_atom, k_atom)
@@ -386,17 +377,14 @@ function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
             end associate
         end do
     end if
-#ifdef WITH_SCALAPACK
-    n_atoms = A%blacs%n_atoms
-    call DGSUM2D(A%blacs%ctx, 'A', ' ', n_atoms, 1, res, n_atoms, -1, -1)
-#endif
+    call all_reduce(res, A%blacs)
 end function
 
 function mat3n3n_contract_n33diag_cols(A) result(res)
     class(mat3n3n), intent(in) :: A
     real(dp) :: res(A%blacs%n_atoms)
 
-    integer :: i_xyz, my_j_atom, n_atoms, j_atom
+    integer :: i_xyz, my_j_atom, j_atom
 
     res(:) = 0d0
     do my_j_atom = 1, size(A%blacs%j_atom)
@@ -407,17 +395,14 @@ function mat3n3n_contract_n33diag_cols(A) result(res)
         end do
     end do
     res = res/3
-#ifdef WITH_SCALAPACK
-    n_atoms = A%blacs%n_atoms
-    call DGSUM2D(A%blacs%ctx, 'A', ' ', n_atoms, 1, res, n_atoms, -1, -1)
-#endif
+    call all_reduce(res, A%blacs)
 end function
 
 function mat3n3n_contract_n33_rows(A) result(res)
     class(mat3n3n), intent(in) :: A
     real(dp) :: res(A%blacs%n_atoms)
 
-    integer :: my_i_atom, n_atoms, i_atom
+    integer :: my_i_atom, i_atom
 
     res(:) = 0d0
     do my_i_atom = 1, size(A%blacs%i_atom)
@@ -426,10 +411,7 @@ function mat3n3n_contract_n33_rows(A) result(res)
             res(i_atom) = res(i_atom) + sum(A_sub(:3, :))
         end associate
     end do
-#ifdef WITH_SCALAPACK
-    n_atoms = A%blacs%n_atoms
-    call DGSUM2D(A%blacs%ctx, 'A', ' ', n_atoms, 1, res, n_atoms, -1, -1)
-#endif
+    call all_reduce(res, A%blacs)
 end function
 
 end module

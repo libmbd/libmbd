@@ -3,10 +3,12 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_parallel
 
+use mbd_common, only: dp
+
 implicit none
 
 private
-public :: mbd_blacs, mbd_blacs_grid
+public :: mbd_blacs, mbd_blacs_grid, all_reduce
 
 type :: mbd_blacs_grid
     integer :: ctx
@@ -29,9 +31,14 @@ contains
     procedure :: init => mbd_blacs_init
 end type
 
+interface all_reduce
+    module procedure all_reduce_re_1d_
+    module procedure all_reduce_re_2d_
+end interface
+
 #ifdef WITH_SCALAPACK
 external :: BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, &
-    BLACS_GRIDEXIT, NUMROC, DESCINIT
+    BLACS_GRIDEXIT, NUMROC, DESCINIT, DGSUM2D
 integer :: NUMROC
 #endif
 
@@ -125,5 +132,25 @@ function get_idx_map(my_task, n_tasks, n, blocksize, nidx) result(idx_map)
         end if
     end do
 end function
+
+subroutine all_reduce_re_1d_(A, blacs)
+    real(dp), intent(inout) :: A(:)
+    type(mbd_blacs), intent(in) :: blacs
+
+#ifdef WITH_SCALAPACK
+    call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
+#endif
+end subroutine
+
+subroutine all_reduce_re_2d_(A, blacs)
+    real(dp), intent(inout) :: A(:, :)
+    type(mbd_blacs), intent(in) :: blacs
+
+#ifdef WITH_SCALAPACK
+    call DGSUM2D( &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
+    )
+#endif
+end subroutine
 
 end module

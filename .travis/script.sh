@@ -7,7 +7,9 @@ else
     if [[ "$MPI_NODES" ]]; then
         PREFIX="mpirun -n $MPI_NODES"
     fi
-    $PREFIX make -C build check
+    make -C build mbd_tests mbd_api_tests
+    $PREFIX build/mbd_tests
+    $PREFIX build/mbd_api_tests
     if [[ "$CODECOV" ]]; then
         EXTRA_FLAGS="--cov=./"
     fi

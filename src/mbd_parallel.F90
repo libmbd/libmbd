@@ -104,7 +104,7 @@ subroutine mbd_blacs_init(this, n_atoms, grid)
 #else
     integer :: i
 
-    this%grid = grid
+    this%ctx = grid%ctx
     this%i_atom = [(i, i = 1, n_atoms)]
     this%j_atom = this%i_atom
     this%n_atoms = n_atoms

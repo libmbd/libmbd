@@ -9,7 +9,7 @@ module mbd
 use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
-use mbd_parallel, only: mbd_blacs_grid, mbd_blacs
+use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
 use mbd_defaults
 #ifdef WITH_SCALAPACK
 use mpi
@@ -148,7 +148,7 @@ type(mbd_result) function mbd_scs_energy( &
     type(mbd_gradients), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
     type(mbd_gradients) :: dene_mbd, dr_vdw_scs
     type(mbd_damping) :: damp_scs, damp_mbd
-    integer :: n_freq, i_freq, n_atoms, i_atom
+    integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
 
     select case (variant)
@@ -187,51 +187,65 @@ type(mbd_result) function mbd_scs_energy( &
             dene_mbd%dC6*dC6_scs_dalpha_dyn_scs(:, i_freq)
     end do
     if (allocated(dene%dcoords)) then
-        dene%dcoords = dene_mbd%dcoords
-        do i_atom = 1, n_atoms
+        dene%dcoords = 0d0
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = sys%blacs%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dcoords = dene%dcoords + &
+                dene%dcoords(sys%blacs%j_atom, :) = &
+                    dene%dcoords(sys%blacs%j_atom, :) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
-                    dalpha_dyn_scs(i_atom, i_freq)%dcoords
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
             end do
         end do
+        call all_reduce(dene%dcoords, sys%blacs)
+        dene%dcoords = dene%dcoords + dene_mbd%dcoords
     end if
     if (allocated(dene%dalpha)) then
-        dene%dalpha = dene_mbd%dr_vdw*dr_vdw_scs%dV_free
-        do i_atom = 1, n_atoms
+        dene%dalpha = 0d0
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = sys%blacs%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dalpha = dene%dalpha + &
+                dene%dalpha(sys%blacs%j_atom) = dene%dalpha(sys%blacs%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
-                    dalpha_dyn_scs(i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dalpha
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
+                    dalpha_dyn(i_freq)%dalpha(sys%blacs%j_atom)
             end do
         end do
+        call all_reduce(dene%dalpha, sys%blacs)
+        dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
     end if
     if (allocated(dene%dC6)) then
         dene%dC6 = 0d0
-        do i_atom = 1, n_atoms
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = sys%blacs%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dC6 = dene%dC6 + &
+                dene%dC6(sys%blacs%j_atom) = dene%dC6(sys%blacs%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
-                    dalpha_dyn_scs(i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dC6
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
+                    dalpha_dyn(i_freq)%dC6(sys%blacs%j_atom)
             end do
         end do
+        call all_reduce(dene%dC6, sys%blacs)
     end if
     if (allocated(dene%dr_vdw)) then
-        dene%dr_vdw = dene_mbd%dr_vdw*dr_vdw_scs%dX_free
-        do i_atom = 1, n_atoms
+        dene%dr_vdw = 0d0
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = sys%blacs%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dr_vdw = dene%dr_vdw + &
+                dene%dr_vdw(sys%blacs%j_atom) = dene%dr_vdw(sys%blacs%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
-                    dalpha_dyn_scs(i_atom, i_freq)%dr_vdw
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dr_vdw
             end do
         end do
+        call all_reduce(dene%dr_vdw, sys%blacs)
+        dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
 
     contains
 
     subroutine allocate_derivs()
+        integer :: my_ncatoms
+
         if (allocated(dene%dcoords)) allocate (dene_mbd%dcoords(n_atoms, 3))
         if (dene%has_grad()) then
             allocate (dC6_scs_dalpha_dyn_scs(n_atoms, 0:n_freq))
@@ -244,19 +258,22 @@ type(mbd_result) function mbd_scs_energy( &
         if (allocated(dene%dalpha)) allocate (dr_vdw_scs%dV_free(n_atoms))
         if (allocated(dene%dr_vdw)) allocate (dr_vdw_scs%dX_free(n_atoms))
         allocate (dalpha_dyn(0:n_freq))
-        allocate (dalpha_dyn_scs(n_atoms, 0:n_freq))
+        allocate (dalpha_dyn_scs(size(sys%blacs%i_atom), 0:n_freq))
+        my_ncatoms = size(sys%blacs%j_atom)
         do i_freq = 0, n_freq
             if (allocated(dene%dalpha)) &
                 allocate (dalpha_dyn(i_freq)%dalpha(n_atoms))
             if (allocated(dene%dC6)) &
                 allocate (dalpha_dyn(i_freq)%dC6(n_atoms))
-            do i_atom = 1, n_atoms
-                if (allocated(dene%dcoords)) &
-                allocate (dalpha_dyn_scs(i_atom, i_freq)%dcoords(n_atoms, 3))
-                if (allocated(dene%dalpha) .or. allocated(dene%dC6)) &
-                allocate (dalpha_dyn_scs(i_atom, i_freq)%dalpha(n_atoms))
-                if (allocated(dene%dr_vdw)) &
-                allocate (dalpha_dyn_scs(i_atom, i_freq)%dr_vdw(n_atoms))
+            do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+                associate (da => dalpha_dyn_scs(my_i_atom, i_freq))
+                    if (allocated(dene%dcoords)) &
+                        allocate (da%dcoords(my_ncatoms, 3))
+                    if (allocated(dene%dalpha) .or. allocated(dene%dC6)) &
+                        allocate (da%dalpha(my_ncatoms))
+                    if (allocated(dene%dr_vdw)) &
+                        allocate (da%dr_vdw(my_ncatoms))
+                end associate
             end do
         end do
     end subroutine
@@ -723,7 +740,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     real(dp) :: alpha_scs(size(alpha))
 
     type(mat3n3n) :: alpha_full, dQ, T
-    integer :: n_atoms, i_xyz, i_atom
+    integer :: n_atoms, i_xyz, i_atom, my_i_atom
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:)
@@ -755,9 +772,14 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             dQ = mmul(alpha_full, dQ)
             call dQ%contract_n_transp('C', B_prime)
             do i_atom = 1, n_atoms
-                dalpha_scs(i_atom)%dcoords(:, i_xyz) = contract_cross_33( &
+                grads_i = contract_cross_33( &
                     i_atom, dQ, alpha_prime, alpha_full, B_prime &
                 )
+                my_i_atom = findval(sys%blacs%i_atom, i_atom)
+                if (my_i_atom > 0) then
+                    dalpha_scs(my_i_atom)%dcoords(:, i_xyz) = &
+                        grads_i(sys%blacs%j_atom)
+                end if
             end do
         end do
     end if
@@ -772,9 +794,13 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         dQ = mmul(alpha_full, dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms
-            dalpha_scs(i_atom)%dalpha = contract_cross_33( &
+            grads_i = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
             )
+            my_i_atom = findval(sys%blacs%i_atom, i_atom)
+            if (my_i_atom > 0) then
+                dalpha_scs(my_i_atom)%dalpha = grads_i(sys%blacs%j_atom)
+            end if
         end do
     end if
     if (allocated(dalpha_scs(1)%dr_vdw)) then
@@ -782,9 +808,13 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         dQ = mmul(alpha_full, dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms
-            dalpha_scs(i_atom)%dr_vdw = contract_cross_33( &
+            grads_i = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
             )
+            my_i_atom = findval(sys%blacs%i_atom, i_atom)
+            if (my_i_atom > 0) then
+                dalpha_scs(my_i_atom)%dr_vdw = grads_i(sys%blacs%j_atom)
+            end if
         end do
     end if
 end function run_scs

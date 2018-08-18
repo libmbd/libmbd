@@ -7,7 +7,7 @@
 program mbd_tests
 
 use mbd
-use mbd_common, only: diff7
+use mbd_common, only: diff7, findval
 
 #ifdef WITH_SCALAPACK
 use mpi
@@ -280,45 +280,53 @@ subroutine test_scs_deriv_expl()
     real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :)
     real(dp), allocatable :: diff(:, :, :)
     real(dp), allocatable :: alpha_0(:)
-    integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
+    integer :: i_atom, n_atoms, i_xyz, i_step, j_atom, my_i_atom, my_nratoms, &
+        my_ncatoms, my_j_atom
     real(dp), allocatable :: alpha_scs(:, :)
     type(mbd_gradients), allocatable :: dalpha_scs(:)
 
     delta = 0.05d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, n_atoms, 3), gradients_anl(n_atoms, n_atoms, 3))
-    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(n_atoms))
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     sys%coords = coords
     call sys%init(calc)
+    my_nratoms = size(sys%blacs%i_atom)
+    my_ncatoms = size(sys%blacs%j_atom)
+    allocate (gradients(my_nratoms, my_ncatoms, 3))
+    allocate (gradients_anl(my_nratoms, my_ncatoms, 3))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
     damp%version = 'fermi,dip,gg'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    do i_atom = 1, n_atoms
-        allocate (dalpha_scs(i_atom)%dcoords(n_atoms, 3))
+    do my_i_atom = 1, my_nratoms
+        allocate (dalpha_scs(my_i_atom)%dcoords(my_ncatoms, 3))
     end do
     alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
-    do j_atom = 1, n_atoms
-        gradients_anl(j_atom, :, :) = dalpha_scs(j_atom)%dcoords
-        deallocate (dalpha_scs(j_atom)%dcoords)
+    do my_i_atom = 1, my_nratoms
+        gradients_anl(my_i_atom, :, :) = dalpha_scs(my_i_atom)%dcoords
+        deallocate (dalpha_scs(my_i_atom)%dcoords)
     end do
-    do i_atom = 1, n_atoms
+    do j_atom = 1, n_atoms
+        my_j_atom = findval(sys%blacs%j_atom, j_atom)
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom) + &
+                sys%coords(i_xyz, j_atom) = sys%coords(i_xyz, j_atom) + &
                     i_step*delta
                 alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
             end do
-            do j_atom = 1, n_atoms
-                gradients(j_atom, i_atom, i_xyz) = &
-                    diff7(alpha_scs(j_atom, :), delta)
-            end do
+            if (my_j_atom > 0) then
+                do my_i_atom = 1, my_nratoms
+                    i_atom = sys%blacs%i_atom(my_i_atom)
+                    gradients(my_i_atom, my_j_atom, i_xyz) = &
+                        diff7(alpha_scs(i_atom, :), delta)
+                end do
+            end if
         end do
     end do
     diff = (gradients-gradients_anl)/gradients_anl
@@ -336,41 +344,49 @@ subroutine test_scs_deriv_impl_alpha
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_0_diff(:), &
         alpha_scs(:, :)
-    integer :: i_atom, n_atoms, i_step, j_atom
+    integer :: i_atom, n_atoms, i_step, j_atom, my_i_atom, my_nratoms, &
+        my_ncatoms, my_j_atom
     type(mbd_gradients), allocatable :: dalpha_scs(:)
 
     delta = 0.1d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, n_atoms), gradients_anl(n_atoms, n_atoms))
-    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(n_atoms))
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     sys%coords = coords
     call sys%init(calc)
+    my_nratoms = size(sys%blacs%i_atom)
+    my_ncatoms = size(sys%blacs%j_atom)
+    allocate (gradients(my_nratoms, my_ncatoms))
+    allocate (gradients_anl(my_nratoms, my_ncatoms))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
     damp%version = 'fermi,dip,gg'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    do i_atom = 1, n_atoms
-        allocate (dalpha_scs(i_atom)%dalpha(n_atoms))
+    do my_i_atom = 1, my_nratoms
+        allocate (dalpha_scs(my_i_atom)%dalpha(my_ncatoms))
     end do
     alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
-    do i_atom = 1, n_atoms
-        gradients_anl(i_atom, :) = dalpha_scs(i_atom)%dalpha
-        deallocate (dalpha_scs(i_atom)%dalpha)
+    do my_i_atom = 1, my_nratoms
+        gradients_anl(my_i_atom, :) = dalpha_scs(my_i_atom)%dalpha
+        deallocate (dalpha_scs(my_i_atom)%dalpha)
     end do
-    do i_atom = 1, n_atoms
+    do j_atom = 1, n_atoms
+        my_j_atom = findval(sys%blacs%j_atom, j_atom)
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step*delta
             alpha_scs(:, i_step) = run_scs(sys, alpha_0_diff, damp, dalpha_scs)
         end do
-        do j_atom = 1, n_atoms
-            gradients(j_atom, i_atom) = diff7(alpha_scs(j_atom, :), delta)
-        end do
+        if (my_j_atom > 0) then
+            do my_i_atom = 1, my_nratoms
+                i_atom = sys%blacs%i_atom(my_i_atom)
+                gradients(my_i_atom, my_j_atom) = diff7(alpha_scs(i_atom, :), delta)
+            end do
+    end if
     end do
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
@@ -384,44 +400,50 @@ subroutine test_scs_deriv_impl_vdw
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_scs(:, :), rvdw(:)
-    integer :: i_atom, n_atoms, i_xyz, i_step, j_atom
+    integer :: i_atom, n_atoms, i_step, j_atom, my_i_atom, my_nratoms, &
+        my_ncatoms, my_j_atom
     type(mbd_gradients), allocatable :: dalpha_scs(:)
 
     delta = 0.1d0
     n_atoms = 3
     allocate (coords(3, n_atoms), source=0d0)
-    allocate (gradients(n_atoms, n_atoms), gradients_anl(n_atoms, n_atoms))
-    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(n_atoms))
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     sys%coords = coords
     call sys%init(calc)
+    my_nratoms = size(sys%blacs%i_atom)
+    my_ncatoms = size(sys%blacs%j_atom)
+    allocate (gradients(my_nratoms, my_ncatoms))
+    allocate (gradients_anl(my_nratoms, my_ncatoms))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
     damp%version = 'fermi,dip,gg'
     rvdw = [3.55d0, 3.5d0, 3.56d0]
     damp%r_vdw = rvdw
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    do i_atom = 1, n_atoms
-        allocate (dalpha_scs(i_atom)%dr_vdw(n_atoms))
+    do my_i_atom = 1, my_nratoms
+        allocate (dalpha_scs(my_i_atom)%dr_vdw(my_ncatoms))
     end do
     alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
-    do i_atom = 1, n_atoms
-        gradients_anl(i_atom, :) = dalpha_scs(i_atom)%dr_vdw
-        deallocate (dalpha_scs(i_atom)%dr_vdw)
+    do my_i_atom = 1, my_nratoms
+        gradients_anl(my_i_atom, :) = dalpha_scs(my_i_atom)%dr_vdw
+        deallocate (dalpha_scs(my_i_atom)%dr_vdw)
     end do
-    do i_atom = 1, n_atoms
-        do i_xyz = 1, 3
-            do i_step = -3, 3
-                if (i_step == 0) cycle
-                damp%r_vdw = rvdw
-                damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-                alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
-            end do
-            do j_atom = 1, n_atoms
-                gradients(j_atom, i_atom) = diff7(alpha_scs(j_atom, :), delta)
-            end do
+    do j_atom = 1, n_atoms
+        my_j_atom = findval(sys%blacs%j_atom, j_atom)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            damp%r_vdw = rvdw
+            damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step*delta
+            alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
         end do
+        if (my_j_atom > 0) then
+            do my_i_atom = 1, my_nratoms
+                i_atom = sys%blacs%i_atom(my_i_atom)
+                gradients(my_i_atom, my_j_atom) = diff7(alpha_scs(i_atom, :), delta)
+            end do
+        end if
     end do
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then

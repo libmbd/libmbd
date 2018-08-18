@@ -37,11 +37,11 @@ integer :: NUMROC
 
 contains
 
-#ifdef WITH_SCALAPACK
 
 subroutine mbd_blacs_grid_init(this)
     class(mbd_blacs_grid), intent(inout) :: this
 
+#ifdef WITH_SCALAPACK
     integer :: my_task, n_tasks, nprows
 
     call BLACS_PINFO(my_task, n_tasks)
@@ -55,12 +55,20 @@ subroutine mbd_blacs_grid_init(this)
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &
     )
+#else
+    this%nprows = 1
+    this%npcols = 1
+    this%my_prow = 1
+    this%my_pcol = 1
+#endif
 end subroutine
 
 subroutine mbd_blacs_grid_destroy(this)
     class(mbd_blacs_grid), intent(inout) :: this
 
+#ifdef WITH_SCALAPACK
     call BLACS_GRIDEXIT(this%ctx)
+#endif
 end subroutine
 
 subroutine mbd_blacs_init(this, n_atoms, grid)
@@ -68,6 +76,7 @@ subroutine mbd_blacs_init(this, n_atoms, grid)
     type(mbd_blacs_grid), intent(in) :: grid
     integer, intent(in) :: n_atoms
 
+#ifdef WITH_SCALAPACK
     integer :: blocksize, my_nratoms, my_ncatoms, ierr
 
     this%ctx = grid%ctx
@@ -85,6 +94,14 @@ subroutine mbd_blacs_init(this, n_atoms, grid)
     this%j_atom = get_idx_map( &
         grid%my_pcol, grid%npcols, n_atoms, blocksize/3, my_ncatoms &
     )
+#else
+    integer :: i
+
+    this%grid = grid
+    this%i_atom = [(i, i = 1, n_atoms)]
+    this%j_atom = this%i_atom
+    this%n_atoms = n_atoms
+#endif
 end subroutine
 
 function get_idx_map(my_task, n_tasks, n, blocksize, nidx) result(idx_map)
@@ -108,35 +125,5 @@ function get_idx_map(my_task, n_tasks, n, blocksize, nidx) result(idx_map)
         end if
     end do
 end function
-
-#else
-
-subroutine mbd_blacs_grid_init(this)
-    class(mbd_blacs_grid), intent(out) :: this
-
-    this%nprows = 1
-    this%npcols = 1
-    this%my_prow = 1
-    this%my_pcol = 1
-end subroutine
-
-subroutine mbd_blacs_grid_destroy(this)
-    class(mbd_blacs_grid), intent(inout) :: this
-end subroutine
-
-subroutine mbd_blacs_init(this, n_atoms, grid)
-    class(mbd_blacs), intent(out) :: this
-    integer, intent(in) :: n_atoms
-    type(mbd_blacs_grid), intent(in) :: grid
-
-    integer :: i
-
-    this%grid = grid
-    this%i_atom = [(i, i = 1, n_atoms)]
-    this%j_atom = this%i_atom
-    this%n_atoms = n_atoms
-end subroutine
-
-#endif
 
 end module

@@ -6,7 +6,7 @@ module mbd_api
 use mbd, only: mbd_system, mbd_calc, mbd_damping, &
     mbd_scs_energy, ts_energy, set_damping_parameters, init_grid, &
     mbd_result, mbd_gradients, scale_TS
-use mbd_common, only: dp
+use mbd_common, only: dp, printer
 use mbd_vdw_param, only: default_vdw_params, species_index
 use mbd_defaults
 
@@ -68,6 +68,7 @@ contains
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
     procedure :: get_exception => mbd_calc_get_exception
+    procedure :: print_info => mbd_calc_print_info
 end type
 
 contains
@@ -212,6 +213,14 @@ subroutine mbd_calc_get_exception(this, code, origin, msg)
     this%calc%exc%code = 0
     this%calc%exc%origin = ''
     this%calc%exc%msg = ''
+end subroutine
+
+
+subroutine mbd_calc_print_info(this, info)
+    class(mbd_calculation), intent(inout) :: this
+    procedure(printer) :: info
+
+    call this%calc%info%print(info)
 end subroutine
 
 

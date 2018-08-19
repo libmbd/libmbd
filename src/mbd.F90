@@ -1658,6 +1658,20 @@ logical function gradients_has_grad(this)
         allocated(this%dr_vdw) .or. allocated(this%domega)
 end function
 
+subroutine info_print(this, info)
+    class(mbd_info), intent(in) :: this
+    procedure(printer) :: info
+
+    if (this%freq_n /= '') call info(this%freq_n)
+    if (this%freq_error /= '') call info(this%freq_error)
+    if (this%ewald_alpha /= '') call info(this%ewald_alpha)
+    if (this%ewald_rsum /= '') call info(this%ewald_rsum)
+    if (this%ewald_cutoff /= '') call info(this%ewald_cutoff)
+    if (this%ewald_recsum /= '') call info(this%ewald_recsum)
+    if (this%ts_conv /= '') call info(this%ts_conv)
+    if (this%neg_eigvals /= '') call info(this%neg_eigvals)
+end subroutine
+
 integer function calc_rank(this)
     class(mbd_calc), intent(in) :: this
 

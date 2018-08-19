@@ -7,7 +7,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, mbd_exc, diff7, &
-    findval
+    findval, printer
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
@@ -27,6 +27,12 @@ type :: mbd_exc
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''
 end type
+
+abstract interface
+    subroutine printer(msg)
+        character(len=*), intent(in) :: msg
+    end subroutine
+end interface
 
 contains
 

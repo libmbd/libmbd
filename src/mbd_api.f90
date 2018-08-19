@@ -37,8 +37,6 @@ type :: mbd_input
     real(dp) :: mbd_a = MBD_DAMPING_A
     real(dp) :: mbd_beta
 
-    ! lattice vectors as column vectors, unallocated when not periodic
-    real(dp), allocatable :: lattice_vectors(:, :)
     integer :: k_grid(3)  ! number of k-points along reciprocal axes
     ! is there vacuum along some axes in a periodic calculation
     logical :: vacuum_axis(3) = [.false., .false., .false.]
@@ -112,8 +110,6 @@ subroutine mbd_calc_update_coords(this, coords)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
 
-    if (.not. allocated(this%sys%coords)) &
-        allocate (this%sys%coords(3, size(coords, 2)))
     this%sys%coords = coords
     call this%sys%init(this%calc)
 end subroutine
@@ -124,6 +120,8 @@ subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%sys%lattice = latt_vecs
+    this%sys%periodic = .true.
+    call this%sys%init(this%calc)
 end subroutine
 
 
@@ -135,7 +133,7 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
 
     this%alpha_0 = alpha_0
     this%C6 = C6
-    this%damp%r_vdw= r_vdw
+    this%damp%r_vdw = r_vdw
 end subroutine
 
 

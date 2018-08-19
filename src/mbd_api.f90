@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_api
 
-use mbd, only: mbd_system, mbd_calc_inner => mbd_calc, mbd_damping, &
+use mbd, only: mbd_system, mbd_calc, mbd_damping, &
     mbd_scs_energy, ts_energy, set_damping_parameters, init_grid, &
     mbd_result, mbd_gradients, scale_TS
 use mbd_common, only: dp
@@ -13,7 +13,7 @@ use mbd_defaults
 implicit none
 
 private
-public :: mbd_input, mbd_calc  ! types
+public :: mbd_input, mbd_calculation  ! types
 public :: mbd_get_damping_parameters, mbd_get_free_vdw_params  ! subroutines
 
 type :: mbd_input
@@ -45,14 +45,14 @@ type :: mbd_input
     real(dp), allocatable :: free_values(:, :)
 end type
 
-type mbd_calc
+type mbd_calculation
     private
     type(mbd_system) :: sys
     type(mbd_damping) :: damp
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
     character(len=30) :: dispersion_type
-    type(mbd_calc_inner) :: calc
+    type(mbd_calc) :: calc
     type(mbd_result) :: results
     type(mbd_gradients) :: denergy
     logical :: do_gradients
@@ -75,7 +75,7 @@ contains
 
 
 subroutine mbd_calc_init(this, input)
-    class(mbd_calc), target, intent(out) :: this
+    class(mbd_calculation), target, intent(out) :: this
     type(mbd_input), intent(in) :: input
 
     this%calc%comm = input%comm
@@ -102,14 +102,14 @@ end subroutine
 
 
 subroutine mbd_calc_destroy(this)
-    class(mbd_calc), target, intent(out) :: this
+    class(mbd_calculation), target, intent(out) :: this
 
     call this%calc%blacs_grid%destroy()
 end subroutine
 
 
 subroutine mbd_calc_update_coords(this, coords)
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
 
     if (.not. allocated(this%sys%coords)) &
@@ -120,7 +120,7 @@ end subroutine
 
 
 subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%sys%lattice = latt_vecs
@@ -128,7 +128,7 @@ end subroutine
 
 
 subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: r_vdw(:)
@@ -140,7 +140,7 @@ end subroutine
 
 
 subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: ratios(:)
 
     real(dp), allocatable :: ones(:)
@@ -154,7 +154,7 @@ end subroutine
 
 
 subroutine mbd_calc_get_energy(this, energy)
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calculation), intent(inout) :: this
     real(dp), intent(out) :: energy
 
     select case (this%dispersion_type)
@@ -172,7 +172,7 @@ end subroutine
 
 
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
-    class(mbd_calc), intent(in) :: this
+    class(mbd_calculation), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
 
     gradients = transpose(this%denergy%dcoords)
@@ -180,7 +180,7 @@ end subroutine
 
 
 subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)  ! 3 by 3  (dE/d{abc}_i)
-    class(mbd_calc), intent(in) :: this
+    class(mbd_calculation), intent(in) :: this
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
@@ -188,7 +188,7 @@ end subroutine
 
 
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calculation), intent(inout) :: this
     real(dp), intent(out) :: spectrum(:)
     real(dp), intent(out), optional :: modes(:, :)
     ! TODO document that this can be called only once

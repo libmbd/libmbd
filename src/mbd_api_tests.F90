@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_api_tests
 
-use mbd_api, only: mbd_input, mbd_calc, mbd_get_damping_parameters, &
+use mbd_api, only: mbd_input, mbd_calculation, mbd_get_damping_parameters, &
     mbd_get_free_vdw_params
 
 implicit none
@@ -17,7 +17,7 @@ integer, parameter :: dp = kind(0d0)
 real(dp), parameter :: ang = 1.8897259886d0
 
 type(mbd_input) :: inp
-type(mbd_calc) :: calc
+type(mbd_calculation) :: calc
 real(dp) :: energy
 real(dp), allocatable :: gradients(:, :)
 logical :: failed

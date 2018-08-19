@@ -108,11 +108,10 @@ end subroutine
 
 elemental pure function lower(str)
     character(len=*), intent(in) :: str
-    character(len=2) :: lower
+    character(len=len(str)) :: lower
 
     integer :: i
 
-    lower = '  '
     do i = 1, len(str)
         select case (str(i:i))
             case ('A':'Z')

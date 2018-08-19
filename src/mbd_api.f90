@@ -41,6 +41,7 @@ type :: mbd_input
     ! is there vacuum along some axes in a periodic calculation
     logical :: vacuum_axis(3) = [.false., .false., .false.]
     real(dp), allocatable :: free_values(:, :)
+    logical :: zero_negative_eigvals = .false.
 end type
 
 type mbd_calculation
@@ -89,6 +90,7 @@ subroutine mbd_calc_init(this, input)
     ! TODO ... = input%ts_f_acc
     this%calc%param%n_frequency_grid = input%n_omega_grid
     this%calc%param%k_grid_shift = input%k_grid_shift
+    this%calc%param%zero_negative_eigs = input%zero_negative_eigvals
     this%damp%beta = input%mbd_beta
     this%damp%a = input%mbd_a
     this%damp%ts_d = input%ts_d

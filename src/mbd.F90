@@ -6,7 +6,7 @@
 #endif
 module mbd
 
-use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval
+use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval, lower
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
@@ -1338,7 +1338,7 @@ subroutine set_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
     mbd_ts_fermi_beta = 1d0
     mbd_rsscs_a = 6d0
     mbd_rsscs_beta = 1d0
-    select case (xc)
+    select case (lower(xc))
         case ("pbe")
             ts_s_r = 0.94d0
             mbd_scs_a = 2.56d0

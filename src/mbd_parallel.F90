@@ -29,6 +29,7 @@ type :: mbd_blacs
     integer :: ctx
 contains
     procedure :: init => mbd_blacs_init
+    procedure :: parallel => mbd_blacs_parallel
 end type
 
 interface all_reduce
@@ -110,6 +111,13 @@ subroutine mbd_blacs_init(this, n_atoms, grid)
     this%n_atoms = n_atoms
 #endif
 end subroutine
+
+logical function mbd_blacs_parallel(this)
+    class(mbd_blacs), intent(in) :: this
+
+    mbd_blacs_parallel = this%n_atoms /= size(this%i_atom) .or. &
+            this%n_atoms /= size(this%j_atom)
+end function
 
 function get_idx_map(my_task, n_tasks, n, blocksize, nidx) result(idx_map)
     integer, intent(in) :: my_task, n_tasks, n, blocksize, nidx

@@ -3,7 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_linalg
 
-use mbd_common, only: tostr, dp, exception => mbd_exc, MBD_EXC_LINALG
+use mbd_common, only: tostr, dp, exception => mbd_exc, MBD_EXC_LINALG, &
+    MBD_EXC_UNIMPL
 use mbd_types, only: mat3n3n
 use mbd_parallel, only: mbd_blacs
 
@@ -324,7 +325,17 @@ subroutine eigh_mat3n3n_(A, eigs, exc, src, vals_only)
         call peigh_re_(A%re, A%blacs, eigs, exc, src%re, vals_only)
 #endif
     else
+#ifndef WITH_SCALAPACK
         call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
+#else
+        if (A%blacs%parallel()) then
+            exc%code = MBD_EXC_UNIMPL
+            exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+            return
+        else
+            call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
+        end if
+#endif
     end if
 end subroutine
 
@@ -630,7 +641,17 @@ function eigvalsh_mat3n3n_(A, exc, destroy)
         eigvalsh_mat3n3n_ = peigvalsh_re_(A%re, A%blacs, exc, destroy)
 #endif
     else
-        eigvalsh_mat3n3n_ = eigvalsh(A%cplx, exc, destroy)
+#ifndef WITH_SCALAPACK
+        eigvalsh_mat3n3n_ = eigvalsh_cplx_(A%cplx, exc, destroy)
+#else
+        if (A%blacs%parallel()) then
+            exc%code = MBD_EXC_UNIMPL
+            exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+            return
+        else
+            eigvalsh_mat3n3n_ = eigvalsh_cplx_(A%cplx, exc, destroy)
+        end if
+#endif
     end if
 end function
 
@@ -640,10 +661,15 @@ function eigvals_mat3n3n_(A, exc, destroy)
     logical, intent(in), optional :: destroy
     complex(dp) :: eigvals_mat3n3n_(3*A%blacs%n_atoms)
 
+    if (A%blacs%parallel()) then
+        exc%code = MBD_EXC_UNIMPL
+        exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+        return
+    end if
     if (allocated(A%re)) then
-        eigvals_mat3n3n_ = eigvals(A%re, exc, destroy)
+        eigvals_mat3n3n_ = eigvals_re_(A%re, exc, destroy)
     else
-        eigvals_mat3n3n_ = eigvals(A%cplx, exc, destroy)
+        eigvals_mat3n3n_ = eigvals_cplx_(A%cplx, exc, destroy)
     end if
 end function
 

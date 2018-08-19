@@ -7,7 +7,7 @@
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
-    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, printer
+    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, printer
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
@@ -405,6 +405,11 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
         if (any(sys%vacuum_axis)) then
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
+            if (grad) then
+                sys%calc%exc%code = MBD_EXC_UNIMPL
+                sys%calc%exc%msg = 'Forces not implemented for periodic systems'
+                return
+            end if
             do_ewald = .true.
             volume = max(abs(dble(product(eigvals(sys%lattice)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1d0/3)
@@ -754,6 +759,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     if (allocated(dalpha_scs(1)%dalpha)) allocate (dsigma_dalpha(n_atoms))
     damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha)
     T = dipole_matrix(sys, damp_local, dalpha_scs(1)%has_grad())
+    if (sys%has_exc()) return
     if (dalpha_scs(1)%has_grad()) then
         call alpha_full%copy_from(T)
     else
@@ -882,6 +888,7 @@ type(mbd_result) function get_single_mbd_energy( &
     n_atoms = sys%siz()
     grad = dene%has_grad()
     T = dipole_matrix(sys, damp, grad, k_point)
+    if (sys%has_exc()) return
     if (grad) then
         call relay%copy_from(T)
     else

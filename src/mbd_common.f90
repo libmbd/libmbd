@@ -20,7 +20,8 @@ end interface
 integer, parameter, public :: &
     MBD_EXC_NEG_EIGVALS = 1, &
     MBD_EXC_NEG_POL = 2, &
-    MBD_EXC_LINALG = 3
+    MBD_EXC_LINALG = 3, &
+    MBD_EXC_UNIMPL = 4
 
 type :: mbd_exc
     integer :: code = 0

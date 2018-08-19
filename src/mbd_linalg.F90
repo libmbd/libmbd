@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_linalg
 
-use mbd_common, only: tostr, dp, exception
+use mbd_common, only: tostr, dp, exception => mbd_exc, MBD_EXC_LINALG
 use mbd_types, only: mat3n3n
 use mbd_parallel, only: mbd_blacs
 
@@ -140,7 +140,7 @@ subroutine inv_re_(A, exc, src)
     call DGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DGETRF'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -152,7 +152,7 @@ subroutine inv_re_(A, exc, src)
     call DGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DGETRI'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -176,7 +176,7 @@ subroutine inv_cplx_(A, exc, src)
     call ZGETRF(n, n, A, n, i_pivot, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'ZGETRF'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -188,7 +188,7 @@ subroutine inv_cplx_(A, exc, src)
     call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'ZGETRI'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -216,7 +216,7 @@ subroutine invh_re_(A, exc, src)
     call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DSYTRF'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -227,7 +227,7 @@ subroutine invh_re_(A, exc, src)
     call DSYTRI('U', n, A, n, i_pivot, work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DSYTRI'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -256,7 +256,7 @@ subroutine pinvh_re_(A, blacs, exc, src)
     ! call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'PDGETRF'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -273,7 +273,7 @@ subroutine pinvh_re_(A, blacs, exc, src)
         work_arr, n_work_arr, iwork_arr, n_iwork_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'PDSYTRI'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -346,7 +346,7 @@ subroutine eigh_re_(A, eigs, exc, src, vals_only)
     call DSYEV(mode(vals_only), 'U', n, A, n, eigs, work_arr, size(work_arr), error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DSYEV'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -385,7 +385,7 @@ subroutine peigh_re_(A, blacs, eigs, exc, src, vals_only)
     )
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'PDSYEV'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -425,7 +425,7 @@ subroutine eig_re_(A, eigs, exc, src, vals_only)
     )
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DGEEV'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -500,7 +500,7 @@ subroutine eigh_cplx_(A, eigs, exc, src, vals_only)
     call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, work, lwork, rwork, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'ZHEEV'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -539,7 +539,7 @@ subroutine eig_cplx_(A, eigs, exc, src, vals_only)
     )
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'ZGEEV'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if
@@ -675,7 +675,7 @@ function solve(A, b, exc) result(x)
     call DGESV(n, 1, A_, n, i_pivot, x, n, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
-            exc%label = 'linalg'
+            exc%code = MBD_EXC_LINALG
             exc%origin = 'DGESV'
             exc%msg = 'Failed with code ' // trim(tostr(error_flag))
         end if

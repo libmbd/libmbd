@@ -67,6 +67,7 @@ contains
     procedure :: get_gradients => mbd_calc_get_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
+    procedure :: get_exception => mbd_calc_get_exception
 end type
 
 contains
@@ -195,6 +196,22 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     if (present(modes)) then
         modes = this%results%modes
     end if
+end subroutine
+
+
+subroutine mbd_calc_get_exception(this, code, origin, msg)
+    class(mbd_calculation), intent(inout) :: this
+    integer, intent(out) :: code
+    character(50), intent(out) :: origin
+    character(150), intent(out) :: msg
+
+    code = this%calc%exc%code
+    if (code == 0) return
+    origin = this%calc%exc%origin
+    msg = this%calc%exc%msg
+    this%calc%exc%code = 0
+    this%calc%exc%origin = ''
+    this%calc%exc%msg = ''
 end subroutine
 
 

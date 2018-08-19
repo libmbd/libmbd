@@ -6,7 +6,7 @@ module mbd_common
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, exception, diff7, &
+public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, mbd_exc, diff7, &
     findval
 
 integer, parameter :: dp = kind(0.d0)
@@ -17,8 +17,13 @@ interface tostr
     module procedure tostr_dble_
 end interface
 
-type :: exception
-    character(30) :: label = ''
+integer, parameter, public :: &
+    MBD_EXC_NEG_EIGVALS = 1, &
+    MBD_EXC_NEG_POL = 2, &
+    MBD_EXC_LINALG = 3
+
+type :: mbd_exc
+    integer :: code = 0
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''
 end type

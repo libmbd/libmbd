@@ -6,7 +6,8 @@
 #endif
 module mbd
 
-use mbd_common, only: tostr, print_matrix, dp, pi, exception, findval, lower
+use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
+    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, printer
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
@@ -51,7 +52,9 @@ end type mbd_timing
 type :: mbd_info
     character(len=120) :: ewald_alpha = '', ewald_rsum = '', ts_conv = '', &
         ewald_cutoff = '', ewald_recsum = '', freq_n = '', freq_error = '', &
-        neg_eig = ''
+        neg_eigvals = ''
+    contains
+    procedure :: print => info_print
 end type mbd_info
 
 type :: mbd_calc
@@ -64,7 +67,7 @@ type :: mbd_calc
 #else
     integer :: comm = -1
 #endif
-    type(exception) :: exc
+    type(mbd_exc) :: exc
     type(mbd_info) :: info
     type(mbd_blacs_grid) :: blacs_grid
     contains
@@ -126,7 +129,7 @@ type :: mbd_system
     type(mbd_blacs) :: blacs
     contains
     procedure :: siz => system_siz
-    procedure :: has_exc => mbd_system_has_exc
+    procedure :: has_exc => system_has_exc
     procedure :: init => system_init
 end type mbd_system
 
@@ -169,8 +172,8 @@ type(mbd_result) function mbd_scs_energy( &
         alpha_dyn_scs(:, i_freq) = run_scs( &
             sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq) &
         )
+        if (sys%has_exc()) return
     end do
-    if (sys%has_exc()) return
     C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs)
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
@@ -178,6 +181,7 @@ type(mbd_result) function mbd_scs_energy( &
     )
     damp_mbd%version = damping_types(2)
     res = mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd)
+    if (sys%has_exc()) return
     if (.not. dene%has_grad()) return
     freq_w = sys%calc%omega_grid_w
     freq_w(0) = 1d0
@@ -761,6 +765,11 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     if (sys%has_exc()) return
     call ts(sys%calc, -32)
     alpha_scs = alpha_full%contract_n33diag_cols()
+    if (any(alpha_scs < 0)) then
+        sys%calc%exc%code = MBD_EXC_NEG_POL
+        sys%calc%exc%msg = 'Screening leads to negative polarizability'
+        return
+    end if
     if (.not. dalpha_scs(1)%has_grad()) return
     allocate (alpha_prime(3, 3*n_atoms), B_prime(3*n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
@@ -868,6 +877,7 @@ type(mbd_result) function get_single_mbd_energy( &
     type(mbd_gradients) :: domega
     integer :: i_xyz, n_negative_eigs, n_atoms
     logical :: grad
+    character(120) :: msg
 
     n_atoms = sys%siz()
     grad = dene%has_grad()
@@ -901,9 +911,15 @@ type(mbd_result) function get_single_mbd_energy( &
     if (sys%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        sys%calc%info%neg_eig = "CDM Hamiltonian has " // &
-            trim(tostr(n_negative_eigs)) //  " negative eigenvalues"
-        if (sys%calc%param%zero_negative_eigs) where (eigs < 0) eigs = 0d0
+        msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
+            " negative eigenvalues"
+        if (sys%calc%param%zero_negative_eigs) then
+            where (eigs < 0) eigs = 0d0
+            sys%calc%info%neg_eigvals = msg
+        else
+            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            sys%calc%exc%msg = msg
+        end if
     end if
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
     if (.not. grad) return
@@ -988,6 +1004,7 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
             if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
             if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
         end if
+        if (sys%has_exc()) return
         res%energy = res%energy + res_k%energy
     end do ! k_point loop
     res%energy = res%energy/size(res%k_pts, 2)
@@ -1036,8 +1053,10 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            sys%calc%info%neg_eig = "1+AT matrix has " // &
+            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            sys%calc%exc%msg = "1+AT matrix has " // &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
+            return
         end if
         res%energy = res%energy + &
             1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
@@ -1104,8 +1123,10 @@ type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, dam
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            sys%calc%info%neg_eig = "1+AT matrix has " // &
+            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            sys%calc%exc%msg = "1+AT matrix has " // &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
+            return
         end if
         res%energy = res%energy + &
             1d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_freq)
@@ -1547,10 +1568,10 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
 end function make_g_grid
 
 
-logical function mbd_system_has_exc(sys)
+logical function system_has_exc(sys)
     class(mbd_system), intent(in) :: sys
 
-    mbd_system_has_exc = sys%calc%exc%label /= ''
+    system_has_exc = sys%calc%exc%code /= 0
 end function
 
 

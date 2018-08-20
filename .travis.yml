@@ -20,15 +20,12 @@ matrix:
     addons: *mpi
   - env: PYTHON=python WITH_PIP=1
     addons: *nompi
-  - &osx_fail
-    os: osx
+  - os: osx
     env:
-    - PYTHON=python MPI_NODES=1
+    - PYTHON=python MPI_NODES=2
   - os: osx
     env:
     - PYTHON=python3 WITH_PIP=1
-  allow_failures:
-  - *osx_fail
 before_install:
 - |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then

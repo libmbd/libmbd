@@ -1,4 +1,4 @@
-``libmbd`` — Many-body dispersion library
+Libmbd — many-body dispersion library
 =========================================
 
 This project contains implementations of the `many-body dispersion <http://dx.doi.org/10.1063/1.4865104>`_ (MBD) method in several programming languages and frameworks:
@@ -7,7 +7,7 @@ This project contains implementations of the `many-body dispersion <http://dx.do
 - The Python/Numpy implementation is intended for prototyping, and as a high-level language reference.
 - The Python/Tensorflow implemntation is an experiment that should enable rapid prototyping of machine learning applications with MBD.
 
-Since all implementations provide Python bindings, the project is structured as a Python package, however, the implementations in languages other than Python can be used as standalone libraries in their respective languages.
+Since all implementations provide Python bindings, the project is structured as a Python package called Pymbd, however, the implementations in languages other than Python can be used as standalone libraries in their respective languages.
 
 .. toctree::
 

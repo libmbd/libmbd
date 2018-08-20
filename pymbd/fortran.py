@@ -13,6 +13,13 @@ if with_scalapack:
     from mpi4py import MPI  # noqa
 
 
+class MBDFortranException(Exception):
+    def __init__(self, code, origin, msg):
+        super(MBDFortranException, self).__init__(msg)
+        self.code = code
+        self.origin = origin
+
+
 class MBDCalc(object):
     def __init__(self, n_freq=15):
         self._calc_obj = None
@@ -25,6 +32,16 @@ class MBDCalc(object):
     def __exit__(self, exc_type, exc_value, traceback):
         _lib.cmbd_destroy_calc(self._calc)
         self._calc_obj = None
+
+    def _check_exc(self):
+        code = _array(0, dtype=int)
+        origin = _ffi.new('char[50]')
+        msg = _ffi.new('char[150]')
+        _lib.cmbd_get_exception(self._calc, _cast('int*', code), origin, msg)
+        if code != 0:
+            raise MBDFortranException(
+                int(code), _ffi.string(origin).decode(), _ffi.string(msg).decode()
+            )
 
     @property
     def _calc(self):
@@ -64,6 +81,7 @@ class MBDCalc(object):
         )
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_system(system)
+        self._check_exc()
         return ene
 
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
@@ -102,6 +120,7 @@ class MBDCalc(object):
         ene = getattr(_lib, 'cmbd_' + func)(*args)
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_system(system)
+        self._check_exc()
         if spectrum:
             ene = ene, eigs, modes
         if force:
@@ -138,6 +157,7 @@ class MBDCalc(object):
         )
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_system(system)
+        self._check_exc()
         return dipmat
 
     def mbd_energy_species(self, coords, species, vols, beta, **kwargs):
@@ -157,7 +177,7 @@ class MBDCalc(object):
             _ffi.NULL,
             _ffi.NULL,
         )
-        return _lib.cmbd_dipole_energy(
+        res = _lib.cmbd_dipole_energy(
             system,
             n_atoms,
             _cast('double*', a0),
@@ -169,6 +189,8 @@ class MBDCalc(object):
             a,
             _cast('double*', C),
         )
+        self._check_exc()
+        return res
 
     def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, a, C):
         n_atoms = len(coords)
@@ -179,7 +201,7 @@ class MBDCalc(object):
             _ffi.NULL,
             _ffi.NULL,
         )
-        return _lib.cmbd_coulomb_energy(
+        res = _lib.cmbd_coulomb_energy(
             system,
             n_atoms,
             _cast('double*', q),
@@ -191,6 +213,8 @@ class MBDCalc(object):
             a,
             _cast('double*', C),
         )
+        self._check_exc()
+        return res
 
 
 def _ndarray(ptr, shape=None, dtype='float'):

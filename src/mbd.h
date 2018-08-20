@@ -11,6 +11,13 @@ struct cmbd_calc {
 struct cmbd_calc* cmbd_init_calc(int n_freq);
 void cmbd_destroy_calc(struct cmbd_calc* calc);
 
+void cmbd_get_exception(
+    struct cmbd_calc* calc,
+    int* code,
+    char origin[50],
+    char msg[150]
+);
+
 struct cmbd_system* cmbd_init_system(
     struct cmbd_calc* calc,
     int n_atoms,

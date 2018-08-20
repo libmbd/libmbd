@@ -64,6 +64,22 @@ subroutine cmbd_destroy_calc(calc_cp) bind(c)
     deallocate (calc_c)
 end subroutine cmbd_destroy_calc
 
+subroutine cmbd_get_exception(calc_cp, code, origin, msg) bind(c)
+    type(c_ptr), value :: calc_cp
+    integer(c_int), intent(out) :: code
+    character(kind=c_char), intent(out) :: origin(50), msg(150)
+
+    type(mbd_calc), pointer :: calc
+
+    calc => get_mbd_calc(calc_cp)
+    code = calc%exc%code
+    call f_c_string(calc%exc%origin, origin)
+    call f_c_string(calc%exc%msg, msg)
+    calc%exc%code = 0
+    calc%exc%origin = ''
+    calc%exc%msg = ''
+end subroutine
+
 type(c_ptr) function cmbd_init_system( &
         calc_cp, n_atoms, coords, lattice, k_grid) bind(c)
     type(c_ptr), value :: calc_cp
@@ -337,6 +353,7 @@ function f_string(str_c) result(str_f)
     character(len=:), allocatable :: str_f
 
     integer :: i
+
     i = 0
     do
         if (str_c(i+1) == c_null_char) exit
@@ -345,5 +362,17 @@ function f_string(str_c) result(str_f)
     allocate (character(len=i) :: str_f)
     str_f = transfer(str_c(1:i), str_f)
 end function f_string
+
+subroutine f_c_string(str_f, str_c)
+    character(len=*), intent(in) :: str_f
+    character(kind=c_char), intent(out) :: str_c(:)
+
+    integer :: i
+
+    do i = 1, min(len(trim(str_f)), size(str_c)-1)
+        str_c(i) = str_f(i:i)
+    end do
+    str_c(i) = c_null_char
+end subroutine
 
 end module mbd_c_api

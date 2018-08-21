@@ -124,7 +124,6 @@ subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%sys%lattice = latt_vecs
-    this%sys%periodic = .true.
     call this%sys%init(this%calc)
 end subroutine
 

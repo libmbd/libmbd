@@ -96,10 +96,7 @@ type(c_ptr) function cmbd_init_system( &
     allocate (sys)
     sys%coords = coords
     call sys%init(calc)
-    if (present(lattice)) then
-        sys%periodic = .true.
-        sys%lattice = lattice
-    end if
+    if (present(lattice)) sys%lattice = lattice
     if (present(k_grid)) sys%k_grid = k_grid
     allocate (sys_c)
     sys_c%mbd_system_f = c_loc(sys)

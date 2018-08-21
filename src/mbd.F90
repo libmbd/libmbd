@@ -117,9 +117,8 @@ end type
 type :: mbd_system
     type(mbd_calc), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
-    logical :: periodic = .false.
     logical :: vacuum_axis(3) = [.false., .false., .false.]
-    real(dp) :: lattice(3, 3)  ! vectors in columns
+    real(dp), allocatable :: lattice(:, :)  ! vectors in columns
     integer :: k_grid(3)
     integer :: supercell(3)
     logical :: do_rpa = .false.
@@ -295,15 +294,15 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
     type(scalar) :: f_damp
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(dp), parameter :: shell_thickness = 10d0
-    logical :: is_crystal
+    logical :: is_periodic
 
-    is_crystal = sys%periodic
+    is_periodic = allocated(sys%lattice)
     ene = 0d0
     i_shell = 0
     do
         i_shell = i_shell+1
         ene_shell = 0d0
-        if (is_crystal) then
+        if (is_periodic) then
             range_cell = supercell_circum(sys, sys%lattice, i_shell*shell_thickness)
         else
             range_cell = [0, 0, 0]
@@ -311,7 +310,7 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
         idx_cell = [0, 0, -1]
         do i_cell = 1, product(1+2*range_cell)
             call shift_cell(idx_cell, -range_cell, range_cell)
-            if (is_crystal) then
+            if (is_periodic) then
                 R_cell = matmul(sys%lattice, idx_cell)
             else
                 R_cell = [0d0, 0d0, 0d0]
@@ -324,7 +323,7 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
                     r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm > sys%calc%param%ts_cutoff_radius) cycle
-                    if (is_crystal) then
+                    if (is_periodic) then
                         if (r_norm >= i_shell*shell_thickness &
                             .or. r_norm < (i_shell-1)*shell_thickness) then
                             cycle
@@ -359,7 +358,7 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
             end do ! i_atom
         end do ! i_cell
         ene = ene+ene_shell
-        if (.not. is_crystal) exit
+        if (.not. is_periodic) exit
         if (i_shell > 1 .and. &
                 abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
             sys%calc%info%ts_conv = "Periodic TS converged in " // &
@@ -383,9 +382,10 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
     complex(dp) :: Tpp_c(3, 3)
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
         n_atoms, my_i_atom, my_j_atom, my_nratoms, my_ncatoms
-    logical :: do_ewald
+    logical :: do_ewald, is_periodic
 
     do_ewald = .false.
+    is_periodic = allocated(sys%lattice)
     n_atoms = sys%siz()
     call dipmat%init(sys%blacs)
     my_nratoms = size(dipmat%blacs%i_atom)
@@ -401,7 +401,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
         end if
     end if
     ! MPI code end
-    if (sys%periodic) then
+    if (is_periodic) then
         if (any(sys%vacuum_axis)) then
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
@@ -425,7 +425,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
     else
         range_cell(:) = 0
     end if
-    if (sys%periodic) then
+    if (is_periodic) then
         sys%calc%info%ewald_rsum = &
             'Ewald: summing real part in cell vector range of ' // &
             trim(tostr(1+2*range_cell(1))) // 'x' // &
@@ -436,7 +436,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
     idx_cell = [0, 0, -1]
     do i_cell = 1, product(1+2*range_cell)
         call shift_cell(idx_cell, -range_cell, range_cell)
-        if (sys%periodic) then
+        if (is_periodic) then
             R_cell = matmul(sys%lattice, idx_cell)
         else
             R_cell(:) = 0d0
@@ -450,7 +450,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
                 end if
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
                 r_norm = sqrt(sum(r**2))
-                if (sys%periodic .and. r_norm > real_space_cutoff) cycle
+                if (is_periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
                     R_vdw_ij = sum(damp%R_vdw([i_atom, j_atom]))
                 end if
@@ -842,15 +842,12 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
     type(mbd_damping), intent(in) :: damp
     type(mbd_gradients), intent(inout) :: dene
 
-    logical :: do_rpa, is_crystal
     real(dp), allocatable :: alpha(:, :)
     type(mbd_gradients), allocatable :: dalpha(:)
     integer :: n_freq, n_atoms, i_freq
 
-    is_crystal = sys%periodic
-    do_rpa = sys%do_rpa
-    if (.not. is_crystal) then
-        if (.not. do_rpa) then
+    if (.not. allocated(sys%lattice)) then
+        if (.not. sys%do_rpa) then
             res = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
         else
             n_freq = ubound(sys%calc%omega_grid, 1)

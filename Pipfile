@@ -9,7 +9,7 @@ cffi = "*"
 [dev-packages]
 pytest = "*"
 ipykernel = "*"
-"e1839a8" = {editable = true, path = ".", extras = ["mpi"]}
+pymbd = {editable = true, path = ".", extras = ["mpi"]}
 sphinx = "*"
 breathe = "*"
 

@@ -1,9 +1,6 @@
 #!/bin/bash
 set -ev
-$PYTHON -m pip install --user cffi numpy pytest
-if [[ "$MPI_NODES" ]]; then
-    $PYTHON -m pip install --user mpi4py
-fi
+$PYTHON -m pip install --user cffi numpy pytest mpi4py
 if [[ "$WITH_PIP" ]]; then
     $PYTHON -m pip install --user .
 else
@@ -11,13 +8,12 @@ else
     if [[ "$CODECOV" ]]; then
         CMAKE_FLAGS+=(-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage")
     fi
-    if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-        SCALAPACKLIB=-lscalapack
-    else
-        SCALAPACKLIB="-lscalapack-openmpi -lblacs-openmpi"
-    fi
     if [[ "$MPI_NODES" ]]; then
-        CMAKE_FLAGS+=(-DSCALAPACK="$SCALAPACKLIB")
+        if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+            CMAKE_FLAGS+=(-DENABLE_SCALAPACK=ON)
+        else
+            CMAKE_FLAGS+=(-DSCALAPACK_LIBRARIES="-lscalapack-openmpi -lblacs-openmpi")
+        fi
     fi
     mkdir build
     pushd build

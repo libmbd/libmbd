@@ -13,31 +13,48 @@ This project contains implementations of the [many-body dispersion](http://dx.do
 - The Python/Numpy implementation is intended for prototyping, and as a high-level language reference.
 - The Python/Tensorflow implemntation is an experiment that should enable rapid prototyping of machine learning applications with MBD.
 
-Since all implementations provide Python bindings, the project is structured as a Python package called Pymbd, however, the implementations in languages other than Python can be used as standalone libraries in their respective languages.
+The Python-based implementations as well as Python bindings to the Libmbd C API are accessible from the Python package called Pymbd.
 
-## Installing Pymbd
+## Installing Libmbd
 
-There are two basic ways how to install Pymbd. The Pip installation is easier and intended for basic usage. The Cmake installation is best for development, and supports distributed parallelism with Scalapack.
-
-Both approaches require a Fortran compiler, Lapack, cFFI, and Numpy.  The parallel version also requires MPI and Scalapack. All these need to be installed before installing Pymbd.
+Libmbd uses CMake for building and installation, and requires a Fortran compiler, Lapack, and optionally MPI and ScaLAPACK.
 
 On Ubuntu:
 
 ```bash
 apt-get install gfortran libblas-dev liblapack-dev [mpi-default-dev mpi-default-bin libscalapack-mpi-dev]
-pip install cffi numpy
 ```
 
 On macOS:
 
 ```bash
 brew install gcc [open-mpi scalapack]
-pip install cffi numpy
 ```
 
-### Using Pip
+The building and installation can then proceed with
 
 ```
+git clone https://github.com/azag0/libmbd.git && cd libmbd
+mkdir build && cd build
+cmake .. [-DENABLE_SCALAPACK=ON]
+make
+make install
+```
+
+This installs the Libmbd shared library, C API header file, and high-level Fortran API module file.
+
+Tests can be run with
+
+```
+make check
+```
+
+## Installing Pymbd
+
+Pymbd links against Libmbd, which can be either installed on the system, or built on the fly by Pip/Setuptools. The linking requires the cFFI Python package installed prior to installing Libmbd. If the installed Libmbd is built with MPI/ScaLAPACK, Mpi4py package is required. For the Pip/Setuptools build, Fortran compiler must be available on the system (MPI/ScaLAPACK is not supported by the Setuptools build), and Numpy must be installed prior to installing Pymbd.
+
+```
+pip install cffi [numpy] [mpi4py]
 pip install git+https://github.com/azag0/libmbd.git
 ```
 
@@ -45,26 +62,6 @@ If you have Pytest installed, you can run tests with
 
 ```
 pytest --pyargs pymbd -v --durations=3
-```
-
-### Using Cmake
-
-This is the recommended way for developing or if installing via Pip runs into problems.
-
-```
-git clone https://github.com/azag0/libmbd.git && cd libmbd
-mkdir build && pushd build && cmake .. [-DSCALAPACK=<Scalapack linking>] && make && popd
-python setup.py build_ext -i
-pip install -e .[MPI,tensorflow]
-```
-
-If one wants to build the serial version even though MPI is present on the system, the Cmake flag `-DMPI_Fortran_COMPILER=xxxxx` disables the Scalapack compilation.
-
-Tests can be run with
-
-```
-make -C build check
-pytest -v --durations=3
 ```
 
 ## Example
@@ -81,4 +78,20 @@ with MBDCalc() as calc:
         [(0, 0, 0), (0, 0, 4*ang)], ['Ar', 'Ar'], [1, 1], 0.83
     )
 assert abs(ene_f-ene_py) < 1e-15
+```
+
+## Developing
+
+For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in `./build`
+
+```
+git clone https://github.com/azag0/libmbd.git && cd libmbd
+mkdir build && cd build
+cmake .. -DENABLE_SCALAPACK=ON
+make
+make check
+cd ..
+pip install cffi mpi4py
+python setup.py build_ext -i
+pytest -v --durations=3
 ```

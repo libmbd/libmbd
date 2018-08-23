@@ -7,16 +7,6 @@ from setuptools import setup
 
 blddir = os.environ.get('MBDBLDDIR', 'build')
 library_dirs = [blddir] if os.path.exists(blddir) else []
-sources = [
-    'src/mbd_common.f90',
-    'src/mbd_defaults.f90',
-    'src/mbd_parallel.F90',
-    'src/mbd_types.F90',
-    'src/mbd_linalg.F90',
-    'src/mbd.F90',
-    'src/mbd_coulomb.f90',
-    'src/mbd_c_api.F90',
-]
 
 
 def libmbd_exists():
@@ -55,27 +45,39 @@ def update_dict(dct, update):
 
 
 if libmbd_exists():
-    kwargs = {'libraries': ['mbd']}
-    if sys.platform == 'darwin':
-        kwargs['extra_link_args'] = ['-rpath', os.path.realpath(blddir)]
-    else:
-        kwargs['runtime_library_dirs'] = [os.path.realpath(blddir)]
+    ext_args = {'libraries': ['mbd']}
+    if library_dirs:
+        if sys.platform == 'darwin':
+            ext_args['extra_link_args'] = ['-rpath', os.path.realpath(blddir)]
+        else:
+            ext_args['runtime_library_dirs'] = [os.path.realpath(blddir)]
 else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info
-    kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
-    update_dict(kwargs, get_info('lapack_opt', 2))
+    sources = [
+        'src/mbd_common.f90',
+        'src/mbd_defaults.f90',
+        'src/mbd_parallel.F90',
+        'src/mbd_types.F90',
+        'src/mbd_linalg.F90',
+        'src/mbd.F90',
+        'src/mbd_coulomb.f90',
+        'src/mbd_c_api.F90',
+    ]
+    ext_args = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
+    update_dict(ext_args, get_info('lapack_opt', 2))
 
 
-update_dict(kwargs, {
-    'include_dirs': ['src'],
-    'library_dirs': library_dirs
-})
+if library_dirs:
+    update_dict(ext_args, {
+        'include_dirs': ['src'],
+        'library_dirs': library_dirs
+    })
 ffibuilder = cffi.FFI()
 ffibuilder.set_source(
     'pymbd._libmbd',
     '#include "mbd.h"',
-    **kwargs
+    **ext_args
 )
 with open('src/mbd.h') as f:
     ffibuilder.cdef(f.read())

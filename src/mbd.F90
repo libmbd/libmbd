@@ -18,7 +18,7 @@ implicit none
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
     sigma_selfint, scale_TS, set_damping_parameters, &
-    clock_rate, mbd_gradients, damping_fermi
+    mbd_gradients, damping_fermi, test_frequency_grid
 #endif
 
 type :: mbd_damping
@@ -62,7 +62,6 @@ type :: mbd_gradients
 end type
 
 contains
-
 
 type(mbd_result) function mbd_scs_energy( &
         sys, variant, alpha_0, C6, damp, dene) result(res)
@@ -211,7 +210,6 @@ type(mbd_result) function mbd_scs_energy( &
     end subroutine
 end function mbd_scs_energy
 
-
 type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
@@ -274,7 +272,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
             trim(tostr(1+2*range_cell(2))) // 'x' // &
             trim(tostr(1+2*range_cell(3)))
     end if
-    call ts(sys%calc, 11)
+    call sys%clock(11)
     idx_cell = [0, 0, -1]
     do i_cell = 1, product(1+2*range_cell)
         call shift_cell(idx_cell, -range_cell, range_cell)
@@ -374,12 +372,11 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
             end do ! j_atom
         end do ! i_atom
     end do ! i_cell
-    call ts(sys%calc, -11)
+    call sys%clock(-11)
     if (do_ewald) then
         call add_ewald_dipole_parts(sys, ewald_alpha, dipmat, k_point)
     end if
 end function dipole_matrix
-
 
 subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     type(mbd_system), intent(inout) :: sys
@@ -406,7 +403,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         trim(tostr(1+2*range_G_vector(1))) // 'x' // &
         trim(tostr(1+2*range_G_vector(2))) // 'x' // &
         trim(tostr(1+2*range_G_vector(3)))
-    call ts(sys%calc, 12)
+    call sys%clock(12)
     idx_G_vector = [0, 0, -1]
     do i_G_vector = 1, product(1+2*range_G_vector)
         call shift_cell(idx_G_vector, -range_G_vector, range_G_vector)
@@ -488,9 +485,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end do ! j_atom
         end do ! i_atom
     end if
-    call ts(sys%calc, -12)
+    call sys%clock(-12)
 end subroutine
-
 
 subroutine test_frequency_grid(calc)
     type(mbd_calc), intent(inout) :: calc
@@ -506,7 +502,6 @@ subroutine test_frequency_grid(calc)
         "Relative quadrature error in C6 of carbon atom: " // &
         trim(tostr(error))
 end subroutine
-
 
 function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
@@ -533,10 +528,10 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         call alpha_full%move_from(T)
     end if
     call alpha_full%add_diag(1d0/alpha)
-    call ts(sys%calc, 32)
+    call sys%clock(32)
     call invh(alpha_full, sys%calc%exc)
     if (sys%has_exc()) return
-    call ts(sys%calc, -32)
+    call sys%clock(-32)
     alpha_scs = alpha_full%contract_n33diag_cols()
     if (any(alpha_scs < 0)) then
         sys%calc%exc%code = MBD_EXC_NEG_POL
@@ -601,7 +596,6 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     end if
 end function run_scs
 
-
 type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
@@ -632,7 +626,6 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
     end if
 end function mbd_energy
 
-
 type(mbd_result) function get_single_mbd_energy( &
         sys, alpha_0, C6, damp, dene, k_point) result(res)
     type(mbd_system), intent(inout) :: sys
@@ -662,7 +655,7 @@ type(mbd_result) function get_single_mbd_energy( &
     omega = omega_eff(C6, alpha_0, domega)
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
-    call ts(sys%calc, 21)
+    call sys%clock(21)
     if (sys%get_modes .or. grad) then
         call modes%alloc_from(relay)
         allocate (eigs(3*n_atoms))
@@ -678,7 +671,7 @@ type(mbd_result) function get_single_mbd_energy( &
         eigs = eigvalsh(relay, sys%calc%exc, destroy=.true.)
     end if
     if (sys%has_exc()) return
-    call ts(sys%calc, -21)
+    call sys%clock(-21)
     if (sys%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
@@ -729,7 +722,6 @@ type(mbd_result) function get_single_mbd_energy( &
         dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
     end if
 end function get_single_mbd_energy
-
 
 type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(res)
     type(mbd_system), intent(inout) :: sys
@@ -782,7 +774,6 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     if (sys%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
 end function get_reciprocal_mbd_energy
 
-
 type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha(:, 0:)
@@ -813,9 +804,9 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
         if (sys%get_rpa_orders) AT = relay
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1d0)
-        call ts(sys%calc, 23)
+        call sys%clock(23)
         eigs = eigvals(relay, sys%calc%exc, destroy=.true.)
-        call ts(sys%calc, -23)
+        call sys%clock(-23)
         if (sys%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
@@ -832,9 +823,9 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
         res%energy = res%energy + &
             1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
         if (sys%get_rpa_orders) then
-            call ts(sys%calc, 24)
+            call sys%clock(24)
             eigs = eigvals(AT, sys%calc%exc, destroy=.true.)
-            call ts(sys%calc, -24)
+            call sys%clock(-24)
             if (sys%has_exc()) return
             allocate (res%rpa_orders(sys%calc%param%rpa_order_max))
             do n_order = 2, sys%calc%param%rpa_order_max
@@ -846,7 +837,6 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
         end if
     end do
 end function get_single_rpa_energy
-
 
 type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) &
         result(res)
@@ -883,10 +873,10 @@ type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, dam
         do i = 1, 3*sys%siz()
             relay%cplx(i, i) = 1d0+relay%cplx(i, i) ! relay = 1+alpha*T
         end do
-        call ts(sys%calc, 25)
+        call sys%clock(25)
         eigs = eigvals(relay%cplx, sys%calc%exc, destroy=.true.)
         if (sys%has_exc()) return
-        call ts(sys%calc, -25)
+        call sys%clock(-25)
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
         n_negative_eigs = 0
@@ -902,10 +892,10 @@ type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, dam
         res%energy = res%energy + &
             1d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_freq)
         if (sys%get_rpa_orders) then
-            call ts(sys%calc, 26)
+            call sys%clock(26)
             eigs = eigvals(AT%cplx, sys%calc%exc, destroy=.true.)
             if (sys%has_exc()) return
-            call ts(sys%calc, -26)
+            call sys%clock(-26)
             do n_order = 2, sys%calc%param%rpa_order_max
                 res%rpa_orders(n_order) = res%rpa_orders(n_order) + &
                     (-1d0)/(2*pi)*(-1)**n_order * &
@@ -915,7 +905,6 @@ type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, dam
         end if
     end do
 end function get_single_reciprocal_rpa_ene
-
 
 function T_bare(rxyz) result(T)
     real(dp), intent(in) :: rxyz(3)
@@ -935,7 +924,6 @@ function T_bare(rxyz) result(T)
     end do
     T = -T
 end function
-
 
 type(mat33) function T_bare_v2(r, deriv) result(T)
     real(dp), intent(in) :: r(3)
@@ -979,20 +967,17 @@ type(mat33) function T_bare_v2(r, deriv) result(T)
     end if
 end function
 
-
 real(dp) function B_erfc(r, a) result(B)
     real(dp), intent(in) :: r, a
 
     B = (erfc(a*r)+(2*a*r/sqrt(pi))*exp(-(a*r)**2))/r**3
 end function
 
-
 real(dp) elemental function C_erfc(r, a) result(C)
     real(dp), intent(in) :: r, a
 
     C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
 end function
-
 
 function T_erfc(rxyz, alpha) result(T)
     real(dp), intent(in) :: rxyz(3), alpha
@@ -1013,7 +998,6 @@ function T_erfc(rxyz, alpha) result(T)
     end do
 end function
 
-
 type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
@@ -1032,7 +1016,6 @@ type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
     end if
 end function
 
-
 type(scalar) function damping_sqrtfermi(r, s_vdw, d, deriv) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
@@ -1043,7 +1026,6 @@ type(scalar) function damping_sqrtfermi(r, s_vdw, d, deriv) result(f)
     f%val = sqrt(f%val)
 end function
 
-
 type(scalar) function op1minus(f)
     type(scalar), intent(in) :: f
 
@@ -1051,7 +1033,6 @@ type(scalar) function op1minus(f)
     if (allocated(f%dr)) op1minus%dr = -f%dr
     if (allocated(f%dvdw)) op1minus%dvdw = -f%dvdw
 end function
-
 
 type(mat33) function T_damped(f, T) result(fT)
     type(scalar), intent(in) :: f
@@ -1070,7 +1051,6 @@ type(mat33) function T_damped(f, T) result(fT)
     if (allocated(T%dvdw)) fT%dvdw = fT%dvdw + f%val*T%dvdw
     if (allocated(T%dsigma)) fT%dsigma = f%val*T%dsigma
 end function
-
 
 type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     real(dp), intent(in) :: r(3)
@@ -1101,7 +1081,6 @@ type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     end if
 end function
 
-
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     real(dp), intent(in) :: rxyz(3), sigma, a
     real(dp) :: T(3, 3)
@@ -1113,7 +1092,6 @@ function T_1mexp_coulomb(rxyz, sigma, a) result(T)
     zeta_2 = -r_sigma*a*exp(-r_sigma)*(1+a*(-1+r_sigma))
     T = zeta_1*T_bare(rxyz)-zeta_2*outer(rxyz, rxyz)/sqrt(sum(rxyz**2))**5
 end function
-
 
 subroutine set_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
         mbd_ts_erf_beta, mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta)
@@ -1160,14 +1138,12 @@ subroutine set_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
     endselect
 end subroutine set_damping_parameters
 
-
 elemental function terf(r, r0, a)
     real(dp), intent(in) :: r, r0, a
     real(dp) :: terf
 
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function
-
 
 function alpha_dynamic_ts(calc, alpha_0, C6, dalpha) result(alpha)
     type(mbd_calc), intent(in) :: calc
@@ -1202,7 +1178,6 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha) result(alpha)
     end do
 end function
 
-
 ! equation 14
 function alpha_osc(alpha_0, omega, u, dalpha) result(alpha)
     real(dp), intent(in) :: alpha_0(:)
@@ -1216,7 +1191,6 @@ function alpha_osc(alpha_0, omega, u, dalpha) result(alpha)
     if (allocated(dalpha%domega)) dalpha%domega = &
         alpha*2d0/omega/(1d0+(omega/u)**2)
 end function
-
 
 ! equation 13
 function scale_TS(X_free, V, V_free, q, dX) result(X)
@@ -1233,7 +1207,6 @@ end function
 
 
 
-
 ! equation 12
 function omega_eff(C6, alpha, domega) result(omega)
     real(dp), intent(in) :: C6(:)
@@ -1246,7 +1219,6 @@ function omega_eff(C6, alpha, domega) result(omega)
     if (allocated(domega%dalpha)) domega%dalpha = -2*omega/alpha
 end function
 
-
 function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
     real(dp), intent(in) :: alpha(:)
     real(dp), intent(inout), allocatable :: dsigma_dalpha(:)
@@ -1255,7 +1227,6 @@ function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
     sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
     if (allocated(dsigma_dalpha)) dsigma_dalpha = sigma/(3*alpha)
 end function
-
 
 function get_C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
     type(mbd_calc), intent(in) :: calc
@@ -1277,7 +1248,6 @@ function get_C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
     end do
 end function
 
-
 function make_g_grid(calc, n1, n2, n3) result(g_grid)
     type(mbd_calc), intent(in) :: calc
     integer, intent(in) :: n1, n2, n3
@@ -1298,7 +1268,6 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
     end do
 end function make_g_grid
 
-
 function make_k_grid(g_grid, uc) result(k_grid)
     real(dp), intent(in) :: g_grid(:, :), uc(3, 3)
     real(dp) :: k_grid(3, size(g_grid, 2))
@@ -1312,34 +1281,6 @@ function make_k_grid(g_grid, uc) result(k_grid)
     end do
 end function make_k_grid
 
-
-subroutine ts(calc, id, always)
-    type(mbd_calc), intent(inout) :: calc
-    integer, intent(in) :: id
-    logical, intent(in), optional :: always
-
-    if (calc%tm%measure_time .or. present(always)) then
-        call system_clock(calc%tm%ts_cnt, calc%tm%ts_rate, calc%tm%ts_cnt_max)
-        if (id > 0) then
-            calc%tm%timestamps(id) = calc%tm%timestamps(id)-calc%tm%ts_cnt
-        else
-            calc%tm%ts_aid = abs(id)
-            calc%tm%timestamps(calc%tm%ts_aid) = &
-                calc%tm%timestamps(calc%tm%ts_aid)+calc%tm%ts_cnt
-            calc%tm%ts_counts(calc%tm%ts_aid) = &
-                calc%tm%ts_counts(calc%tm%ts_aid)+1
-        end if
-    end if
-end subroutine ts
-
-
-function clock_rate() result(rate)
-    integer :: cnt, rate, cnt_max
-
-    call system_clock(cnt, rate, cnt_max)
-end function clock_rate
-
-
 subroutine gradients_copy_alloc(this, other)
     class(mbd_gradients), intent(in) :: this
     type(mbd_gradients), intent(out) :: other
@@ -1352,7 +1293,6 @@ subroutine gradients_copy_alloc(this, other)
     if (allocated(this%dr_vdw)) allocate (other%dr_vdw(size(this%dr_vdw)))
     if (allocated(this%domega)) allocate (other%domega(size(this%domega)))
 end subroutine
-
 
 logical function gradients_has_grad(this)
     class(mbd_gradients), intent(in) :: this

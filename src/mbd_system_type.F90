@@ -18,7 +18,7 @@ implicit none
 
 #ifndef MODULE_UNIT_TESTS
 private
-public :: mbd_system, mbd_calc, ang
+public :: mbd_system, mbd_calc, ang, clock_rate
 #endif
 real(dp), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
@@ -93,6 +93,7 @@ type :: mbd_system
     procedure :: siz => mbd_system_siz
     procedure :: has_exc => mbd_system_has_exc
     procedure :: supercell_circum => mbd_system_supercell_circum
+    procedure :: clock => mbd_system_clock
 end type mbd_system
 
 contains
@@ -135,6 +136,27 @@ function mbd_system_supercell_circum(this, uc, radius) result(sc)
     sc = ceiling(radius/layer_sep+0.5d0)
     where (this%vacuum_axis) sc = 0
 end function
+
+subroutine mbd_system_clock(this, id, always)
+    class(mbd_system), intent(inout) :: this
+    integer, intent(in) :: id
+    logical, intent(in), optional :: always
+
+    associate (tm => this%calc%tm)
+        if (tm%measure_time .or. present(always)) then
+            call system_clock(tm%ts_cnt, tm%ts_rate, tm%ts_cnt_max)
+            if (id > 0) then
+                tm%timestamps(id) = tm%timestamps(id)-tm%ts_cnt
+            else
+                tm%ts_aid = abs(id)
+                tm%timestamps(tm%ts_aid) = &
+                    tm%timestamps(tm%ts_aid)+tm%ts_cnt
+                tm%ts_counts(tm%ts_aid) = &
+                    tm%ts_counts(tm%ts_aid)+1
+            end if
+        end if
+    end associate
+end subroutine
 
 subroutine mbd_info_print(this, info)
     class(mbd_info), intent(in) :: this
@@ -233,5 +255,11 @@ subroutine gauss_legendre(n, r, w)
         w(i) = dble(2/((1-x**2)*df**2))
     end do
 end subroutine
+
+function clock_rate() result(rate)
+    integer :: cnt, rate, cnt_max
+
+    call system_clock(cnt, rate, cnt_max)
+end function clock_rate
 
 end module

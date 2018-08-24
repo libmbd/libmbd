@@ -55,6 +55,7 @@ subroutine test()
     call calc%update_vdw_params_from_ratios([1d0, 1d0])
     call calc%get_energy(energy)
     call check('Ar2 energy 2', energy, -0.0002462647623815428d0, 1d-10)
+    call calc%destroy()
 end subroutine
 
 subroutine check(label, val, ref, rel)

@@ -63,6 +63,7 @@ type mbd_calculation
     real(dp), allocatable :: free_values(:, :)
 contains
     procedure :: init => mbd_calc_init
+    procedure :: destroy => mbd_calc_destroy
     procedure :: update_coords => mbd_calc_update_coords
     procedure :: update_lattice_vectors => mbd_calc_update_lattice_vectors
     procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
@@ -107,6 +108,13 @@ subroutine mbd_calc_init(this, input)
     call this%calc%init_grid()
     call this%sys%init(this%calc)
     this%free_values = input%free_values
+end subroutine
+
+
+subroutine mbd_calc_destroy(this)
+    class(mbd_calculation), target, intent(inout) :: this
+
+    call this%sys%destroy()
 end subroutine
 
 

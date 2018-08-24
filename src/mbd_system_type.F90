@@ -89,6 +89,7 @@ type :: mbd_system
 #endif
     contains
     procedure :: init => mbd_system_init
+    procedure :: destroy => mbd_system_destroy
     procedure :: siz => mbd_system_siz
     procedure :: has_exc => mbd_system_has_exc
     procedure :: supercell_circum => mbd_system_supercell_circum
@@ -106,6 +107,12 @@ subroutine mbd_system_init(this, calc)
     call this%blacs%init( &
         this%siz(), this%blacs_grid, this%parallel_mode == 'atoms' &
     )
+end subroutine
+
+subroutine mbd_system_destroy(this)
+    class(mbd_system), intent(inout) :: this
+
+    call this%blacs_grid%destroy()
 end subroutine
 
 integer function mbd_system_siz(this) result(siz)

@@ -265,6 +265,7 @@ subroutine test_mbd_deriv_expl()
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
@@ -328,6 +329,7 @@ subroutine test_scs_deriv_expl()
             end if
         end do
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('diff x', diff(:, :, 1))
@@ -387,6 +389,7 @@ subroutine test_scs_deriv_impl_alpha
             end do
     end if
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff)
@@ -444,6 +447,7 @@ subroutine test_scs_deriv_impl_vdw
             end do
         end if
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff(:, :))
@@ -486,6 +490,7 @@ subroutine test_mbd_deriv_impl_alpha()
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', reshape(diff, [n_atoms, 1]))
@@ -528,6 +533,7 @@ subroutine test_mbd_deriv_impl_C6()
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -570,6 +576,7 @@ subroutine test_mbd_deriv_impl_vdw()
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -617,6 +624,7 @@ subroutine test_mbd_rsscs_deriv_expl()
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
@@ -659,6 +667,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -701,6 +710,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 5d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -743,6 +753,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
+    call sys%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))

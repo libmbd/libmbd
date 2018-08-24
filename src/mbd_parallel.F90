@@ -18,7 +18,7 @@ type :: mbd_blacs_grid
     integer :: my_pcol
 contains
     procedure :: init => mbd_blacs_grid_init
-    final :: mbd_blacs_grid_destroy
+    procedure :: destroy => mbd_blacs_grid_destroy
 end type
 
 type :: mbd_blacs
@@ -72,8 +72,9 @@ subroutine mbd_blacs_grid_init(this, comm)
 #endif
 end subroutine
 
+! TODO this should be made a destructor once support for gfortran 4.9 is dropped
 subroutine mbd_blacs_grid_destroy(this)
-    type(mbd_blacs_grid) :: this
+    class(mbd_blacs_grid), intent(inout) :: this
 #ifdef WITH_SCALAPACK
 
     if (this%ctx /= -1) call BLACS_GRIDEXIT(this%ctx)

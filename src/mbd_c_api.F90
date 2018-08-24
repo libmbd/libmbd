@@ -116,6 +116,7 @@ subroutine cmbd_destroy_system(sys_cp) bind(c)
 
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
+    call sys%destroy()
     deallocate (sys)
     deallocate (sys_c)
 end subroutine cmbd_destroy_system

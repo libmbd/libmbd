@@ -4,7 +4,8 @@
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
-    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, printer
+    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, printer, &
+    shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc, ang
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
@@ -16,7 +17,7 @@ implicit none
 #ifndef MODULE_UNIT_TESTS
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
-    sigma_selfint, scale_TS, ts_energy, set_damping_parameters, &
+    sigma_selfint, scale_TS, set_damping_parameters, &
     clock_rate, mbd_gradients, damping_fermi
 #endif
 
@@ -211,93 +212,6 @@ type(mbd_result) function mbd_scs_energy( &
 end function mbd_scs_energy
 
 
-function ts_energy(sys, alpha_0, C6, damp) result(ene)
-    type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
-    real(dp) :: ene
-
-    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3)
-    type(scalar) :: f_damp
-    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
-    real(dp), parameter :: shell_thickness = 10d0
-    logical :: is_periodic
-
-    is_periodic = allocated(sys%lattice)
-    ene = 0d0
-    i_shell = 0
-    do
-        i_shell = i_shell+1
-        ene_shell = 0d0
-        if (is_periodic) then
-            range_cell = supercell_circum(sys, sys%lattice, i_shell*shell_thickness)
-        else
-            range_cell = [0, 0, 0]
-        end if
-        idx_cell = [0, 0, -1]
-        do i_cell = 1, product(1+2*range_cell)
-            call shift_cell(idx_cell, -range_cell, range_cell)
-            if (is_periodic) then
-                R_cell = matmul(sys%lattice, idx_cell)
-            else
-                R_cell = [0d0, 0d0, 0d0]
-            end if
-            do i_atom = 1, sys%siz()
-                do j_atom = 1, i_atom
-                    if (i_cell == 1) then
-                        if (i_atom == j_atom) cycle
-                    end if
-                    r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
-                    r_norm = sqrt(sum(r**2))
-                    if (r_norm > sys%calc%param%ts_cutoff_radius) cycle
-                    if (is_periodic) then
-                        if (r_norm >= i_shell*shell_thickness &
-                            .or. r_norm < (i_shell-1)*shell_thickness) then
-                            cycle
-                        end if
-                    end if
-                    C6_ij = combine_C6( &
-                        C6(i_atom), C6(j_atom), &
-                        alpha_0(i_atom), alpha_0(j_atom))
-                    if (allocated(damp%r_vdw)) then
-                        R_vdw_ij = damp%r_vdw(i_atom)+damp%r_vdw(j_atom)
-                    end if
-                    select case (damp%version)
-                        case ("fermi")
-                            f_damp = damping_fermi( &
-                                r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false. &
-                            )
-                        case ("fermi2")
-                            f_damp = damping_fermi( &
-                                r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false. &
-                            )
-                            f_damp%val = f_damp%val**2
-                        case ("custom")
-                            f_damp%val = damp%damping_custom(i_atom, j_atom)
-                    end select
-                    ene_pair = -C6_ij*f_damp%val/r_norm**6
-                    if (i_atom == j_atom) then
-                        ene_shell = ene_shell+ene_pair/2
-                    else
-                        ene_shell = ene_shell+ene_pair
-                    endif
-                end do ! j_atom
-            end do ! i_atom
-        end do ! i_cell
-        ene = ene+ene_shell
-        if (.not. is_periodic) exit
-        if (i_shell > 1 .and. &
-                abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
-            sys%calc%info%ts_conv = "Periodic TS converged in " // &
-                trim(tostr(i_shell)) // " shells, " // &
-                trim(tostr(i_shell*shell_thickness/ang)) // " angstroms"
-            exit
-        endif
-    end do ! i_shell
-end function ts_energy
-
-
 type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
@@ -349,7 +263,7 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
         else
             real_space_cutoff = sys%calc%param%dipole_cutoff
         end if
-        range_cell = supercell_circum(sys, sys%lattice, real_space_cutoff)
+        range_cell = sys%supercell_circum(sys%lattice, real_space_cutoff)
     else
         range_cell(:) = 0
     end if
@@ -484,7 +398,7 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
     rec_unit_cell = 2*pi*inverse(transpose(sys%lattice))
     volume = abs(dble(product(eigvals(sys%lattice))))
     rec_space_cutoff = 10d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
-    range_G_vector = supercell_circum(sys, rec_unit_cell, rec_space_cutoff)
+    range_G_vector = sys%supercell_circum(rec_unit_cell, rec_space_cutoff)
     sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
         trim(tostr(rec_space_cutoff))
     sys%calc%info%ewald_recsum = &
@@ -1318,12 +1232,6 @@ function scale_TS(X_free, V, V_free, q, dX) result(X)
 end function
 
 
-elemental function combine_C6(C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
-    real(dp), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
-    real(dp) :: C6_ij
-
-    C6_ij = 2*C6_i*C6_j/(alpha_0_j/alpha_0_i*C6_i+alpha_0_i/alpha_0_j*C6_j)
-end function
 
 
 ! equation 12
@@ -1368,40 +1276,6 @@ function get_C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
         dC6_dalpha(:, i_freq) = dC6_dalpha(:, i_freq) + 6d0/pi*alpha(:, i_freq)
     end do
 end function
-
-
-function supercell_circum(sys, uc, radius) result(sc)
-    type(mbd_system), intent(in) :: sys
-    real(dp), intent(in) :: uc(3, 3), radius
-    integer :: sc(3)
-
-    real(dp) :: ruc(3, 3), layer_sep(3)
-    integer :: i
-
-    ruc = 2*pi*inverse(transpose(uc))
-    forall (i = 1:3) &
-        layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
-    sc = ceiling(radius/layer_sep+0.5d0)
-    where (sys%vacuum_axis) sc = 0
-end function
-
-
-subroutine shift_cell(ijk, first_cell, last_cell)
-    integer, intent(inout) :: ijk(3)
-    integer, intent(in) :: first_cell(3), last_cell(3)
-
-    integer :: i_dim, i
-
-    do i_dim = 3, 1, -1
-        i = ijk(i_dim)+1
-        if (i <= last_cell(i_dim)) then
-            ijk(i_dim) = i
-            return
-        else
-            ijk(i_dim) = first_cell(i_dim)
-        end if
-    end do
-end subroutine
 
 
 function make_g_grid(calc, n1, n2, n3) result(g_grid)

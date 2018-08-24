@@ -8,6 +8,7 @@ module mbd_system_type
 
 use mbd_common, only: dp, pi, mbd_exc, printer, tostr
 use mbd_parallel, only: mbd_blacs, mbd_blacs_grid
+use mbd_linalg, only: inverse
 use mbd_defaults
 #ifdef WITH_MPI
 use mpi
@@ -91,6 +92,7 @@ type :: mbd_system
     procedure :: init => mbd_system_init
     procedure :: siz => mbd_system_siz
     procedure :: has_exc => mbd_system_has_exc
+    procedure :: supercell_circum => mbd_system_supercell_circum
 end type mbd_system
 
 contains
@@ -117,6 +119,21 @@ logical function mbd_system_has_exc(this) result(has_exc)
     class(mbd_system), intent(in) :: this
 
     has_exc = this%calc%exc%code /= 0
+end function
+
+function mbd_system_supercell_circum(this, uc, radius) result(sc)
+    class(mbd_system), intent(in) :: this
+    real(dp), intent(in) :: uc(3, 3), radius
+    integer :: sc(3)
+
+    real(dp) :: ruc(3, 3), layer_sep(3)
+    integer :: i
+
+    ruc = 2*pi*inverse(transpose(uc))
+    forall (i = 1:3) &
+        layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
+    sc = ceiling(radius/layer_sep+0.5d0)
+    where (this%vacuum_axis) sc = 0
 end function
 
 subroutine mbd_info_print(this, info)

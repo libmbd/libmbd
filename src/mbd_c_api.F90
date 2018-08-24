@@ -7,8 +7,9 @@ use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd, only: mbd_damping, mbd_energy, &
-    mbd_scs_energy, mbd_scs_energy, dipole_matrix, ts_energy, mbd_result, &
+    mbd_scs_energy, mbd_scs_energy, dipole_matrix, mbd_result, &
     mbd_gradients
+use mbd_ts, only: ts_energy
 use mbd_common, only: dp
 use mbd_types, only: mat3n3n
 use mbd_coulomb, only: dipole_energy, coulomb_energy

@@ -7,7 +7,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, mbd_exc, diff7, &
-    findval, printer
+    findval, printer, shift_cell
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
@@ -148,5 +148,22 @@ integer pure function findval(array, val)
         end if
     end do
 end function
+
+subroutine shift_cell(ijk, first_cell, last_cell)
+    integer, intent(inout) :: ijk(3)
+    integer, intent(in) :: first_cell(3), last_cell(3)
+
+    integer :: i_dim, i
+
+    do i_dim = 3, 1, -1
+        i = ijk(i_dim)+1
+        if (i <= last_cell(i_dim)) then
+            ijk(i_dim) = i
+            return
+        else
+            ijk(i_dim) = first_cell(i_dim)
+        end if
+    end do
+end subroutine
 
 end module

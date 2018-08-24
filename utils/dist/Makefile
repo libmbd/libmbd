@@ -2,11 +2,11 @@ SOURCES = mbd.f90 mbd_api.f90 mbd_common.f90 mbd_defaults.f90 mbd_linalg.f90 mbd
 
 VPATH = ../../src
 
-all: serial_dist scalapack_dist
+all: serial_dist scalapack_mpi_dist
 
 serial_dist: $(addprefix serial/,$(SOURCES))
 
-scalapack_dist: $(addprefix scalapack/,$(SOURCES))
+scalapack_mpi_dist: $(addprefix scalapack_mpi/,$(SOURCES))
 
 serial/%.f90: %.f90 | serial
 	cp $^ $@
@@ -14,14 +14,14 @@ serial/%.f90: %.f90 | serial
 serial/%.f90: %.F90 | serial
 	gfortran -E -P $^ -o $@
 
-scalapack/%.f90: %.f90 | scalapack
+scalapack_mpi/%.f90: %.f90 | scalapack_mpi
 	cp $^ $@
 
-scalapack/%.f90: %.F90 | scalapack
-	gfortran -E -P $^ -o $@ -DWITH_SCALAPACK
+scalapack_mpi/%.f90: %.F90 | scalapack_mpi
+	gfortran -E -P $^ -o $@ -DWITH_MPI -DWITH_SCALAPACK
 
-serial scalapack:
+serial scalapack_mpi:
 	mkdir $@
 
 clean:
-	rm -rf serial scalapack
+	rm -rf serial scalapack_mpi

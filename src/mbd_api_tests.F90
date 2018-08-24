@@ -6,12 +6,11 @@ program mbd_api_tests
 use mbd_api, only: mbd_input, mbd_calculation, mbd_get_damping_parameters, &
     mbd_get_free_vdw_params
 
-implicit none
-
-#ifdef WITH_SCALAPACK
-external :: MPI_INIT, MPI_FINALIZE
-integer :: err
+#ifdef WITH_MPI
+use mpi
 #endif
+
+implicit none
 
 integer, parameter :: dp = kind(0d0)
 real(dp), parameter :: ang = 1.8897259886d0
@@ -22,7 +21,9 @@ real(dp) :: energy
 real(dp), allocatable :: gradients(:, :)
 logical :: failed
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
+integer :: err
+
 call MPI_INIT(err)
 #endif
 
@@ -43,7 +44,7 @@ call calc%get_energy(energy)
 call check('Ar2 energy 2', energy, -0.0002462647623815428d0, 1d-10)
 call calc%destroy()
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
 call MPI_FINALIZE(err)
 #endif
 

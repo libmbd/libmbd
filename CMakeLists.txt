@@ -5,7 +5,7 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_fl
 
 project(libmbd LANGUAGES Fortran)
 
-option(ENABLE_SCALAPACK "Enable parallelisation with ScaLAPACK/MPI")
+option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
 option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)
 
 set(DEFAULT_BUILD_TYPE "Release")
@@ -26,7 +26,7 @@ if(NOT LAPACK_LIBRARIES)
     endif()
 endif()
 
-if(ENABLE_SCALAPACK)
+if(ENABLE_SCALAPACK_MPI)
     find_package(MPI)
     if(NOT MPI_Fortran_FOUND)
         message(SEND_ERROR "MPI not found, specify the MPI Fortran compiler with MPI_Fortran_COMPILER variable")

@@ -8,8 +8,10 @@ import numpy as np
 from .pymbd import _array, from_volumes
 from ._libmbd import ffi as _ffi, lib as _lib
 
+with_mpi = _lib.cmbd_with_mpi
 with_scalapack = _lib.cmbd_with_scalapack
-if with_scalapack:
+
+if with_mpi:
     from mpi4py import MPI  # noqa
 
 

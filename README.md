@@ -17,7 +17,7 @@ The Python-based implementations as well as Python bindings to the Libmbd C API 
 
 ## Installing Libmbd
 
-Libmbd uses CMake for building and installation, and requires a Fortran compiler, Lapack, and optionally MPI and ScaLAPACK.
+Libmbd uses CMake for building and installation, and requires a Fortran compiler, Lapack, and optionally ScaLAPACK/MPI.
 
 On Ubuntu:
 
@@ -36,7 +36,7 @@ The building and installation can then proceed with
 ```
 git clone https://github.com/azag0/libmbd.git && cd libmbd
 mkdir build && cd build
-cmake .. [-DENABLE_SCALAPACK=ON]
+cmake .. [-DENABLE_SCALAPACK_MPI=ON]
 make
 make install
 ```
@@ -51,7 +51,7 @@ make check
 
 ## Installing Pymbd
 
-Pymbd links against Libmbd, which can be either installed on the system, or built on the fly by Pip/Setuptools. The linking requires the cFFI Python package installed prior to installing Libmbd. If the installed Libmbd is built with MPI/ScaLAPACK, Mpi4py package is required. For the Pip/Setuptools build, Fortran compiler must be available on the system (MPI/ScaLAPACK is not supported by the Setuptools build), and Numpy must be installed prior to installing Pymbd.
+Pymbd links against Libmbd, which can be either installed on the system, or built on the fly by Pip/Setuptools. The linking requires the cFFI Python package installed prior to installing Libmbd. If the installed Libmbd is built with ScaLAPACK/MPI, Mpi4py package is required. For the Pip/Setuptools build, Fortran compiler must be available on the system (ScaLAPACK/MPI is not supported by the Setuptools build), and Numpy must be installed prior to installing Pymbd.
 
 ```
 pip install cffi [numpy] [mpi4py]
@@ -87,7 +87,7 @@ For development, Libmbd doesn't have to be installed on the system, and Pymbd ca
 ```
 git clone https://github.com/azag0/libmbd.git && cd libmbd
 mkdir build && cd build
-cmake .. -DENABLE_SCALAPACK=ON
+cmake .. -DENABLE_SCALAPACK_MPI=ON
 make
 make check
 cd ..

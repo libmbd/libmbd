@@ -1,5 +1,6 @@
 // vim: set ft=c:
 
+extern const _Bool cmbd_with_mpi;
 extern const _Bool cmbd_with_scalapack;
 
 struct cmbd_calc {

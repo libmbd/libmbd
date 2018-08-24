@@ -1,6 +1,6 @@
-from .fortran import with_scalapack
+from .fortran import with_mpi
 
-if with_scalapack:
+if with_mpi:
     from mpi4py import MPI
     from functools import wraps
     import py._io.terminalwriter

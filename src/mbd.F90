@@ -12,7 +12,7 @@ use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
 use mbd_defaults
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
 use mpi
 #endif
 
@@ -62,7 +62,7 @@ type :: mbd_calc
     type(mbd_timing) :: tm
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
     integer :: comm = MPI_COMM_WORLD
 #else
     integer :: comm = -1
@@ -1681,7 +1681,7 @@ integer function calc_rank(this)
 
     integer :: ierr
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
     call MPI_COMM_RANK(this%comm, calc_rank, ierr)
 #else
     calc_rank = 0

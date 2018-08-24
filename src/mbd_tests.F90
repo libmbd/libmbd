@@ -9,20 +9,18 @@ program mbd_tests
 use mbd
 use mbd_common, only: diff7, findval
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
 use mpi
 #endif
 
 implicit none
 
-#ifdef WITH_SCALAPACK
-integer :: err
-#endif
-
 integer :: n_failed, n_all
 type(mbd_calc), target :: calc
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
+integer :: err
+
 call MPI_INIT(err)
 #endif
 
@@ -50,7 +48,7 @@ if (calc%rank() == 0) write (6, *) &
     trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
 if (n_failed /= 0) stop 1
 
-#ifdef WITH_SCALAPACK
+#ifdef WITH_MPI
 call MPI_FINALIZE(err)
 #endif
 

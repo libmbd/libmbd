@@ -14,6 +14,11 @@ use mbd_coulomb, only: dipole_energy, coulomb_energy
 
 implicit none
 
+#ifdef WITH_MPI
+logical(c_bool), bind(c) :: cmbd_with_mpi = .true.
+#else
+logical(c_bool), bind(c) :: cmbd_with_mpi = .false.
+#endif
 #ifdef WITH_SCALAPACK
 logical(c_bool), bind(c) :: cmbd_with_scalapack = .true.
 #else

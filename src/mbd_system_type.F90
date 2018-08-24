@@ -58,7 +58,6 @@ type :: mbd_calc
     real(dp), allocatable :: omega_grid_w(:)
     type(mbd_exc) :: exc
     type(mbd_info) :: info
-    type(mbd_blacs_grid) :: blacs_grid
     contains
     procedure :: init_grid => mbd_calc_init_grid
 end type mbd_calc
@@ -82,6 +81,7 @@ type :: mbd_system
     !> eigenproblems for its k-points)
     character(len=10) :: parallel_mode = 'atoms'
     type(mbd_blacs) :: blacs
+    type(mbd_blacs_grid) :: blacs_grid
 #ifdef WITH_MPI
     integer :: comm = MPI_COMM_WORLD
 #else
@@ -102,7 +102,10 @@ subroutine mbd_system_init(this, calc)
     type(mbd_calc), target, intent(in) :: calc
 
     this%calc => calc
-    call this%blacs%init(this%siz(), calc%blacs_grid, this%parallel_mode == 'atoms')
+    call this%blacs_grid%init()
+    call this%blacs%init( &
+        this%siz(), this%blacs_grid, this%parallel_mode == 'atoms' &
+    )
 end subroutine
 
 integer function mbd_system_siz(this) result(siz)

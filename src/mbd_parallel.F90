@@ -11,14 +11,14 @@ private
 public :: mbd_blacs, mbd_blacs_grid, all_reduce
 
 type :: mbd_blacs_grid
-    integer :: ctx
+    integer :: ctx = -1
     integer :: nprows
     integer :: npcols
     integer :: my_prow
     integer :: my_pcol
 contains
     procedure :: init => mbd_blacs_grid_init
-    procedure :: destroy => mbd_blacs_grid_destroy
+    final :: mbd_blacs_grid_destroy
 end type
 
 type :: mbd_blacs
@@ -26,7 +26,7 @@ type :: mbd_blacs
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
     integer :: desc(9)
-    integer :: ctx
+    integer :: ctx = -1
 contains
     procedure :: init => mbd_blacs_init
     procedure :: parallel => mbd_blacs_parallel
@@ -64,7 +64,6 @@ subroutine mbd_blacs_grid_init(this)
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &
     )
 #else
-    this%ctx = -1
     this%nprows = 1
     this%npcols = 1
     this%my_prow = 1
@@ -73,10 +72,10 @@ subroutine mbd_blacs_grid_init(this)
 end subroutine
 
 subroutine mbd_blacs_grid_destroy(this)
-    class(mbd_blacs_grid), intent(inout) :: this
+    type(mbd_blacs_grid) :: this
 #ifdef WITH_SCALAPACK
 
-    call BLACS_GRIDEXIT(this%ctx)
+    if (this%ctx /= -1) call BLACS_GRIDEXIT(this%ctx)
 #endif
 end subroutine
 

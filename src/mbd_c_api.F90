@@ -49,7 +49,6 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     allocate (calc)
     calc%param%n_frequency_grid = n_freq
     call calc%init_grid()
-    call calc%blacs_grid%init()
     allocate (calc_c)
     calc_c%n_freq = ubound(calc%omega_grid, 1)
     calc_c%omega_grid = c_loc(calc%omega_grid)
@@ -66,7 +65,6 @@ subroutine cmbd_destroy_calc(calc_cp) bind(c)
 
     call c_f_pointer(calc_cp, calc_c)
     call c_f_pointer(calc_c%mbd_calc_f, calc)
-    call calc%blacs_grid%destroy()
     deallocate (calc)
     deallocate (calc_c)
 end subroutine cmbd_destroy_calc
@@ -224,16 +222,15 @@ real(c_double) function cmbd_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(mbd_system), pointer :: sys
-    type(mbd_system) :: sys2
     type(mbd_damping), pointer :: damping
     type(mbd_result) :: res
     type(mbd_gradients) :: dene
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    sys2 = sys
-    sys2%do_rpa = .true.
-    res = mbd_energy(sys2, alpha_0, C6, damping, dene)
+    sys%do_rpa = .true.
+    res = mbd_energy(sys, alpha_0, C6, damping, dene)
+    sys%do_rpa = .false.
     cmbd_rpa_energy = res%energy
 end function cmbd_rpa_energy
 

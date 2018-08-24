@@ -28,7 +28,6 @@ call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
 #endif
 
 call calc%init_grid()
-call calc%blacs_grid%init()
 n_failed = 0
 n_all = 0
 call exec_test('T_bare derivative')
@@ -46,7 +45,6 @@ call exec_test('MBD@rsscs derivative explicit')
 call exec_test('MBD@rsscs derivative implicit alpha')
 call exec_test('MBD@rsscs derivative implicit C6')
 call exec_test('MBD@rsscs derivative implicit Rvdw')
-call calc%blacs_grid%destroy()
 if (rank == 0) write (6, *) &
     trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
 if (n_failed /= 0) stop 1

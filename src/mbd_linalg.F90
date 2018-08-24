@@ -86,12 +86,12 @@ function mmul_re_(A, B, transA, transB) result(C)
     call DGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
 end function
 
-#ifdef WITH_SCALAPACK
 function pmmul_re_(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     real(dp), intent(in) :: A(:, :), B(:, :)
     type(mbd_blacs), intent(in) :: blacsA, blacsB, blacsC
     logical, intent(in), optional :: transA, transB
     real(dp) :: C(size(A, 1), size(B, 2))
+#ifdef WITH_SCALAPACK
 
     character :: transA_, transB_
     integer :: n
@@ -109,19 +109,19 @@ function pmmul_re_(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
         transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
         B, 1, 1, blacsB%desc, 0d0, C, 1, 1, blacsC%desc &
     )
-end function
 #endif
+end function
 
 type(mat3n3n) function mmul_mat3n3n_(A, B, transA, transB) result(C)
     type(mat3n3n), intent(in) :: A, B
     logical, intent(in), optional :: transA, transB
 
     C%blacs = A%blacs
-#ifndef WITH_SCALAPACK
-    C%re = mmul_re_(A%re, B%re, transA, transB)
-#else
-    C%re = pmmul_re_(A%re, A%blacs, B%re, B%blacs, transA, transB, C%blacs)
-#endif
+    if (.not. A%blacs%parallel()) then
+        C%re = mmul_re_(A%re, B%re, transA, transB)
+    else
+        C%re = pmmul_re_(A%re, A%blacs, B%re, B%blacs, transA, transB, C%blacs)
+    end if
 end function
 
 subroutine inv_re_(A, exc, src)
@@ -237,12 +237,12 @@ subroutine invh_re_(A, exc, src)
     call fill_tril(A)
 end subroutine
 
-#ifdef WITH_SCALAPACK
 subroutine pinvh_re_(A, blacs, exc, src)
     real(dp), intent(inout) :: A(:, :)
     type(mbd_blacs), intent(in) :: blacs
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
+#ifdef WITH_SCALAPACK
 
     integer, allocatable :: i_pivot(:), iwork_arr(:)
     real(dp), allocatable :: work_arr(:)
@@ -280,27 +280,27 @@ subroutine pinvh_re_(A, blacs, exc, src)
         end if
         return
     endif
-end subroutine
 #endif
+end subroutine
 
 subroutine invh_mat3n3n_(A, exc, src)
     type(mat3n3n), intent(inout) :: A
     type(exception), intent(out), optional :: exc
     type(mat3n3n), intent(in), optional :: src
 
-#ifndef WITH_SCALAPACK
-    if (present(src)) then
-        call invh_re_(A%re, exc, src%re)
+    if (.not. A%blacs%parallel()) then
+        if (present(src)) then
+            call invh_re_(A%re, exc, src%re)
+        else
+            call invh_re_(A%re, exc)
+        end if
     else
-        call invh_re_(A%re, exc)
+        if (present(src)) then
+            call pinvh_re_(A%re, A%blacs, exc, src%re)
+        else
+            call pinvh_re_(A%re, A%blacs, exc)
+        end if
     end if
-#else
-    if (present(src)) then
-        call pinvh_re_(A%re, A%blacs, exc, src%re)
-    else
-        call pinvh_re_(A%re, A%blacs, exc)
-    end if
-#endif
 end subroutine
 
 function inverse(A, exc)
@@ -319,23 +319,19 @@ subroutine eigh_mat3n3n_(A, eigs, exc, src, vals_only)
     logical, intent(in), optional :: vals_only
 
     if (allocated(A%re)) then
-#ifndef WITH_SCALAPACK
-        call eigh_re_(A%re, eigs, exc, src%re, vals_only)
-#else
-        call peigh_re_(A%re, A%blacs, eigs, exc, src%re, vals_only)
-#endif
+        if (.not. A%blacs%parallel()) then
+            call eigh_re_(A%re, eigs, exc, src%re, vals_only)
+        else
+            call peigh_re_(A%re, A%blacs, eigs, exc, src%re, vals_only)
+        end if
     else
-#ifndef WITH_SCALAPACK
-        call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
-#else
-        if (A%blacs%parallel()) then
+        if (.not. A%blacs%parallel()) then
+            call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
+        else
             exc%code = MBD_EXC_UNIMPL
             exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
             return
-        else
-            call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
         end if
-#endif
     end if
 end subroutine
 
@@ -365,7 +361,6 @@ subroutine eigh_re_(A, eigs, exc, src, vals_only)
     endif
 end subroutine
 
-#ifdef WITH_SCALAPACK
 subroutine peigh_re_(A, blacs, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     type(mbd_blacs), intent(in) :: blacs
@@ -373,6 +368,7 @@ subroutine peigh_re_(A, blacs, eigs, exc, src, vals_only)
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
+#ifdef WITH_SCALAPACK
 
     real(dp), allocatable :: work_arr(:), vectors(:, :)
     real(dp) :: n_work_arr
@@ -403,8 +399,8 @@ subroutine peigh_re_(A, blacs, eigs, exc, src, vals_only)
         return
     endif
     if (mode(vals_only) == 'V') A = vectors
-end subroutine
 #endif
+end subroutine
 
 subroutine eig_re_(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
@@ -581,13 +577,13 @@ function eigvalsh_re_(A, exc, destroy)
     call eigh_re_(A_p, eigvalsh_re_, exc, vals_only=.true.)
 end function
 
-#ifdef WITH_SCALAPACK
 function peigvalsh_re_(A, blacs, exc, destroy)
     real(dp), target, intent(in) :: A(:, :)
     type(mbd_blacs), intent(in) :: blacs
     type(exception), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: peigvalsh_re_(3*blacs%n_atoms)
+#ifdef WITH_SCALAPACK
 
     real(dp), allocatable, target :: A_work(:, :)
     real(dp), pointer :: A_p(:, :)
@@ -603,8 +599,8 @@ function peigvalsh_re_(A, blacs, exc, destroy)
         A_p => A_work
     end if
     call peigh_re_(A_p, blacs, peigvalsh_re_, exc, vals_only=.true.)
-end function
 #endif
+end function
 
 function eigvalsh_cplx_(A, exc, destroy)
     complex(dp), target, intent(in) :: A(:, :)
@@ -635,23 +631,19 @@ function eigvalsh_mat3n3n_(A, exc, destroy)
     real(dp) :: eigvalsh_mat3n3n_(3*A%blacs%n_atoms)
 
     if (allocated(A%re)) then
-#ifndef WITH_SCALAPACK
-        eigvalsh_mat3n3n_ = eigvalsh_re_(A%re, exc, destroy)
-#else
-        eigvalsh_mat3n3n_ = peigvalsh_re_(A%re, A%blacs, exc, destroy)
-#endif
+        if (.not. A%blacs%parallel()) then
+            eigvalsh_mat3n3n_ = eigvalsh_re_(A%re, exc, destroy)
+        else
+            eigvalsh_mat3n3n_ = peigvalsh_re_(A%re, A%blacs, exc, destroy)
+        end if
     else
-#ifndef WITH_SCALAPACK
-        eigvalsh_mat3n3n_ = eigvalsh_cplx_(A%cplx, exc, destroy)
-#else
-        if (A%blacs%parallel()) then
+        if (.not. A%blacs%parallel()) then
+            eigvalsh_mat3n3n_ = eigvalsh_cplx_(A%cplx, exc, destroy)
+        else
             exc%code = MBD_EXC_UNIMPL
             exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
             return
-        else
-            eigvalsh_mat3n3n_ = eigvalsh_cplx_(A%cplx, exc, destroy)
         end if
-#endif
     end if
 end function
 

@@ -125,6 +125,13 @@ type :: mbd_system
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
+    !> Type of parallelization: `"atoms"` or `"k_points"`.
+    !>
+    !> - `"atoms"`: distribute matrices over all MPI tasks using ScaLAPACK, solve
+    !> eigenproblems sequentialy.
+    !> - `"k_points"`: parallelize over k-points (each MPI task solves entire
+    !> eigenproblems for its k-points)
+    character(len=10) :: parallel_mode = 'atoms'
     type(mbd_blacs) :: blacs
     contains
     procedure :: siz => system_siz
@@ -1584,7 +1591,7 @@ subroutine system_init(this, calc)
     type(mbd_calc), target, intent(in) :: calc
 
     this%calc => calc
-    call this%blacs%init(this%siz(), calc%blacs_grid)
+    call this%blacs%init(this%siz(), calc%blacs_grid, this%parallel_mode == 'atoms')
 end subroutine
 
 

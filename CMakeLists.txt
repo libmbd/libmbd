@@ -6,6 +6,7 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_fl
 project(libmbd LANGUAGES Fortran)
 
 option(ENABLE_SCALAPACK "Enable parallelisation with ScaLAPACK/MPI")
+option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)
 
 set(DEFAULT_BUILD_TYPE "Release")
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
@@ -32,7 +33,7 @@ set(SOURCES
     src/mbd_defaults.f90
 )
 
-add_library(mbd SHARED ${SOURCES})
+add_library(mbd ${SOURCES})
 
 if(NOT LAPACK_LIBRARIES)
     find_package(LAPACK)
@@ -81,6 +82,7 @@ endif()
 set_target_properties(mbd PROPERTIES PUBLIC_HEADER "src/mbd.h;${PROJECT_BINARY_DIR}/mbd_api.mod")
 install(TARGETS mbd
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 enable_testing()

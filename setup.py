@@ -5,7 +5,7 @@ import cffi
 import shutil
 from setuptools import setup
 
-blddir = os.environ.get('MBDBLDDIR', 'build')
+blddir = os.environ.get('MBDBLDDIR', 'build/src')
 library_dirs = [blddir] if os.path.exists(blddir) else []
 
 
@@ -66,6 +66,7 @@ else:
     ]
     ext_args = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
     update_dict(ext_args, get_info('lapack_opt', 2))
+    library_dirs = ['build']
 
 
 if library_dirs:

@@ -1,78 +1,24 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef LEGENDRE_PREC
-#define LEGENDRE_PREC 8
-#endif
 module mbd
 
 use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
     MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, printer
+use mbd_system_type, only: mbd_system, mbd_calc, ang
 use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
 use mbd_defaults
-#ifdef WITH_MPI
-use mpi
-#endif
 
 implicit none
 
 #ifndef MODULE_UNIT_TESTS
 private
-public :: mbd_param, mbd_calc, mbd_damping, mbd_result, mbd_system, &
-    init_grid, mbd_energy, dipole_matrix, mbd_scs_energy, &
+public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
     sigma_selfint, scale_TS, ts_energy, set_damping_parameters, &
     clock_rate, mbd_gradients, damping_fermi
 #endif
-
-real(dp), parameter :: ang = 1.8897259886d0
-integer, parameter :: n_timestamps = 100
-
-type :: mbd_param
-    real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
-    real(dp) :: ts_cutoff_radius = 50d0*ang
-    real(dp) :: dipole_low_dim_cutoff = 100d0*ang
-    real(dp) :: dipole_cutoff = 400d0*ang  ! used only when Ewald is off
-    real(dp) :: ewald_real_cutoff_scaling = 1d0
-    real(dp) :: ewald_rec_cutoff_scaling = 1d0
-    real(dp) :: k_grid_shift = K_GRID_SHIFT
-    logical :: ewald_on = .true.
-    logical :: zero_negative_eigs = .false.
-    integer :: rpa_order_max = 10
-    integer :: n_frequency_grid = N_FREQUENCY_GRID
-end type
-
-type :: mbd_timing
-    logical :: measure_time = .true.
-    integer :: timestamps(n_timestamps), ts_counts(n_timestamps)
-    integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
-end type mbd_timing
-
-type :: mbd_info
-    character(len=120) :: ewald_alpha = '', ewald_rsum = '', ts_conv = '', &
-        ewald_cutoff = '', ewald_recsum = '', freq_n = '', freq_error = '', &
-        neg_eigvals = ''
-    contains
-    procedure :: print => info_print
-end type mbd_info
-
-type :: mbd_calc
-    type(mbd_param) :: param
-    type(mbd_timing) :: tm
-    real(dp), allocatable :: omega_grid(:)
-    real(dp), allocatable :: omega_grid_w(:)
-#ifdef WITH_MPI
-    integer :: comm = MPI_COMM_WORLD
-#else
-    integer :: comm = -1
-#endif
-    type(mbd_exc) :: exc
-    type(mbd_info) :: info
-    type(mbd_blacs_grid) :: blacs_grid
-    contains
-    procedure :: rank => calc_rank
-end type mbd_calc
 
 type :: mbd_damping
     character(len=20) :: version
@@ -113,31 +59,6 @@ type :: mbd_gradients
     procedure :: copy_alloc => gradients_copy_alloc
     procedure :: has_grad => gradients_has_grad
 end type
-
-type :: mbd_system
-    type(mbd_calc), pointer :: calc
-    real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
-    logical :: vacuum_axis(3) = [.false., .false., .false.]
-    real(dp), allocatable :: lattice(:, :)  ! vectors in columns
-    integer :: k_grid(3)
-    integer :: supercell(3)
-    logical :: do_rpa = .false.
-    logical :: get_eigs = .false.
-    logical :: get_modes = .false.
-    logical :: get_rpa_orders = .false.
-    !> Type of parallelization: `"atoms"` or `"k_points"`.
-    !>
-    !> - `"atoms"`: distribute matrices over all MPI tasks using ScaLAPACK, solve
-    !> eigenproblems sequentialy.
-    !> - `"k_points"`: parallelize over k-points (each MPI task solves entire
-    !> eigenproblems for its k-points)
-    character(len=10) :: parallel_mode = 'atoms'
-    type(mbd_blacs) :: blacs
-    contains
-    procedure :: siz => system_siz
-    procedure :: has_exc => system_has_exc
-    procedure :: init => system_init
-end type mbd_system
 
 contains
 
@@ -657,94 +578,19 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
 end subroutine
 
 
-subroutine init_grid(calc)
+subroutine test_frequency_grid(calc)
     type(mbd_calc), intent(inout) :: calc
 
-    integer :: n
-
-    n = calc%param%n_frequency_grid
-    allocate (calc%omega_grid(0:n))
-    allocate (calc%omega_grid_w(0:n))
-    calc%omega_grid(0) = 0d0
-    calc%omega_grid_w(0) = 0d0
-    call get_omega_grid(n, 0.6d0, calc%omega_grid(1:n), calc%omega_grid_w(1:n))
-    calc%info%freq_n = &
-        "Initialized a radial integration grid of " // trim(tostr(n)) // &
-        " points."
-    calc%info%freq_error = &
-        "Relative quadrature error in C6 of carbon atom: " // &
-        trim(tostr(test_frequency_grid(calc)))
-end subroutine
-
-
-real(dp) function test_frequency_grid(calc) result(error)
-    type(mbd_calc), intent(in) :: calc
-
-    real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1)
+    real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
     type(mbd_gradients) :: dalpha(0:ubound(calc%omega_grid, 1))
     real(dp), allocatable :: dC6_dalpha(:, :)
 
     alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha)
     C6 = get_C6_from_alpha(calc, alpha, dC6_dalpha)
     error = abs(C6(1)/99.5d0-1d0)
-end function
-
-
-subroutine get_omega_grid(n, L, x, w)
-    integer, intent(in) :: n
-    real(dp), intent(in) :: L
-    real(dp), intent(out) :: x(n), w(n)
-
-    call gauss_legendre(n, x, w)
-    w = 2*L/(1-x)**2*w
-    x = L*(1+x)/(1-x)
-    w = w(n:1:-1)
-    x = x(n:1:-1)
-end subroutine get_omega_grid
-
-
-subroutine gauss_legendre(n, r, w)
-    integer, intent(in) :: n
-    real(dp), intent(out) :: r(n), w(n)
-
-    integer, parameter :: q = LEGENDRE_PREC
-    integer, parameter :: n_iter = 1000
-    real(q) :: x, f, df, dx
-    integer :: k, iter, i
-    real(q) :: Pk(0:n), Pk1(0:n-1), Pk2(0:n-2)
-
-    if (n == 1) then
-        r(1) = 0d0
-        w(1) = 2d0
-        return
-    end if
-    Pk2(0) = 1._q  ! k = 0
-    Pk1(0:1) = [0._q, 1._q]  ! k = 1
-    do k = 2, n
-        Pk(0:k) = ((2*k-1) * &
-            [0._q, Pk1(0:k-1)]-(k-1)*[Pk2(0:k-2), 0._q, 0._q])/k
-        if (k < n) then
-            Pk2(0:k-1) = Pk1(0:k-1)
-            Pk1(0:k) = Pk(0:k)
-        end if
-    end do
-    ! now Pk contains k-th Legendre polynomial
-    do i = 1, n
-        x = cos(pi*(i-0.25_q)/(n+0.5_q))
-        do iter = 1, n_iter
-            df = 0._q
-            f = Pk(n)
-            do k = n-1, 0, -1
-                df = f + x*df
-                f = Pk(k) + x*f
-            end do
-            dx = f/df
-            x = x-dx
-            if (abs(dx) < 10*epsilon(dx)) exit
-        end do
-        r(i) = dble(x)
-        w(i) = dble(2/((1-x**2)*df**2))
-    end do
+    calc%info%freq_error = &
+        "Relative quadrature error in C6 of carbon atom: " // &
+        trim(tostr(error))
 end subroutine
 
 
@@ -1579,22 +1425,6 @@ function make_g_grid(calc, n1, n2, n3) result(g_grid)
 end function make_g_grid
 
 
-logical function system_has_exc(sys)
-    class(mbd_system), intent(in) :: sys
-
-    system_has_exc = sys%calc%exc%code /= 0
-end function
-
-
-subroutine system_init(this, calc)
-    class(mbd_system), intent(inout) :: this
-    type(mbd_calc), target, intent(in) :: calc
-
-    this%calc => calc
-    call this%blacs%init(this%siz(), calc%blacs_grid, this%parallel_mode == 'atoms')
-end subroutine
-
-
 function make_k_grid(g_grid, uc) result(k_grid)
     real(dp), intent(in) :: g_grid(:, :), uc(3, 3)
     real(dp) :: k_grid(3, size(g_grid, 2))
@@ -1636,17 +1466,6 @@ function clock_rate() result(rate)
 end function clock_rate
 
 
-integer function system_siz(this)
-    class(mbd_system), intent(in) :: this
-
-    if (allocated(this%coords)) then
-        system_siz = size(this%coords, 2)
-    else
-        system_siz = 0
-    end if
-end function
-
-
 subroutine gradients_copy_alloc(this, other)
     class(mbd_gradients), intent(in) :: this
     type(mbd_gradients), intent(out) :: other
@@ -1667,32 +1486,6 @@ logical function gradients_has_grad(this)
     gradients_has_grad = allocated(this%dcoords) .or. &
         allocated(this%dalpha) .or. allocated(this%dC6) .or. &
         allocated(this%dr_vdw) .or. allocated(this%domega)
-end function
-
-subroutine info_print(this, info)
-    class(mbd_info), intent(in) :: this
-    procedure(printer) :: info
-
-    if (this%freq_n /= '') call info(this%freq_n)
-    if (this%freq_error /= '') call info(this%freq_error)
-    if (this%ewald_alpha /= '') call info(this%ewald_alpha)
-    if (this%ewald_rsum /= '') call info(this%ewald_rsum)
-    if (this%ewald_cutoff /= '') call info(this%ewald_cutoff)
-    if (this%ewald_recsum /= '') call info(this%ewald_recsum)
-    if (this%ts_conv /= '') call info(this%ts_conv)
-    if (this%neg_eigvals /= '') call info(this%neg_eigvals)
-end subroutine
-
-integer function calc_rank(this)
-    class(mbd_calc), intent(in) :: this
-
-    integer :: ierr
-
-#ifdef WITH_MPI
-    call MPI_COMM_RANK(this%comm, calc_rank, ierr)
-#else
-    calc_rank = 0
-#endif
 end function
 
 end module mbd

@@ -10,6 +10,7 @@ set(SOURCES
     mbd_linalg.F90
     mbd_types.F90
     mbd_defaults.f90
+    mbd_system_type.F90
 )
 
 add_library(mbd ${SOURCES})

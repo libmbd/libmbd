@@ -4,7 +4,8 @@
 module mbd_coulomb
 
 use mbd_linalg, only: eye, inverse, diag, inv, eye, det, outer
-use mbd, only: dipole_matrix, mbd_system, mbd_damping, damping_fermi
+use mbd_system_type, only: mbd_system
+use mbd, only: dipole_matrix, mbd_damping, damping_fermi
 use mbd_common, only: dp, pi
 use mbd_types, only: mat3n3n, scalar
 

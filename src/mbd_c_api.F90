@@ -5,7 +5,8 @@ module mbd_c_api
 
 use iso_c_binding, only: c_ptr, c_int, c_double, c_f_pointer, c_loc, c_bool, &
     c_null_ptr, c_null_char, c_char
-use mbd, only: mbd_system, mbd_calc, mbd_damping, mbd_energy, init_grid, &
+use mbd_system_type, only: mbd_system, mbd_calc
+use mbd, only: mbd_damping, mbd_energy, &
     mbd_scs_energy, mbd_scs_energy, dipole_matrix, ts_energy, mbd_result, &
     mbd_gradients
 use mbd_common, only: dp
@@ -46,7 +47,7 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
 
     allocate (calc)
     calc%param%n_frequency_grid = n_freq
-    call init_grid(calc)
+    call calc%init_grid()
     call calc%blacs_grid%init()
     allocate (calc_c)
     calc_c%n_freq = ubound(calc%omega_grid, 1)

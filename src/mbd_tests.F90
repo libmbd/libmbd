@@ -24,7 +24,7 @@ integer :: err
 call MPI_INIT(err)
 #endif
 
-call init_grid(calc)
+call calc%init_grid()
 call calc%blacs_grid%init()
 n_failed = 0
 n_all = 0

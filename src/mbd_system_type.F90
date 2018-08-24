@@ -102,7 +102,7 @@ subroutine mbd_system_init(this, calc)
     type(mbd_calc), target, intent(in) :: calc
 
     this%calc => calc
-    call this%blacs_grid%init()
+    call this%blacs_grid%init(this%comm)
     call this%blacs%init( &
         this%siz(), this%blacs_grid, this%parallel_mode == 'atoms' &
     )

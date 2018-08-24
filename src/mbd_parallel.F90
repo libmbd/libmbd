@@ -38,7 +38,7 @@ interface all_reduce
 end interface
 
 #ifdef WITH_SCALAPACK
-external :: BLACS_PINFO, BLACS_GET, BLACS_GRIDINIT, BLACS_GRIDINFO, &
+external :: BLACS_PINFO, BLACS_GRIDINIT, BLACS_GRIDINFO, &
     BLACS_GRIDEXIT, NUMROC, DESCINIT, DGSUM2D
 integer :: NUMROC
 #endif
@@ -46,8 +46,9 @@ integer :: NUMROC
 contains
 
 
-subroutine mbd_blacs_grid_init(this)
+subroutine mbd_blacs_grid_init(this, comm)
     class(mbd_blacs_grid), intent(inout) :: this
+    integer, intent(in) :: comm
 
 #ifdef WITH_SCALAPACK
     integer :: my_task, n_tasks, nprows
@@ -58,7 +59,7 @@ subroutine mbd_blacs_grid_init(this)
     enddo
     this%nprows = nprows
     this%npcols = n_tasks/this%nprows
-    call BLACS_GET(-1, 0, this%ctx)
+    this%ctx = comm
     call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &

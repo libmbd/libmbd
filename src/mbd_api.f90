@@ -44,6 +44,9 @@ type :: mbd_input
     logical :: vacuum_axis(3) = [.false., .false., .false.]
     real(dp), allocatable :: free_values(:, :)
     logical :: zero_negative_eigvals = .false.
+
+    real(dp), allocatable :: coords(:, :)
+    real(dp), allocatable :: lattice_vectors(:, :)
 end type
 
 type mbd_calculation
@@ -99,7 +102,11 @@ subroutine mbd_calc_init(this, input)
     this%damp%ts_sr = input%ts_sr
     this%sys%k_grid = input%k_grid
     this%sys%vacuum_axis = input%vacuum_axis
+    this%sys%coords = input%coords
+    if (allocated(input%lattice_vectors)) &
+        this%sys%lattice = input%lattice_vectors
     call this%calc%init_grid()
+    call this%sys%init(this%calc)
     this%free_values = input%free_values
     call this%calc%blacs_grid%init()
 end subroutine
@@ -117,7 +124,6 @@ subroutine mbd_calc_update_coords(this, coords)
     real(dp), intent(in) :: coords(:, :)
 
     this%sys%coords = coords
-    call this%sys%init(this%calc)
 end subroutine
 
 
@@ -126,7 +132,6 @@ subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%sys%lattice = latt_vecs
-    call this%sys%init(this%calc)
 end subroutine
 
 

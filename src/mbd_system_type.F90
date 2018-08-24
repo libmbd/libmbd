@@ -56,16 +56,10 @@ type :: mbd_calc
     type(mbd_timing) :: tm
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
-#ifdef WITH_MPI
-    integer :: comm = MPI_COMM_WORLD
-#else
-    integer :: comm = -1
-#endif
     type(mbd_exc) :: exc
     type(mbd_info) :: info
     type(mbd_blacs_grid) :: blacs_grid
     contains
-    procedure :: rank => mbd_calc_rank
     procedure :: init_grid => mbd_calc_init_grid
 end type mbd_calc
 
@@ -88,6 +82,11 @@ type :: mbd_system
     !> eigenproblems for its k-points)
     character(len=10) :: parallel_mode = 'atoms'
     type(mbd_blacs) :: blacs
+#ifdef WITH_MPI
+    integer :: comm = MPI_COMM_WORLD
+#else
+    integer :: comm = -1
+#endif
     contains
     procedure :: init => mbd_system_init
     procedure :: siz => mbd_system_siz
@@ -171,18 +170,6 @@ subroutine mbd_info_print(this, info)
     if (this%ts_conv /= '') call info(this%ts_conv)
     if (this%neg_eigvals /= '') call info(this%neg_eigvals)
 end subroutine
-
-integer function mbd_calc_rank(this) result(rank)
-    class(mbd_calc), intent(in) :: this
-
-    integer :: ierr
-
-#ifdef WITH_MPI
-    call MPI_COMM_RANK(this%comm, rank, ierr)
-#else
-    calc_rank = 0
-#endif
-end function
 
 subroutine mbd_calc_init_grid(this)
     class(mbd_calc), intent(inout) :: this

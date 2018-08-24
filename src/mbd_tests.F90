@@ -15,13 +15,16 @@ use mpi
 
 implicit none
 
-integer :: n_failed, n_all
+integer :: n_failed, n_all, rank
 type(mbd_calc), target :: calc
 
 #ifdef WITH_MPI
 integer :: err
 
 call MPI_INIT(err)
+call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
+#else
+    rank = 0
 #endif
 
 call calc%init_grid()
@@ -44,7 +47,7 @@ call exec_test('MBD@rsscs derivative implicit alpha')
 call exec_test('MBD@rsscs derivative implicit C6')
 call exec_test('MBD@rsscs derivative implicit Rvdw')
 call calc%blacs_grid%destroy()
-if (calc%rank() == 0) write (6, *) &
+if (rank == 0) write (6, *) &
     trim(tostr(n_failed)) // '/' // trim(tostr(n_all)) // ' tests failed'
 if (n_failed /= 0) stop 1
 
@@ -57,7 +60,7 @@ contains
 subroutine exec_test(test_name)
     character(len=*), intent(in) :: test_name
 
-    if (calc%rank() == 0) write (6, '(A,A,A)', advance='no') &
+    if (rank == 0) write (6, '(A,A,A)', advance='no') &
         'Executing test "', test_name, '"... '
     select case (test_name)
     case ('T_bare derivative'); call test_T_bare_deriv()
@@ -83,10 +86,10 @@ logical function failed(diff, thre)
     real(dp), intent(in) :: diff, thre
 
     failed = abs(diff) > thre
-    if (calc%rank() == 0) write (6, '(A,G10.3,A,G10.3,A)', advance='no') &
+    if (rank == 0) write (6, '(A,G10.3,A,G10.3,A)', advance='no') &
         'diff:', diff, ', threshold:', thre, ': '
     if (failed) n_failed = n_failed + 1
-    if (calc%rank() == 0) then
+    if (rank == 0) then
         if (failed) then
             write (6, *) 'FAILED!'
         else

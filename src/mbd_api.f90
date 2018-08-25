@@ -19,7 +19,7 @@ public :: mbd_input, mbd_calculation  ! types
 public :: mbd_get_damping_parameters, mbd_get_free_vdw_params  ! subroutines
 
 type :: mbd_input
-    integer :: comm  ! MPI communicator
+    integer :: comm = -1  ! MPI communicator
 
     ! which calculation will be done (mbd|ts)
     character(len=30) :: dispersion_type = 'mbd'
@@ -84,7 +84,7 @@ subroutine mbd_calc_init(this, input)
     class(mbd_calculation), target, intent(inout) :: this
     type(mbd_input), intent(in) :: input
 
-    this%sys%comm = input%comm
+    if (input%comm /= -1) this%sys%comm = input%comm
     this%dispersion_type = input%dispersion_type
     this%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then

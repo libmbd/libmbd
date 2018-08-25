@@ -14,13 +14,10 @@ matrix:
   - env: PYTHON=python MPI_NODES=1 CODECOV=1
   - env: PYTHON=python MPI_NODES=2
   - env: PYTHON=python WITH_PIP=1
-  - &osx_mpi_fail
-    os: osx
+  - os: osx
     env: PYTHON=python MPI_NODES=2
   - os: osx
     env: PYTHON=python3 WITH_PIP=1
-  allow_failures:
-  - *osx_mpi_fail
 before_install:
 - |
   if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then

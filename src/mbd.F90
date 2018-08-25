@@ -7,7 +7,8 @@ use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
     MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, printer, &
     shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc, ang
-use mbd_linalg, only: invh, inverse, eigh, eigvals, eigvalsh, outer, mmul
+use mbd_linalg, only: outer
+use mbd_lapack, only: eigvals, inverse
 use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
 use mbd_defaults
@@ -529,7 +530,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     end if
     call alpha_full%add_diag(1d0/alpha)
     call sys%clock(32)
-    call invh(alpha_full, sys%calc%exc)
+    call alpha_full%invh(sys%calc%exc)
     if (sys%has_exc()) return
     call sys%clock(-32)
     alpha_scs = alpha_full%contract_n33diag_cols()
@@ -546,7 +547,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     if (allocated(dalpha_scs(1)%dcoords)) then
         do i_xyz = 1, 3
             dQ%re = -T%re_dr(:, :, i_xyz)
-            dQ = mmul(alpha_full, dQ)
+            dQ = alpha_full%mmul(dQ)
             call dQ%contract_n_transp('C', B_prime)
             do i_atom = 1, n_atoms
                 grads_i = contract_cross_33( &
@@ -568,7 +569,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             call dQ%mult_col(i_atom, dsij_dsi)
         end do
         call dQ%add_diag(-0.5d0/alpha**2)
-        dQ = mmul(alpha_full, dQ)
+        dQ = alpha_full%mmul(dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms
             grads_i = contract_cross_33( &
@@ -582,7 +583,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     end if
     if (allocated(dalpha_scs(1)%dr_vdw)) then
         dQ%re = T%re_dvdw
-        dQ = mmul(alpha_full, dQ)
+        dQ = alpha_full%mmul(dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms
             grads_i = contract_cross_33( &
@@ -659,7 +660,7 @@ type(mbd_result) function get_single_mbd_energy( &
     if (sys%get_modes .or. grad) then
         call modes%alloc_from(relay)
         allocate (eigs(3*n_atoms))
-        call eigh(modes, eigs, sys%calc%exc, src=relay)
+        call modes%eigh(eigs, sys%calc%exc, src=relay)
         if (sys%get_modes) then
             if (allocated(modes%re)) then
                 call move_alloc(modes%re, res%modes)
@@ -668,7 +669,7 @@ type(mbd_result) function get_single_mbd_energy( &
             end if
         end if
     else
-        eigs = eigvalsh(relay, sys%calc%exc, destroy=.true.)
+        eigs = relay%eigvalsh(sys%calc%exc, destroy=.true.)
     end if
     if (sys%has_exc()) return
     call sys%clock(-21)
@@ -689,7 +690,7 @@ type(mbd_result) function get_single_mbd_energy( &
     if (.not. grad) return
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
-    c_lambda12i_c = mmul(c_lambda12i_c, c_lambda12i_c, transB=.true.)
+    c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB=.true.)
     call dQ%init_from(T)
     if (allocated(dene%dcoords)) then
         do i_xyz = 1, 3
@@ -805,7 +806,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1d0)
         call sys%clock(23)
-        eigs = eigvals(relay, sys%calc%exc, destroy=.true.)
+        eigs = relay%eigvals(sys%calc%exc, destroy=.true.)
         call sys%clock(-23)
         if (sys%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
@@ -824,7 +825,7 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
             1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
         if (sys%get_rpa_orders) then
             call sys%clock(24)
-            eigs = eigvals(AT, sys%calc%exc, destroy=.true.)
+            eigs = AT%eigvals(sys%calc%exc, destroy=.true.)
             call sys%clock(-24)
             if (sys%has_exc()) return
             allocate (res%rpa_orders(sys%calc%param%rpa_order_max))

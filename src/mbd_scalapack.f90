@@ -3,9 +3,9 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_scalapack
 
-use mbd_common, only: dp, exception => mbd_exc, MBD_EXC_LINALG, tostr, &
-    mode => eig_mode
+use mbd_common, only: dp, exception => mbd_exc, MBD_EXC_LINALG, tostr
 use mbd_parallel, only: mbd_blacs
+use mbd_lapack, only: mode
 
 implicit none
 
@@ -139,12 +139,12 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
-function peigvalsh_real(A, blacs, exc, destroy) result(eigvals)
+function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
     real(dp), target, intent(in) :: A(:, :)
     type(mbd_blacs), intent(in) :: blacs
     type(exception), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    real(dp) :: eigvals(3*blacs%n_atoms)
+    real(dp) :: eigs(3*blacs%n_atoms)
 
     real(dp), allocatable, target :: A_work(:, :)
     real(dp), pointer :: A_p(:, :)
@@ -159,7 +159,7 @@ function peigvalsh_real(A, blacs, exc, destroy) result(eigvals)
         allocate (A_work(size(A, 1), size(A, 1)), source=A)
         A_p => A_work
     end if
-    call peigh_real(A_p, blacs, eigvals, exc, vals_only=.true.)
+    call peigh_real(A_p, blacs, eigs, exc, vals_only=.true.)
 end function
 
 end module

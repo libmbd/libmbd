@@ -8,7 +8,7 @@ module mbd_system_type
 
 use mbd_common, only: dp, pi, mbd_exc, printer, tostr
 use mbd_parallel, only: mbd_blacs, mbd_blacs_grid
-use mbd_linalg, only: inverse
+use mbd_lapack, only: inverse
 use mbd_defaults
 #ifdef WITH_MPI
 use mpi

@@ -3,8 +3,12 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_types
 
-use mbd_common, only: dp, findval
+use mbd_common, only: dp, findval, exception => mbd_exc, MBD_EXC_UNIMPL
 use mbd_parallel, only: mbd_blacs, mbd_blacs_grid, all_reduce
+use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
+#ifdef WITH_SCALAPACK
+use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
+#endif
 
 implicit none
 
@@ -28,6 +32,11 @@ type :: mat3n3n
     procedure :: mult_rows => mat3n3n_mult_rows
     procedure :: mult_cols_3n => mat3n3n_mult_cols_3n
     procedure :: mult_col => mat3n3n_mult_col
+    procedure :: mmul => mat3n3n_mmul
+    procedure :: invh => mat3n3n_invh
+    procedure :: eigh => mat3n3n_eigh
+    procedure :: eigvals => mat3n3n_eigvals
+    procedure :: eigvalsh => mat3n3n_eigvalsh
     procedure :: contract_n_transp => mat3n3n_contract_n_transp
     procedure :: contract_n33diag_cols => mat3n3n_contract_n33diag_cols
     procedure :: contract_n33_rows => mat3n3n_contract_n33_rows
@@ -315,6 +324,124 @@ subroutine mat3n3n_mult_col(this, idx, a)
         end do
     end if
 end subroutine
+
+type(mat3n3n) function mat3n3n_mmul(A, B, transA, transB) result(C)
+    class(mat3n3n), intent(in) :: A
+    type(mat3n3n), intent(in) :: B
+    logical, intent(in), optional :: transA, transB
+
+    C%blacs = A%blacs
+#ifdef WITH_SCALAPACK
+    if (.not. A%blacs%parallel()) then
+        C%re = mmul(A%re, B%re, transA, transB)
+    else
+        C%re = pmmul(A%re, A%blacs, B%re, B%blacs, transA, transB, C%blacs)
+    end if
+#else
+    C%re = mmul(A%re, B%re, transA, transB)
+#endif
+end function
+
+subroutine mat3n3n_invh(A, exc, src)
+    class(mat3n3n), intent(inout) :: A
+    type(exception), intent(out), optional :: exc
+    type(mat3n3n), intent(in), optional :: src
+
+#ifdef WITH_SCALAPACK
+    if (.not. A%blacs%parallel()) then
+        if (present(src)) then
+            call invh(A%re, exc, src%re)
+        else
+            call invh(A%re, exc)
+        end if
+    else
+        if (present(src)) then
+            call pinvh(A%re, A%blacs, exc, src%re)
+        else
+            call pinvh(A%re, A%blacs, exc)
+        end if
+    end if
+#else
+    if (present(src)) then
+        call invh(A%re, exc, src%re)
+    else
+        call invh(A%re, exc)
+    end if
+#endif
+end subroutine
+
+subroutine mat3n3n_eigh(A, eigs, exc, src, vals_only)
+    class(mat3n3n), intent(inout) :: A
+    real(dp), intent(out) :: eigs(:)
+    type(exception), intent(out), optional :: exc
+    type(mat3n3n), intent(in), optional :: src
+    logical, intent(in), optional :: vals_only
+
+    if (allocated(A%re)) then
+#ifdef WITH_SCALAPACK
+        if (.not. A%blacs%parallel()) then
+            call eigh(A%re, eigs, exc, src%re, vals_only)
+        else
+            call peigh(A%re, A%blacs, eigs, exc, src%re, vals_only)
+        endif
+#else
+        call eigh(A%re, eigs, exc, src%re, vals_only)
+#endif
+    else
+        if (.not. A%blacs%parallel()) then
+            call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
+        else
+            exc%code = MBD_EXC_UNIMPL
+            exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+            return
+        end if
+    end if
+end subroutine
+
+function mat3n3n_eigvalsh(A, exc, destroy) result(eigs)
+    class(mat3n3n), target, intent(in) :: A
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    real(dp) :: eigs(3*A%blacs%n_atoms)
+
+    if (allocated(A%re)) then
+#ifdef WITH_SCALAPACK
+        if (.not. A%blacs%parallel()) then
+            eigs = eigvalsh(A%re, exc, destroy)
+        else
+            eigs = peigvalsh(A%re, A%blacs, exc, destroy)
+        end if
+#else
+        eigs = eigvalsh(A%re, exc, destroy)
+#endif
+    else
+        if (.not. A%blacs%parallel()) then
+            eigs = eigvalsh(A%cplx, exc, destroy)
+        else
+            exc%code = MBD_EXC_UNIMPL
+            exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+            return
+        end if
+    end if
+end function
+
+function mat3n3n_eigvals(A, exc, destroy) result(eigs)
+    class(mat3n3n), target, intent(in) :: A
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    complex(dp) :: eigs(3*A%blacs%n_atoms)
+
+    if (A%blacs%parallel()) then
+        exc%code = MBD_EXC_UNIMPL
+        exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+        return
+    end if
+    if (allocated(A%re)) then
+        eigs = eigvals(A%re, exc, destroy)
+    else
+        eigs = eigvals(A%cplx, exc, destroy)
+    end if
+end function
 
 subroutine mat3n3n_contract_n_transp(this, dir, res)
     class(mat3n3n), intent(in) :: this

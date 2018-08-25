@@ -11,7 +11,7 @@ use mbd, only: mbd_damping, mbd_energy, &
     mbd_gradients
 use mbd_ts, only: ts_energy
 use mbd_common, only: dp
-use mbd_types, only: mat3n3n
+use mbd_matrix_type, only: mat3n3n
 use mbd_coulomb, only: dipole_energy, coulomb_energy
 
 implicit none

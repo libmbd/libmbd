@@ -9,7 +9,7 @@ set(SRCS
     mbd_common.f90
     mbd_linalg.F90
     mbd_lapack.f90
-    mbd_types.F90
+    mbd_matrix_type.F90
     mbd_defaults.f90
     mbd_system_type.F90
     mbd_ts.f90

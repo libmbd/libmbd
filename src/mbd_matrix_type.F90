@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-module mbd_types
+module mbd_matrix_type
 
 use mbd_common, only: dp, findval, exception => mbd_exc, MBD_EXC_UNIMPL
 use mbd_parallel, only: mbd_blacs, mbd_blacs_grid, all_reduce
@@ -13,7 +13,7 @@ use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
 implicit none
 
 private
-public :: mat3n3n, mat33, scalar, contract_cross_33
+public :: mat3n3n, contract_cross_33
 
 type :: mat3n3n
     real(dp), allocatable :: re(:, :)
@@ -44,20 +44,6 @@ type :: mat3n3n
     procedure :: move_from => mat3n3n_move_from
     procedure :: init_from => mat3n3n_init_from
     procedure :: alloc_from => mat3n3n_alloc_from
-end type
-
-type :: mat33
-    real(dp) :: val(3, 3)
-    ! explicit derivative, [abc] ~ dval_{ab}/dR_c
-    real(dp), allocatable :: dr(:, :, :)
-    real(dp), allocatable :: dvdw(:, :)
-    real(dp), allocatable :: dsigma(:, :)
-end type
-
-type :: scalar
-    real(dp) :: val
-    real(dp), allocatable :: dr(:)  ! explicit derivative
-    real(dp), allocatable :: dvdw
 end type
 
 contains

@@ -9,7 +9,7 @@ use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
 use mbd_system_type, only: mbd_system, mbd_calc, ang
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
-use mbd_types, only: mat3n3n, mat33, scalar, contract_cross_33
+use mbd_matrix_type, only: mat3n3n, contract_cross_33
 use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
 use mbd_defaults
 
@@ -19,7 +19,7 @@ implicit none
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
     sigma_selfint, scale_TS, set_damping_parameters, &
-    mbd_gradients, damping_fermi, test_frequency_grid
+    mbd_gradients, damping_fermi, test_frequency_grid, scalar, mat3n3n
 #endif
 
 type :: mbd_damping
@@ -60,6 +60,20 @@ type :: mbd_gradients
     contains
     procedure :: copy_alloc => gradients_copy_alloc
     procedure :: has_grad => gradients_has_grad
+end type
+
+type :: mat33
+    real(dp) :: val(3, 3)
+    ! explicit derivative, [abc] ~ dval_{ab}/dR_c
+    real(dp), allocatable :: dr(:, :, :)
+    real(dp), allocatable :: dvdw(:, :)
+    real(dp), allocatable :: dsigma(:, :)
+end type
+
+type :: scalar
+    real(dp) :: val
+    real(dp), allocatable :: dr(:)  ! explicit derivative
+    real(dp), allocatable :: dvdw
 end type
 
 contains

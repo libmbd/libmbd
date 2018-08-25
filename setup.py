@@ -59,7 +59,7 @@ else:
         'src/mbd_defaults.f90',
         'src/mbd_parallel.F90',
         'src/mbd_lapack.f90',
-        'src/mbd_types.F90',
+        'src/mbd_matrix_type.F90',
         'src/mbd_linalg.F90',
         'src/mbd_system_type.F90',
         'src/mbd.F90',

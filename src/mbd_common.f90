@@ -7,7 +7,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, mbd_exc, diff7, &
-    findval, printer, shift_cell
+    findval, printer, shift_cell, eig_mode
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
@@ -165,5 +165,14 @@ subroutine shift_cell(ijk, first_cell, last_cell)
         end if
     end do
 end subroutine
+
+character(len=1) function eig_mode(vals_only) result(mode)
+    logical, intent(in), optional :: vals_only
+
+    mode = 'V'
+    if (present(vals_only)) then
+        if (vals_only) mode = 'N'
+    end if
+end function
 
 end module

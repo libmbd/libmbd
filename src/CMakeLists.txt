@@ -1,4 +1,4 @@
-set(SOURCES
+set(SRCS
     mbd.F90
     mbd_c_api.F90
     mbd_api.f90
@@ -14,7 +14,11 @@ set(SOURCES
     mbd_ts.f90
 )
 
-add_library(mbd ${SOURCES})
+if(ENABLE_SCALAPACK_MPI)
+    list(APPEND SRCS mbd_scalapack.f90)
+endif()
+
+add_library(mbd ${SRCS})
 
 target_link_libraries(mbd PRIVATE ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
 
@@ -26,11 +30,7 @@ if(ENABLE_SCALAPACK_MPI)
     else()
         target_link_libraries(mbd PRIVATE scalapack)
     endif()
-    foreach(SRC ${SOURCES} mbd_tests.F90 mbd_api_tests.F90)
-        if(SRC MATCHES ".*\\.F90")
-            set_property(SOURCE ${SRC} APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
-        endif()
-    endforeach()
+    set_target_properties(mbd PROPERTIES COMPILE_DEFINITIONS "WITH_MPI;WITH_SCALAPACK")
 endif()
 
 set_target_properties(mbd PROPERTIES PUBLIC_HEADER "mbd.h;${CMAKE_CURRENT_BINARY_DIR}/mbd_api.mod")
@@ -53,6 +53,7 @@ if(CMAKE_TESTING_ENABLED)
         target_include_directories(mbd_api_tests PRIVATE ${MPI_Fortran_INCLUDE_PATH})
         target_link_libraries(mbd_tests PRIVATE ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
         target_link_libraries(mbd_api_tests PRIVATE ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
+        set_target_properties(mbd_tests mbd_api_tests PROPERTIES COMPILE_DEFINITIONS "WITH_MPI;WITH_SCALAPACK")
     endif()
 
     add_dependencies(check mbd_tests mbd_api_tests)

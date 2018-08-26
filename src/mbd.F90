@@ -246,6 +246,20 @@ end function mbd_scs_energy
 #define MBD_TYPE 0
 #endif
 
+!> \f[
+!> T_{(ij)ab}\equiv\frac{\partial^2}{\partial R_a\partial R_b}\frac1R=
+!> \frac{-3R_aR_b+R^2\delta_{ab}}{R^5},\qquad
+!> \mathbf R\equiv \mathbf R_{ij}\equiv\mathbf R_j-\mathbf R_i
+!> \f]
+!>
+!> \f[
+!> \frac{\partial\mathbf T_{ij}}{\partial\mathbf R_k}=
+!> \frac{\partial\mathbf T}{\partial\mathbf R}(\delta_{jk}-\delta_{ik}),\qquad
+!> \frac{\partial T_{ab}}{\partial R_c}=-3\left(
+!> \frac{R_a\delta_{bc}+R_b\delta_{ca}+R_c\delta_{ab}}{R^5}-
+!> \frac{5R_aR_bR_c}{R^7}
+!> \right)
+!> \f]
 #if MBD_TYPE == 0
 type(mbd_matrix_real) function dipole_matrix_real(sys, damp, grad) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_REAL
@@ -540,6 +554,48 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
     call sys%clock(-12)
 end subroutine
 
+!> \f[
+!> \begin{gathered}
+!> E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-
+!> 3\sum_i\frac{\omega_i}2,\qquad
+!> \mathbf Q_{ij}=\omega_i^2\delta_{ij}\mathbf I+
+!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij} \\\\
+!> \mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad
+!> \boldsymbol\Lambda\equiv\operatorname{diag}(\{\tilde\omega_i^2\}),\qquad
+!> \operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\sum_i\tilde\omega_i
+!> \end{gathered}
+!> \f]
+!>
+!> \f[
+!> \begin{aligned}
+!> \partial E_\text{MBD}&=\frac14\operatorname{Tr}\big(
+!> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T
+!> \partial\mathbf Q
+!> \big)-
+!> 3\sum_i\frac{\partial\omega_i}2 \\\\
+!> \frac{\partial E_\text{MBD}}{\partial X_i}&=
+!> \frac12\sum_{p\zeta}(
+!> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T
+!> )_{p,i\zeta}
+!> \frac{\partial Q_{p,i\zeta}}{\partial X_i}-
+!> \frac32\frac{\partial\omega_i}{\partial X_i}
+!> \end{aligned}
+!> \f]
+!>
+!> \f[
+!> \begin{aligned}
+!> \partial\mathbf Q_{ij}=&
+!> 2\delta_{ij}\omega_i\partial\omega_i\mathbf I+
+!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}\left(
+!> \frac{\partial\omega_i}{\omega_i}+
+!> \frac{\partial\omega_j}{\omega_j}+
+!> \frac12\frac{\partial\alpha_{0,i}}{\alpha_{0,i}}+
+!> \frac12\frac{\partial\alpha_{0,j}}{\alpha_{0,j}}
+!> \right) \\\\
+!> &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
+!> \partial\mathbf T_{ij}
+!> \end{aligned}
+!> \f]
 #if MBD_TYPE == 0
 type(mbd_result) function mbd_energy_single_real( &
         sys, alpha_0, C6, damp, dene) result(res)
@@ -758,6 +814,32 @@ subroutine test_frequency_grid(calc)
         trim(tostr(error))
 end subroutine
 
+!> \f[
+!> \bar\alpha_i=\tfrac13\operatorname{Tr}
+!> \big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad
+!> \boldsymbol{\bar\alpha}=(\boldsymbol\alpha^{-1}+\mathbf T_\text{GG})^{-1}
+!> \f]
+!>
+!> \f[
+!> \begin{gathered}
+!> \partial\boldsymbol{\bar\alpha}=
+!> -\boldsymbol{\bar\alpha}(
+!> \partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG}
+!> )\boldsymbol{\bar\alpha},\qquad
+!> \frac{\partial\bar\alpha_i}{\partial X_j}=
+!> -\frac13\sum_{\zeta\eta}\big(
+!> B_{i\zeta,j\eta}\bar\alpha'_{\zeta,j\eta}+
+!> B'_{j\eta,\zeta}\bar\alpha_{j\eta,i\zeta}
+!> \big) \\\\
+!> \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
+!> \quad A_{i\zeta,j\eta}=
+!> \frac{\partial(\alpha_i^{-1})}{\partial X_i}
+!> \delta_{ij}\delta_{\zeta\eta}+
+!> \frac{\partial T^\text{GG}_{i\zeta,j\eta}}{\partial X_i},\quad
+!> \bar\alpha'_{\zeta,p}=\sum_i\bar\alpha_{i\zeta,p},\quad
+!> B'_{p,\zeta}=\sum_iB_{p,i\zeta}
+!> \end{gathered}
+!> \f]
 function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha(:)
@@ -1008,6 +1090,19 @@ function T_erfc(rxyz, alpha) result(T)
     end do
 end function
 
+!> \f[
+!> f_{(ij)}=\frac1{1+\exp\big({-}a(\eta-1)\big)},\qquad
+!> \eta=\frac{R_{(ij)}}{S_{\text{vdW}(ij)}}\equiv
+!> \frac{R_{(ij)}}{\beta R_{\text{vdW}(ij)}}
+!> \f]
+!>
+!> \f[
+!> \frac{\mathrm df}{\mathrm dR_c}=
+!> \frac a{2+2\cosh\big(a(\eta-1)\big)}\frac{\mathrm d\eta}{\mathrm dR_c},\qquad
+!> \frac{\mathrm d\eta}{\mathrm dR_c}=
+!> \frac{R_c}{RS_\text{vdW}}-
+!> \frac{R}{S_\text{vdW}^2}\frac{\mathrm dS_\text{vdW}}{\mathrm dR_c}
+!> \f]
 type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
@@ -1062,6 +1157,32 @@ type(mat33) function T_damped(f, T) result(fT)
     if (allocated(T%dsigma)) fT%dsigma = f%val*T%dsigma
 end function
 
+!> \f[
+!> \begin{gathered}
+!> T^\text{GG}_{(ij)ab}\equiv
+!> \frac{\partial^2}{\partial R_a\partial R_b}\frac{\operatorname{erf}(\zeta)}R=
+!> \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}+
+!> 2\zeta^2\Theta(\zeta)\frac{R_aR_b}{R^5}, \\\\
+!> \Theta(\zeta)=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\qquad
+!> \zeta=\frac{R_{(ij)}}{\sigma_{(ij)}}
+!> \end{gathered}
+!> \f]
+!>
+!> \f[
+!> \begin{aligned}
+!> \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dR_c}&=
+!> 2\zeta\Theta(\zeta)\left(T_{ab}+(3-2\zeta^2)\frac{R_aR_b}{R^5}\right)
+!> \frac{\mathrm d\zeta}{\mathrm dR_c} \\\\
+!> &\qquad+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
+!> \frac{\partial T_{ab}}{\partial R_c}-
+!> 2\zeta^2\Theta(\zeta)\left(
+!> \frac13\frac{\partial T_{ab}}{\partial R_c}+
+!> \frac{R_c\delta_{ab}}{R^5}
+!> \right) \\\\
+!> \qquad\frac{\mathrm d\zeta}{\mathrm dR_c}&=
+!> \frac{R_c}{R\sigma}-\frac R{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dR_c}
+!> \end{aligned}
+!> \f]
 type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma
@@ -1188,7 +1309,13 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha) result(alpha)
     end do
 end function
 
-! equation 14
+!> \f[
+!> \alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
+!> \partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(
+!> \frac{\partial\alpha_0}{\alpha_0}+
+!> \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
+!> \right)
+!> \f]
 function alpha_osc(alpha_0, omega, u, dalpha) result(alpha)
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
@@ -1202,7 +1329,14 @@ function alpha_osc(alpha_0, omega, u, dalpha) result(alpha)
         alpha*2d0/omega/(1d0+(omega/u)**2)
 end function
 
-! equation 13
+!> \f[
+!> \bar X=X\left(\frac{\bar\alpha_0}{\alpha_0}\right)^q,\qquad
+!> \partial\bar X=\bar X\left(
+!> \frac{\partial X}{X}+
+!> q\frac{\partial\bar\alpha_0}{\bar\alpha_0}-
+!> q\frac{\partial\alpha_0}{\alpha_0}
+!> \right)
+!> \f]
 function scale_TS(X_free, V, V_free, q, dX) result(X)
     real(dp), intent(in) :: X_free(:), V(:), V_free(:)
     real(dp), intent(in) :: q
@@ -1215,9 +1349,12 @@ function scale_TS(X_free, V, V_free, q, dX) result(X)
     if (allocated(dX%dV_free)) dX%dV_free = -X*q/V_free
 end function
 
-
-
-! equation 12
+!> \f[
+!> \omega=\frac{4C_6}{3\alpha_{0}^2},\qquad
+!> \partial\omega=\omega\left(
+!> \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
+!> \right)
+!> \f]
 function omega_eff(C6, alpha, domega) result(omega)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: alpha(:)
@@ -1229,6 +1366,16 @@ function omega_eff(C6, alpha, domega) result(omega)
     if (allocated(domega%dalpha)) domega%dalpha = -2*omega/alpha
 end function
 
+!> \f[
+!> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
+!> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
+!> \f]
+!>
+!> \f[
+!> \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
+!> \partial\sigma_{ij}=
+!> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
+!> \f]
 function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
     real(dp), intent(in) :: alpha(:)
     real(dp), intent(inout), allocatable :: dsigma_dalpha(:)
@@ -1238,6 +1385,11 @@ function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
     if (allocated(dsigma_dalpha)) dsigma_dalpha = sigma/(3*alpha)
 end function
 
+!> \f[
+!> \bar C_6=\frac3\pi\int_0^\infty\mathrm du\,\bar\alpha(u)^2,\qquad
+!> \partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du
+!> \bar\alpha(u)\partial\bar\alpha(u)
+!> \f]
 function C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(in) :: alpha(:, 0:)

@@ -3,25 +3,18 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_common
 
+use mbd_constants
+
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, dp, lower, pi, mbd_exc, diff7, &
+public :: tostr, diff3, diff5, print_matrix, lower, mbd_exc, diff7, &
     findval, printer, shift_cell
-
-integer, parameter :: dp = kind(0.d0)
-real(dp), parameter :: pi = acos(-1.d0)
 
 interface tostr
     module procedure tostr_int_
     module procedure tostr_dble_
 end interface
-
-integer, parameter, public :: &
-    MBD_EXC_NEG_EIGVALS = 1, &
-    MBD_EXC_NEG_POL = 2, &
-    MBD_EXC_LINALG = 3, &
-    MBD_EXC_UNIMPL = 4
 
 type :: mbd_exc
     integer :: code = 0

@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_density
 
-use mbd_common, only: dp, pi
+use mbd_constants
 use mbd_linalg, only: diag, inverted, sdiagonalized
 
 implicit none

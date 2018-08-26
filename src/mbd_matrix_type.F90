@@ -3,7 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_matrix_type
 
-use mbd_common, only: dp, findval, exception => mbd_exc, MBD_EXC_UNIMPL
+use mbd_constants
+use mbd_common, only: findval, exception => mbd_exc
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid, all_reduce

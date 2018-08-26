@@ -6,9 +6,9 @@
 #endif
 module mbd_system_type
 
-use mbd_common, only: dp, pi, mbd_exc, printer, tostr
+use mbd_constants
+use mbd_common, only: mbd_exc, printer, tostr
 use mbd_lapack, only: inverse
-use mbd_defaults
 use mbd_matrix_type, only: mbd_index
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid

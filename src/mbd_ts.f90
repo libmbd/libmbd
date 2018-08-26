@@ -3,7 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_ts
 
-use mbd_common, only: dp, shift_cell, tostr
+use mbd_constants
+use mbd_common, only: shift_cell, tostr
 use mbd, only: mbd_damping, damping_fermi, scalar
 use mbd_system_type, only: mbd_system, ang
 

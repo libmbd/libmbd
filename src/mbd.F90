@@ -4,13 +4,12 @@
 #ifndef MBD_INCLUDED
 module mbd
 
-use mbd_common, only: tostr, dp, pi, findval, lower, &
-    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, shift_cell
+use mbd_constants
+use mbd_common, only: tostr, findval, lower, shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
 use mbd_matrix_type, only: mat3n3n, contract_cross_33
-use mbd_defaults
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: all_reduce
 #endif

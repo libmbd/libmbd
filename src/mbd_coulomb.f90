@@ -3,11 +3,11 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_coulomb
 
+use mbd_constants
 use mbd_linalg, only: eye, outer, diag
 use mbd_lapack, only: inverse, det, inv
 use mbd_system_type, only: mbd_system
 use mbd, only: dipole_matrix, mbd_damping, damping_fermi, scalar
-use mbd_common, only: dp, pi
 use mbd_matrix_type, only: mat3n3n
 
 implicit none

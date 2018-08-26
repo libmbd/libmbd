@@ -3,7 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_scalapack
 
-use mbd_common, only: dp, exception => mbd_exc, MBD_EXC_LINALG, tostr
+use mbd_constants
+use mbd_common, only: exception => mbd_exc, tostr
 use mbd_lapack, only: mode
 use mbd_blacs, only: mbd_blacs_desc
 

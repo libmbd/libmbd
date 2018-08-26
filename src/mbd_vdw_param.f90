@@ -3,7 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_vdw_param
 
-use mbd_common, only: dp, lower
+use mbd_constants
+use mbd_common, only: lower
 
 implicit none
 

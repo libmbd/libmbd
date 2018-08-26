@@ -3,14 +3,14 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_api
 
+use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd, only: mbd_damping, &
     mbd_scs_energy, set_damping_parameters, &
     mbd_result, mbd_gradients, scale_TS
 use mbd_ts, only: ts_energy
-use mbd_common, only: dp, printer
+use mbd_common, only: printer
 use mbd_vdw_param, only: default_vdw_params, species_index
-use mbd_defaults
 
 implicit none
 

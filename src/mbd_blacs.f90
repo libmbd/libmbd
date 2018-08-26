@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_blacs
 
-use mbd_common, only: dp
+use mbd_constants
 
 implicit none
 

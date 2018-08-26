@@ -55,8 +55,8 @@ else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info
     sources = [
+        'src/mbd_constants.f90',
         'src/mbd_common.f90',
-        'src/mbd_defaults.f90',
         'src/mbd_lapack.f90',
         'src/mbd_matrix_type.F90',
         'src/mbd_linalg.F90',

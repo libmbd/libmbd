@@ -83,6 +83,11 @@ interface dipole_matrix
     module procedure dipole_matrix_complex
 end interface
 
+interface get_single_mbd_energy
+    module procedure get_single_mbd_energy_real
+    module procedure get_single_mbd_energy_complex
+end interface
+
 contains
 
 type(mbd_result) function mbd_scs_energy( &
@@ -547,20 +552,21 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
     call sys%clock(-12)
 end subroutine
 
-#ifndef MBD_INCLUDED
-#define MBD_INCLUDED
-#undef MBD_TYPE
-#define MBD_TYPE 1
-#include "mbd.F90"
-
-type(mbd_result) function get_single_mbd_energy( &
+#if MBD_TYPE == 0
+type(mbd_result) function get_single_mbd_energy_real( &
+        sys, alpha_0, C6, damp, dene) result(res)
+#elif MBD_TYPE == 1
+type(mbd_result) function get_single_mbd_energy_complex( &
         sys, alpha_0, C6, damp, dene, k_point) result(res)
+#endif
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
     type(mbd_gradients), intent(inout) :: dene
-    real(dp), intent(in), optional :: k_point(3)
+#if MBD_TYPE == 1
+    real(dp), intent(in) :: k_point(3)
+#endif
 
     type(mat3n3n) :: relay, dQ, T, modes, c_lambda12i_c
     real(dp), allocatable :: eigs(:), omega(:)
@@ -571,7 +577,11 @@ type(mbd_result) function get_single_mbd_energy( &
 
     n_atoms = sys%siz()
     grad = dene%has_grad()
-    T = dipole_matrix(sys, damp, grad, k_point)
+#if MBD_TYPE == 0
+    T = dipole_matrix_real(sys, damp, grad)
+#elif MBD_TYPE == 1
+    T = dipole_matrix_complex(sys, damp, grad, k_point)
+#endif
     if (sys%has_exc()) return
     if (grad) then
         call relay%copy_from(T)
@@ -648,7 +658,13 @@ type(mbd_result) function get_single_mbd_energy( &
         dQ%re = c_lambda12i_c%re*dQ%re
         dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
     end if
-end function get_single_mbd_energy
+end function
+
+#ifndef MBD_INCLUDED
+#define MBD_INCLUDED
+#undef MBD_TYPE
+#define MBD_TYPE 1
+#include "mbd.F90"
 
 type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
     type(mbd_system), intent(inout) :: sys

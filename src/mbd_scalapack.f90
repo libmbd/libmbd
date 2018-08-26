@@ -4,8 +4,8 @@
 module mbd_scalapack
 
 use mbd_common, only: dp, exception => mbd_exc, MBD_EXC_LINALG, tostr
-use mbd_parallel, only: mbd_blacs
 use mbd_lapack, only: mode
+use mbd_blacs, only: mbd_blacs_desc
 
 implicit none
 
@@ -34,7 +34,7 @@ contains
 
 subroutine pinvh_real(A, blacs, exc, src)
     real(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs), intent(in) :: blacs
+    type(mbd_blacs_desc), intent(in) :: blacs
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
 
@@ -78,7 +78,7 @@ end subroutine
 
 function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     real(dp), intent(in) :: A(:, :), B(:, :)
-    type(mbd_blacs), intent(in) :: blacsA, blacsB, blacsC
+    type(mbd_blacs_desc), intent(in) :: blacsA, blacsB, blacsC
     logical, intent(in), optional :: transA, transB
     real(dp) :: C(size(A, 1), size(B, 2))
 
@@ -102,7 +102,7 @@ end function
 
 subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs), intent(in) :: blacs
+    type(mbd_blacs_desc), intent(in) :: blacs
     real(dp), intent(out) :: eigs(:)
     type(exception), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
@@ -141,7 +141,7 @@ end subroutine
 
 function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
     real(dp), target, intent(in) :: A(:, :)
-    type(mbd_blacs), intent(in) :: blacs
+    type(mbd_blacs_desc), intent(in) :: blacs
     type(exception), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3*blacs%n_atoms)

@@ -3,15 +3,16 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd
 
-use mbd_common, only: tostr, print_matrix, dp, pi, mbd_exc, findval, lower, &
-    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, printer, &
-    shift_cell
-use mbd_system_type, only: mbd_system, mbd_calc, ang
+use mbd_common, only: tostr, dp, pi, findval, lower, &
+    MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_UNIMPL, shift_cell
+use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
 use mbd_matrix_type, only: mat3n3n, contract_cross_33
-use mbd_parallel, only: mbd_blacs_grid, mbd_blacs, all_reduce
 use mbd_defaults
+#ifdef WITH_SCALAPACK
+use mbd_blacs, only: all_reduce
+#endif
 
 implicit none
 
@@ -135,55 +136,63 @@ type(mbd_result) function mbd_scs_energy( &
     if (allocated(dene%dcoords)) then
         dene%dcoords = 0d0
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%blacs%i_atom(my_i_atom)
+            i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dcoords(sys%blacs%j_atom, :) = &
-                    dene%dcoords(sys%blacs%j_atom, :) + &
+                dene%dcoords(sys%idx%j_atom, :) = &
+                    dene%dcoords(sys%idx%j_atom, :) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
             end do
         end do
+#ifdef WITH_SCALAPACK
         call all_reduce(dene%dcoords, sys%blacs)
+#endif
         dene%dcoords = dene%dcoords + dene_mbd%dcoords
     end if
     if (allocated(dene%dalpha)) then
         dene%dalpha = 0d0
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%blacs%i_atom(my_i_atom)
+            i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dalpha(sys%blacs%j_atom) = dene%dalpha(sys%blacs%j_atom) + &
+                dene%dalpha(sys%idx%j_atom) = dene%dalpha(sys%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dalpha(sys%blacs%j_atom)
+                    dalpha_dyn(i_freq)%dalpha(sys%idx%j_atom)
             end do
         end do
+#ifdef WITH_SCALAPACK
         call all_reduce(dene%dalpha, sys%blacs)
+#endif
         dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
     end if
     if (allocated(dene%dC6)) then
         dene%dC6 = 0d0
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%blacs%i_atom(my_i_atom)
+            i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dC6(sys%blacs%j_atom) = dene%dC6(sys%blacs%j_atom) + &
+                dene%dC6(sys%idx%j_atom) = dene%dC6(sys%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dC6(sys%blacs%j_atom)
+                    dalpha_dyn(i_freq)%dC6(sys%idx%j_atom)
             end do
         end do
+#ifdef WITH_SCALAPACK
         call all_reduce(dene%dC6, sys%blacs)
+#endif
     end if
     if (allocated(dene%dr_vdw)) then
         dene%dr_vdw = 0d0
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%blacs%i_atom(my_i_atom)
+            i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dr_vdw(sys%blacs%j_atom) = dene%dr_vdw(sys%blacs%j_atom) + &
+                dene%dr_vdw(sys%idx%j_atom) = dene%dr_vdw(sys%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dr_vdw
             end do
         end do
+#ifdef WITH_SCALAPACK
         call all_reduce(dene%dr_vdw, sys%blacs)
+#endif
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
 
@@ -204,8 +213,8 @@ type(mbd_result) function mbd_scs_energy( &
         if (allocated(dene%dalpha)) allocate (dr_vdw_scs%dV_free(n_atoms))
         if (allocated(dene%dr_vdw)) allocate (dr_vdw_scs%dX_free(n_atoms))
         allocate (dalpha_dyn(0:n_freq))
-        allocate (dalpha_dyn_scs(size(sys%blacs%i_atom), 0:n_freq))
-        my_ncatoms = size(sys%blacs%j_atom)
+        allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
+        my_ncatoms = size(sys%idx%j_atom)
         do i_freq = 0, n_freq
             if (allocated(dene%dalpha)) &
                 allocate (dalpha_dyn(i_freq)%dalpha(n_atoms))
@@ -242,9 +251,13 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
     do_ewald = .false.
     is_periodic = allocated(sys%lattice)
     n_atoms = sys%siz()
-    call dipmat%init(sys%blacs)
-    my_nratoms = size(dipmat%blacs%i_atom)
-    my_ncatoms = size(dipmat%blacs%j_atom)
+#ifdef WITH_SCALAPACK
+    call dipmat%init(sys%idx, sys%blacs)
+#else
+    call dipmat%init(sys%idx)
+#endif
+    my_nratoms = size(dipmat%idx%i_atom)
+    my_ncatoms = size(dipmat%idx%j_atom)
     if (present(k_point)) then
         allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0d0, 0d0))
     else
@@ -296,10 +309,10 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
         else
             R_cell(:) = 0d0
         end if
-        do my_i_atom = 1, size(dipmat%blacs%i_atom)
-            i_atom = dipmat%blacs%i_atom(my_i_atom)
-            do my_j_atom = 1, size(dipmat%blacs%j_atom)
-                j_atom = dipmat%blacs%j_atom(my_j_atom)
+        do my_i_atom = 1, size(dipmat%idx%i_atom)
+            i_atom = dipmat%idx%i_atom(my_i_atom)
+            do my_j_atom = 1, size(dipmat%idx%j_atom)
+                j_atom = dipmat%idx%j_atom(my_j_atom)
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
@@ -435,10 +448,10 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
-        do my_i_atom = 1, size(dipmat%blacs%i_atom)
-            i_atom = dipmat%blacs%i_atom(my_i_atom)
-            do my_j_atom = 1, size(dipmat%blacs%j_atom)
-                j_atom = dipmat%blacs%j_atom(my_j_atom)
+        do my_i_atom = 1, size(dipmat%idx%i_atom)
+            i_atom = dipmat%idx%i_atom(my_i_atom)
+            do my_j_atom = 1, size(dipmat%idx%j_atom)
+                j_atom = dipmat%idx%j_atom(my_j_atom)
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
                 if (present(k_point)) then
                     Tpp_c = k_prefactor*exp(cmplx(0d0, 1d0, 8) &
@@ -466,8 +479,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         k_sq = sum(k_point**2)
         if (sqrt(k_sq) > 1.d-15) then
             do_surface = .false.
-            do my_i_atom = 1, size(dipmat%blacs%i_atom)
-            do my_j_atom = 1, size(dipmat%blacs%j_atom)
+            do my_i_atom = 1, size(dipmat%idx%i_atom)
+            do my_j_atom = 1, size(dipmat%idx%j_atom)
                 do i_xyz = 1, 3
                 do j_xyz = 1, 3
                     i = 3*(my_i_atom-1)+i_xyz
@@ -486,8 +499,8 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         end if ! k_sq >
     end if ! k_point present
     if (do_surface) then ! surface energy
-        do my_i_atom = 1, size(dipmat%blacs%i_atom)
-        do my_j_atom = 1, size(dipmat%blacs%j_atom)
+        do my_i_atom = 1, size(dipmat%idx%i_atom)
+        do my_j_atom = 1, size(dipmat%idx%j_atom)
             do i_xyz = 1, 3
                 i = 3*(my_i_atom-1)+i_xyz
                 j = 3*(my_j_atom-1)+i_xyz
@@ -567,10 +580,10 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
                 grads_i = contract_cross_33( &
                     i_atom, dQ, alpha_prime, alpha_full, B_prime &
                 )
-                my_i_atom = findval(sys%blacs%i_atom, i_atom)
+                my_i_atom = findval(sys%idx%i_atom, i_atom)
                 if (my_i_atom > 0) then
                     dalpha_scs(my_i_atom)%dcoords(:, i_xyz) = &
-                        grads_i(sys%blacs%j_atom)
+                        grads_i(sys%idx%j_atom)
                 end if
             end do
         end do
@@ -589,9 +602,9 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             grads_i = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
             )
-            my_i_atom = findval(sys%blacs%i_atom, i_atom)
+            my_i_atom = findval(sys%idx%i_atom, i_atom)
             if (my_i_atom > 0) then
-                dalpha_scs(my_i_atom)%dalpha = grads_i(sys%blacs%j_atom)
+                dalpha_scs(my_i_atom)%dalpha = grads_i(sys%idx%j_atom)
             end if
         end do
     end if
@@ -603,9 +616,9 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             grads_i = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
             )
-            my_i_atom = findval(sys%blacs%i_atom, i_atom)
+            my_i_atom = findval(sys%idx%i_atom, i_atom)
             if (my_i_atom > 0) then
-                dalpha_scs(my_i_atom)%dr_vdw = grads_i(sys%blacs%j_atom)
+                dalpha_scs(my_i_atom)%dr_vdw = grads_i(sys%idx%j_atom)
             end if
         end do
     end if
@@ -807,9 +820,9 @@ type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
         ! relay = T
         relay = dipole_matrix(sys, damp_alpha, .false.)
-        do my_i_atom = 1, size(relay%blacs%i_atom)
+        do my_i_atom = 1, size(relay%idx%i_atom)
             associate ( &
-                    i_atom => relay%blacs%i_atom(my_i_atom), &
+                    i_atom => relay%idx%i_atom(my_i_atom), &
                     relay_sub => relay%re(3*(my_i_atom-1)+1:, :) &
             )
                 relay_sub(:3, :) = relay_sub(:3, :)*alpha(i_atom, i_freq)

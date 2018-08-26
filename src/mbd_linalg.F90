@@ -3,9 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_linalg
 
-use mbd_common, only: tostr, dp, exception => mbd_exc, MBD_EXC_LINALG, &
-    MBD_EXC_UNIMPL
-use mbd_parallel, only: mbd_blacs
+use mbd_common, only: dp
 
 implicit none
 

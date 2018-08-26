@@ -7,7 +7,7 @@
 program mbd_tests
 
 use mbd
-use mbd_common, only: diff7, findval
+use mbd_common, only: diff7, findval, print_matrix
 
 #ifdef WITH_MPI
 use mpi
@@ -293,8 +293,8 @@ subroutine test_scs_deriv_expl()
     coords(3, 2) = 4d0
     sys%coords = coords
     call sys%init(calc)
-    my_nratoms = size(sys%blacs%i_atom)
-    my_ncatoms = size(sys%blacs%j_atom)
+    my_nratoms = size(sys%idx%i_atom)
+    my_ncatoms = size(sys%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms, 3))
     allocate (gradients_anl(my_nratoms, my_ncatoms, 3))
     allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
@@ -311,7 +311,7 @@ subroutine test_scs_deriv_expl()
         deallocate (dalpha_scs(my_i_atom)%dcoords)
     end do
     do j_atom = 1, n_atoms
-        my_j_atom = findval(sys%blacs%j_atom, j_atom)
+        my_j_atom = findval(sys%idx%j_atom, j_atom)
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
@@ -322,7 +322,7 @@ subroutine test_scs_deriv_expl()
             end do
             if (my_j_atom > 0) then
                 do my_i_atom = 1, my_nratoms
-                    i_atom = sys%blacs%i_atom(my_i_atom)
+                    i_atom = sys%idx%i_atom(my_i_atom)
                     gradients(my_i_atom, my_j_atom, i_xyz) = &
                         diff7(alpha_scs(i_atom, :), delta)
                 end do
@@ -357,8 +357,8 @@ subroutine test_scs_deriv_impl_alpha
     coords(3, 2) = 4d0
     sys%coords = coords
     call sys%init(calc)
-    my_nratoms = size(sys%blacs%i_atom)
-    my_ncatoms = size(sys%blacs%j_atom)
+    my_nratoms = size(sys%idx%i_atom)
+    my_ncatoms = size(sys%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
     allocate (gradients_anl(my_nratoms, my_ncatoms))
     allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
@@ -375,7 +375,7 @@ subroutine test_scs_deriv_impl_alpha
         deallocate (dalpha_scs(my_i_atom)%dalpha)
     end do
     do j_atom = 1, n_atoms
-        my_j_atom = findval(sys%blacs%j_atom, j_atom)
+        my_j_atom = findval(sys%idx%j_atom, j_atom)
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
@@ -384,7 +384,7 @@ subroutine test_scs_deriv_impl_alpha
         end do
         if (my_j_atom > 0) then
             do my_i_atom = 1, my_nratoms
-                i_atom = sys%blacs%i_atom(my_i_atom)
+                i_atom = sys%idx%i_atom(my_i_atom)
                 gradients(my_i_atom, my_j_atom) = diff7(alpha_scs(i_atom, :), delta)
             end do
     end if
@@ -414,8 +414,8 @@ subroutine test_scs_deriv_impl_vdw
     coords(3, 2) = 4d0
     sys%coords = coords
     call sys%init(calc)
-    my_nratoms = size(sys%blacs%i_atom)
-    my_ncatoms = size(sys%blacs%j_atom)
+    my_nratoms = size(sys%idx%i_atom)
+    my_ncatoms = size(sys%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
     allocate (gradients_anl(my_nratoms, my_ncatoms))
     allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
@@ -433,7 +433,7 @@ subroutine test_scs_deriv_impl_vdw
         deallocate (dalpha_scs(my_i_atom)%dr_vdw)
     end do
     do j_atom = 1, n_atoms
-        my_j_atom = findval(sys%blacs%j_atom, j_atom)
+        my_j_atom = findval(sys%idx%j_atom, j_atom)
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = rvdw
@@ -442,7 +442,7 @@ subroutine test_scs_deriv_impl_vdw
         end do
         if (my_j_atom > 0) then
             do my_i_atom = 1, my_nratoms
-                i_atom = sys%blacs%i_atom(my_i_atom)
+                i_atom = sys%idx%i_atom(my_i_atom)
                 gradients(my_i_atom, my_j_atom) = diff7(alpha_scs(i_atom, :), delta)
             end do
         end if

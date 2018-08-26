@@ -7,6 +7,8 @@ use mbd_common, only: dp
 
 implicit none
 
+private :: dp
+
 real(dp), parameter :: TS_ENERGY_ACCURACY = 1d-6
 real(dp), parameter :: TS_FORCES_ACCURACY = 1d-7
 integer, parameter :: N_FREQUENCY_GRID = 15

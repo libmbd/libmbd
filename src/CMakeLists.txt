@@ -3,7 +3,6 @@ set(SRCS
     mbd_c_api.F90
     mbd_api.f90
     mbd_vdw_param.f90
-    mbd_parallel.F90
     mbd_coulomb.f90
     # mbd_density.f90
     mbd_common.f90
@@ -16,7 +15,7 @@ set(SRCS
 )
 
 if(ENABLE_SCALAPACK_MPI)
-    list(APPEND SRCS mbd_scalapack.f90)
+    list(APPEND SRCS mbd_blacs.f90 mbd_scalapack.f90)
 endif()
 
 add_library(mbd ${SRCS})

@@ -4,16 +4,25 @@
 module mbd_matrix_type
 
 use mbd_common, only: dp, findval, exception => mbd_exc, MBD_EXC_UNIMPL
-use mbd_parallel, only: mbd_blacs, mbd_blacs_grid, all_reduce
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
 #ifdef WITH_SCALAPACK
+use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid, all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
 #endif
 
 implicit none
 
 private
-public :: mat3n3n, contract_cross_33
+public :: mat3n3n, contract_cross_33, mbd_index
+
+type :: mbd_index
+    integer, allocatable :: i_atom(:)
+    integer, allocatable :: j_atom(:)
+    integer :: n_atoms
+#ifdef WITH_SCALAPACK
+    logical :: parallel
+#endif
+end type
 
 type :: mat3n3n
     real(dp), allocatable :: re(:, :)
@@ -21,7 +30,10 @@ type :: mat3n3n
     real(dp), allocatable :: re_dr(:, :, :)
     real(dp), allocatable :: re_dvdw(:, :)
     real(dp), allocatable :: re_dsigma(:, :)
-    type(mbd_blacs) :: blacs
+    type(mbd_index) :: idx
+#ifdef WITH_SCALAPACK
+    type(mbd_blacs_desc) :: blacs
+#endif
     contains
     procedure :: siz => mat3n3n_siz
     procedure :: init => mat3n3n_init
@@ -61,18 +73,31 @@ integer function mat3n3n_siz(this, ndim)
     end if
 end function
 
-subroutine mat3n3n_init(this, blacs)
+#ifdef WITH_SCALAPACK
+subroutine mat3n3n_init(this, idx, blacs)
+#else
+subroutine mat3n3n_init(this, idx)
+#endif
     class(mat3n3n), intent(out) :: this
-    type(mbd_blacs), intent(in) :: blacs
+    type(mbd_index), intent(in) :: idx
+#ifdef WITH_SCALAPACK
+    type(mbd_blacs_desc), intent(in) :: blacs
+#endif
 
+    this%idx = idx
+#ifdef WITH_SCALAPACK
     this%blacs = blacs
+#endif
 end subroutine
 
 subroutine mat3n3n_init_from(this, other)
     class(mat3n3n), intent(out) :: this
     type(mat3n3n), intent(in) :: other
 
+    this%idx = other%idx
+#ifdef WITH_SCALAPACK
     this%blacs = other%blacs
+#endif
 end subroutine
 
 subroutine mat3n3n_copy_from(this, other)
@@ -84,7 +109,10 @@ subroutine mat3n3n_copy_from(this, other)
     else
         this%cplx = other%cplx
     end if
+    this%idx = other%idx
+#ifdef WITH_SCALAPACK
     this%blacs = other%blacs
+#endif
 end subroutine
 
 subroutine mat3n3n_move_from(this, other)
@@ -96,7 +124,10 @@ subroutine mat3n3n_move_from(this, other)
     else
         call move_alloc(other%cplx, this%cplx)
     end if
+    this%idx = other%idx
+#ifdef WITH_SCALAPACK
     this%blacs = other%blacs
+#endif
 end subroutine
 
 subroutine mat3n3n_alloc_from(this, other)
@@ -112,7 +143,10 @@ subroutine mat3n3n_alloc_from(this, other)
     else
         allocate (this%cplx(n1, n2))
     end if
+    this%idx = other%idx
+#ifdef WITH_SCALAPACK
     this%blacs = other%blacs
+#endif
 end subroutine
 
 subroutine mat3n3n_add(this, other)
@@ -132,7 +166,7 @@ subroutine mat3n3n_add_diag_scalar(this, d)
 
     integer :: i
 
-    call mat3n3n_add_diag(this, [(d, i = 1, this%blacs%n_atoms)])
+    call mat3n3n_add_diag(this, [(d, i = 1, this%idx%n_atoms)])
 end subroutine
 
 subroutine mat3n3n_add_diag(this, d)
@@ -142,11 +176,11 @@ subroutine mat3n3n_add_diag(this, d)
     integer :: my_i_atom, my_j_atom, i
 
     if (allocated(this%re)) then
-        do my_i_atom = 1, size(this%blacs%i_atom)
-            do my_j_atom = 1, size(this%blacs%j_atom)
+        do my_i_atom = 1, size(this%idx%i_atom)
+            do my_j_atom = 1, size(this%idx%j_atom)
                 associate ( &
-                        i_atom => this%blacs%i_atom(my_i_atom), &
-                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        i_atom => this%idx%i_atom(my_i_atom), &
+                        j_atom => this%idx%j_atom(my_j_atom), &
                         this_diag => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     if (i_atom /= j_atom) cycle
@@ -158,11 +192,11 @@ subroutine mat3n3n_add_diag(this, d)
         end do
     end if
     if (allocated(this%cplx)) then
-        do my_i_atom = 1, size(this%blacs%i_atom)
-            do my_j_atom = 1, size(this%blacs%j_atom)
+        do my_i_atom = 1, size(this%idx%i_atom)
+            do my_j_atom = 1, size(this%idx%j_atom)
                 associate ( &
-                        i_atom => this%blacs%i_atom(my_i_atom), &
-                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        i_atom => this%idx%i_atom(my_i_atom), &
+                        j_atom => this%idx%j_atom(my_j_atom), &
                         this_diag => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     if (i_atom /= j_atom) cycle
@@ -183,11 +217,11 @@ subroutine mat3n3n_mult_cross(this, b, c)
     integer :: my_i_atom, my_j_atom
 
     if (allocated(this%re)) then
-        do my_i_atom = 1, size(this%blacs%i_atom)
-            do my_j_atom = 1, size(this%blacs%j_atom)
+        do my_i_atom = 1, size(this%idx%i_atom)
+            do my_j_atom = 1, size(this%idx%j_atom)
                 associate ( &
-                        i_atom => this%blacs%i_atom(my_i_atom), &
-                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        i_atom => this%idx%i_atom(my_i_atom), &
+                        j_atom => this%idx%j_atom(my_j_atom), &
                         this_sub => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     if (present(c)) then
@@ -201,11 +235,11 @@ subroutine mat3n3n_mult_cross(this, b, c)
         end do
     end if
     if (allocated(this%cplx)) then
-        do my_i_atom = 1, size(this%blacs%i_atom)
-            do my_j_atom = 1, size(this%blacs%j_atom)
+        do my_i_atom = 1, size(this%idx%i_atom)
+            do my_j_atom = 1, size(this%idx%j_atom)
                 associate ( &
-                        i_atom => this%blacs%i_atom(my_i_atom), &
-                        j_atom => this%blacs%j_atom(my_j_atom), &
+                        i_atom => this%idx%i_atom(my_i_atom), &
+                        j_atom => this%idx%j_atom(my_j_atom), &
                         this_sub => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     if (present(c)) then
@@ -227,9 +261,9 @@ subroutine mat3n3n_mult_rows(this, b)
     integer :: my_i_atom
 
     if (allocated(this%re)) then
-        do my_i_atom = 1, size(this%blacs%i_atom)
+        do my_i_atom = 1, size(this%idx%i_atom)
             associate ( &
-                    i_atom => this%blacs%i_atom(my_i_atom), &
+                    i_atom => this%idx%i_atom(my_i_atom), &
                     this_sub => this%re(3*(my_i_atom-1)+1:, :) &
             )
                 this_sub(:3, :) = this_sub(:3, :)*b(i_atom)
@@ -237,9 +271,9 @@ subroutine mat3n3n_mult_rows(this, b)
         end do
     end if
     if (allocated(this%cplx)) then
-        do my_i_atom = 1, size(this%blacs%i_atom)
+        do my_i_atom = 1, size(this%idx%i_atom)
             associate ( &
-                    i_atom => this%blacs%i_atom(my_i_atom), &
+                    i_atom => this%idx%i_atom(my_i_atom), &
                     this_sub => this%cplx(3*(my_i_atom-1)+1:, :) &
             )
                 this_sub(:3, :) = this_sub(:3, :)*b(i_atom)
@@ -255,9 +289,9 @@ subroutine mat3n3n_mult_cols_3n(this, b)
     integer :: my_j_atom, i
 
     if (allocated(this%re)) then
-        do my_j_atom = 1, size(this%blacs%j_atom)
+        do my_j_atom = 1, size(this%idx%j_atom)
             associate ( &
-                    b_sub => b(3*(this%blacs%j_atom(my_j_atom)-1)+1:), &
+                    b_sub => b(3*(this%idx%j_atom(my_j_atom)-1)+1:), &
                     this_sub => this%re(:, 3*(my_j_atom-1)+1:) &
             )
                 forall (i = 1:3) this_sub(:, i) = this_sub(:, i)*b_sub(i)
@@ -265,9 +299,9 @@ subroutine mat3n3n_mult_cols_3n(this, b)
         end do
     end if
     if (allocated(this%cplx)) then
-        do my_j_atom = 1, size(this%blacs%j_atom)
+        do my_j_atom = 1, size(this%idx%j_atom)
             associate ( &
-                    b_sub => b(3*(this%blacs%j_atom(my_j_atom)-1)+1:), &
+                    b_sub => b(3*(this%idx%j_atom(my_j_atom)-1)+1:), &
                     this_sub => this%cplx(:, 3*(my_j_atom-1)+1:) &
             )
                 forall (i = 1:3) this_sub(:, i) = this_sub(:, i)*b_sub(i)
@@ -284,11 +318,11 @@ subroutine mat3n3n_mult_col(this, idx, a)
     integer :: my_i_atom, my_j_atom
 
     if (allocated(this%re)) then
-        do my_j_atom = 1, size(this%blacs%j_atom)
-            if (this%blacs%j_atom(my_j_atom) /= idx) cycle
-            do my_i_atom = 1, size(this%blacs%i_atom)
+        do my_j_atom = 1, size(this%idx%j_atom)
+            if (this%idx%j_atom(my_j_atom) /= idx) cycle
+            do my_i_atom = 1, size(this%idx%i_atom)
                 associate ( &
-                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        i_atom => this%idx%i_atom(my_i_atom), &
                         this_sub => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     this_sub(:3, :3) = this_sub(:3, :3)*a(i_atom)
@@ -297,11 +331,11 @@ subroutine mat3n3n_mult_col(this, idx, a)
         end do
     end if
     if (allocated(this%cplx)) then
-        do my_j_atom = 1, size(this%blacs%j_atom)
-            if (this%blacs%j_atom(my_j_atom) /= idx) cycle
-            do my_i_atom = 1, size(this%blacs%i_atom)
+        do my_j_atom = 1, size(this%idx%j_atom)
+            if (this%idx%j_atom(my_j_atom) /= idx) cycle
+            do my_i_atom = 1, size(this%idx%i_atom)
                 associate ( &
-                        i_atom => this%blacs%i_atom(my_i_atom), &
+                        i_atom => this%idx%i_atom(my_i_atom), &
                         this_sub => this%cplx(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
                 )
                     this_sub(:3, :3) = this_sub(:3, :3)*a(i_atom)
@@ -316,9 +350,10 @@ type(mat3n3n) function mat3n3n_mmul(A, B, transA, transB) result(C)
     type(mat3n3n), intent(in) :: B
     logical, intent(in), optional :: transA, transB
 
-    C%blacs = A%blacs
+    C%idx = A%idx
 #ifdef WITH_SCALAPACK
-    if (.not. A%blacs%parallel()) then
+    C%blacs = A%blacs
+    if (.not. A%idx%parallel) then
         C%re = mmul(A%re, B%re, transA, transB)
     else
         C%re = pmmul(A%re, A%blacs, B%re, B%blacs, transA, transB, C%blacs)
@@ -334,7 +369,7 @@ subroutine mat3n3n_invh(A, exc, src)
     type(mat3n3n), intent(in), optional :: src
 
 #ifdef WITH_SCALAPACK
-    if (.not. A%blacs%parallel()) then
+    if (.not. A%idx%parallel) then
         if (present(src)) then
             call invh(A%re, exc, src%re)
         else
@@ -365,7 +400,7 @@ subroutine mat3n3n_eigh(A, eigs, exc, src, vals_only)
 
     if (allocated(A%re)) then
 #ifdef WITH_SCALAPACK
-        if (.not. A%blacs%parallel()) then
+        if (.not. A%idx%parallel) then
             call eigh(A%re, eigs, exc, src%re, vals_only)
         else
             call peigh(A%re, A%blacs, eigs, exc, src%re, vals_only)
@@ -374,13 +409,16 @@ subroutine mat3n3n_eigh(A, eigs, exc, src, vals_only)
         call eigh(A%re, eigs, exc, src%re, vals_only)
 #endif
     else
-        if (.not. A%blacs%parallel()) then
+#ifdef WITH_SCALAPACK
+        if (.not. A%idx%parallel) then
             call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
         else
             exc%code = MBD_EXC_UNIMPL
             exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
-            return
         end if
+#else
+        call eigh(A%cplx, eigs, exc, src%cplx, vals_only)
+#endif
     end if
 end subroutine
 
@@ -388,11 +426,11 @@ function mat3n3n_eigvalsh(A, exc, destroy) result(eigs)
     class(mat3n3n), target, intent(in) :: A
     type(exception), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    real(dp) :: eigs(3*A%blacs%n_atoms)
+    real(dp) :: eigs(3*A%idx%n_atoms)
 
     if (allocated(A%re)) then
 #ifdef WITH_SCALAPACK
-        if (.not. A%blacs%parallel()) then
+        if (.not. A%idx%parallel) then
             eigs = eigvalsh(A%re, exc, destroy)
         else
             eigs = peigvalsh(A%re, A%blacs, exc, destroy)
@@ -401,13 +439,16 @@ function mat3n3n_eigvalsh(A, exc, destroy) result(eigs)
         eigs = eigvalsh(A%re, exc, destroy)
 #endif
     else
-        if (.not. A%blacs%parallel()) then
+#ifdef WITH_SCALAPACK
+        if (.not. A%idx%parallel) then
             eigs = eigvalsh(A%cplx, exc, destroy)
         else
             exc%code = MBD_EXC_UNIMPL
             exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
-            return
         end if
+#else
+        eigs = eigvalsh(A%cplx, exc, destroy)
+#endif
     end if
 end function
 
@@ -415,17 +456,30 @@ function mat3n3n_eigvals(A, exc, destroy) result(eigs)
     class(mat3n3n), target, intent(in) :: A
     type(exception), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    complex(dp) :: eigs(3*A%blacs%n_atoms)
+    complex(dp) :: eigs(3*A%idx%n_atoms)
 
-    if (A%blacs%parallel()) then
-        exc%code = MBD_EXC_UNIMPL
-        exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
-        return
-    end if
     if (allocated(A%re)) then
+#ifdef WITH_SCALAPACK
+        if (A%idx%parallel) then
+            exc%code = MBD_EXC_UNIMPL
+            exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+        else
+            eigs = eigvals(A%re, exc, destroy)
+        end if
+#else
         eigs = eigvals(A%re, exc, destroy)
+#endif
     else
+#ifdef WITH_SCALAPACK
+        if (A%idx%parallel) then
+            exc%code = MBD_EXC_UNIMPL
+            exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+        else
+            eigs = eigvals(A%cplx, exc, destroy)
+        end if
+#else
         eigs = eigvals(A%cplx, exc, destroy)
+#endif
     end if
 end function
 
@@ -438,13 +492,13 @@ subroutine mat3n3n_contract_n_transp(this, dir, res)
     real(dp), pointer :: res_sub(:, :)
 
     res(:, :) = 0d0
-    do my_i_atom = 1, size(this%blacs%i_atom)
-        do my_j_atom = 1, size(this%blacs%j_atom)
+    do my_i_atom = 1, size(this%idx%i_atom)
+        do my_j_atom = 1, size(this%idx%j_atom)
             select case (dir(1:1))
             case ('R')
-                res_sub => res(:, 3*(this%blacs%i_atom(my_i_atom)-1)+1:)
+                res_sub => res(:, 3*(this%idx%i_atom(my_i_atom)-1)+1:)
             case ('C')
-                res_sub => res(3*(this%blacs%j_atom(my_j_atom)-1)+1:, :)
+                res_sub => res(3*(this%idx%j_atom(my_j_atom)-1)+1:, :)
             end select
             associate ( &
                     this_sub => this%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
@@ -453,22 +507,24 @@ subroutine mat3n3n_contract_n_transp(this, dir, res)
             end associate
         end do
     end do
+#ifdef WITH_SCALAPACK
     call all_reduce(res, this%blacs)
+#endif
 end subroutine
 
 function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
     integer, intent(in) :: k_atom
     type(mat3n3n), intent(in) :: A, B
     real(dp), intent(in) :: A_prime(:, :), B_prime(:, :)
-    real(dp) :: res(A%blacs%n_atoms)
+    real(dp) :: res(A%idx%n_atoms)
 
     integer :: my_i_atom, my_j_atom, i_atom, j_atom
 
     res(:) = 0d0
-    my_i_atom = findval(A%blacs%i_atom, k_atom)
+    my_i_atom = findval(A%idx%i_atom, k_atom)
     if (my_i_atom > 0) then
-        do my_j_atom = 1, size(A%blacs%j_atom)
-            j_atom = A%blacs%j_atom(my_j_atom)
+        do my_j_atom = 1, size(A%idx%j_atom)
+            j_atom = A%idx%j_atom(my_j_atom)
             associate ( &
                     A_sub => A%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
                     A_prime_sub => A_prime(:, 3*(j_atom-1)+1:) &
@@ -477,10 +533,10 @@ function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
             end associate
         end do
     end if
-    my_j_atom = findval(A%blacs%j_atom, k_atom)
+    my_j_atom = findval(A%idx%j_atom, k_atom)
     if (my_j_atom > 0) then
-        do my_i_atom = 1, size(A%blacs%i_atom)
-            i_atom = A%blacs%i_atom(my_i_atom)
+        do my_i_atom = 1, size(A%idx%i_atom)
+            i_atom = A%idx%i_atom(my_i_atom)
             associate ( &
                     B_sub => B%re(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
                     B_prime_sub => B_prime(3*(i_atom-1)+1:, :) &
@@ -490,41 +546,47 @@ function contract_cross_33(k_atom, A, A_prime, B, B_prime) result(res)
             end associate
         end do
     end if
+#ifdef WITH_SCALAPACK
     call all_reduce(res, A%blacs)
+#endif
 end function
 
 function mat3n3n_contract_n33diag_cols(A) result(res)
     class(mat3n3n), intent(in) :: A
-    real(dp) :: res(A%blacs%n_atoms)
+    real(dp) :: res(A%idx%n_atoms)
 
     integer :: i_xyz, my_j_atom, j_atom
 
     res(:) = 0d0
-    do my_j_atom = 1, size(A%blacs%j_atom)
-        j_atom = A%blacs%j_atom(my_j_atom)
+    do my_j_atom = 1, size(A%idx%j_atom)
+        j_atom = A%idx%j_atom(my_j_atom)
         do i_xyz = 1, 3
             res(j_atom) = res(j_atom) + &
                 sum(A%re(i_xyz::3, 3*(my_j_atom-1)+i_xyz))
         end do
     end do
     res = res/3
+#ifdef WITH_SCALAPACK
     call all_reduce(res, A%blacs)
+#endif
 end function
 
 function mat3n3n_contract_n33_rows(A) result(res)
     class(mat3n3n), intent(in) :: A
-    real(dp) :: res(A%blacs%n_atoms)
+    real(dp) :: res(A%idx%n_atoms)
 
     integer :: my_i_atom, i_atom
 
     res(:) = 0d0
-    do my_i_atom = 1, size(A%blacs%i_atom)
-        i_atom = A%blacs%i_atom(my_i_atom)
+    do my_i_atom = 1, size(A%idx%i_atom)
+        i_atom = A%idx%i_atom(my_i_atom)
         associate (A_sub => A%re(3*(my_i_atom-1)+1:, :))
             res(i_atom) = res(i_atom) + sum(A_sub(:3, :))
         end associate
     end do
+#ifdef WITH_SCALAPACK
     call all_reduce(res, A%blacs)
+#endif
 end function
 
 end module

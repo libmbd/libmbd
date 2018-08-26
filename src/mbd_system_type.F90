@@ -7,9 +7,12 @@
 module mbd_system_type
 
 use mbd_common, only: dp, pi, mbd_exc, printer, tostr
-use mbd_parallel, only: mbd_blacs, mbd_blacs_grid
 use mbd_lapack, only: inverse
 use mbd_defaults
+use mbd_matrix_type, only: mbd_index
+#ifdef WITH_SCALAPACK
+use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid
+#endif
 #ifdef WITH_MPI
 use mpi
 #endif
@@ -80,8 +83,11 @@ type :: mbd_system
     !> - `"k_points"`: parallelize over k-points (each MPI task solves entire
     !> eigenproblems for its k-points)
     character(len=10) :: parallel_mode = 'atoms'
-    type(mbd_blacs) :: blacs
+    type(mbd_index) :: idx
+#ifdef WITH_SCALAPACK
+    type(mbd_blacs_desc) :: blacs
     type(mbd_blacs_grid) :: blacs_grid
+#endif
 #ifdef WITH_MPI
     integer :: comm = MPI_COMM_WORLD
 #else
@@ -102,17 +108,33 @@ subroutine mbd_system_init(this, calc)
     class(mbd_system), intent(inout) :: this
     type(mbd_calc), target, intent(in) :: calc
 
+    integer :: i_atom
+
     this%calc => calc
-    call this%blacs_grid%init(this%comm)
-    call this%blacs%init( &
-        this%siz(), this%blacs_grid, this%parallel_mode == 'atoms' &
-    )
+#ifdef WITH_SCALAPACK
+    this%idx%parallel = this%parallel_mode == 'atoms'
+    if (this%idx%parallel) then
+        call this%blacs_grid%init(this%comm)
+        call this%blacs%init(this%siz(), this%blacs_grid)
+        this%idx%i_atom = this%blacs%i_atom
+        this%idx%j_atom = this%blacs%j_atom
+    else
+        this%idx%i_atom = [(i_atom, i_atom = 1, this%siz())]
+        this%idx%j_atom = this%idx%i_atom
+    end if
+#else
+    this%idx%i_atom = [(i_atom, i_atom = 1, this%siz())]
+    this%idx%j_atom = this%idx%i_atom
+#endif
+    this%idx%n_atoms = this%siz()
 end subroutine
 
 subroutine mbd_system_destroy(this)
     class(mbd_system), intent(inout) :: this
+#ifdef WITH_SCALAPACK
 
     call this%blacs_grid%destroy()
+#endif
 end subroutine
 
 integer function mbd_system_siz(this) result(siz)

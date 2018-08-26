@@ -9,9 +9,8 @@ else
         CMAKE_FLAGS+=(-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage")
     fi
     if [[ "$MPI_NODES" ]]; then
-        if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-            CMAKE_FLAGS+=(-DENABLE_SCALAPACK_MPI=ON)
-        else
+        CMAKE_FLAGS+=(-DENABLE_SCALAPACK_MPI=ON)
+        if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
             CMAKE_FLAGS+=(-DSCALAPACK_LIBRARIES="-lscalapack-openmpi -lblacs-openmpi")
         fi
     fi

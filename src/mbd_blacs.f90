@@ -34,10 +34,12 @@ end type
 interface all_reduce
     module procedure all_reduce_real_1d
     module procedure all_reduce_real_2d
+    module procedure all_reduce_complex_1d
+    module procedure all_reduce_complex_2d
 end interface
 
 external :: BLACS_PINFO, BLACS_GRIDINIT, BLACS_GRIDINFO, &
-    BLACS_GRIDEXIT, NUMROC, DESCINIT, DGSUM2D
+    BLACS_GRIDEXIT, NUMROC, DESCINIT, DGSUM2D, ZGSUM2D
 integer :: NUMROC
 
 contains
@@ -128,6 +130,24 @@ subroutine all_reduce_real_2d(A, blacs)
 
     if (blacs%ctx == -1) return
     call DGSUM2D( &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
+    )
+end subroutine
+
+subroutine all_reduce_complex_1d(A, blacs)
+    complex(dp), intent(inout) :: A(:)
+    type(mbd_blacs_desc), intent(in) :: blacs
+
+    if (blacs%ctx == -1) return
+    call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
+end subroutine
+
+subroutine all_reduce_complex_2d(A, blacs)
+    complex(dp), intent(inout) :: A(:, :)
+    type(mbd_blacs_desc), intent(in) :: blacs
+
+    if (blacs%ctx == -1) return
+    call ZGSUM2D( &
         blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
     )
 end subroutine

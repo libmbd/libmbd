@@ -1,6 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#ifndef MBD_INCLUDED
 module mbd
 
 use mbd_common, only: tostr, dp, pi, findval, lower, &
@@ -76,6 +77,11 @@ type :: scalar
     real(dp), allocatable :: dr(:)  ! explicit derivative
     real(dp), allocatable :: dvdw
 end type
+
+interface dipole_matrix
+    module procedure dipole_matrix_real
+    module procedure dipole_matrix_complex
+end interface
 
 contains
 
@@ -234,19 +240,33 @@ type(mbd_result) function mbd_scs_energy( &
     end subroutine
 end function mbd_scs_energy
 
-type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
+#endif
+
+#ifndef MBD_TYPE
+#define MBD_TYPE 0
+#endif
+
+#if MBD_TYPE == 0
+type(mat3n3n) function dipole_matrix_real(sys, damp, grad) result(dipmat)
+#elif MBD_TYPE == 1
+type(mat3n3n) function dipole_matrix_complex(sys, damp, grad, k_point) result(dipmat)
+#endif
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
     logical, intent(in) :: grad
-    real(dp), intent(in), optional :: k_point(3)
+#if MBD_TYPE == 1
+    real(dp), intent(in) :: k_point(3)
+#endif
 
     real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
     type(mat33) :: Tpp
-    complex(dp) :: Tpp_c(3, 3)
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
         n_atoms, my_i_atom, my_j_atom, my_nratoms, my_ncatoms
     logical :: do_ewald, is_periodic
+#if MBD_TYPE == 1
+    complex(dp) :: Tpp_c(3, 3)
+#endif
 
     do_ewald = .false.
     is_periodic = allocated(sys%lattice)
@@ -258,16 +278,16 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
 #endif
     my_nratoms = size(dipmat%idx%i_atom)
     my_ncatoms = size(dipmat%idx%j_atom)
-    if (present(k_point)) then
-        allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0d0, 0d0))
-    else
-        allocate (dipmat%re(3*my_nratoms, 3*my_ncatoms), source=0d0)
-        if (grad) then
-            allocate (dipmat%re_dr(3*my_nratoms, 3*my_ncatoms, 3), source=0d0)
-            allocate (dipmat%re_dvdw(3*my_nratoms, 3*my_ncatoms), source=0d0)
-            allocate (dipmat%re_dsigma(3*my_nratoms, 3*my_ncatoms), source=0d0)
-        end if
+#if MBD_TYPE == 1
+    allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0d0, 0d0))
+#elif MBD_TYPE == 0
+    allocate (dipmat%re(3*my_nratoms, 3*my_ncatoms), source=0d0)
+    if (grad) then
+        allocate (dipmat%re_dr(3*my_nratoms, 3*my_ncatoms, 3), source=0d0)
+        allocate (dipmat%re_dvdw(3*my_nratoms, 3*my_ncatoms), source=0d0)
+        allocate (dipmat%re_dsigma(3*my_nratoms, 3*my_ncatoms), source=0d0)
     end if
+#endif
     ! MPI code end
     if (is_periodic) then
         if (any(sys%vacuum_axis)) then
@@ -367,58 +387,73 @@ type(mat3n3n) function dipole_matrix(sys, damp, grad, k_point) result(dipmat)
                 if (do_ewald) then
                     Tpp%val = Tpp%val+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
-                if (present(k_point)) then
-                    Tpp_c = Tpp%val*exp(-cmplx(0d0, 1d0, 8)*( &
-                        dot_product(k_point, r)))
-                end if
+#if MBD_TYPE == 1
+                Tpp_c = Tpp%val*exp(-cmplx(0d0, 1d0, 8)*( &
+                    dot_product(k_point, r)))
+#endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
-                if (present(k_point)) then
-                    associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
-                        T = T + Tpp_c
+#if MBD_TYPE == 1
+                associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
+                    T = T + Tpp_c
+                end associate
+#elif MBD_TYPE == 0
+                associate (T => dipmat%re(i+1:i+3, j+1:j+3))
+                    T = T + Tpp%val
+                end associate
+                if (allocated(Tpp%dr)) then
+                    associate (T => dipmat%re_dr(i+1:i+3, j+1:j+3, :))
+                        T = T + Tpp%dr
                     end associate
-                else
-                    associate (T => dipmat%re(i+1:i+3, j+1:j+3))
-                        T = T + Tpp%val
-                    end associate
-                    if (allocated(Tpp%dr)) then
-                        associate (T => dipmat%re_dr(i+1:i+3, j+1:j+3, :))
-                            T = T + Tpp%dr
-                        end associate
-                    end if
-                    if (allocated(Tpp%dvdw)) then
-                        associate (dTdRvdw => dipmat%re_dvdw(i+1:i+3, j+1:j+3))
-                            dTdRvdw = dTdRvdw + Tpp%dvdw
-                        end associate
-                    end if
-                    if (allocated(Tpp%dsigma)) then
-                        associate (dTdsigma => dipmat%re_dsigma(i+1:i+3, j+1:j+3))
-                            dTdsigma = dTdsigma + Tpp%dsigma
-                        end associate
-                    end if
                 end if
+                if (allocated(Tpp%dvdw)) then
+                    associate (dTdRvdw => dipmat%re_dvdw(i+1:i+3, j+1:j+3))
+                        dTdRvdw = dTdRvdw + Tpp%dvdw
+                    end associate
+                end if
+                if (allocated(Tpp%dsigma)) then
+                    associate (dTdsigma => dipmat%re_dsigma(i+1:i+3, j+1:j+3))
+                        dTdsigma = dTdsigma + Tpp%dsigma
+                    end associate
+                end if
+#endif
             end do ! j_atom
         end do ! i_atom
     end do ! i_cell
     call sys%clock(-11)
     if (do_ewald) then
-        call add_ewald_dipole_parts(sys, ewald_alpha, dipmat, k_point)
+#if MBD_TYPE == 0
+        call add_ewald_dipole_parts_real(sys, ewald_alpha, dipmat)
+#elif MBD_TYPE == 1
+        call add_ewald_dipole_parts_complex(sys, ewald_alpha, dipmat, k_point)
+#endif
     end if
-end function dipole_matrix
+end function
 
-subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
+#if MBD_TYPE == 0
+subroutine add_ewald_dipole_parts_real(sys, alpha, dipmat)
+#elif MBD_TYPE == 1
+subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
+#endif
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha
-    real(dp), intent(in), optional :: k_point(3)
     type(mat3n3n), intent(inout) :: dipmat
+#if MBD_TYPE == 1
+    real(dp), intent(in) :: k_point(3)
+#endif
 
     logical :: do_surface
     real(dp) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
-        k_sq, rec_space_cutoff, Tpp(3, 3), k_prefactor(3, 3), elem
-    complex(dp) :: Tpp_c(3, 3)
+        k_sq, rec_space_cutoff, k_prefactor(3, 3)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
         range_G_vector(3), my_i_atom, my_j_atom
+#if MBD_TYPE == 0
+    real(dp) :: Tpp(3, 3)
+#elif MBD_TYPE == 1
+    complex(dp) :: Tpp(3, 3)
+    real(dp) :: elem
+#endif
 
     rec_unit_cell = 2*pi*inverse(transpose(sys%lattice))
     volume = abs(dble(product(eigvals(sys%lattice))))
@@ -437,11 +472,11 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
         call shift_cell(idx_G_vector, -range_G_vector, range_G_vector)
         if (i_G_vector == 1) cycle
         G_vector = matmul(rec_unit_cell, idx_G_vector)
-        if (present(k_point)) then
-            k_total = k_point+G_vector
-        else
-            k_total = G_vector
-        end if
+#if MBD_TYPE == 1
+        k_total = G_vector + k_point
+#elif MBD_TYPE == 0
+        k_total = G_vector
+#endif
         k_sq = sum(k_total**2)
         if (sqrt(k_sq) > rec_space_cutoff) cycle
         k_prefactor = 4*pi/volume*exp(-k_sq/(4*alpha**2))
@@ -453,68 +488,70 @@ subroutine add_ewald_dipole_parts(sys, alpha, dipmat, k_point)
             do my_j_atom = 1, size(dipmat%idx%j_atom)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
                 r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
-                if (present(k_point)) then
-                    Tpp_c = k_prefactor*exp(cmplx(0d0, 1d0, 8) &
-                        *dot_product(G_vector, r))
-                else
-                    Tpp = k_prefactor*cos(dot_product(G_vector, r))
-                end if
+#if MBD_TYPE == 1
+                Tpp = k_prefactor*exp(cmplx(0d0, 1d0, 8) &
+                    *dot_product(G_vector, r))
+#elif MBD_TYPE == 0
+                Tpp = k_prefactor*cos(dot_product(G_vector, r))
+#endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
-                if (present(k_point)) then
-                    associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
-                        T = T + Tpp_c
-                    end associate
-                else
-                    associate (T => dipmat%re(i+1:i+3, j+1:j+3))
-                        T = T + Tpp
-                    end associate
-                end if
+#if MBD_TYPE == 1
+                associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
+                    T = T + Tpp
+                end associate
+#elif MBD_TYPE == 0
+                associate (T => dipmat%re(i+1:i+3, j+1:j+3))
+                    T = T + Tpp
+                end associate
+#endif
             end do ! j_atom
         end do ! i_atom
     end do ! i_G_vector
     call dipmat%add_diag_scalar(-4*alpha**3/(3*sqrt(pi))) ! self energy
     do_surface = .true.
-    if (present(k_point)) then
-        k_sq = sum(k_point**2)
-        if (sqrt(k_sq) > 1.d-15) then
-            do_surface = .false.
-            do my_i_atom = 1, size(dipmat%idx%i_atom)
-            do my_j_atom = 1, size(dipmat%idx%j_atom)
-                do i_xyz = 1, 3
-                do j_xyz = 1, 3
-                    i = 3*(my_i_atom-1)+i_xyz
-                    j = 3*(my_j_atom-1)+j_xyz
-                    elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                        *exp(-k_sq/(4*alpha**2))
-                    if (present(k_point)) then
-                        dipmat%cplx(i, j) = dipmat%cplx(i, j) + elem
-                    else
-                        dipmat%re(i, j) = dipmat%re(i, j) + elem
-                    end if ! present(k_point)
-                end do ! j_xyz
-                end do ! i_xyz
-            end do ! j_atom
-            end do ! i_atom
-        end if ! k_sq >
-    end if ! k_point present
+#if MBD_TYPE == 1
+    k_sq = sum(k_point**2)
+    if (sqrt(k_sq) > 1.d-15) then
+        do_surface = .false.
+        do my_i_atom = 1, size(dipmat%idx%i_atom)
+        do my_j_atom = 1, size(dipmat%idx%j_atom)
+            do i_xyz = 1, 3
+            do j_xyz = 1, 3
+                i = 3*(my_i_atom-1)+i_xyz
+                j = 3*(my_j_atom-1)+j_xyz
+                elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
+                    *exp(-k_sq/(4*alpha**2))
+                dipmat%cplx(i, j) = dipmat%cplx(i, j) + elem
+            end do ! j_xyz
+            end do ! i_xyz
+        end do ! j_atom
+        end do ! i_atom
+    end if ! k_sq >
+#endif
     if (do_surface) then ! surface energy
         do my_i_atom = 1, size(dipmat%idx%i_atom)
         do my_j_atom = 1, size(dipmat%idx%j_atom)
             do i_xyz = 1, 3
                 i = 3*(my_i_atom-1)+i_xyz
                 j = 3*(my_j_atom-1)+i_xyz
-                if (present(k_point)) then
-                    dipmat%cplx(i, j) = dipmat%cplx(i, j) + 4*pi/(3*volume)
-                else
-                    dipmat%re(i, j) = dipmat%re(i, j) + 4*pi/(3*volume)
-                end if
+#if MBD_TYPE == 1
+                dipmat%cplx(i, j) = dipmat%cplx(i, j) + 4*pi/(3*volume)
+#elif MBD_TYPE == 0
+                dipmat%re(i, j) = dipmat%re(i, j) + 4*pi/(3*volume)
+#endif
             end do ! i_xyz
         end do ! j_atom
         end do ! i_atom
     end if
     call sys%clock(-12)
 end subroutine
+
+#ifndef MBD_INCLUDED
+#define MBD_INCLUDED
+#undef MBD_TYPE
+#define MBD_TYPE 1
+#include "mbd.F90"
 
 subroutine test_frequency_grid(calc)
     type(mbd_calc), intent(inout) :: calc
@@ -1331,3 +1368,5 @@ logical function gradients_has_grad(this)
 end function
 
 end module mbd
+
+#endif

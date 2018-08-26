@@ -83,16 +83,6 @@ interface dipole_matrix
     module procedure dipole_matrix_complex
 end interface
 
-interface get_single_mbd_energy
-    module procedure get_single_mbd_energy_real
-    module procedure get_single_mbd_energy_complex
-end interface
-
-interface get_single_rpa_energy
-    module procedure get_single_rpa_energy_real
-    module procedure get_single_rpa_energy_complex
-end interface
-
 contains
 
 type(mbd_result) function mbd_scs_energy( &
@@ -133,7 +123,7 @@ type(mbd_result) function mbd_scs_energy( &
         )
         if (sys%has_exc()) return
     end do
-    C6_scs = get_C6_from_alpha(sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs)
+    C6_scs = C6_from_alpha(sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs)
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs &
@@ -558,10 +548,10 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
 end subroutine
 
 #if MBD_TYPE == 0
-type(mbd_result) function get_single_mbd_energy_real( &
+type(mbd_result) function mbd_energy_single_real( &
         sys, alpha_0, C6, damp, dene) result(res)
 #elif MBD_TYPE == 1
-type(mbd_result) function get_single_mbd_energy_complex( &
+type(mbd_result) function mbd_energy_single_complex( &
         sys, alpha_0, C6, damp, dene, k_point) result(res)
 #endif
     type(mbd_system), intent(inout) :: sys
@@ -666,10 +656,10 @@ type(mbd_result) function get_single_mbd_energy_complex( &
 end function
 
 #if MBD_TYPE == 0
-type(mbd_result) function get_single_rpa_energy_real( &
+type(mbd_result) function rpa_energy_single_real( &
         sys, alpha, damp) result(res)
 #elif MBD_TYPE == 1
-type(mbd_result) function get_single_rpa_energy_complex( &
+type(mbd_result) function rpa_energy_single_complex( &
         sys, alpha, damp, k_point) result(res)
 #endif
     type(mbd_system), intent(inout) :: sys
@@ -760,7 +750,7 @@ subroutine test_frequency_grid(calc)
     real(dp), allocatable :: dC6_dalpha(:, :)
 
     alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha)
-    C6 = get_C6_from_alpha(calc, alpha, dC6_dalpha)
+    C6 = C6_from_alpha(calc, alpha, dC6_dalpha)
     error = abs(C6(1)/99.5d0-1d0)
     calc%info%freq_error = &
         "Relative quadrature error in C6 of carbon atom: " // &
@@ -869,77 +859,61 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
 
     real(dp), allocatable :: alpha(:, :)
     type(mbd_gradients), allocatable :: dalpha(:)
-    integer :: n_freq, n_atoms, i_freq
-
-    if (.not. allocated(sys%lattice)) then
-        if (.not. sys%do_rpa) then
-            res = get_single_mbd_energy(sys, alpha_0, C6, damp, dene)
-        else
-            n_freq = ubound(sys%calc%omega_grid, 1)
-            n_atoms = sys%siz()
-            allocate (alpha(n_atoms, 0:n_freq), dalpha(0:n_freq))
-            do i_freq = 0, n_freq
-                call dene%copy_alloc(dalpha(i_freq))
-            end do
-            alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha)
-            res = get_single_rpa_energy(sys, alpha, damp)
-            ! TODO gradients
-        end if
-    else
-        res = get_reciprocal_mbd_energy(sys, alpha_0, C6, damp)
-    end if
-end function mbd_energy
-
-type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(res)
-    type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
-
-    logical :: do_rpa
-    integer :: i_kpt, n_kpts, n_atoms, n_freq
+    integer :: n_freq, n_atoms, i_freq, n_kpts, i_kpt
     real(dp) :: k_point(3)
-    real(dp), allocatable :: alpha_ts(:, :)
-    type(mbd_gradients), allocatable :: dalpha_ts(:)
     type(mbd_result) :: res_k
     type(mbd_gradients) :: dene_k
 
     n_atoms = sys%siz()
-    res%k_pts = make_k_grid(make_g_grid( &
-        sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3) &
-    ), sys%lattice)
-    n_kpts = size(res%k_pts, 2)
-    n_freq = ubound(sys%calc%omega_grid, 1)
-    do_rpa = sys%do_rpa
-
-    allocate (alpha_ts(n_atoms, 0:n_freq), dalpha_ts(0:n_freq))
-    alpha_ts = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_ts)
-    res%energy = 0d0
-    if (sys%get_eigs) &
-        allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
-    if (sys%get_modes) &
-        allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
-    if (sys%get_rpa_orders) allocate ( &
-        res%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0d0 &
-    )
-    do i_kpt = 1, n_kpts
-        k_point = res%k_pts(:, i_kpt)
-        if (do_rpa) then
-            res_k = get_single_rpa_energy_complex(sys, alpha_ts, damp, k_point)
-            if (sys%get_rpa_orders) then
-                res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
-            end if
+    if (sys%do_rpa) then
+        n_freq = ubound(sys%calc%omega_grid, 1)
+        allocate (alpha(n_atoms, 0:n_freq), dalpha(0:n_freq))
+        do i_freq = 0, n_freq
+            call dene%copy_alloc(dalpha(i_freq))
+        end do
+        alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha)
+    end if
+    if (.not. allocated(sys%lattice)) then
+        if (.not. sys%do_rpa) then
+            res = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
         else
-            res_k = get_single_mbd_energy(sys, alpha_0, C6, damp, dene_k, k_point)
-            if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
-            if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+            res = rpa_energy_single_real(sys, alpha, damp)
+            ! TODO gradients
         end if
-        if (sys%has_exc()) return
-        res%energy = res%energy + res_k%energy
-    end do ! k_point loop
-    res%energy = res%energy/size(res%k_pts, 2)
-    if (sys%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
-end function get_reciprocal_mbd_energy
+    else
+        res%k_pts = make_k_grid(make_g_grid( &
+            sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3) &
+        ), sys%lattice)
+        n_kpts = size(res%k_pts, 2)
+        res%energy = 0d0
+        if (sys%get_eigs) &
+            allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
+        if (sys%get_modes) &
+            allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
+        if (sys%get_rpa_orders) allocate ( &
+            res%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0d0 &
+        )
+        do i_kpt = 1, n_kpts
+            k_point = res%k_pts(:, i_kpt)
+            if (.not. sys%do_rpa) then
+                res_k = mbd_energy_single_complex( &
+                    sys, alpha_0, C6, damp, dene_k, k_point &
+                )
+                if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
+                if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+            else
+                res_k = rpa_energy_single_complex(sys, alpha, damp, k_point)
+                if (sys%get_rpa_orders) then
+                    res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
+                end if
+            end if
+            if (sys%has_exc()) return
+            res%energy = res%energy + res_k%energy
+        end do ! k_point loop
+        res%energy = res%energy/size(res%k_pts, 2)
+        if (sys%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
+    end if
+end function mbd_energy
 
 function T_bare(rxyz) result(T)
     real(dp), intent(in) :: rxyz(3)
@@ -1263,7 +1237,7 @@ function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
     if (allocated(dsigma_dalpha)) dsigma_dalpha = sigma/(3*alpha)
 end function
 
-function get_C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
+function C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(in) :: alpha(:, 0:)
     real(dp), intent(inout), allocatable :: dC6_dalpha(:, :)

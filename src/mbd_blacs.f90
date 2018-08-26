@@ -84,15 +84,15 @@ subroutine mbd_blacs_desc_init(this, n_atoms, grid)
         this%desc, 3*n_atoms, 3*n_atoms, blocksize, blocksize, 0, 0, &
         grid%ctx, 3*my_nratoms, ierr &
     )
-    this%i_atom = get_idx_map( &
+    this%i_atom = idx_map( &
         grid%my_prow, grid%nprows, n_atoms, blocksize/3, my_nratoms &
     )
-    this%j_atom = get_idx_map( &
+    this%j_atom = idx_map( &
         grid%my_pcol, grid%npcols, n_atoms, blocksize/3, my_ncatoms &
     )
 end subroutine
 
-function get_idx_map(my_task, n_tasks, n, blocksize, nidx) result(idx_map)
+function idx_map(my_task, n_tasks, n, blocksize, nidx)
     integer, intent(in) :: my_task, n_tasks, n, blocksize, nidx
     integer :: idx_map(nidx)
 

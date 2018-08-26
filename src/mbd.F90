@@ -553,6 +553,235 @@ end subroutine
 #define MBD_TYPE 1
 #include "mbd.F90"
 
+type(mbd_result) function get_single_mbd_energy( &
+        sys, alpha_0, C6, damp, dene, k_point) result(res)
+    type(mbd_system), intent(inout) :: sys
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    type(mbd_damping), intent(in) :: damp
+    type(mbd_gradients), intent(inout) :: dene
+    real(dp), intent(in), optional :: k_point(3)
+
+    type(mat3n3n) :: relay, dQ, T, modes, c_lambda12i_c
+    real(dp), allocatable :: eigs(:), omega(:)
+    type(mbd_gradients) :: domega
+    integer :: i_xyz, n_negative_eigs, n_atoms
+    logical :: grad
+    character(120) :: msg
+
+    n_atoms = sys%siz()
+    grad = dene%has_grad()
+    T = dipole_matrix(sys, damp, grad, k_point)
+    if (sys%has_exc()) return
+    if (grad) then
+        call relay%copy_from(T)
+    else
+        call relay%move_from(T)
+    end if
+    call dene%copy_alloc(domega)
+    omega = omega_eff(C6, alpha_0, domega)
+    call relay%mult_cross(omega*sqrt(alpha_0))
+    call relay%add_diag(omega**2)
+    call sys%clock(21)
+    if (sys%get_modes .or. grad) then
+        call modes%alloc_from(relay)
+        allocate (eigs(3*n_atoms))
+        call modes%eigh(eigs, sys%calc%exc, src=relay)
+        if (sys%get_modes) then
+            if (allocated(modes%re)) then
+                call move_alloc(modes%re, res%modes)
+            else
+                call move_alloc(modes%cplx, res%modes_k_single)
+            end if
+        end if
+    else
+        eigs = relay%eigvalsh(sys%calc%exc, destroy=.true.)
+    end if
+    if (sys%has_exc()) return
+    call sys%clock(-21)
+    if (sys%get_eigs) res%mode_eigs = eigs
+    n_negative_eigs = count(eigs(:) < 0)
+    if (n_negative_eigs > 0) then
+        msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
+            " negative eigenvalues"
+        if (sys%calc%param%zero_negative_eigs) then
+            where (eigs < 0) eigs = 0d0
+            sys%calc%info%neg_eigvals = msg
+        else
+            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            sys%calc%exc%msg = msg
+        end if
+    end if
+    res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
+    if (.not. grad) return
+    call c_lambda12i_c%copy_from(modes)
+    call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
+    c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB=.true.)
+    call dQ%init_from(T)
+    if (allocated(dene%dcoords)) then
+        do i_xyz = 1, 3
+            dQ%re = T%re_dr(:, :, i_xyz)
+            call dQ%mult_cross(omega*sqrt(alpha_0))
+            dQ%re = c_lambda12i_c%re*dQ%re
+            dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
+        end do
+    end if
+    if (allocated(dene%dalpha)) then
+        dQ%re = T%re
+        call dQ%mult_cross(omega*sqrt(alpha_0))
+        call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
+        call dQ%add_diag(omega*domega%dalpha)
+        dQ%re = c_lambda12i_c%re*dQ%re
+        dene%dalpha = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dalpha
+    end if
+    if (allocated(dene%dC6)) then
+        dQ%re = T%re
+        call dQ%mult_cross(omega*sqrt(alpha_0))
+        call dQ%mult_rows(domega%dC6/omega)
+        call dQ%add_diag(omega*domega%dC6)
+        dQ%re = c_lambda12i_c%re*dQ%re
+        dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
+    end if
+    if (allocated(dene%dr_vdw)) then
+        dQ%re = T%re_dvdw
+        call dQ%mult_cross(omega*sqrt(alpha_0))
+        dQ%re = c_lambda12i_c%re*dQ%re
+        dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
+    end if
+end function get_single_mbd_energy
+
+type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
+    type(mbd_system), intent(inout) :: sys
+    real(dp), intent(in) :: alpha(:, 0:)
+    type(mbd_damping), intent(in) :: damp
+
+    type(mat3n3n) :: relay, AT
+    complex(dp), allocatable :: eigs(:)
+    integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
+    type(mbd_damping) :: damp_alpha
+    real(dp), allocatable :: dsigma_dalpha(:)
+
+    res%energy = 0d0
+    damp_alpha = damp
+    allocate (eigs(3*sys%siz()))
+    do i_freq = 0, ubound(sys%calc%omega_grid, 1)
+        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
+        ! relay = T
+        relay = dipole_matrix(sys, damp_alpha, .false.)
+        do my_i_atom = 1, size(relay%idx%i_atom)
+            associate ( &
+                    i_atom => relay%idx%i_atom(my_i_atom), &
+                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :) &
+            )
+                relay_sub(:3, :) = relay_sub(:3, :)*alpha(i_atom, i_freq)
+            end associate
+        end do
+        ! relay = alpha*T
+        if (sys%get_rpa_orders) AT = relay
+        ! relay = 1+alpha*T
+        call relay%add_diag_scalar(1d0)
+        call sys%clock(23)
+        eigs = relay%eigvals(sys%calc%exc, destroy=.true.)
+        call sys%clock(-23)
+        if (sys%has_exc()) return
+        ! The count construct won't work here due to a bug in Cray compiler
+        ! Has to manually unroll the counting
+        n_negative_eigs = 0
+        do i = 1, size(eigs)
+           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
+        end do
+        if (n_negative_eigs > 0) then
+            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            sys%calc%exc%msg = "1+AT matrix has " // &
+                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
+            return
+        end if
+        res%energy = res%energy + &
+            1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
+        if (sys%get_rpa_orders) then
+            call sys%clock(24)
+            eigs = AT%eigvals(sys%calc%exc, destroy=.true.)
+            call sys%clock(-24)
+            if (sys%has_exc()) return
+            allocate (res%rpa_orders(sys%calc%param%rpa_order_max))
+            do n_order = 2, sys%calc%param%rpa_order_max
+                res%rpa_orders(n_order) = res%rpa_orders(n_order) &
+                    +(-1d0/(2*pi)*(-1)**n_order &
+                    *sum(dble(eigs)**n_order)/n_order) &
+                    *sys%calc%omega_grid_w(i_freq)
+            end do
+        end if
+    end do
+end function get_single_rpa_energy
+
+type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) &
+        result(res)
+    type(mbd_system), intent(inout) :: sys
+    real(dp), intent(in) :: alpha(0:, :)
+    real(dp), intent(in) :: k_point(3)
+    type(mbd_damping), intent(in) :: damp
+
+    type(mat3n3n) :: relay, AT
+    complex(dp), allocatable :: eigs(:)
+    integer :: i_atom, i_freq, i, n_order, n_negative_eigs
+    type(mbd_damping) :: damp_alpha
+    real(dp), allocatable :: dsigma_dalpha(:)
+
+    res%energy = 0d0
+    damp_alpha = damp
+    allocate (eigs(3*sys%siz()))
+    do i_freq = 0, ubound(sys%calc%omega_grid, 1)
+        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
+        ! relay = T
+        relay = dipole_matrix(sys, damp_alpha, .false., k_point)
+        do i_atom = 1, sys%siz()
+            i = 3*(i_atom-1)
+            relay%cplx(i+1:i+3, :i) = alpha(i_freq, i_atom) * &
+                conjg(transpose(relay%cplx(:i, i+1:i+3)))
+        end do
+        do i_atom = 1, sys%siz()
+            i = 3*(i_atom-1)
+            relay%cplx(i+1:i+3, i+1:) = &
+                alpha(i_freq, i_atom)*relay%cplx(i+1:i+3, i+1:)
+        end do
+        ! relay = alpha*T
+        if (sys%get_rpa_orders) AT = relay
+        do i = 1, 3*sys%siz()
+            relay%cplx(i, i) = 1d0+relay%cplx(i, i) ! relay = 1+alpha*T
+        end do
+        call sys%clock(25)
+        eigs = eigvals(relay%cplx, sys%calc%exc, destroy=.true.)
+        if (sys%has_exc()) return
+        call sys%clock(-25)
+        ! The count construct won't work here due to a bug in Cray compiler
+        ! Has to manually unroll the counting
+        n_negative_eigs = 0
+        do i = 1, size(eigs)
+           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
+        end do
+        if (n_negative_eigs > 0) then
+            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            sys%calc%exc%msg = "1+AT matrix has " // &
+                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
+            return
+        end if
+        res%energy = res%energy + &
+            1d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_freq)
+        if (sys%get_rpa_orders) then
+            call sys%clock(26)
+            eigs = eigvals(AT%cplx, sys%calc%exc, destroy=.true.)
+            if (sys%has_exc()) return
+            call sys%clock(-26)
+            do n_order = 2, sys%calc%param%rpa_order_max
+                res%rpa_orders(n_order) = res%rpa_orders(n_order) + &
+                    (-1d0)/(2*pi)*(-1)**n_order * &
+                    dble(sum(eigs**n_order))/n_order * &
+                    sys%calc%omega_grid_w(i_freq)
+            end do
+        end if
+    end do
+end function get_single_reciprocal_rpa_ene
+
 subroutine test_frequency_grid(calc)
     type(mbd_calc), intent(inout) :: calc
 
@@ -691,103 +920,6 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
     end if
 end function mbd_energy
 
-type(mbd_result) function get_single_mbd_energy( &
-        sys, alpha_0, C6, damp, dene, k_point) result(res)
-    type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
-    type(mbd_gradients), intent(inout) :: dene
-    real(dp), intent(in), optional :: k_point(3)
-
-    type(mat3n3n) :: relay, dQ, T, modes, c_lambda12i_c
-    real(dp), allocatable :: eigs(:), omega(:)
-    type(mbd_gradients) :: domega
-    integer :: i_xyz, n_negative_eigs, n_atoms
-    logical :: grad
-    character(120) :: msg
-
-    n_atoms = sys%siz()
-    grad = dene%has_grad()
-    T = dipole_matrix(sys, damp, grad, k_point)
-    if (sys%has_exc()) return
-    if (grad) then
-        call relay%copy_from(T)
-    else
-        call relay%move_from(T)
-    end if
-    call dene%copy_alloc(domega)
-    omega = omega_eff(C6, alpha_0, domega)
-    call relay%mult_cross(omega*sqrt(alpha_0))
-    call relay%add_diag(omega**2)
-    call sys%clock(21)
-    if (sys%get_modes .or. grad) then
-        call modes%alloc_from(relay)
-        allocate (eigs(3*n_atoms))
-        call modes%eigh(eigs, sys%calc%exc, src=relay)
-        if (sys%get_modes) then
-            if (allocated(modes%re)) then
-                call move_alloc(modes%re, res%modes)
-            else
-                call move_alloc(modes%cplx, res%modes_k_single)
-            end if
-        end if
-    else
-        eigs = relay%eigvalsh(sys%calc%exc, destroy=.true.)
-    end if
-    if (sys%has_exc()) return
-    call sys%clock(-21)
-    if (sys%get_eigs) res%mode_eigs = eigs
-    n_negative_eigs = count(eigs(:) < 0)
-    if (n_negative_eigs > 0) then
-        msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
-            " negative eigenvalues"
-        if (sys%calc%param%zero_negative_eigs) then
-            where (eigs < 0) eigs = 0d0
-            sys%calc%info%neg_eigvals = msg
-        else
-            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            sys%calc%exc%msg = msg
-        end if
-    end if
-    res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
-    if (.not. grad) return
-    call c_lambda12i_c%copy_from(modes)
-    call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
-    c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB=.true.)
-    call dQ%init_from(T)
-    if (allocated(dene%dcoords)) then
-        do i_xyz = 1, 3
-            dQ%re = T%re_dr(:, :, i_xyz)
-            call dQ%mult_cross(omega*sqrt(alpha_0))
-            dQ%re = c_lambda12i_c%re*dQ%re
-            dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
-        end do
-    end if
-    if (allocated(dene%dalpha)) then
-        dQ%re = T%re
-        call dQ%mult_cross(omega*sqrt(alpha_0))
-        call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
-        call dQ%add_diag(omega*domega%dalpha)
-        dQ%re = c_lambda12i_c%re*dQ%re
-        dene%dalpha = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dalpha
-    end if
-    if (allocated(dene%dC6)) then
-        dQ%re = T%re
-        call dQ%mult_cross(omega*sqrt(alpha_0))
-        call dQ%mult_rows(domega%dC6/omega)
-        call dQ%add_diag(omega*domega%dC6)
-        dQ%re = c_lambda12i_c%re*dQ%re
-        dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
-    end if
-    if (allocated(dene%dr_vdw)) then
-        dQ%re = T%re_dvdw
-        call dQ%mult_cross(omega*sqrt(alpha_0))
-        dQ%re = c_lambda12i_c%re*dQ%re
-        dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
-    end if
-end function get_single_mbd_energy
-
 type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) result(res)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
@@ -838,138 +970,6 @@ type(mbd_result) function get_reciprocal_mbd_energy(sys, alpha_0, C6, damp) resu
     res%energy = res%energy/size(res%k_pts, 2)
     if (sys%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
 end function get_reciprocal_mbd_energy
-
-type(mbd_result) function get_single_rpa_energy(sys, alpha, damp) result(res)
-    type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha(:, 0:)
-    type(mbd_damping), intent(in) :: damp
-
-    type(mat3n3n) :: relay, AT
-    complex(dp), allocatable :: eigs(:)
-    integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
-    type(mbd_damping) :: damp_alpha
-    real(dp), allocatable :: dsigma_dalpha(:)
-
-    res%energy = 0d0
-    damp_alpha = damp
-    allocate (eigs(3*sys%siz()))
-    do i_freq = 0, ubound(sys%calc%omega_grid, 1)
-        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
-        ! relay = T
-        relay = dipole_matrix(sys, damp_alpha, .false.)
-        do my_i_atom = 1, size(relay%idx%i_atom)
-            associate ( &
-                    i_atom => relay%idx%i_atom(my_i_atom), &
-                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :) &
-            )
-                relay_sub(:3, :) = relay_sub(:3, :)*alpha(i_atom, i_freq)
-            end associate
-        end do
-        ! relay = alpha*T
-        if (sys%get_rpa_orders) AT = relay
-        ! relay = 1+alpha*T
-        call relay%add_diag_scalar(1d0)
-        call sys%clock(23)
-        eigs = relay%eigvals(sys%calc%exc, destroy=.true.)
-        call sys%clock(-23)
-        if (sys%has_exc()) return
-        ! The count construct won't work here due to a bug in Cray compiler
-        ! Has to manually unroll the counting
-        n_negative_eigs = 0
-        do i = 1, size(eigs)
-           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
-        end do
-        if (n_negative_eigs > 0) then
-            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            sys%calc%exc%msg = "1+AT matrix has " // &
-                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
-            return
-        end if
-        res%energy = res%energy + &
-            1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
-        if (sys%get_rpa_orders) then
-            call sys%clock(24)
-            eigs = AT%eigvals(sys%calc%exc, destroy=.true.)
-            call sys%clock(-24)
-            if (sys%has_exc()) return
-            allocate (res%rpa_orders(sys%calc%param%rpa_order_max))
-            do n_order = 2, sys%calc%param%rpa_order_max
-                res%rpa_orders(n_order) = res%rpa_orders(n_order) &
-                    +(-1d0/(2*pi)*(-1)**n_order &
-                    *sum(dble(eigs)**n_order)/n_order) &
-                    *sys%calc%omega_grid_w(i_freq)
-            end do
-        end if
-    end do
-end function get_single_rpa_energy
-
-type(mbd_result) function get_single_reciprocal_rpa_ene(sys, alpha, k_point, damp) &
-        result(res)
-    type(mbd_system), intent(inout) :: sys
-    real(dp), intent(in) :: alpha(0:, :)
-    real(dp), intent(in) :: k_point(3)
-    type(mbd_damping), intent(in) :: damp
-
-    type(mat3n3n) :: relay, AT
-    complex(dp), allocatable :: eigs(:)
-    integer :: i_atom, i_freq, i, n_order, n_negative_eigs
-    type(mbd_damping) :: damp_alpha
-    real(dp), allocatable :: dsigma_dalpha(:)
-
-    res%energy = 0d0
-    damp_alpha = damp
-    allocate (eigs(3*sys%siz()))
-    do i_freq = 0, ubound(sys%calc%omega_grid, 1)
-        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
-        ! relay = T
-        relay = dipole_matrix(sys, damp_alpha, .false., k_point)
-        do i_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            relay%cplx(i+1:i+3, :i) = alpha(i_freq, i_atom) * &
-                conjg(transpose(relay%cplx(:i, i+1:i+3)))
-        end do
-        do i_atom = 1, sys%siz()
-            i = 3*(i_atom-1)
-            relay%cplx(i+1:i+3, i+1:) = &
-                alpha(i_freq, i_atom)*relay%cplx(i+1:i+3, i+1:)
-        end do
-        ! relay = alpha*T
-        if (sys%get_rpa_orders) AT = relay
-        do i = 1, 3*sys%siz()
-            relay%cplx(i, i) = 1d0+relay%cplx(i, i) ! relay = 1+alpha*T
-        end do
-        call sys%clock(25)
-        eigs = eigvals(relay%cplx, sys%calc%exc, destroy=.true.)
-        if (sys%has_exc()) return
-        call sys%clock(-25)
-        ! The count construct won't work here due to a bug in Cray compiler
-        ! Has to manually unroll the counting
-        n_negative_eigs = 0
-        do i = 1, size(eigs)
-           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
-        end do
-        if (n_negative_eigs > 0) then
-            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            sys%calc%exc%msg = "1+AT matrix has " // &
-                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
-            return
-        end if
-        res%energy = res%energy + &
-            1d0/(2*pi)*dble(sum(log(eigs)))*sys%calc%omega_grid_w(i_freq)
-        if (sys%get_rpa_orders) then
-            call sys%clock(26)
-            eigs = eigvals(AT%cplx, sys%calc%exc, destroy=.true.)
-            if (sys%has_exc()) return
-            call sys%clock(-26)
-            do n_order = 2, sys%calc%param%rpa_order_max
-                res%rpa_orders(n_order) = res%rpa_orders(n_order) + &
-                    (-1d0)/(2*pi)*(-1)**n_order * &
-                    dble(sum(eigs**n_order))/n_order * &
-                    sys%calc%omega_grid_w(i_freq)
-            end do
-        end if
-    end do
-end function get_single_reciprocal_rpa_ene
 
 function T_bare(rxyz) result(T)
     real(dp), intent(in) :: rxyz(3)

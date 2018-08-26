@@ -7,16 +7,11 @@ import pytest
 from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDCalc, with_mpi, with_scalapack
+from .fortran import MBDCalc, with_scalapack
 from .utils import numerical_gradients
 
-if with_mpi:
-    from mpi4py import MPI
-    n_tasks = MPI.COMM_WORLD.Get_size()
-else:
-    n_tasks = 1
 no_scalapack = pytest.mark.skipif(
-    with_scalapack and n_tasks > 1,
+    with_scalapack,
     reason="doesn't support scalapack"
 )
 

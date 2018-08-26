@@ -10,7 +10,7 @@ use mbd, only: mbd_damping, mbd_energy, &
     mbd_scs_energy, mbd_scs_energy, dipole_matrix, mbd_result, &
     mbd_gradients
 use mbd_ts, only: ts_energy
-use mbd_matrix_type, only: mat3n3n
+use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex
 use mbd_coulomb, only: dipole_energy, coulomb_energy
 
 implicit none
@@ -291,7 +291,8 @@ subroutine cmbd_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
 
     type(mbd_system), pointer :: sys
     type(mbd_damping), pointer :: damp
-    type(mat3n3n) :: dipmat
+    type(mbd_matrix_real) :: dipmat
+    type(mbd_matrix_complex) :: dipmat_c
     real(dp), pointer :: dipmat_re(:, :)
     complex(dp), pointer :: dipmat_cplx(:, :)
     integer :: n_atoms
@@ -299,13 +300,14 @@ subroutine cmbd_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
     sys => get_mbd_system(sys_cp)
     n_atoms = size(sys%coords, 2)
     call c_f_pointer(damping_p, damp)
-    dipmat = dipole_matrix(sys, damp, .false., k_point)
     if (present(k_point)) then
+        dipmat_c = dipole_matrix(sys, damp, .false., k_point)
         call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
-        dipmat_cplx = transpose(dipmat%cplx)
+        dipmat_cplx = transpose(dipmat_c%val)
     else
+        dipmat = dipole_matrix(sys, damp, .false.)
         call c_f_pointer(dipmat_p, dipmat_re, [3*n_atoms, 3*n_atoms])
-        dipmat_re = transpose(dipmat%re)
+        dipmat_re = transpose(dipmat%val)
     end if
 end subroutine cmbd_dipole_matrix
 

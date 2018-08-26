@@ -9,7 +9,8 @@ use mbd_common, only: tostr, findval, lower, shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
-use mbd_matrix_type, only: mat3n3n, contract_cross_33
+use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, &
+    contract_cross_33
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: all_reduce
 #endif
@@ -20,7 +21,7 @@ implicit none
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
     sigma_selfint, scale_TS, set_damping_parameters, &
-    mbd_gradients, damping_fermi, test_frequency_grid, scalar, mat3n3n
+    mbd_gradients, damping_fermi, test_frequency_grid, scalar
 #endif
 
 type :: mbd_damping
@@ -246,10 +247,14 @@ end function mbd_scs_energy
 #endif
 
 #if MBD_TYPE == 0
-type(mat3n3n) function dipole_matrix_real(sys, damp, grad) result(dipmat)
+type(mbd_matrix_real) function dipole_matrix_real(sys, damp, grad) result(dipmat)
+    use mbd_constants, only: ZERO => ZERO_REAL
 #elif MBD_TYPE == 1
-type(mat3n3n) function dipole_matrix_complex(sys, damp, grad, k_point) result(dipmat)
+type(mbd_matrix_complex) function dipole_matrix_complex( &
+        sys, damp, grad, k_point) result(dipmat)
+    use mbd_constants, only: ZERO => ZERO_COMPLEX
 #endif
+
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
     logical, intent(in) :: grad
@@ -277,14 +282,12 @@ type(mat3n3n) function dipole_matrix_complex(sys, damp, grad, k_point) result(di
 #endif
     my_nratoms = size(dipmat%idx%i_atom)
     my_ncatoms = size(dipmat%idx%j_atom)
-#if MBD_TYPE == 1
-    allocate (dipmat%cplx(3*my_nratoms, 3*my_ncatoms), source=(0d0, 0d0))
-#elif MBD_TYPE == 0
-    allocate (dipmat%re(3*my_nratoms, 3*my_ncatoms), source=0d0)
+    allocate (dipmat%val(3*my_nratoms, 3*my_ncatoms), source=ZERO)
+#if MBD_TYPE == 0
     if (grad) then
-        allocate (dipmat%re_dr(3*my_nratoms, 3*my_ncatoms, 3), source=0d0)
-        allocate (dipmat%re_dvdw(3*my_nratoms, 3*my_ncatoms), source=0d0)
-        allocate (dipmat%re_dsigma(3*my_nratoms, 3*my_ncatoms), source=0d0)
+        allocate (dipmat%dr(3*my_nratoms, 3*my_ncatoms, 3), source=0d0)
+        allocate (dipmat%dvdw(3*my_nratoms, 3*my_ncatoms), source=0d0)
+        allocate (dipmat%dsigma(3*my_nratoms, 3*my_ncatoms), source=0d0)
     end if
 #endif
     ! MPI code end
@@ -392,26 +395,26 @@ type(mat3n3n) function dipole_matrix_complex(sys, damp, grad, k_point) result(di
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
+                associate (T => dipmat%val(i+1:i+3, j+1:j+3))
 #if MBD_TYPE == 1
-                associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
                     T = T + Tpp_c
-                end associate
 #elif MBD_TYPE == 0
-                associate (T => dipmat%re(i+1:i+3, j+1:j+3))
                     T = T + Tpp%val
+#endif
                 end associate
+#if MBD_TYPE == 0
                 if (allocated(Tpp%dr)) then
-                    associate (T => dipmat%re_dr(i+1:i+3, j+1:j+3, :))
+                    associate (T => dipmat%dr(i+1:i+3, j+1:j+3, :))
                         T = T + Tpp%dr
                     end associate
                 end if
                 if (allocated(Tpp%dvdw)) then
-                    associate (dTdRvdw => dipmat%re_dvdw(i+1:i+3, j+1:j+3))
+                    associate (dTdRvdw => dipmat%dvdw(i+1:i+3, j+1:j+3))
                         dTdRvdw = dTdRvdw + Tpp%dvdw
                     end associate
                 end if
                 if (allocated(Tpp%dsigma)) then
-                    associate (dTdsigma => dipmat%re_dsigma(i+1:i+3, j+1:j+3))
+                    associate (dTdsigma => dipmat%dsigma(i+1:i+3, j+1:j+3))
                         dTdsigma = dTdsigma + Tpp%dsigma
                     end associate
                 end if
@@ -431,12 +434,13 @@ end function
 
 #if MBD_TYPE == 0
 subroutine add_ewald_dipole_parts_real(sys, alpha, dipmat)
+    type(mbd_matrix_real), intent(inout) :: dipmat
 #elif MBD_TYPE == 1
 subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
+    type(mbd_matrix_complex), intent(inout) :: dipmat
 #endif
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha
-    type(mat3n3n), intent(inout) :: dipmat
 #if MBD_TYPE == 1
     real(dp), intent(in) :: k_point(3)
 #endif
@@ -495,15 +499,9 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
-#if MBD_TYPE == 1
-                associate (T => dipmat%cplx(i+1:i+3, j+1:j+3))
+                associate (T => dipmat%val(i+1:i+3, j+1:j+3))
                     T = T + Tpp
                 end associate
-#elif MBD_TYPE == 0
-                associate (T => dipmat%re(i+1:i+3, j+1:j+3))
-                    T = T + Tpp
-                end associate
-#endif
             end do ! j_atom
         end do ! i_atom
     end do ! i_G_vector
@@ -521,7 +519,7 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
                 j = 3*(my_j_atom-1)+j_xyz
                 elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
                     *exp(-k_sq/(4*alpha**2))
-                dipmat%cplx(i, j) = dipmat%cplx(i, j) + elem
+                dipmat%val(i, j) = dipmat%val(i, j) + elem
             end do ! j_xyz
             end do ! i_xyz
         end do ! j_atom
@@ -534,11 +532,7 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
             do i_xyz = 1, 3
                 i = 3*(my_i_atom-1)+i_xyz
                 j = 3*(my_j_atom-1)+i_xyz
-#if MBD_TYPE == 1
-                dipmat%cplx(i, j) = dipmat%cplx(i, j) + 4*pi/(3*volume)
-#elif MBD_TYPE == 0
-                dipmat%re(i, j) = dipmat%re(i, j) + 4*pi/(3*volume)
-#endif
+                dipmat%val(i, j) = dipmat%val(i, j) + 4*pi/(3*volume)
             end do ! i_xyz
         end do ! j_atom
         end do ! i_atom
@@ -562,10 +556,15 @@ type(mbd_result) function mbd_energy_single_complex( &
     real(dp), intent(in) :: k_point(3)
 #endif
 
-    type(mat3n3n) :: relay, dQ, T, modes, c_lambda12i_c
+#if MBD_TYPE == 0
+    type(mbd_matrix_real) :: relay, dQ, T, modes, c_lambda12i_c
+    integer :: i_xyz
+#elif MBD_TYPE == 1
+    type(mbd_matrix_complex) :: relay, T, modes
+#endif
     real(dp), allocatable :: eigs(:), omega(:)
     type(mbd_gradients) :: domega
-    integer :: i_xyz, n_negative_eigs, n_atoms
+    integer :: n_negative_eigs, n_atoms
     logical :: grad
     character(120) :: msg
 
@@ -592,11 +591,11 @@ type(mbd_result) function mbd_energy_single_complex( &
         allocate (eigs(3*n_atoms))
         call modes%eigh(eigs, sys%calc%exc, src=relay)
         if (sys%get_modes) then
-            if (allocated(modes%re)) then
-                call move_alloc(modes%re, res%modes)
-            else
-                call move_alloc(modes%cplx, res%modes_k_single)
-            end if
+#if MBD_TYPE == 0
+            call move_alloc(modes%val, res%modes)
+#elif MBD_TYPE == 1
+            call move_alloc(modes%val, res%modes_k_single)
+#endif
         end if
     else
         eigs = relay%eigvalsh(sys%calc%exc, destroy=.true.)
@@ -617,6 +616,8 @@ type(mbd_result) function mbd_energy_single_complex( &
         end if
     end if
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
+    ! TODO finish implementation for complex
+#if MBD_TYPE == 0
     if (.not. grad) return
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
@@ -624,34 +625,35 @@ type(mbd_result) function mbd_energy_single_complex( &
     call dQ%init_from(T)
     if (allocated(dene%dcoords)) then
         do i_xyz = 1, 3
-            dQ%re = T%re_dr(:, :, i_xyz)
+            dQ%val = T%dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
-            dQ%re = c_lambda12i_c%re*dQ%re
+            dQ%val = c_lambda12i_c%val*dQ%val
             dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
         end do
     end if
     if (allocated(dene%dalpha)) then
-        dQ%re = T%re
+        dQ%val = T%val
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
         call dQ%add_diag(omega*domega%dalpha)
-        dQ%re = c_lambda12i_c%re*dQ%re
+        dQ%val = c_lambda12i_c%val*dQ%val
         dene%dalpha = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dalpha
     end if
     if (allocated(dene%dC6)) then
-        dQ%re = T%re
+        dQ%val = T%val
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(domega%dC6/omega)
         call dQ%add_diag(omega*domega%dC6)
-        dQ%re = c_lambda12i_c%re*dQ%re
+        dQ%val = c_lambda12i_c%val*dQ%val
         dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
     end if
     if (allocated(dene%dr_vdw)) then
-        dQ%re = T%re_dvdw
+        dQ%val = T%dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
-        dQ%re = c_lambda12i_c%re*dQ%re
+        dQ%val = c_lambda12i_c%val*dQ%val
         dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
     end if
+#endif
 end function
 
 #if MBD_TYPE == 0
@@ -668,7 +670,11 @@ type(mbd_result) function rpa_energy_single_complex( &
     real(dp), intent(in) :: k_point(3)
 #endif
 
-    type(mat3n3n) :: relay, AT
+#if MBD_TYPE == 0
+    type(mbd_matrix_real) :: relay, AT
+#elif MBD_TYPE == 1
+    type(mbd_matrix_complex) :: relay, AT
+#endif
     complex(dp), allocatable :: eigs(:)
     integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
@@ -688,11 +694,7 @@ type(mbd_result) function rpa_energy_single_complex( &
         do my_i_atom = 1, size(relay%idx%i_atom)
             associate ( &
                     i_atom => relay%idx%i_atom(my_i_atom), &
-#if MBD_TYPE == 0
-                    relay_sub => relay%re(3*(my_i_atom-1)+1:, :) &
-#elif MBD_TYPE == 1
-                    relay_sub => relay%cplx(3*(my_i_atom-1)+1:, :) &
-#endif
+                    relay_sub => relay%val(3*(my_i_atom-1)+1:, :) &
             )
                 relay_sub(:3, :) = relay_sub(:3, :)*alpha(i_atom, i_freq)
             end associate
@@ -763,7 +765,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     type(mbd_gradients), intent(inout) :: dalpha_scs(:)
     real(dp) :: alpha_scs(size(alpha))
 
-    type(mat3n3n) :: alpha_full, dQ, T
+    type(mbd_matrix_real) :: alpha_full, dQ, T
     integer :: n_atoms, i_xyz, i_atom, my_i_atom
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
@@ -798,7 +800,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
     call dQ%init_from(T)
     if (allocated(dalpha_scs(1)%dcoords)) then
         do i_xyz = 1, 3
-            dQ%re = -T%re_dr(:, :, i_xyz)
+            dQ%val = -T%dr(:, :, i_xyz)
             dQ = alpha_full%mmul(dQ)
             call dQ%contract_n_transp('C', B_prime)
             do i_atom = 1, n_atoms
@@ -814,7 +816,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         end do
     end if
     if (allocated(dalpha_scs(1)%dalpha)) then
-        dQ%re = T%re_dsigma
+        dQ%val = T%dsigma
         do i_atom = 1, n_atoms
             dsij_dsi = damp_local%sigma(i_atom)*dsigma_dalpha(i_atom) / &
                 sqrt(damp_local%sigma(i_atom)**2+damp_local%sigma**2)
@@ -834,7 +836,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         end do
     end if
     if (allocated(dalpha_scs(1)%dr_vdw)) then
-        dQ%re = T%re_dvdw
+        dQ%val = T%dvdw
         dQ = alpha_full%mmul(dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms

@@ -8,7 +8,7 @@ use mbd_linalg, only: eye, outer, diag
 use mbd_lapack, only: inverse, det, inv
 use mbd_system_type, only: mbd_system
 use mbd, only: dipole_matrix, mbd_damping, damping_fermi, scalar
-use mbd_matrix_type, only: mat3n3n
+use mbd_matrix_type, only: mbd_matrix_real
 
 implicit none
 
@@ -171,7 +171,7 @@ real(dp) function dipole_energy(sys, a0, w, w_t, C, damp)
     type(mbd_damping), intent(in) :: damp
 
     integer :: A, B, i, j, N
-    type(mat3n3n) :: T
+    type(mbd_matrix_real) :: T
 
     N = sys%siz()
     T = dipole_matrix(sys, damp, grad=.false.)
@@ -179,12 +179,12 @@ real(dp) function dipole_energy(sys, a0, w, w_t, C, damp)
         do B = 1, N
             i = 3*(A-1)
             j = 3*(B-1)
-            T%re(i+1:i+3, j+1:j+3) = &
-                w(A)*w(B)*sqrt(a0(A)*a0(B))*T%re(i+1:i+3, j+1:j+3)
+            T%val(i+1:i+3, j+1:j+3) = &
+                w(A)*w(B)*sqrt(a0(A)*a0(B))*T%val(i+1:i+3, j+1:j+3)
         end do
     end do
-    T%re = matmul(matmul(transpose(C), T%re), C)
-    dipole_energy = sum(diag(T%re)/(4*w_t))
+    T%val = matmul(matmul(transpose(C), T%val), C)
+    dipole_energy = sum(diag(T%val)/(4*w_t))
 end function
 
 subroutine simpson1by3(n, x, w)

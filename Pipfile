@@ -12,6 +12,7 @@ ipykernel = "*"
 pymbd = {editable = true, path = ".", extras = ["mpi"]}
 sphinx = "*"
 breathe = "*"
+"flake8" = "*"
 
 [requires]
 python_version = "3.7"

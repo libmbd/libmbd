@@ -1,0 +1,20 @@
+LIB = libmbd.a
+
+$$(LIB): $objs
+	ar -r $$@ $$^
+
+%.o: %.f90
+	$$(FXX) $$(FXXOPT) -c $$<
+
+%.o: %.F90
+	$$(FXX) $$(FXXOPT) $$(MACROS) -c $$<
+
+$deps
+
+.PHONY: clean distclean
+clean:
+	rm -f *.o
+
+distclean: clean
+	rm -f *.mod
+	rm -f $$(LIB)

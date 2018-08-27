@@ -4,14 +4,13 @@
 module mbd_damping_type
 
 use mbd_constants
-use mbd_common, only: lower
+use mbd_common, only: lower, mbd_exc
 use mbd_gradients_type, only: mbd_grad_scalar, mbd_grad_switch
 
 implicit none
 
 private
-public :: mbd_damping, damping_fermi, damping_sqrtfermi, set_damping_parameters, &
-    op1minus_grad
+public :: mbd_damping, damping_fermi, damping_sqrtfermi, op1minus_grad
 
 type :: mbd_damping
     character(len=20) :: version
@@ -24,6 +23,8 @@ type :: mbd_damping
     real(dp), allocatable :: sigma(:)
     real(dp), allocatable :: damping_custom(:, :)
     real(dp), allocatable :: potential_custom(:, :, :, :)
+    contains
+    procedure :: set_params_from_xc => mbd_damping_set_params_from_xc
 end type mbd_damping
 
 contains
@@ -76,49 +77,73 @@ subroutine op1minus_grad(f, df)
     if (allocated(df%dvdw)) df%dvdw = -df%dvdw
 end subroutine
 
-subroutine set_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
-        mbd_ts_erf_beta, mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta)
+type(mbd_exc) function mbd_damping_set_params_from_xc(this, xc, variant) result(exc)
+    class(mbd_damping), intent(inout) :: this
     character(len=*), intent(in) :: xc
-    real(dp), intent(out) :: &
-        ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, mbd_ts_erf_beta, &
-        mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta
+    character(len=*), intent(in) :: variant
 
-    ts_d = 20d0
-    ts_s_r = 1d0
-    mbd_scs_a = 2d0
-    mbd_ts_a = 6d0
-    mbd_ts_erf_beta = 1d0
-    mbd_ts_fermi_beta = 1d0
-    mbd_rsscs_a = 6d0
-    mbd_rsscs_beta = 1d0
-    select case (lower(xc))
-        case ("pbe")
-            ts_s_r = 0.94d0
-            mbd_scs_a = 2.56d0
-            mbd_ts_erf_beta = 1.07d0
-            mbd_ts_fermi_beta = 0.81d0
-            mbd_rsscs_beta = 0.83d0
-        case ("pbe0")
-            ts_s_r = 0.96d0
-            mbd_scs_a = 2.53d0
-            mbd_ts_erf_beta = 1.08d0
-            mbd_ts_fermi_beta = 0.83d0
-            mbd_rsscs_beta = 0.85d0
-        case ("hse")
-            ts_s_r = 0.96d0
-            mbd_scs_a = 2.53d0
-            mbd_ts_erf_beta = 1.08d0
-            mbd_ts_fermi_beta = 0.83d0
-            mbd_rsscs_beta = 0.85d0
-        case ("blyp")
-            ts_s_r = 0.62d0
-        case ("b3lyp")
-            ts_s_r = 0.84d0
-        case ("revpbe")
-            ts_s_r = 0.60d0
-        case ("am05")
-            ts_s_r = 0.84d0
-    endselect
-end subroutine set_damping_parameters
+    select case (lower(variant))
+    case ('ts')
+        select case (lower(xc))
+        case ('pbe')
+            this%ts_sr = 0.94d0
+        case ('pbe0')
+            this%ts_sr = 0.96d0
+        case ('hse')
+            this%ts_sr = 0.96d0
+        case ('blyp')
+            this%ts_sr = 0.62d0
+        case ('b3lyp')
+            this%ts_sr = 0.84d0
+        case ('revpbe')
+            this%ts_sr = 0.60d0
+        case ('am05')
+            this%ts_sr = 0.84d0
+        case default
+            exc%code = MBD_EXC_DAMPING
+            exc%msg = 'Damping parameter S_r of method TS unknown for ' // trim(xc)
+        end select
+    case ('mbd@rsscs')
+        select case (lower(xc))
+        case ('pbe')
+            this%beta = 0.83d0
+        case ('pbe0')
+            this%beta = 0.85d0
+        case ('hse')
+            this%beta = 0.85d0
+        case default
+            exc%code = MBD_EXC_DAMPING
+            exc%msg = 'Damping parameter beta of method MBD@rsSCS unknown for ' // trim(xc)
+        end select
+    case ('mbd@ts')
+        select case (lower(xc))
+        case ('pbe')
+            this%beta = 0.81d0
+        case ('pbe0')
+            this%beta = 0.83d0
+        case ('hse')
+            this%beta = 0.83d0
+        case default
+            exc%code = MBD_EXC_DAMPING
+            exc%msg = 'Damping parameter beta of method MBD@TS unknown for ' // trim(xc)
+        end select
+    case ('mbd@scs')
+        this%beta = 1d0
+        select case (lower(xc))
+        case ('pbe')
+            this%a = 2.56d0
+        case ('pbe0')
+            this%a = 2.53d0
+        case ('hse')
+            this%a = 2.53d0
+        case default
+            exc%code = MBD_EXC_DAMPING
+            exc%msg = 'Damping parameter a of method MBD@SCS unknown for ' // trim(xc)
+        end select
+    case default
+        exc%code = MBD_EXC_DAMPING
+        exc%msg = 'Method is unkonwn: ' // trim(variant)
+    end select
+end function
 
 end module

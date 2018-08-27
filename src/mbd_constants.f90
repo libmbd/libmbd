@@ -19,6 +19,7 @@ integer, parameter :: MBD_EXC_NEG_EIGVALS = 1
 integer, parameter :: MBD_EXC_NEG_POL = 2
 integer, parameter :: MBD_EXC_LINALG = 3
 integer, parameter :: MBD_EXC_UNIMPL = 4
+integer, parameter :: MBD_EXC_DAMPING = 5
 
 real(dp), parameter :: ZERO_REAL = 0d0
 complex(dp), parameter :: ZERO_COMPLEX = (0d0, 0d0)

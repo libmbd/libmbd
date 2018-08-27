@@ -3,8 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_api_tests
 
-use mbd_api, only: mbd_input, mbd_calculation, mbd_get_damping_parameters, &
-    mbd_get_free_vdw_params
+use mbd_api, only: mbd_input, mbd_calculation, mbd_get_free_vdw_params
 
 #ifdef WITH_MPI
 use mpi
@@ -41,10 +40,17 @@ subroutine test()
     type(mbd_calculation) :: calc
     real(dp) :: energy
     real(dp), allocatable :: gradients(:, :)
+    integer :: code
+    character(200) :: origin, msg
 
     inp%free_values = mbd_get_free_vdw_params(['Ar', 'Ar'], 'ts')
-    call mbd_get_damping_parameters('pbe', inp%mbd_beta, inp%ts_d)
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2])
+    inp%xc = 'xxx'
+    call calc%init(inp)
+    call calc%get_exception(code, origin, msg)
+    print *, msg
+    call calc%destroy()
+    inp%xc = 'pbe'
     call calc%init(inp)
     call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
     call calc%get_energy(energy)

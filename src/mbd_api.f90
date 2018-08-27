@@ -6,7 +6,7 @@ module mbd_api
 use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd, only: mbd_scs_energy, mbd_result, scale_TS
-use mbd_damping_type, only: mbd_damping, set_damping_parameters
+use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
 use mbd_ts, only: ts_energy
 use mbd_common, only: printer
@@ -16,7 +16,7 @@ implicit none
 
 private
 public :: mbd_input, mbd_calculation  ! types
-public :: mbd_get_damping_parameters, mbd_get_free_vdw_params  ! subroutines
+public :: mbd_get_free_vdw_params  ! subroutines
 
 type :: mbd_input
     integer :: comm = -1  ! MPI communicator
@@ -32,12 +32,13 @@ type :: mbd_input
     ! off-gamma shift of k-points in units of inter-k-point distance
     real(dp) :: k_grid_shift = K_GRID_SHIFT
 
+    character(len=20) :: xc = ''
     ! TS damping parameters
     real(dp) :: ts_d = TS_DAMPING_D
-    real(dp) :: ts_sr
+    real(dp) :: ts_sr = -1
     ! MBD damping parameters
     real(dp) :: mbd_a = MBD_DAMPING_A
-    real(dp) :: mbd_beta
+    real(dp) :: mbd_beta = -1
 
     integer :: k_grid(3)  ! number of k-points along reciprocal axes
     ! is there vacuum along some axes in a periodic calculation
@@ -96,10 +97,6 @@ subroutine mbd_calc_init(this, input)
     this%calc%param%n_frequency_grid = input%n_omega_grid
     this%calc%param%k_grid_shift = input%k_grid_shift
     this%calc%param%zero_negative_eigs = input%zero_negative_eigvals
-    this%damp%beta = input%mbd_beta
-    this%damp%a = input%mbd_a
-    this%damp%ts_d = input%ts_d
-    this%damp%ts_sr = input%ts_sr
     this%sys%k_grid = input%k_grid
     this%sys%vacuum_axis = input%vacuum_axis
     this%sys%coords = input%coords
@@ -108,12 +105,24 @@ subroutine mbd_calc_init(this, input)
     call this%calc%init_grid()
     call this%sys%init(this%calc)
     this%free_values = input%free_values
+    if (input%xc == '') then
+        this%damp%beta = input%mbd_beta
+        this%damp%a = input%mbd_a
+        this%damp%ts_d = input%ts_d
+        this%damp%ts_sr = input%ts_sr
+    else
+        this%calc%exc = this%damp%set_params_from_xc(input%xc, 'MBD@rsSCS')
+        if (this%sys%has_exc()) return
+        this%calc%exc = this%damp%set_params_from_xc(input%xc, 'TS')
+        if (this%sys%has_exc()) return
+    end if
 end subroutine
 
 
 subroutine mbd_calc_destroy(this)
     class(mbd_calculation), target, intent(inout) :: this
 
+    deallocate (this%calc%omega_grid, this%calc%omega_grid_w)
     call this%sys%destroy()
 end subroutine
 
@@ -208,8 +217,8 @@ end subroutine
 subroutine mbd_calc_get_exception(this, code, origin, msg)
     class(mbd_calculation), intent(inout) :: this
     integer, intent(out) :: code
-    character(50), intent(out) :: origin
-    character(150), intent(out) :: msg
+    character(*), intent(out) :: origin
+    character(*), intent(out) :: msg
 
     code = this%calc%exc%code
     if (code == 0) return
@@ -226,16 +235,6 @@ subroutine mbd_calc_print_info(this, info)
     procedure(printer) :: info
 
     call this%calc%info%print(info)
-end subroutine
-
-
-subroutine mbd_get_damping_parameters(xc, mbd_beta, ts_sr)
-    character(len=*), intent(in) :: xc
-    real(dp), intent(out) :: mbd_beta, ts_sr
-
-    real(dp) :: d1, d2, d3, d4, d5, d6
-
-    call set_damping_parameters(xc, d1, ts_sr, d2, d3, d4, d5, d6, mbd_beta)
 end subroutine
 
 

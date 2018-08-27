@@ -99,7 +99,8 @@ type(mbd_result) function mbd_scs_energy( &
     call allocate_derivs()
     allocate (alpha_dyn(n_atoms, 0:n_freq))
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
-    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_dyn)
+    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_dyn, &
+        mbd_grad(dalpha=allocated(dene%dalpha), dC6=allocated(dene%dC6)))
     damp_scs = damp
     damp_scs%version = damping_types(1)
     do i_freq = 0, n_freq
@@ -203,14 +204,9 @@ type(mbd_result) function mbd_scs_energy( &
             allocate (dene_mbd%dC6(n_atoms))
             allocate (dene_mbd%dr_vdw(n_atoms))
         end if
-        allocate (dalpha_dyn(0:n_freq))
         allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
         my_ncatoms = size(sys%idx%j_atom)
         do i_freq = 0, n_freq
-            if (allocated(dene%dalpha)) &
-                allocate (dalpha_dyn(i_freq)%dalpha(n_atoms))
-            if (allocated(dene%dC6)) &
-                allocate (dalpha_dyn(i_freq)%dC6(n_atoms))
             do my_i_atom = 1, size(dalpha_dyn_scs, 1)
                 associate (da => dalpha_dyn_scs(my_i_atom, i_freq))
                     if (allocated(dene%dcoords)) &
@@ -788,9 +784,10 @@ subroutine test_frequency_grid(calc)
     type(mbd_calc), intent(inout) :: calc
 
     real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
-    type(mbd_gradients) :: dalpha(0:ubound(calc%omega_grid, 1))
+    type(mbd_gradients), allocatable :: dalpha(:)
+    type(mbd_grad) :: grad
 
-    alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha)
+    alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha, grad)
     C6 = C6_from_alpha(calc, alpha)
     error = abs(C6(1)/99.5d0-1d0)
     calc%info%freq_error = &
@@ -927,19 +924,15 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
 
     real(dp), allocatable :: alpha(:, :)
     type(mbd_gradients), allocatable :: dalpha(:)
-    integer :: n_freq, n_atoms, i_freq, n_kpts, i_kpt
+    integer :: n_atoms, n_kpts, i_kpt
     real(dp) :: k_point(3)
     type(mbd_result) :: res_k
     type(mbd_gradients) :: dene_k
+    type(mbd_grad) :: grad
 
     n_atoms = sys%siz()
     if (sys%do_rpa) then
-        n_freq = ubound(sys%calc%omega_grid, 1)
-        allocate (alpha(n_atoms, 0:n_freq), dalpha(0:n_freq))
-        do i_freq = 0, n_freq
-            call dene%copy_alloc(dalpha(i_freq))
-        end do
-        alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha)
+        alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha, grad)
     end if
     if (.not. allocated(sys%lattice)) then
         if (.not. sys%do_rpa) then
@@ -1261,22 +1254,21 @@ elemental function terf(r, r0, a)
     terf = 0.5d0*(erf(a*(r+r0))+erf(a*(r-r0)))
 end function
 
-function alpha_dynamic_ts(calc, alpha_0, C6, dalpha) result(alpha)
+function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_gradients), intent(inout) :: dalpha(0:)
+    type(mbd_gradients), allocatable, intent(out) :: dalpha(:)
+    type(mbd_grad), intent(in) :: grad
     real(dp) :: alpha(size(alpha_0), 0:ubound(calc%omega_grid, 1))
 
     integer :: i_freq, n_atoms
     real(dp), allocatable :: omega(:)
     type(mbd_gradients) :: domega
-    type(mbd_grad) :: grad
 
     n_atoms = size(alpha_0)
-    grad = mbd_grad(dalpha=allocated(dalpha(0)%dalpha), &
-        dC6=allocated(dalpha(0)%dC6))
     omega = omega_eff(C6, alpha_0, domega, grad)
+    allocate(dalpha(0:ubound(alpha, 2)))
     do i_freq = 0, ubound(alpha, 2)
         alpha(:, i_freq) = alpha_osc(&
             alpha_0, omega, calc%omega_grid(i_freq), dalpha(i_freq), &

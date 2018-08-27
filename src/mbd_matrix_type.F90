@@ -572,11 +572,12 @@ function mbd_matrix_complex_contract_n33_rows(A) result(res)
 #endif
 end function
 
+#undef MBD_TYPE
 #ifndef MBD_INCLUDED
 #define MBD_INCLUDED
-#undef MBD_TYPE
 #define MBD_TYPE 1
 #include "mbd_matrix_type.F90"
+#undef MBD_INCLUDED
 
 ! #if MBD_TYPE == 0
 type(mbd_matrix_real) function mbd_matrix_real_mmul( &

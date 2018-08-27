@@ -9,7 +9,7 @@ implicit none
 
 private
 public :: mbd_gradients, mbd_grad_matrix_real, mbd_grad_matrix_complex, &
-    mbd_grad_switch, mbd_grad_scalar, damping_grad, op1minus_grad
+    mbd_grad_switch, mbd_grad_scalar
 
 type :: mbd_gradients
     real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
@@ -63,39 +63,5 @@ logical function mbd_grad_switch_any(this) result(any)
     any = this%dcoords .or. this%dalpha .or. this%dC6 .or. &
         this%dr_vdw .or. this%domega
 end function
-
-function damping_grad(f, df, T, dT, dfT, grad) result(fT)
-    real(dp), intent(in) :: f
-    type(mbd_grad_scalar), intent(in) :: df
-    real(dp), intent(in) :: T(3, 3)
-    type(mbd_grad_matrix_real), intent(in) :: dT
-    type(mbd_grad_matrix_real), intent(out) :: dfT
-    type(mbd_grad_switch), intent(in) :: grad
-    real(dp) :: fT(3, 3)
-
-    integer :: c
-
-    fT = f*T
-    if (grad%dcoords) then
-        allocate (dfT%dr(3, 3, 3), source=0d0)
-        if (allocated(df%dr)) forall (c = 1:3) dfT%dr(:, :, c) = df%dr(c)*T
-        if (allocated(dT%dr)) dfT%dr = dfT%dr + f*dT%dr
-    end if
-    if (grad%dr_vdw) then
-        allocate (dfT%dvdw(3, 3), source=0d0)
-        if (allocated(df%dvdw)) dfT%dvdw = df%dvdw*T
-        if (allocated(dT%dvdw)) dfT%dvdw = dfT%dvdw + f*dT%dvdw
-    end if
-    if (grad%dsigma) dfT%dsigma = f*dT%dsigma
-end function
-
-subroutine op1minus_grad(f, df)
-    real(dp), intent(inout) :: f
-    type(mbd_grad_scalar), intent(inout) :: df
-
-    f = 1-f
-    if (allocated(df%dr)) df%dr = -df%dr
-    if (allocated(df%dvdw)) df%dvdw = -df%dvdw
-end subroutine
 
 end module

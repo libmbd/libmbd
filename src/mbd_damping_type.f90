@@ -10,7 +10,8 @@ use mbd_gradients_type, only: mbd_grad_scalar, mbd_grad_switch
 implicit none
 
 private
-public :: mbd_damping, damping_fermi, set_damping_parameters
+public :: mbd_damping, damping_fermi, damping_sqrtfermi, set_damping_parameters, &
+    op1minus_grad
 
 type :: mbd_damping
     character(len=20) :: version
@@ -57,6 +58,23 @@ real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     if (grad%dcoords) df%dr = pre*r/(r_1*s_vdw)
     if (grad%dr_vdw) df%dvdw = -pre*r_1/s_vdw**2
 end function
+
+real(dp) function damping_sqrtfermi(r, s_vdw, d) result(f)
+    real(dp), intent(in) :: r(3)
+    real(dp), intent(in) :: s_vdw
+    real(dp), intent(in) :: d
+
+    f = sqrt(damping_fermi(r, s_vdw, d))
+end function
+
+subroutine op1minus_grad(f, df)
+    real(dp), intent(inout) :: f
+    type(mbd_grad_scalar), intent(inout) :: df
+
+    f = 1-f
+    if (allocated(df%dr)) df%dr = -df%dr
+    if (allocated(df%dvdw)) df%dvdw = -df%dvdw
+end subroutine
 
 subroutine set_damping_parameters(xc, ts_d, ts_s_r, mbd_scs_a, mbd_ts_a, &
         mbd_ts_erf_beta, mbd_ts_fermi_beta, mbd_rsscs_a, mbd_rsscs_beta)

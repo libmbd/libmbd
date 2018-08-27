@@ -63,6 +63,7 @@ else:
         'src/mbd_matrix_type.F90',
         'src/mbd_linalg.F90',
         'src/mbd_system_type.F90',
+        'src/mbd_dipole.F90',
         'src/mbd.F90',
         'src/mbd_ts.f90',
         'src/mbd_coulomb.f90',

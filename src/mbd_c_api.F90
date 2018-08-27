@@ -6,7 +6,8 @@ module mbd_c_api
 use iso_c_binding
 use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
-use mbd, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, dipole_matrix, mbd_result
+use mbd, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, mbd_result
+use mbd_dipole, only: dipole_matrix
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch
 use mbd_ts, only: ts_energy

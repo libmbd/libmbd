@@ -4,9 +4,13 @@
 #define MODULE_UNIT_TESTS
 #include "mbd.F90"
 
+#define MODULE_UNIT_TESTS
+#include "mbd_dipole.F90"
+
 program mbd_tests
 
 use mbd
+use mbd_dipole
 use mbd_common, only: diff7, findval, print_matrix
 
 #ifdef WITH_MPI

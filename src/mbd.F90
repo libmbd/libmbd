@@ -105,7 +105,10 @@ type(mbd_result) function mbd_scs_energy( &
     damp_scs%version = damping_types(1)
     do i_freq = 0, n_freq
         alpha_dyn_scs(:, i_freq) = run_scs( &
-            sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq) &
+            sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), &
+            mbd_grad(dcoords=allocated(dene%dcoords), &
+                dalpha=allocated(dene%dalpha) .or. allocated(dene%dC6), &
+                dr_vdw=allocated(dene%dr_vdw)) &
         )
         if (sys%has_exc()) return
     end do
@@ -195,8 +198,6 @@ type(mbd_result) function mbd_scs_energy( &
     contains
 
     subroutine allocate_derivs()
-        integer :: my_ncatoms
-
         if (allocated(dene%dcoords)) allocate (dene_mbd%dcoords(n_atoms, 3))
         if (dene%has_grad()) then
             allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
@@ -205,19 +206,6 @@ type(mbd_result) function mbd_scs_energy( &
             allocate (dene_mbd%dr_vdw(n_atoms))
         end if
         allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
-        my_ncatoms = size(sys%idx%j_atom)
-        do i_freq = 0, n_freq
-            do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-                associate (da => dalpha_dyn_scs(my_i_atom, i_freq))
-                    if (allocated(dene%dcoords)) &
-                        allocate (da%dcoords(my_ncatoms, 3))
-                    if (allocated(dene%dalpha) .or. allocated(dene%dC6)) &
-                        allocate (da%dalpha(my_ncatoms))
-                    if (allocated(dene%dr_vdw)) &
-                        allocate (da%dr_vdw(my_ncatoms))
-                end associate
-            end do
-        end do
     end subroutine
 end function mbd_scs_energy
 
@@ -821,11 +809,12 @@ end subroutine
 !> B'_{p,\zeta}=\sum_iB_{p,i\zeta}
 !> \end{gathered}
 !> \f]
-function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
+function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha(:)
     type(mbd_damping), intent(in) :: damp
-    type(mbd_gradients), intent(inout) :: dalpha_scs(:)
+    type(mbd_gradients), intent(out) :: dalpha_scs(:)
+    type(mbd_grad), intent(in) :: grad
     real(dp) :: alpha_scs(size(alpha))
 
     type(mbd_matrix_real) :: alpha_full, dQ, T
@@ -836,12 +825,10 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
 
     n_atoms = sys%siz()
     damp_local = damp
-    damp_local%sigma = sigma_selfint( &
-        alpha, dsigma_dalpha, allocated(dalpha_scs(1)%dalpha) &
-    )
-    T = dipole_matrix(sys, damp_local, dalpha_scs(1)%has_grad())
+    damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
+    T = dipole_matrix(sys, damp_local, grad%any())
     if (sys%has_exc()) return
-    if (dalpha_scs(1)%has_grad()) then
+    if (grad%any()) then
         call alpha_full%copy_from(T)
     else
         call alpha_full%move_from(T)
@@ -857,12 +844,15 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
         sys%calc%exc%msg = 'Screening leads to negative polarizability'
         return
     end if
-    if (.not. dalpha_scs(1)%has_grad()) return
+    if (.not. grad%any()) return
     allocate (alpha_prime(3, 3*n_atoms), B_prime(3*n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
     call alpha_full%contract_n_transp('R', alpha_prime)
     call dQ%init_from(T)
-    if (allocated(dalpha_scs(1)%dcoords)) then
+    if (grad%dcoords) then
+        do my_i_atom = 1, size(sys%idx%i_atom)
+            allocate(dalpha_scs(my_i_atom)%dcoords(size(sys%idx%j_atom), 3))
+        end do
         do i_xyz = 1, 3
             dQ%val = -T%dr(:, :, i_xyz)
             dQ = alpha_full%mmul(dQ)
@@ -879,7 +869,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             end do
         end do
     end if
-    if (allocated(dalpha_scs(1)%dalpha)) then
+    if (grad%dalpha) then
         dQ%val = T%dsigma
         do i_atom = 1, n_atoms
             dsij_dsi = damp_local%sigma(i_atom)*dsigma_dalpha(i_atom) / &
@@ -899,7 +889,7 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
             end if
         end do
     end if
-    if (allocated(dalpha_scs(1)%dr_vdw)) then
+    if (grad%dr_vdw) then
         dQ%val = T%dvdw
         dQ = alpha_full%mmul(dQ)
         call dQ%contract_n_transp('C', B_prime)

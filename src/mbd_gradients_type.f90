@@ -35,6 +35,8 @@ type :: mbd_grad_switch
     logical :: dV = .false.
     logical :: dV_free = .false.
     logical :: dX_free = .false.
+    contains
+    procedure :: any => mbd_grad_switch_any
 end type
 
 contains
@@ -58,6 +60,13 @@ logical function mbd_gradients_has_grad(this) result(has_grad)
     has_grad = allocated(this%dcoords) .or. &
         allocated(this%dalpha) .or. allocated(this%dC6) .or. &
         allocated(this%dr_vdw) .or. allocated(this%domega)
+end function
+
+logical function mbd_grad_switch_any(this) result(any)
+    class(mbd_grad_switch), intent(in) :: this
+
+    any = this%dcoords .or. this%dalpha .or. this%dC6 .or. &
+        this%dr_vdw .or. this%domega
 end function
 
 end module

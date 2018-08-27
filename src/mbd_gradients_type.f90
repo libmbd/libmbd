@@ -8,7 +8,7 @@ use mbd_constants
 implicit none
 
 private
-public :: mbd_gradients
+public :: mbd_gradients, mbd_grad_switch
 
 type :: mbd_gradients
     real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
@@ -23,6 +23,18 @@ type :: mbd_gradients
     contains
     procedure :: copy_alloc => mbd_gradients_copy_alloc
     procedure :: has_grad => mbd_gradients_has_grad
+end type
+
+type :: mbd_grad_switch
+    logical :: dcoords = .false.
+    logical :: dalpha = .false.
+    logical :: dalpha_dyn = .false.
+    logical :: dC6 = .false.
+    logical :: dr_vdw = .false.
+    logical :: domega = .false.
+    logical :: dV = .false.
+    logical :: dV_free = .false.
+    logical :: dX_free = .false.
 end type
 
 contains

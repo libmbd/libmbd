@@ -9,7 +9,7 @@ use mbd_common, only: tostr, findval, lower, shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
-use mbd_gradients_type, only: mbd_gradients
+use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, &
     contract_cross_33
 #ifdef WITH_SCALAPACK
@@ -109,7 +109,9 @@ type(mbd_result) function mbd_scs_energy( &
         )
         if (sys%has_exc()) return
     end do
-    C6_scs = C6_from_alpha(sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs)
+    C6_scs = C6_from_alpha( &
+        sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, dene%has_grad() &
+    )
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs &
@@ -195,7 +197,6 @@ type(mbd_result) function mbd_scs_energy( &
 
         if (allocated(dene%dcoords)) allocate (dene_mbd%dcoords(n_atoms, 3))
         if (dene%has_grad()) then
-            allocate (dC6_scs_dalpha_dyn_scs(n_atoms, 0:n_freq))
             allocate (dr_vdw_scs%dV(n_atoms))
             allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
             allocate (dene_mbd%dalpha(n_atoms))
@@ -623,8 +624,9 @@ type(mbd_result) function mbd_energy_single_complex( &
     else
         call relay%move_from(T)
     end if
-    call dene%copy_alloc(domega)
-    omega = omega_eff(C6, alpha_0, domega)
+    omega = omega_eff(C6, alpha_0, domega, mbd_grad( &
+        dC6=allocated(dene%dC6), dalpha=allocated(dene%dalpha) &
+    ))
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
     call sys%clock(21)
@@ -720,13 +722,12 @@ type(mbd_result) function rpa_energy_single_complex( &
     complex(dp), allocatable :: eigs(:)
     integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
     type(mbd_damping) :: damp_alpha
-    real(dp), allocatable :: dsigma_dalpha(:)
 
     res%energy = 0d0
     damp_alpha = damp
     allocate (eigs(3*sys%siz()))
     do i_freq = 0, ubound(sys%calc%omega_grid, 1)
-        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq), dsigma_dalpha)
+        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
         ! relay = T
 #if MBD_TYPE == 0
         relay = dipole_matrix_real(sys, damp_alpha, .false.)
@@ -790,10 +791,9 @@ subroutine test_frequency_grid(calc)
 
     real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
     type(mbd_gradients) :: dalpha(0:ubound(calc%omega_grid, 1))
-    real(dp), allocatable :: dC6_dalpha(:, :)
 
     alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha)
-    C6 = C6_from_alpha(calc, alpha, dC6_dalpha)
+    C6 = C6_from_alpha(calc, alpha)
     error = abs(C6(1)/99.5d0-1d0)
     calc%info%freq_error = &
         "Relative quadrature error in C6 of carbon atom: " // &
@@ -841,8 +841,9 @@ function run_scs(sys, alpha, damp, dalpha_scs) result(alpha_scs)
 
     n_atoms = sys%siz()
     damp_local = damp
-    if (allocated(dalpha_scs(1)%dalpha)) allocate (dsigma_dalpha(n_atoms))
-    damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha)
+    damp_local%sigma = sigma_selfint( &
+        alpha, dsigma_dalpha, allocated(dalpha_scs(1)%dalpha) &
+    )
     T = dipole_matrix(sys, damp_local, dalpha_scs(1)%has_grad())
     if (sys%has_exc()) return
     if (dalpha_scs(1)%has_grad()) then
@@ -1274,8 +1275,9 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha) result(alpha)
     type(mbd_gradients) :: domega
 
     n_atoms = size(alpha_0)
-    call dalpha(0)%copy_alloc(domega)
-    omega = omega_eff(C6, alpha_0, domega)
+    omega = omega_eff(C6, alpha_0, domega, mbd_grad( &
+        dC6=allocated(dalpha(0)%dC6), dalpha=allocated(dalpha(0)%dalpha) &
+    ))
     do i_freq = 0, ubound(alpha, 2)
         if (allocated(dalpha(i_freq)%dalpha) .or. &
                 allocated(dalpha(i_freq)%dC6)) then
@@ -1341,15 +1343,17 @@ end function
 !> \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
 !> \right)
 !> \f]
-function omega_eff(C6, alpha, domega) result(omega)
+function omega_eff(C6, alpha, domega, grad) result(omega)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: alpha(:)
-    type(mbd_gradients), intent(inout) :: domega
+    type(mbd_gradients), intent(out), optional :: domega
+    type(mbd_grad), intent(in), optional :: grad
     real(dp) :: omega(size(C6))
 
     omega = 4d0/3*C6/alpha**2
-    if (allocated(domega%dC6)) domega%dC6 = omega/C6
-    if (allocated(domega%dalpha)) domega%dalpha = -2*omega/alpha
+    if (.not. present(grad)) return
+    if (grad%dC6) domega%dC6 = omega/C6
+    if (grad%dalpha) domega%dalpha = -2*omega/alpha
 end function
 
 !> \f[
@@ -1362,13 +1366,15 @@ end function
 !> \partial\sigma_{ij}=
 !> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
 !> \f]
-function sigma_selfint(alpha, dsigma_dalpha) result(sigma)
+function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
     real(dp), intent(in) :: alpha(:)
-    real(dp), intent(inout), allocatable :: dsigma_dalpha(:)
+    real(dp), allocatable, intent(out), optional :: dsigma_dalpha(:)
+    logical, intent(in), optional :: grad
     real(dp) :: sigma(size(alpha))
 
     sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
-    if (allocated(dsigma_dalpha)) dsigma_dalpha = sigma/(3*alpha)
+    if (.not. present(grad)) return
+    if (grad) dsigma_dalpha = sigma/(3*alpha)
 end function
 
 !> \f[
@@ -1376,10 +1382,11 @@ end function
 !> \partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du
 !> \bar\alpha(u)\partial\bar\alpha(u)
 !> \f]
-function C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
+function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
     type(mbd_calc), intent(in) :: calc
     real(dp), intent(in) :: alpha(:, 0:)
-    real(dp), intent(inout), allocatable :: dC6_dalpha(:, :)
+    real(dp), allocatable, intent(out), optional :: dC6_dalpha(:, :)
+    logical, intent(in), optional :: grad
     real(dp) :: C6(size(alpha, 1))
 
     integer :: i_freq, n_atoms
@@ -1389,8 +1396,9 @@ function C6_from_alpha(calc, alpha, dC6_dalpha) result(C6)
     do i_freq = 0, ubound(alpha, 2)
         C6 = C6 + 3d0/pi*alpha(:, i_freq)**2*calc%omega_grid_w(i_freq)
     end do
-    if (.not. allocated(dC6_dalpha)) return
-    dC6_dalpha = 0d0
+    if (.not. present(grad)) return
+    if (.not. grad) return
+    allocate (dC6_dalpha(n_atoms, 0:ubound(alpha, 2)), source=0d0)
     do i_freq = 0, ubound(alpha, 2)
         dC6_dalpha(:, i_freq) = dC6_dalpha(:, i_freq) + 6d0/pi*alpha(:, i_freq)
     end do

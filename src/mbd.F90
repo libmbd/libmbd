@@ -85,6 +85,7 @@ type(mbd_result) function mbd_scs_energy( &
         dene_dalpha_scs_dyn(:, :), freq_w(:)
     type(mbd_gradients), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
     type(mbd_gradients) :: dene_mbd, dr_vdw_scs
+    type(mbd_grad) :: grad_scs
     type(mbd_damping) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
@@ -101,16 +102,16 @@ type(mbd_result) function mbd_scs_energy( &
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
     allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
     if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
+    grad_scs = mbd_grad( &
+        dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
+        dr_vdw=grad%dr_vdw &
+    )
     alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_dyn, grad)
     damp_scs = damp
     damp_scs%version = damping_types(1)
     do i_freq = 0, n_freq
         alpha_dyn_scs(:, i_freq) = run_scs( &
-            sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), &
-            mbd_grad( &
-                dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
-                dr_vdw=grad%dr_vdw &
-            ) &
+            sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
         )
         if (sys%has_exc()) return
     end do

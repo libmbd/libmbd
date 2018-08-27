@@ -81,11 +81,15 @@ ffibuilder.set_source(
 with open('src/mbd.h') as f:
     ffibuilder.cdef(f.read())
 
+with open('README.md') as f:
+    long_description = f.read()
 
 setup(
     name='pymbd',
     version='0.4.0a1',
     description='Many-body dispersion method',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author='Jan Hermann',
     author_email='dev@janhermann.cz',
     url='https://github.com/azag0/libmbd',
@@ -109,6 +113,6 @@ setup(
     install_requires=['cffi', 'numpy', 'scipy'],
     ext_modules=[ffibuilder.distutils_extension()],
     extras_require={
-        'MPI': ['mpi4py'],
+        'mpi': ['mpi4py'],
     },
 )

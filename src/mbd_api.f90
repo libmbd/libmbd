@@ -7,7 +7,7 @@ use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd, only: mbd_damping, mbd_scs_energy, set_damping_parameters, &
     mbd_result, scale_TS
-use mbd_gradients_type, only: mbd_gradients
+use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
 use mbd_ts, only: ts_energy
 use mbd_common, only: printer
 use mbd_vdw_param, only: default_vdw_params, species_index
@@ -151,12 +151,11 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     real(dp), intent(in) :: ratios(:)
 
     real(dp), allocatable :: ones(:)
-    type(mbd_gradients) :: dX
 
     allocate (ones(size(ratios)), source=1d0)
-    this%alpha_0 = scale_TS(this%free_values(1, :), ratios, ones, 1d0, dX)
-    this%C6 = scale_TS(this%free_values(2, :), ratios, ones, 2d0, dX)
-    this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3, dX)
+    this%alpha_0 = scale_TS(this%free_values(1, :), ratios, ones, 1d0)
+    this%C6 = scale_TS(this%free_values(2, :), ratios, ones, 2d0)
+    this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3)
 end subroutine
 
 
@@ -166,11 +165,10 @@ subroutine mbd_calc_get_energy(this, energy)
 
     select case (this%dispersion_type)
     case ('mbd')
-        if (this%do_gradients) then
-            if (allocated(this%denergy%dcoords)) deallocate(this%denergy%dcoords)
-            allocate (this%denergy%dcoords(this%sys%siz(), 3))
-        end if
-        this%results = mbd_scs_energy(this%sys, 'rsscs', this%alpha_0, this%C6, this%damp, this%denergy)
+        this%results = mbd_scs_energy( &
+            this%sys, 'rsscs', this%alpha_0, this%C6, this%damp, &
+            this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &
+        )
         energy = this%results%energy
     case ('ts')
         energy = ts_energy(this%sys, this%alpha_0, this%C6, this%damp)

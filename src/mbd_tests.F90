@@ -250,17 +250,17 @@ subroutine test_mbd_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dcoords(n_atoms, 3))
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
+    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+        dene, mbd_grad(dcoords=.true.))
     gradients_anl = dene%dcoords
-    deallocate (dene%dcoords)
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                res(i_step) = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
+                res(i_step) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+                    dene, mbd_grad())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
@@ -302,13 +302,10 @@ subroutine test_scs_deriv_expl()
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    do my_i_atom = 1, my_nratoms
-        allocate (dalpha_scs(my_i_atom)%dcoords(my_ncatoms, 3))
-    end do
-    alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
+    alpha_scs(:, 0) = &
+        run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad(dcoords=.true.))
     do my_i_atom = 1, my_nratoms
         gradients_anl(my_i_atom, :, :) = dalpha_scs(my_i_atom)%dcoords
-        deallocate (dalpha_scs(my_i_atom)%dcoords)
     end do
     do j_atom = 1, n_atoms
         my_j_atom = findval(sys%idx%j_atom, j_atom)
@@ -318,7 +315,8 @@ subroutine test_scs_deriv_expl()
                 sys%coords = coords
                 sys%coords(i_xyz, j_atom) = sys%coords(i_xyz, j_atom) + &
                     i_step*delta
-                alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
+                alpha_scs(:, i_step) = &
+                    run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad())
             end do
             if (my_j_atom > 0) then
                 do my_i_atom = 1, my_nratoms
@@ -366,13 +364,10 @@ subroutine test_scs_deriv_impl_alpha
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    do my_i_atom = 1, my_nratoms
-        allocate (dalpha_scs(my_i_atom)%dalpha(my_ncatoms))
-    end do
-    alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
+    alpha_scs(:, 0) = &
+        run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad(dalpha=.true.))
     do my_i_atom = 1, my_nratoms
         gradients_anl(my_i_atom, :) = dalpha_scs(my_i_atom)%dalpha
-        deallocate (dalpha_scs(my_i_atom)%dalpha)
     end do
     do j_atom = 1, n_atoms
         my_j_atom = findval(sys%idx%j_atom, j_atom)
@@ -380,7 +375,8 @@ subroutine test_scs_deriv_impl_alpha
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step*delta
-            alpha_scs(:, i_step) = run_scs(sys, alpha_0_diff, damp, dalpha_scs)
+            alpha_scs(:, i_step) = &
+                run_scs(sys, alpha_0_diff, damp, dalpha_scs, mbd_grad())
         end do
         if (my_j_atom > 0) then
             do my_i_atom = 1, my_nratoms
@@ -424,13 +420,10 @@ subroutine test_scs_deriv_impl_vdw
     damp%r_vdw = rvdw
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    do my_i_atom = 1, my_nratoms
-        allocate (dalpha_scs(my_i_atom)%dr_vdw(my_ncatoms))
-    end do
-    alpha_scs(:, 0) = run_scs(sys, alpha_0, damp, dalpha_scs)
+    alpha_scs(:, 0) = &
+        run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad(dr_vdw=.true.))
     do my_i_atom = 1, my_nratoms
         gradients_anl(my_i_atom, :) = dalpha_scs(my_i_atom)%dr_vdw
-        deallocate (dalpha_scs(my_i_atom)%dr_vdw)
     end do
     do j_atom = 1, n_atoms
         my_j_atom = findval(sys%idx%j_atom, j_atom)
@@ -438,7 +431,8 @@ subroutine test_scs_deriv_impl_vdw
             if (i_step == 0) cycle
             damp%r_vdw = rvdw
             damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step*delta
-            alpha_scs(:, i_step) = run_scs(sys, alpha_0, damp, dalpha_scs)
+            alpha_scs(:, i_step) = &
+                run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad())
         end do
         if (my_j_atom > 0) then
             do my_i_atom = 1, my_nratoms
@@ -478,15 +472,16 @@ subroutine test_mbd_deriv_impl_alpha()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dalpha(n_atoms))
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
-    call move_alloc(dene%dalpha, gradients_anl)
+    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+        dene, mbd_grad(dalpha=.true.))
+    gradients_anl = dene%dalpha
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_energy_single_real(sys, alpha_0_diff, C6, damp, dene)
+            res(i_step) = mbd_energy_single_real(sys, alpha_0_diff, C6, damp, &
+                dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -521,15 +516,16 @@ subroutine test_mbd_deriv_impl_C6()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dC6(n_atoms))
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
-    call move_alloc(dene%dC6, gradients_anl)
+    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+        dene, mbd_grad(dC6=.true.))
+    gradients_anl = dene%dC6
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_energy_single_real(sys, alpha_0, C6_diff, damp, dene)
+            res(i_step) = mbd_energy_single_real(sys, alpha_0, C6_diff, damp, &
+                dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -564,15 +560,16 @@ subroutine test_mbd_deriv_impl_vdw()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dr_vdw(n_atoms))
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
-    call move_alloc(dene%dr_vdw, gradients_anl)
+    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+        dene, mbd_grad(dr_vdw=.true.))
+    gradients_anl = dene%dr_vdw
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-            res(i_step) = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
+            res(i_step) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+                dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -609,9 +606,9 @@ subroutine test_mbd_rsscs_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dcoords(n_atoms, 3))
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
-    call move_alloc(dene%dcoords, gradients_anl)
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+        dene, mbd_grad(dcoords=.true.))
+    gradients_anl = dene%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
@@ -619,7 +616,8 @@ subroutine test_mbd_rsscs_deriv_expl()
                 sys%coords = coords
                 sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom) + &
                     i_step*delta
-                res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
+                res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+                    dene, mbd_grad())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
@@ -655,15 +653,16 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dalpha(n_atoms))
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
-    call move_alloc(dene%dalpha, gradients_anl)
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+        dene, mbd_grad(dalpha=.true.))
+    gradients_anl = dene%dalpha
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0_diff, C6, damp, dene)
+            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0_diff, C6, damp, &
+                dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -698,15 +697,16 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dC6(n_atoms))
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
-    call move_alloc(dene%dC6, gradients_anl)
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+        dene, mbd_grad(dC6=.true.))
+    gradients_anl = dene%dC6
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6_diff, damp, dene)
+            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6_diff, damp, &
+                dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -741,15 +741,16 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    allocate (dene%dr_vdw(n_atoms))
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
-    call move_alloc(dene%dr_vdw, gradients_anl)
+    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+        dene, mbd_grad(dr_vdw=.true.))
+    gradients_anl = dene%dr_vdw
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, dene)
+            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+                dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do

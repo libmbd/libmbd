@@ -9,6 +9,7 @@ use mbd_common, only: tostr, findval, lower, shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
+use mbd_gradients_type, only: mbd_gradients
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, &
     contract_cross_33
 #ifdef WITH_SCALAPACK
@@ -21,7 +22,7 @@ implicit none
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
     sigma_selfint, scale_TS, set_damping_parameters, &
-    mbd_gradients, damping_fermi, test_frequency_grid, scalar
+    damping_fermi, test_frequency_grid, scalar
 #endif
 
 type :: mbd_damping
@@ -47,21 +48,6 @@ type :: mbd_result
     complex(dp), allocatable :: modes_k(:, :, :)
     complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
-end type
-
-type :: mbd_gradients
-    real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
-    real(dp), allocatable :: dalpha(:)
-    real(dp), allocatable :: dalpha_dyn(:, :)  ! n_atoms by 0:n_freq
-    real(dp), allocatable :: dC6(:)
-    real(dp), allocatable :: dr_vdw(:)
-    real(dp), allocatable :: domega(:)
-    real(dp), allocatable :: dV(:)
-    real(dp), allocatable :: dV_free(:)
-    real(dp), allocatable :: dX_free(:)
-    contains
-    procedure :: copy_alloc => gradients_copy_alloc
-    procedure :: has_grad => gradients_has_grad
 end type
 
 type :: mat33
@@ -1442,27 +1428,6 @@ function make_k_grid(g_grid, uc) result(k_grid)
         k_grid(:, i_kpt) = matmul(ruc, g_grid(:, i_kpt))
     end do
 end function make_k_grid
-
-subroutine gradients_copy_alloc(this, other)
-    class(mbd_gradients), intent(in) :: this
-    type(mbd_gradients), intent(out) :: other
-
-    if (allocated(this%dcoords)) &
-        allocate (other%dcoords(size(this%dcoords, 2), 3))
-    if (allocated(this%dalpha)) &
-        allocate (other%dalpha(size(this%dalpha)))
-    if (allocated(this%dC6)) allocate (other%dC6(size(this%dC6)))
-    if (allocated(this%dr_vdw)) allocate (other%dr_vdw(size(this%dr_vdw)))
-    if (allocated(this%domega)) allocate (other%domega(size(this%domega)))
-end subroutine
-
-logical function gradients_has_grad(this)
-    class(mbd_gradients), intent(in) :: this
-
-    gradients_has_grad = allocated(this%dcoords) .or. &
-        allocated(this%dalpha) .or. allocated(this%dC6) .or. &
-        allocated(this%dr_vdw) .or. allocated(this%domega)
-end function
 
 end module mbd
 

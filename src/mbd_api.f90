@@ -5,9 +5,9 @@ module mbd_api
 
 use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
-use mbd, only: mbd_damping, &
-    mbd_scs_energy, set_damping_parameters, &
-    mbd_result, mbd_gradients, scale_TS
+use mbd, only: mbd_damping, mbd_scs_energy, set_damping_parameters, &
+    mbd_result, scale_TS
+use mbd_gradients_type, only: mbd_gradients
 use mbd_ts, only: ts_energy
 use mbd_common, only: printer
 use mbd_vdw_param, only: default_vdw_params, species_index

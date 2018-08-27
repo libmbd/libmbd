@@ -7,8 +7,8 @@ use iso_c_binding
 use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd, only: mbd_damping, mbd_energy, &
-    mbd_scs_energy, mbd_scs_energy, dipole_matrix, mbd_result, &
-    mbd_gradients
+    mbd_scs_energy, mbd_scs_energy, dipole_matrix, mbd_result
+use mbd_gradients_type, only: mbd_gradients
 use mbd_ts, only: ts_energy
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex
 use mbd_coulomb, only: dipole_energy, coulomb_energy

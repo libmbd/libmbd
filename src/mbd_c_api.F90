@@ -302,11 +302,11 @@ subroutine cmbd_dipole_matrix(sys_cp, damping_p, k_point, dipmat_p) bind(c)
     n_atoms = size(sys%coords, 2)
     call c_f_pointer(damping_p, damp)
     if (present(k_point)) then
-        dipmat_c = dipole_matrix(sys, damp, .false., k_point)
+        dipmat_c = dipole_matrix(sys, damp, k_point=k_point)
         call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
         dipmat_cplx = transpose(dipmat_c%val)
     else
-        dipmat = dipole_matrix(sys, damp, .false.)
+        dipmat = dipole_matrix(sys, damp)
         call c_f_pointer(dipmat_p, dipmat_re, [3*n_atoms, 3*n_atoms])
         dipmat_re = transpose(dipmat%val)
     end if

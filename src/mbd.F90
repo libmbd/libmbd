@@ -9,7 +9,8 @@ use mbd_common, only: tostr, findval, lower, shift_cell
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
-use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch
+use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch, &
+    mbd_grad_matrix_real, mbd_grad_matrix_complex
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, &
     contract_cross_33
 #ifdef WITH_SCALAPACK
@@ -224,18 +225,22 @@ end function mbd_scs_energy
 !> \right)
 !> \f]
 #if MBD_TYPE == 0
-type(mbd_matrix_real) function dipole_matrix_real(sys, damp, grad) result(dipmat)
+type(mbd_matrix_real) function dipole_matrix_real( &
+        sys, damp, ddipmat, grad) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_REAL
 #elif MBD_TYPE == 1
 type(mbd_matrix_complex) function dipole_matrix_complex( &
-        sys, damp, grad, k_point) result(dipmat)
+        sys, damp, ddipmat, grad, k_point) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
 #endif
 
     type(mbd_system), intent(inout) :: sys
     type(mbd_damping), intent(in) :: damp
-    logical, intent(in) :: grad
-#if MBD_TYPE == 1
+    type(mbd_grad), intent(in), optional :: grad
+#if MBD_TYPE == 0
+    type(mbd_grad_matrix_real), intent(out), optional :: ddipmat
+#elif MBD_TYPE == 1
+    type(mbd_grad_matrix_complex), intent(out), optional :: ddipmat
     real(dp), intent(in) :: k_point(3)
 #endif
 
@@ -243,8 +248,8 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
         sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
     type(mat33) :: Tpp
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
-        n_atoms, my_i_atom, my_j_atom, my_nratoms, my_ncatoms
-    logical :: do_ewald, is_periodic
+        n_atoms, my_i_atom, my_j_atom
+    logical :: do_ewald, is_periodic, do_grad
 #if MBD_TYPE == 1
     complex(dp) :: Tpp_c(3, 3)
 #endif
@@ -252,27 +257,21 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
     do_ewald = .false.
     is_periodic = allocated(sys%lattice)
     n_atoms = sys%siz()
+    if (present(grad)) then
+        do_grad = grad%dcoords .or. grad%dr_vdw .or. grad%dsigma
+    else
+        do_grad = .false.
+    end if
 #ifdef WITH_SCALAPACK
     call dipmat%init(sys%idx, sys%blacs)
 #else
     call dipmat%init(sys%idx)
 #endif
-    my_nratoms = size(dipmat%idx%i_atom)
-    my_ncatoms = size(dipmat%idx%j_atom)
-    allocate (dipmat%val(3*my_nratoms, 3*my_ncatoms), source=ZERO)
-#if MBD_TYPE == 0
-    if (grad) then
-        allocate (dipmat%dr(3*my_nratoms, 3*my_ncatoms, 3), source=0d0)
-        allocate (dipmat%dvdw(3*my_nratoms, 3*my_ncatoms), source=0d0)
-        allocate (dipmat%dsigma(3*my_nratoms, 3*my_ncatoms), source=0d0)
-    end if
-#endif
-    ! MPI code end
     if (is_periodic) then
         if (any(sys%vacuum_axis)) then
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
-            if (grad) then
+            if (do_grad) then
                 sys%calc%exc%code = MBD_EXC_UNIMPL
                 sys%calc%exc%msg = 'Forces not implemented for periodic systems'
                 return
@@ -299,6 +298,14 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
             trim(tostr(1+2*range_cell(2))) // 'x' // &
             trim(tostr(1+2*range_cell(3)))
     end if
+    associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
+        allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
+        if (present(grad)) then
+            if (grad%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
+            if (grad%dr_vdw) allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
+            if (grad%dsigma) allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
+        end if
+    end associate
     call sys%clock(11)
     idx_cell = [0, 0, -1]
     do i_cell = 1, product(1+2*range_cell)
@@ -327,36 +334,36 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
                 end if
                 select case (damp%version)
                     case ("bare")
-                        Tpp = T_bare_v2(r, grad)
+                        Tpp = T_bare_v2(r, do_grad)
                     case ("dip,1mexp")
                         Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")
                         Tpp = T_damped(damping_fermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, grad &
-                        ), T_bare_v2(r, grad))
+                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
+                            ), T_bare_v2(r, do_grad))
                     case ("sqrtfermi,dip")
                         Tpp = T_damped(damping_sqrtfermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, grad &
-                        ), T_bare_v2(r, grad))
+                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
+                            ), T_bare_v2(r, do_grad))
                     case ("custom,dip")
                         Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
                         Tpp%val = damp%potential_custom(:, :, i_atom, j_atom)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, sigma_ij, grad)
+                        Tpp = T_erf_coulomb(r, sigma_ij, do_grad)
                     case ("fermi,dip,gg")
                         Tpp = T_damped(op1minus(damping_fermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, grad &
-                        )), T_erf_coulomb(r, sigma_ij, grad))
+                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
+                            )), T_erf_coulomb(r, sigma_ij, do_grad))
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
                         Tpp = T_damped(op1minus(damping_sqrtfermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, grad &
-                        )), T_erf_coulomb(r, sigma_ij, grad))
+                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
+                            )), T_erf_coulomb(r, sigma_ij, do_grad))
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         f_ij = 1d0-damp%damping_custom(i_atom, j_atom)
-                        Tpp = T_erf_coulomb(r, sigma_ij, grad)
+                        Tpp = T_erf_coulomb(r, sigma_ij, do_grad)
                         Tpp%val = f_ij*Tpp%val
                         do_ewald = .false.
                 end select
@@ -379,19 +386,20 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
                     T = T + Tpp%val
 #endif
                 end associate
+                if (.not. present(grad)) cycle
 #if MBD_TYPE == 0
-                if (allocated(Tpp%dr)) then
-                    associate (T => dipmat%dr(i+1:i+3, j+1:j+3, :))
+                if (grad%dcoords) then
+                    associate (T => ddipmat%dr(i+1:i+3, j+1:j+3, :))
                         T = T + Tpp%dr
                     end associate
                 end if
-                if (allocated(Tpp%dvdw)) then
-                    associate (dTdRvdw => dipmat%dvdw(i+1:i+3, j+1:j+3))
+                if (grad%dr_vdw) then
+                    associate (dTdRvdw => ddipmat%dvdw(i+1:i+3, j+1:j+3))
                         dTdRvdw = dTdRvdw + Tpp%dvdw
                     end associate
                 end if
-                if (allocated(Tpp%dsigma)) then
-                    associate (dTdsigma => dipmat%dsigma(i+1:i+3, j+1:j+3))
+                if (grad%dsigma) then
+                    associate (dTdsigma => ddipmat%dsigma(i+1:i+3, j+1:j+3))
                         dTdsigma = dTdsigma + Tpp%dsigma
                     end associate
                 end if
@@ -578,9 +586,11 @@ type(mbd_result) function mbd_energy_single_complex( &
 
 #if MBD_TYPE == 0
     type(mbd_matrix_real) :: relay, dQ, T, modes, c_lambda12i_c
+    type(mbd_grad_matrix_real) :: dT
     integer :: i_xyz
 #elif MBD_TYPE == 1
     type(mbd_matrix_complex) :: relay, T, modes
+    type(mbd_grad_matrix_complex) :: dT
 #endif
     real(dp), allocatable :: eigs(:), omega(:)
     type(mbd_gradients) :: domega
@@ -589,9 +599,9 @@ type(mbd_result) function mbd_energy_single_complex( &
 
     n_atoms = sys%siz()
 #if MBD_TYPE == 0
-    T = dipole_matrix_real(sys, damp, grad%any())
+    T = dipole_matrix_real(sys, damp, dT, grad)
 #elif MBD_TYPE == 1
-    T = dipole_matrix_complex(sys, damp, grad%any(), k_point)
+    T = dipole_matrix_complex(sys, damp, dT, grad, k_point)
 #endif
     if (sys%has_exc()) return
     if (grad%any()) then
@@ -643,7 +653,7 @@ type(mbd_result) function mbd_energy_single_complex( &
     if (grad%dcoords) then
         allocate (dene%dcoords(n_atoms, 3))
         do i_xyz = 1, 3
-            dQ%val = T%dr(:, :, i_xyz)
+            dQ%val = dT%dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
             dQ%val = c_lambda12i_c%val*dQ%val
             dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
@@ -666,7 +676,7 @@ type(mbd_result) function mbd_energy_single_complex( &
         dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
     end if
     if (grad%dr_vdw) then
-        dQ%val = T%dvdw
+        dQ%val = dT%dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
         dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
@@ -704,9 +714,9 @@ type(mbd_result) function rpa_energy_single_complex( &
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
         ! relay = T
 #if MBD_TYPE == 0
-        relay = dipole_matrix_real(sys, damp_alpha, .false.)
+        relay = dipole_matrix_real(sys, damp_alpha)
 #elif MBD_TYPE == 1
-        relay = dipole_matrix_complex(sys, damp_alpha, .false., k_point)
+        relay = dipole_matrix_complex(sys, damp_alpha, k_point=k_point)
 #endif
         do my_i_atom = 1, size(relay%idx%i_atom)
             associate ( &
@@ -814,11 +824,14 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:)
+    type(mbd_grad_matrix_real) :: dT
+    type(mbd_grad) :: grad_T
 
     n_atoms = sys%siz()
     damp_local = damp
     damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
-    T = dipole_matrix(sys, damp_local, grad%any())
+    grad_T = mbd_grad(dcoords=grad%dcoords, dsigma=grad%dalpha, dr_vdw=grad%dr_vdw)
+    T = dipole_matrix(sys, damp_local, dT, grad_T)
     if (sys%has_exc()) return
     if (grad%any()) then
         call alpha_full%copy_from(T)
@@ -846,7 +859,7 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
             allocate (dalpha_scs(my_i_atom)%dcoords(size(sys%idx%j_atom), 3))
         end do
         do i_xyz = 1, 3
-            dQ%val = -T%dr(:, :, i_xyz)
+            dQ%val = -dT%dr(:, :, i_xyz)
             dQ = alpha_full%mmul(dQ)
             call dQ%contract_n_transp('C', B_prime)
             do i_atom = 1, n_atoms
@@ -862,7 +875,7 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         end do
     end if
     if (grad%dalpha) then
-        dQ%val = T%dsigma
+        dQ%val = dT%dsigma
         do i_atom = 1, n_atoms
             dsij_dsi = damp_local%sigma(i_atom)*dsigma_dalpha(i_atom) / &
                 sqrt(damp_local%sigma(i_atom)**2+damp_local%sigma**2)
@@ -882,7 +895,7 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         end do
     end if
     if (grad%dr_vdw) then
-        dQ%val = T%dvdw
+        dQ%val = dT%dvdw
         dQ = alpha_full%mmul(dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms

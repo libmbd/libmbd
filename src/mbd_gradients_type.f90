@@ -8,7 +8,8 @@ use mbd_constants
 implicit none
 
 private
-public :: mbd_gradients, mbd_grad_switch
+public :: mbd_gradients, mbd_grad_matrix_real, mbd_grad_matrix_complex, &
+    mbd_grad_switch
 
 type :: mbd_gradients
     real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
@@ -29,11 +30,24 @@ type :: mbd_grad_switch
     logical :: dC6 = .false.
     logical :: dr_vdw = .false.
     logical :: domega = .false.
+    logical :: dsigma = .false.
     logical :: dV = .false.
     logical :: dV_free = .false.
     logical :: dX_free = .false.
     contains
     procedure :: any => mbd_grad_switch_any
+end type
+
+type :: mbd_grad_matrix_real
+    real(dp), allocatable :: dr(:, :, :)
+    real(dp), allocatable :: dvdw(:, :)
+    real(dp), allocatable :: dsigma(:, :)
+end type
+
+type :: mbd_grad_matrix_complex
+    complex(dp), allocatable :: dr(:, :, :)
+    complex(dp), allocatable :: dvdw(:, :)
+    complex(dp), allocatable :: dsigma(:, :)
 end type
 
 contains

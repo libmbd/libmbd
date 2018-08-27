@@ -28,9 +28,6 @@ end type
 
 type :: mbd_matrix_real
     real(dp), allocatable :: val(:, :)
-    real(dp), allocatable :: dr(:, :, :)
-    real(dp), allocatable :: dvdw(:, :)
-    real(dp), allocatable :: dsigma(:, :)
     type(mbd_index) :: idx
 #ifdef WITH_SCALAPACK
     type(mbd_blacs_desc) :: blacs

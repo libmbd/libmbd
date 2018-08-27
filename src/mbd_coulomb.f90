@@ -174,7 +174,7 @@ real(dp) function dipole_energy(sys, a0, w, w_t, C, damp)
     type(mbd_matrix_real) :: T
 
     N = sys%siz()
-    T = dipole_matrix(sys, damp, grad=.false.)
+    T = dipole_matrix(sys, damp)
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

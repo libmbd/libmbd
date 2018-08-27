@@ -1271,24 +1271,22 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha) result(alpha)
     integer :: i_freq, n_atoms
     real(dp), allocatable :: omega(:)
     type(mbd_gradients) :: domega
+    type(mbd_grad) :: grad
 
     n_atoms = size(alpha_0)
-    omega = omega_eff(C6, alpha_0, domega, mbd_grad( &
-        dC6=allocated(dalpha(0)%dC6), dalpha=allocated(dalpha(0)%dalpha) &
-    ))
+    grad = mbd_grad(dalpha=allocated(dalpha(0)%dalpha), &
+        dC6=allocated(dalpha(0)%dC6))
+    omega = omega_eff(C6, alpha_0, domega, grad)
     do i_freq = 0, ubound(alpha, 2)
-        if (allocated(dalpha(i_freq)%dalpha) .or. &
-                allocated(dalpha(i_freq)%dC6)) then
-            allocate (dalpha(i_freq)%domega(n_atoms))
-        end if
         alpha(:, i_freq) = alpha_osc(&
-            alpha_0, omega, calc%omega_grid(i_freq), dalpha(i_freq) &
+            alpha_0, omega, calc%omega_grid(i_freq), dalpha(i_freq), &
+            mbd_grad(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
         )
-        if (allocated(dalpha(i_freq)%dalpha)) then
+        if (grad%dalpha) then
             dalpha(i_freq)%dalpha = dalpha(i_freq)%dalpha + &
                 dalpha(i_freq)%domega*domega%dalpha
         end if
-        if (allocated(dalpha(i_freq)%dC6)) then
+        if (grad%dC6) then
             dalpha(i_freq)%dC6 = dalpha(i_freq)%domega*domega%dC6
         end if
         if (allocated(dalpha(i_freq)%domega)) deallocate(dalpha(i_freq)%domega)
@@ -1302,17 +1300,18 @@ end function
 !> \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
 !> \right)
 !> \f]
-function alpha_osc(alpha_0, omega, u, dalpha) result(alpha)
+function alpha_osc(alpha_0, omega, u, dalpha, grad) result(alpha)
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
     real(dp), intent(in) :: u
-    type(mbd_gradients), intent(inout) :: dalpha
+    type(mbd_gradients), intent(out), optional :: dalpha
+    type(mbd_grad), intent(in), optional :: grad
     real(dp) :: alpha(size(alpha_0))
 
     alpha = alpha_0/(1+(u/omega)**2)
-    if (allocated(dalpha%dalpha)) dalpha%dalpha = alpha/alpha_0
-    if (allocated(dalpha%domega)) dalpha%domega = &
-        alpha*2d0/omega/(1d0+(omega/u)**2)
+    if (.not. present(grad)) return
+    if (grad%dalpha) dalpha%dalpha = alpha/alpha_0
+    if (grad%domega) dalpha%domega = alpha*2d0/omega/(1d0+(omega/u)**2)
 end function
 
 !> \f[

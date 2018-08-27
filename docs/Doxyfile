@@ -4,6 +4,7 @@ HTML_OUTPUT = doxygen
 GENERATE_HTML = YES
 GENERATE_LATEX = NO
 USE_MATHJAX = YES
+MATHJAX_RELPATH = https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/
 
 PROJECT_NAME = "libmbd"
 EXTRACT_ALL = YES

@@ -7,7 +7,8 @@ use mbd_constants
 use mbd_linalg, only: eye, outer, diag
 use mbd_lapack, only: inverse, det, inv
 use mbd_system_type, only: mbd_system
-use mbd, only: dipole_matrix, mbd_damping, damping_fermi
+use mbd, only: dipole_matrix
+use mbd_damping_type, only: mbd_damping, damping_fermi
 use mbd_matrix_type, only: mbd_matrix_real
 
 implicit none

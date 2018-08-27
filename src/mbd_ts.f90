@@ -5,7 +5,7 @@ module mbd_ts
 
 use mbd_constants
 use mbd_common, only: shift_cell, tostr
-use mbd, only: mbd_damping, damping_fermi
+use mbd_damping_type, only: mbd_damping, damping_fermi
 use mbd_system_type, only: mbd_system, ang
 
 implicit none

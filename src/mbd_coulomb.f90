@@ -7,7 +7,7 @@ use mbd_constants
 use mbd_linalg, only: eye, outer, diag
 use mbd_lapack, only: inverse, det, inv
 use mbd_system_type, only: mbd_system
-use mbd, only: dipole_matrix, mbd_damping, damping_fermi, scalar
+use mbd, only: dipole_matrix, mbd_damping, damping_fermi
 use mbd_matrix_type, only: mbd_matrix_real
 
 implicit none
@@ -114,8 +114,7 @@ real(dp) function coulomb_energy(sys, q, m, w_t, C, damp)
 
     real(dp), allocatable :: O(:, :)
     real(dp) :: OAB(6, 6), OABm(6, 6), RA(3), RB(3), ene_ABi(4), prod_w_t, &
-        K(3, 3), s_vdw
-    type(scalar) :: f_damp
+        K(3, 3), s_vdw, f_damp
     integer, allocatable :: notAB(:)
     integer :: N, A, B, i, j, AB(6), i2A(6)
 
@@ -156,11 +155,11 @@ real(dp) function coulomb_energy(sys, q, m, w_t, C, damp)
             select case (damp%version)
             case ('fermi')
                 s_vdw = damp%ts_sr*sum(damp%r_vdw([A, B]))
-                f_damp = damping_fermi(RA-RB, s_vdw, damp%ts_d, .false.)
+                f_damp = damping_fermi(RA-RB, s_vdw, damp%ts_d)
             case default
-                f_damp%val = 1d0
+                f_damp = 1d0
             end select
-            coulomb_energy = coulomb_energy + f_damp%val*q(A)*q(B)*sum(ene_ABi)
+            coulomb_energy = coulomb_energy + f_damp*q(A)*q(B)*sum(ene_ABi)
         end do
     end do
 end function

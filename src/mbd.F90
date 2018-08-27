@@ -10,7 +10,8 @@ use mbd_system_type, only: mbd_system, mbd_calc
 use mbd_linalg, only: outer
 use mbd_lapack, only: eigvals, inverse
 use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch, &
-    mbd_grad_matrix_real, mbd_grad_matrix_complex
+    mbd_grad_matrix_real, mbd_grad_matrix_complex, mbd_grad_scalar, &
+    damping_grad, op1minus_grad
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, &
     contract_cross_33
 #ifdef WITH_SCALAPACK
@@ -22,7 +23,7 @@ implicit none
 #ifndef MODULE_UNIT_TESTS
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
-    scale_TS, set_damping_parameters, damping_fermi, test_frequency_grid, scalar
+    scale_TS, set_damping_parameters, damping_fermi, test_frequency_grid
 #endif
 
 type :: mbd_damping
@@ -48,20 +49,6 @@ type :: mbd_result
     complex(dp), allocatable :: modes_k(:, :, :)
     complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
-end type
-
-type :: mat33
-    real(dp) :: val(3, 3)
-    ! explicit derivative, [abc] ~ dval_{ab}/dR_c
-    real(dp), allocatable :: dr(:, :, :)
-    real(dp), allocatable :: dvdw(:, :)
-    real(dp), allocatable :: dsigma(:, :)
-end type
-
-type :: scalar
-    real(dp) :: val
-    real(dp), allocatable :: dr(:)  ! explicit derivative
-    real(dp), allocatable :: dvdw
 end type
 
 interface dipole_matrix
@@ -244,24 +231,24 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
     real(dp), intent(in) :: k_point(3)
 #endif
 
-    real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, &
-        sigma_ij, volume, ewald_alpha, real_space_cutoff, f_ij
-    type(mat33) :: Tpp
+    real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, Tpp(3, 3), f_damp, &
+        sigma_ij, volume, ewald_alpha, real_space_cutoff, T0pp(3, 3)
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
         n_atoms, my_i_atom, my_j_atom
-    logical :: do_ewald, is_periodic, do_grad
-#if MBD_TYPE == 1
-    complex(dp) :: Tpp_c(3, 3)
+    logical :: do_ewald, is_periodic
+    type(mbd_grad_matrix_real) :: dTpp, dT0pp
+    type(mbd_grad_scalar) :: df
+    type(mbd_grad) :: grad_
+#if MBD_TYPE == 0
+    real(dp) :: Tpp_final(3, 3)
+#elif MBD_TYPE == 1
+    complex(dp) :: Tpp_final(3, 3)
 #endif
 
     do_ewald = .false.
     is_periodic = allocated(sys%lattice)
     n_atoms = sys%siz()
-    if (present(grad)) then
-        do_grad = grad%dcoords .or. grad%dr_vdw .or. grad%dsigma
-    else
-        do_grad = .false.
-    end if
+    if (present(grad)) grad_ = grad
 #ifdef WITH_SCALAPACK
     call dipmat%init(sys%idx, sys%blacs)
 #else
@@ -271,7 +258,7 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
         if (any(sys%vacuum_axis)) then
             real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
         else if (sys%calc%param%ewald_on) then
-            if (do_grad) then
+            if (grad%dcoords .or. grad%dr_vdw .or. grad%dsigma) then
                 sys%calc%exc%code = MBD_EXC_UNIMPL
                 sys%calc%exc%msg = 'Forces not implemented for periodic systems'
                 return
@@ -300,11 +287,9 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
     end if
     associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
         allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
-        if (present(grad)) then
-            if (grad%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
-            if (grad%dr_vdw) allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
-            if (grad%dsigma) allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
-        end if
+        if (grad_%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
+        if (grad_%dr_vdw) allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
+        if (grad_%dsigma) allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
     end associate
     call sys%clock(11)
     idx_cell = [0, 0, -1]
@@ -334,73 +319,67 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
                 end if
                 select case (damp%version)
                     case ("bare")
-                        Tpp = T_bare_v2(r, do_grad)
+                        Tpp = T_bare(r, dTpp, grad_%dcoords)
                     case ("dip,1mexp")
-                        Tpp%val = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
+                        Tpp = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")
-                        Tpp = T_damped(damping_fermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
-                            ), T_bare_v2(r, do_grad))
+                        f_damp = damping_fermi(r, damp%beta*R_vdw_ij, damp%a, df, grad_)
+                        T0pp = T_bare(r, dT0pp, grad_%dcoords)
+                        Tpp = damping_grad(f_damp, df, T0pp, dT0pp, dTpp, grad_)
                     case ("sqrtfermi,dip")
-                        Tpp = T_damped(damping_sqrtfermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
-                            ), T_bare_v2(r, do_grad))
+                        Tpp = damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("custom,dip")
-                        Tpp%val = damp%damping_custom(i_atom, j_atom)*T_bare(r)
+                        Tpp = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
-                        Tpp%val = damp%potential_custom(:, :, i_atom, j_atom)
+                        Tpp = damp%potential_custom(:, :, i_atom, j_atom)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, sigma_ij, do_grad)
+                        Tpp = T_erf_coulomb(r, sigma_ij, dTpp, grad_)
                     case ("fermi,dip,gg")
-                        Tpp = T_damped(op1minus(damping_fermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
-                            )), T_erf_coulomb(r, sigma_ij, do_grad))
+                        f_damp = damping_fermi(r, damp%beta*R_vdw_ij, damp%a, df, grad_)
+                        call op1minus_grad(f_damp, df)
+                        T0pp = T_erf_coulomb(r, sigma_ij, dT0pp, grad_)
+                        Tpp = damping_grad(f_damp, df, T0pp, dT0pp, dTpp, grad_)
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
-                        Tpp = T_damped(op1minus(damping_sqrtfermi( &
-                            r, damp%beta*R_vdw_ij, damp%a, do_grad &
-                            )), T_erf_coulomb(r, sigma_ij, do_grad))
+                        Tpp = (1d0-damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a)) * &
+                            T_erf_coulomb(r, sigma_ij)
                         do_ewald = .false.
                     case ("custom,dip,gg")
-                        f_ij = 1d0-damp%damping_custom(i_atom, j_atom)
-                        Tpp = T_erf_coulomb(r, sigma_ij, do_grad)
-                        Tpp%val = f_ij*Tpp%val
+                        Tpp = (1d0-damp%damping_custom(i_atom, j_atom)) * &
+                            T_erf_coulomb(r, sigma_ij)
                         do_ewald = .false.
                 end select
-                if (allocated(Tpp%dvdw)) then
-                    Tpp%dvdw = damp%beta*Tpp%dvdw
+                if (grad_%dr_vdw) then
+                    dTpp%dvdw = damp%beta*dTpp%dvdw
                 end if
                 if (do_ewald) then
-                    Tpp%val = Tpp%val+T_erfc(r, ewald_alpha)-T_bare(r)
+                    Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
                 end if
-#if MBD_TYPE == 1
-                Tpp_c = Tpp%val*exp(-cmplx(0d0, 1d0, 8)*( &
-                    dot_product(k_point, r)))
+#if MBD_TYPE == 0
+                Tpp_final = Tpp
+#elif MBD_TYPE == 1
+                Tpp_final = Tpp*exp(-cmplx(0d0, 1d0, 8)*(dot_product(k_point, r)))
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
                 associate (T => dipmat%val(i+1:i+3, j+1:j+3))
-#if MBD_TYPE == 1
-                    T = T + Tpp_c
-#elif MBD_TYPE == 0
-                    T = T + Tpp%val
-#endif
+                    T = T + Tpp_final
                 end associate
                 if (.not. present(grad)) cycle
 #if MBD_TYPE == 0
                 if (grad%dcoords) then
                     associate (T => ddipmat%dr(i+1:i+3, j+1:j+3, :))
-                        T = T + Tpp%dr
+                        T = T + dTpp%dr
                     end associate
                 end if
                 if (grad%dr_vdw) then
                     associate (dTdRvdw => ddipmat%dvdw(i+1:i+3, j+1:j+3))
-                        dTdRvdw = dTdRvdw + Tpp%dvdw
+                        dTdRvdw = dTdRvdw + dTpp%dvdw
                     end associate
                 end if
                 if (grad%dsigma) then
                     associate (dTdsigma => ddipmat%dsigma(i+1:i+3, j+1:j+3))
-                        dTdsigma = dTdsigma + Tpp%dsigma
+                        dTdsigma = dTdsigma + dTpp%dsigma
                     end associate
                 end if
 #endif
@@ -972,28 +951,11 @@ type(mbd_result) function mbd_energy( &
     end if
 end function mbd_energy
 
-function T_bare(rxyz) result(T)
-    real(dp), intent(in) :: rxyz(3)
-    real(dp) :: T(3, 3)
-
-    integer :: i, j
-    real(dp) :: r_sq, r_5
-
-    r_sq = sum(rxyz(:)**2)
-    r_5 = sqrt(r_sq)**5
-    do i = 1, 3
-        T(i, i) = (3d0*rxyz(i)**2-r_sq)/r_5
-        do j = i+1, 3
-            T(i, j) = 3d0*rxyz(i)*rxyz(j)/r_5
-            T(j, i) = T(i, j)
-        end do
-    end do
-    T = -T
-end function
-
-type(mat33) function T_bare_v2(r, deriv) result(T)
+function T_bare(r, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
-    logical, intent(in) :: deriv
+    type(mbd_grad_matrix_real), intent(out), optional :: dT
+    logical, intent(in), optional :: grad
+    real(dp) :: T(3, 3)
 
     integer :: a, b, c
     real(dp) :: r_1, r_2, r_5, r_7
@@ -1002,35 +964,35 @@ type(mat33) function T_bare_v2(r, deriv) result(T)
     r_1 = sqrt(r_2)
     r_5 = r_1**5
     forall (a = 1:3)
-        T%val(a, a) = (-3*r(a)**2+r_2)/r_5
+        T(a, a) = (-3*r(a)**2+r_2)/r_5
         forall (b = a+1:3)
-            T%val(a, b) = -3*r(a)*r(b)/r_5
-            T%val(b, a) = T%val(a, b)
+            T(a, b) = -3*r(a)*r(b)/r_5
+            T(b, a) = T(a, b)
         end forall
     end forall
-    if (deriv) then
-        allocate (T%dr(3, 3, 3))
-        r_7 = r_1**7
-        forall (a = 1:3)
-            T%dr(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
-            forall (b = a+1:3)
-                T%dr(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
-                T%dr(a, b, a) = T%dr(a, a, b)
-                T%dr(b, a, a) = T%dr(a, a, b)
-                T%dr(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
-                T%dr(b, a, b) = T%dr(b, b, a)
-                T%dr(a, b, b) = T%dr(b, b, a)
-                forall (c = b+1:3)
-                    T%dr(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
-                    T%dr(a, c, b) = T%dr(a, b, c)
-                    T%dr(b, a, c) = T%dr(a, b, c)
-                    T%dr(b, c, a) = T%dr(a, b, c)
-                    T%dr(c, a, b) = T%dr(a, b, c)
-                    T%dr(c, b, a) = T%dr(a, b, c)
-                end forall
+    if (.not. present(grad)) return
+    if (.not. grad) return
+    allocate (dT%dr(3, 3, 3))
+    r_7 = r_1**7
+    forall (a = 1:3)
+        dT%dr(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
+        forall (b = a+1:3)
+            dT%dr(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
+            dT%dr(a, b, a) = dT%dr(a, a, b)
+            dT%dr(b, a, a) = dT%dr(a, a, b)
+            dT%dr(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
+            dT%dr(b, a, b) = dT%dr(b, b, a)
+            dT%dr(a, b, b) = dT%dr(b, b, a)
+            forall (c = b+1:3)
+                dT%dr(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
+                dT%dr(a, c, b) = dT%dr(a, b, c)
+                dT%dr(b, a, c) = dT%dr(a, b, c)
+                dT%dr(b, c, a) = dT%dr(a, b, c)
+                dT%dr(c, a, b) = dT%dr(a, b, c)
+                dT%dr(c, b, a) = dT%dr(a, b, c)
             end forall
         end forall
-    end if
+    end forall
 end function
 
 real(dp) function B_erfc(r, a) result(B)
@@ -1077,58 +1039,30 @@ end function
 !> \frac{R_c}{RS_\text{vdW}}-
 !> \frac{R}{S_\text{vdW}^2}\frac{\mathrm dS_\text{vdW}}{\mathrm dR_c}
 !> \f]
-type(scalar) function damping_fermi(r, s_vdw, d, deriv) result(f)
+real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
     real(dp), intent(in) :: d
-    logical, intent(in) :: deriv
+    type(mbd_grad_scalar), intent(out), optional :: df
+    type(mbd_grad), intent(in), optional :: grad
 
     real(dp) :: pre, eta, r_1
 
     r_1 = sqrt(sum(r**2))
     eta = r_1/s_vdw
-    f%val = 1d0/(1+exp(-d*(eta-1)))
+    f = 1d0/(1+exp(-d*(eta-1)))
+    if (.not. present(grad)) return
     pre = d/(2+2*cosh(d-d*eta))
-    if (deriv) then
-        f%dr = pre*r/(r_1*s_vdw)
-        f%dvdw = -pre*r_1/s_vdw**2
-    end if
+    if (grad%dcoords) df%dr = pre*r/(r_1*s_vdw)
+    if (grad%dr_vdw) df%dvdw = -pre*r_1/s_vdw**2
 end function
 
-type(scalar) function damping_sqrtfermi(r, s_vdw, d, deriv) result(f)
+real(dp) function damping_sqrtfermi(r, s_vdw, d) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
     real(dp), intent(in) :: d
-    logical, intent(in) :: deriv
 
-    f = damping_fermi(r, s_vdw, d, deriv)
-    f%val = sqrt(f%val)
-end function
-
-type(scalar) function op1minus(f)
-    type(scalar), intent(in) :: f
-
-    op1minus%val = 1-f%val
-    if (allocated(f%dr)) op1minus%dr = -f%dr
-    if (allocated(f%dvdw)) op1minus%dvdw = -f%dvdw
-end function
-
-type(mat33) function T_damped(f, T) result(fT)
-    type(scalar), intent(in) :: f
-    type(mat33), intent(in) :: T
-
-    integer :: c
-
-    fT%val = f%val*T%val
-    if (allocated(f%dr) .or. allocated(T%dr)) &
-        allocate (fT%dr(3, 3, 3), source=0d0)
-    if (allocated(f%dvdw) .or. allocated(T%dvdw)) &
-        allocate (fT%dvdw(3, 3), source=0d0)
-    if (allocated(f%dr)) forall (c = 1:3) fT%dr(:, :, c) = f%dr(c)*T%val
-    if (allocated(T%dr)) fT%dr = fT%dr + f%val*T%dr
-    if (allocated(f%dvdw)) fT%dvdw = f%dvdw*T%val
-    if (allocated(T%dvdw)) fT%dvdw = fT%dvdw + f%val*T%dvdw
-    if (allocated(T%dsigma)) fT%dsigma = f%val*T%dsigma
+    f = sqrt(damping_fermi(r, s_vdw, d))
 end function
 
 !> \f[
@@ -1157,33 +1091,36 @@ end function
 !> \frac{R_c}{R\sigma}-\frac R{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dR_c}
 !> \end{aligned}
 !> \f]
-type(mat33) function T_erf_coulomb(r, sigma, deriv) result(T)
+function T_erf_coulomb(r, sigma, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma
-    logical, intent(in) :: deriv
+    type(mbd_grad_matrix_real), intent(out), optional :: dT
+    type(mbd_grad), intent(in), optional :: grad
+    real(dp) :: T(3, 3)
 
-    real(dp) :: theta, erf_theta, r_5, r_1, zeta
-    type(mat33) :: bare
+    real(dp) :: theta, erf_theta, r_5, r_1, zeta, bare(3, 3)
+    type(mbd_grad_matrix_real) :: dbare
     real(dp) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
     integer :: a, c
 
-    bare = T_bare_v2(r, deriv)
+    bare = T_bare(r, dbare, grad%dcoords)
     r_1 = sqrt(sum(r**2))
     r_5 = r_1**5
     rr_r5 = outer(r, r)/r_5
     zeta = r_1/sigma
     theta = 2*zeta/sqrt(pi)*exp(-zeta**2)
     erf_theta = erf(zeta)-theta
-    T%val = erf_theta*bare%val+2*(zeta**2)*theta*rr_r5
-    if (deriv) then
-        allocate (T%dr(3, 3, 3))
-        tmp33 = 2*zeta*theta*(bare%val+(3-2*zeta**2)*rr_r5)
-        forall (c = 1:3) T%dr(:, :, c) = tmp33*r(c)/(r_1*sigma)
-        tmp333 = bare%dr/3
+    T = erf_theta*bare+2*(zeta**2)*theta*rr_r5
+    if (.not. present(grad)) return
+    tmp33 = 2*zeta*theta*(bare+(3-2*zeta**2)*rr_r5)
+    if (grad%dcoords) then
+        allocate (dT%dr(3, 3, 3))
+        forall (c = 1:3) dT%dr(:, :, c) = tmp33*r(c)/(r_1*sigma)
+        tmp333 = dbare%dr/3
         forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
-        T%dr = T%dr + erf_theta*bare%dr-2*(zeta**2)*theta*tmp333
-        T%dsigma = -tmp33*r_1/sigma**2
+        dT%dr = dT%dr + erf_theta*dbare%dr-2*(zeta**2)*theta*tmp333
     end if
+    if (grad%dsigma) dT%dsigma = -tmp33*r_1/sigma**2
 end function
 
 function T_1mexp_coulomb(rxyz, sigma, a) result(T)

@@ -97,126 +97,101 @@ logical function failed(diff, thre)
 end function
 
 subroutine test_T_bare_deriv()
-    real(dp) :: r(3), r_diff(3)
-    type(mat33) :: T
-    real(dp) :: diff(3, 3)
-    real(dp) :: T_diff_anl(3, 3, 3)
-    real(dp) :: T_diff_num(3, 3, -3:3)
+    real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta
+    type(mbd_grad_matrix_real) :: dT
     integer :: a, b, c, i_step
-    real(dp) :: delta
 
     delta = 1d-2
     r = [1.12d0, -2.12d0, 0.12d0]
-    T = T_bare_v2(r, deriv=.true.)
-    T_diff_anl = T%dr(:, :, :)
+    T = T_bare(r, dT, .true.)
     diff = 0d0
     do c = 1, 3
         do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
             r_diff(c) = r_diff(c)+i_step*delta
-            T = T_bare_v2(r_diff, deriv=.false.)
-            T_diff_num(:, :, i_step) = T%val
+            T_diff_num(:, :, i_step) = T_bare(r_diff)
         end do
         forall (a = 1:3, b = 1:3)
             T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end forall
-        diff = max(diff, abs(T_diff_num(:, :, 0)-T_diff_anl(:, :, c))/T_diff_num(:, :, 0))
+        diff = max(diff, abs(T_diff_num(:, :, 0)-dT%dr(:, :, c))/T_diff_num(:, :, 0))
     end do
     if (failed(maxval(abs(diff)), 1d-10)) then
     end if
 end subroutine test_T_bare_deriv
 
 subroutine test_T_GG_deriv_expl()
-    real(dp) :: r(3), r_diff(3)
-    type(mat33) :: T
-    real(dp) :: diff(3, 3)
-    real(dp) :: T_diff_anl(3, 3, 3)
-    real(dp) :: T_diff_num(3, 3, -3:3)
+    real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, sigma
+    type(mbd_grad_matrix_real) :: dT
     integer :: a, b, c, i_step
-    real(dp) :: delta
-    real(dp) :: sigma
 
     delta = 1d-2
     r = [1.02d0, -2.22d0, 0.15d0]
     sigma = 1.2d0
-    T = T_erf_coulomb(r, sigma, deriv=.true.)
-    T_diff_anl = T%dr
+    T = T_erf_coulomb(r, sigma, dT, mbd_grad(dcoords=.true.))
     diff = 0d0
     do c = 1, 3
         do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
             r_diff(c) = r_diff(c)+i_step*delta
-            T = T_erf_coulomb(r_diff, sigma, deriv=.false.)
-            T_diff_num(:, :, i_step) = T%val
+            T_diff_num(:, :, i_step) = T_erf_coulomb(r_diff, sigma)
         end do
         forall (a = 1:3, b = 1:3)
             T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end forall
-        diff = max(diff, abs(T_diff_num(:, :, 0)-T_diff_anl(:, :, c))/T_diff_num(:, :, 0))
+        diff = max(diff, abs(T_diff_num(:, :, 0)-dT%dr(:, :, c))/T_diff_num(:, :, 0))
     end do
     if (failed(maxval(abs(diff)), 1d-10)) then
     end if
 end subroutine test_T_GG_deriv_expl
 
 subroutine test_T_GG_deriv_impl()
-    real(dp) :: r(3)
-    type(mat33) :: T
-    real(dp) :: diff(3, 3)
-    real(dp) :: T_diff_anl(3, 3)
-    real(dp) :: T_diff_num(3, 3, -3:3)
+    real(dp) :: r(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, sigma, sigma_diff
+    type(mbd_grad_matrix_real) :: dT
     integer :: a, b, i_step
-    real(dp) :: delta
-    real(dp) :: sigma, dsigma_dr, sigma_diff
 
     delta = 1d-3
     r = [1.02d0, -2.22d0, 0.15d0]
     sigma = 1.2d0
-    dsigma_dr = -0.3d0
-    T = T_erf_coulomb(r, sigma, deriv=.true.)
-    T_diff_anl = T%dsigma(:, :)*dsigma_dr
+    T = T_erf_coulomb(r, sigma, dT, mbd_grad(dsigma=.true.))
     do i_step = -3, 3
         if (i_step == 0) cycle
-        sigma_diff = sigma+i_step*delta*dsigma_dr
-        T = T_erf_coulomb(r, sigma_diff, deriv=.false.)
-        T_diff_num(:, :, i_step) = T%val
+        sigma_diff = sigma+i_step*delta
+        T_diff_num(:, :, i_step) = T_erf_coulomb(r, sigma_diff)
     end do
     forall (a = 1:3, b = 1:3)
         T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
     end forall
-    diff = (T_diff_num(:, :, 0)-T_diff_anl)/T_diff_num(:, :, 0)
+    diff = (T_diff_num(:, :, 0)-dT%dsigma)/T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTGG', diff)
     end if
 end subroutine test_T_GG_deriv_impl
 
 subroutine test_T_fermi_deriv_impl()
-    real(dp) :: r(3)
-    type(mat33) :: T
-    real(dp) :: diff(3, 3)
-    real(dp) :: T_diff_anl(3, 3)
-    real(dp) :: T_diff_num(3, 3, -3:3)
+    real(dp) :: r(3), T(3, 3), T0(3, 3), &
+        diff(3, 3), T_diff_num(3, 3, -3:3), delta, rvdw, rvdw_diff, f
+    type(mbd_grad_matrix_real) :: dT, dT0
+    type(mbd_grad_scalar) :: df
     integer :: a, b, i_step
-    real(dp) :: delta
-    real(dp) :: rvdw, drvdw_dr, rvdw_diff
 
     delta = 1d-3
     r = [1.02d0, -2.22d0, 0.15d0]
     rvdw = 2.5d0
-    drvdw_dr = -0.3d0
-    T = T_damped(damping_fermi(r, rvdw, 6d0, .true.), T_bare_v2(r, .true.))
-    T_diff_anl = T%dvdw(:, :)*drvdw_dr
+    f = damping_fermi(r, rvdw, 6d0, df, mbd_grad(dr_vdw=.true.))
+    T0 = T_bare(r)
+    T = damping_grad(f, df, T0, dT0, dT, mbd_grad(dr_vdw=.true.))
     do i_step = -3, 3
         if (i_step == 0) cycle
-        rvdw_diff =rvdw+i_step*delta*drvdw_dr
-        T = T_damped(damping_fermi(r, rvdw_diff, 6d0, .false.), T_bare_v2(r, .false.))
-        T_diff_num(:, :, i_step) = T%val
+        rvdw_diff =rvdw+i_step*delta
+        T_diff_num(:, :, i_step) = damping_fermi(r, rvdw_diff, 6d0)*T_bare(r)
     end do
     forall (a = 1:3, b = 1:3)
         T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
     end forall
-    diff = (T_diff_num(:, :, 0)-T_diff_anl)/T_diff_num(:, :, 0)
+    diff = (T_diff_num(:, :, 0)-dT%dvdw)/T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTfermi', diff)
     end if

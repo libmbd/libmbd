@@ -5,7 +5,7 @@ module mbd_ts
 
 use mbd_constants
 use mbd_common, only: shift_cell, tostr
-use mbd, only: mbd_damping, damping_fermi, scalar
+use mbd, only: mbd_damping, damping_fermi
 use mbd_system_type, only: mbd_system, ang
 
 implicit none
@@ -22,8 +22,8 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
     type(mbd_damping), intent(in) :: damp
     real(dp) :: ene
 
-    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3)
-    type(scalar) :: f_damp
+    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3), &
+        f_damp
     integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
     real(dp), parameter :: shell_thickness = 10d0
     logical :: is_periodic
@@ -69,18 +69,13 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
                     end if
                     select case (damp%version)
                         case ("fermi")
-                            f_damp = damping_fermi( &
-                                r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false. &
-                            )
+                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d)
                         case ("fermi2")
-                            f_damp = damping_fermi( &
-                                r, damp%ts_sr*R_vdw_ij, damp%ts_d, .false. &
-                            )
-                            f_damp%val = f_damp%val**2
+                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d)**2
                         case ("custom")
-                            f_damp%val = damp%damping_custom(i_atom, j_atom)
+                            f_damp = damp%damping_custom(i_atom, j_atom)
                     end select
-                    ene_pair = -C6_ij*f_damp%val/r_norm**6
+                    ene_pair = -C6_ij*f_damp/r_norm**6
                     if (i_atom == j_atom) then
                         ene_shell = ene_shell+ene_pair/2
                     else

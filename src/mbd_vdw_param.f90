@@ -11,7 +11,7 @@ implicit none
 private
 public :: default_vdw_params, species_index
 
-real(dp), parameter :: default_vdw_params(3, 71) = reshape([ &
+real(dp), parameter :: default_vdw_params(3, 86) = reshape([ &
     4.5d0, 6.5d0, 3.1d0, &  ! H
     1.38d0, 1.46d0, 2.65d0, &  ! He
     164.2d0, 1387.0d0, 4.16d0, &  ! Li
@@ -68,6 +68,21 @@ real(dp), parameter :: default_vdw_params(3, 71) = reshape([ &
     27.3d0, 285.9d0, 4.08d0, &  ! Xe
     427.12d0, 6582.08d0, 3.78d0, &  ! Cs
     275.0d0, 5727.0d0, 4.77d0, &  ! Ba
+    0d0, 0d0, 0d0, &  ! La
+    0d0, 0d0, 0d0, &  ! Ce
+    0d0, 0d0, 0d0, &  ! Pr
+    0d0, 0d0, 0d0, &  ! Nd
+    0d0, 0d0, 0d0, &  ! Pm
+    0d0, 0d0, 0d0, &  ! Sm
+    0d0, 0d0, 0d0, &  ! Eu
+    0d0, 0d0, 0d0, &  ! Gd
+    0d0, 0d0, 0d0, &  ! Tb
+    0d0, 0d0, 0d0, &  ! Dy
+    0d0, 0d0, 0d0, &  ! Ho
+    0d0, 0d0, 0d0, &  ! Er
+    0d0, 0d0, 0d0, &  ! Tm
+    0d0, 0d0, 0d0, &  ! Yb
+    0d0, 0d0, 0d0, &  ! Lu
     99.52d0, 1274.8d0, 4.21d0, &  ! Hf
     82.53d0, 1019.92d0, 4.15d0, &  ! Ta
     71.041d0, 847.93d0, 4.08d0, &  ! W
@@ -83,7 +98,7 @@ real(dp), parameter :: default_vdw_params(3, 71) = reshape([ &
     45.013d0, 530.92d0, 4.097d0, &  ! Po
     38.93d0, 457.53d0, 4.07d0, &  ! At
     33.54d0, 390.63d0, 4.23d0 &  ! Rn
-], [3, 71])
+], [3, 86])
 
 contains
 

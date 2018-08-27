@@ -4,9 +4,17 @@ import tempfile
 import cffi
 import shutil
 from setuptools import setup
+if sys.version_info[0] > 2:
+    from configparser import ConfigParser
+else:
+    from ConfigParser import ConfigParser  # noqa
 
 blddir = os.environ.get('MBDBLDDIR', 'build/src')
 library_dirs = [blddir] if os.path.exists(blddir) else []
+
+conf = ConfigParser()
+conf.read('setup.cfg')
+sources = ['src/' + name for name in conf.get('info', 'sources').split()]
 
 
 def libmbd_exists():
@@ -54,21 +62,6 @@ if libmbd_exists():
 else:
     from numpy.distutils.core import setup  # noqa
     from numpy.distutils.system_info import get_info
-    sources = [
-        'src/mbd_constants.f90',
-        'src/mbd_common.f90',
-        'src/mbd_gradients_type.f90',
-        'src/mbd_damping_type.f90',
-        'src/mbd_lapack.f90',
-        'src/mbd_matrix_type.F90',
-        'src/mbd_linalg.F90',
-        'src/mbd_system_type.F90',
-        'src/mbd_dipole.F90',
-        'src/mbd.F90',
-        'src/mbd_ts.f90',
-        'src/mbd_coulomb.f90',
-        'src/mbd_c_api.F90',
-    ]
     ext_args = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
     update_dict(ext_args, get_info('lapack_opt', 2))
     library_dirs = ['build']

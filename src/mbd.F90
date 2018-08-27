@@ -71,13 +71,14 @@ end interface
 contains
 
 type(mbd_result) function mbd_scs_energy( &
-        sys, variant, alpha_0, C6, damp, dene) result(res)
+        sys, variant, alpha_0, C6, damp, dene, grad) result(res)
     type(mbd_system), intent(inout) :: sys
     character(len=*), intent(in) :: variant
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
-    type(mbd_gradients), intent(inout) :: dene
+    type(mbd_gradients), intent(out) :: dene
+    type(mbd_grad), intent(in) :: grad
 
     real(dp), allocatable :: alpha_dyn(:, :), alpha_dyn_scs(:, :), &
         C6_scs(:), dC6_scs_dalpha_dyn_scs(:, :), &
@@ -96,35 +97,40 @@ type(mbd_result) function mbd_scs_energy( &
     end select
     n_freq = ubound(sys%calc%omega_grid, 1)
     n_atoms = sys%siz()
-    call allocate_derivs()
     allocate (alpha_dyn(n_atoms, 0:n_freq))
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
-    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_dyn, &
-        mbd_grad(dalpha=allocated(dene%dalpha), dC6=allocated(dene%dC6)))
+    allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
+    if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
+    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_dyn, grad)
     damp_scs = damp
     damp_scs%version = damping_types(1)
     do i_freq = 0, n_freq
         alpha_dyn_scs(:, i_freq) = run_scs( &
             sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), &
-            mbd_grad(dcoords=allocated(dene%dcoords), &
-                dalpha=allocated(dene%dalpha) .or. allocated(dene%dC6), &
-                dr_vdw=allocated(dene%dr_vdw)) &
+            mbd_grad( &
+                dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
+                dr_vdw=grad%dr_vdw &
+            ) &
         )
         if (sys%has_exc()) return
     end do
     C6_scs = C6_from_alpha( &
-        sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, dene%has_grad() &
+        sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
     )
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
-        mbd_grad(dV=dene%has_grad(), dV_free=allocated(dene%dalpha), &
-            dX_free=allocated(dene%dr_vdw)) &
+        mbd_grad(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
     )
     damp_mbd%version = damping_types(2)
-    res = mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd)
+    res = mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd, &
+        mbd_grad( &
+            dcoords=grad%dcoords, &
+            dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
+        ) &
+    )
     if (sys%has_exc()) return
-    if (.not. dene%has_grad()) return
+    if (.not. grad%any()) return
     freq_w = sys%calc%omega_grid_w
     freq_w(0) = 1d0
     dene_dalpha_scs_dyn(:, 0) = dene_mbd%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV
@@ -132,8 +138,8 @@ type(mbd_result) function mbd_scs_energy( &
         dene_dalpha_scs_dyn(:, i_freq) = &
             dene_mbd%dC6*dC6_scs_dalpha_dyn_scs(:, i_freq)
     end do
-    if (allocated(dene%dcoords)) then
-        dene%dcoords = 0d0
+    if (grad%dcoords) then
+        allocate (dene%dcoords(n_atoms, 3), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
@@ -148,8 +154,8 @@ type(mbd_result) function mbd_scs_energy( &
 #endif
         dene%dcoords = dene%dcoords + dene_mbd%dcoords
     end if
-    if (allocated(dene%dalpha)) then
-        dene%dalpha = 0d0
+    if (grad%dalpha) then
+        allocate (dene%dalpha(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
@@ -164,8 +170,8 @@ type(mbd_result) function mbd_scs_energy( &
 #endif
         dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
     end if
-    if (allocated(dene%dC6)) then
-        dene%dC6 = 0d0
+    if (grad%dC6) then
+        allocate (dene%dC6(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
@@ -179,8 +185,8 @@ type(mbd_result) function mbd_scs_energy( &
         call all_reduce(dene%dC6, sys%blacs)
 #endif
     end if
-    if (allocated(dene%dr_vdw)) then
-        dene%dr_vdw = 0d0
+    if (grad%dr_vdw) then
+        allocate (dene%dr_vdw(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = sys%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
@@ -194,19 +200,6 @@ type(mbd_result) function mbd_scs_energy( &
 #endif
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
-
-    contains
-
-    subroutine allocate_derivs()
-        if (allocated(dene%dcoords)) allocate (dene_mbd%dcoords(n_atoms, 3))
-        if (dene%has_grad()) then
-            allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
-            allocate (dene_mbd%dalpha(n_atoms))
-            allocate (dene_mbd%dC6(n_atoms))
-            allocate (dene_mbd%dr_vdw(n_atoms))
-        end if
-        allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
-    end subroutine
 end function mbd_scs_energy
 
 #endif
@@ -567,16 +560,17 @@ end subroutine
 !> \f]
 #if MBD_TYPE == 0
 type(mbd_result) function mbd_energy_single_real( &
-        sys, alpha_0, C6, damp, dene) result(res)
+        sys, alpha_0, C6, damp, dene, grad) result(res)
 #elif MBD_TYPE == 1
 type(mbd_result) function mbd_energy_single_complex( &
-        sys, alpha_0, C6, damp, dene, k_point) result(res)
+        sys, alpha_0, C6, damp, dene, grad, k_point) result(res)
 #endif
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
-    type(mbd_gradients), intent(inout) :: dene
+    type(mbd_gradients), intent(out) :: dene
+    type(mbd_grad), intent(in) :: grad
 #if MBD_TYPE == 1
     real(dp), intent(in) :: k_point(3)
 #endif
@@ -590,29 +584,25 @@ type(mbd_result) function mbd_energy_single_complex( &
     real(dp), allocatable :: eigs(:), omega(:)
     type(mbd_gradients) :: domega
     integer :: n_negative_eigs, n_atoms
-    logical :: grad
     character(120) :: msg
 
     n_atoms = sys%siz()
-    grad = dene%has_grad()
 #if MBD_TYPE == 0
-    T = dipole_matrix_real(sys, damp, grad)
+    T = dipole_matrix_real(sys, damp, grad%any())
 #elif MBD_TYPE == 1
-    T = dipole_matrix_complex(sys, damp, grad, k_point)
+    T = dipole_matrix_complex(sys, damp, grad%any(), k_point)
 #endif
     if (sys%has_exc()) return
-    if (grad) then
+    if (grad%any()) then
         call relay%copy_from(T)
     else
         call relay%move_from(T)
     end if
-    omega = omega_eff(C6, alpha_0, domega, mbd_grad( &
-        dC6=allocated(dene%dC6), dalpha=allocated(dene%dalpha) &
-    ))
+    omega = omega_eff(C6, alpha_0, domega, grad)
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
     call sys%clock(21)
-    if (sys%get_modes .or. grad) then
+    if (sys%get_modes .or. grad%any()) then
         call modes%alloc_from(relay)
         allocate (eigs(3*n_atoms))
         call modes%eigh(eigs, sys%calc%exc, src=relay)
@@ -644,12 +634,13 @@ type(mbd_result) function mbd_energy_single_complex( &
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
     ! TODO finish implementation for complex
 #if MBD_TYPE == 0
-    if (.not. grad) return
+    if (.not. grad%any()) return
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB=.true.)
     call dQ%init_from(T)
-    if (allocated(dene%dcoords)) then
+    if (grad%dcoords) then
+        allocate (dene%dcoords(n_atoms, 3))
         do i_xyz = 1, 3
             dQ%val = T%dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
@@ -657,7 +648,7 @@ type(mbd_result) function mbd_energy_single_complex( &
             dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
         end do
     end if
-    if (allocated(dene%dalpha)) then
+    if (grad%dalpha) then
         dQ%val = T%val
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
@@ -665,7 +656,7 @@ type(mbd_result) function mbd_energy_single_complex( &
         dQ%val = c_lambda12i_c%val*dQ%val
         dene%dalpha = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dalpha
     end if
-    if (allocated(dene%dC6)) then
+    if (grad%dC6) then
         dQ%val = T%val
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(domega%dC6/omega)
@@ -673,7 +664,7 @@ type(mbd_result) function mbd_energy_single_complex( &
         dQ%val = c_lambda12i_c%val*dQ%val
         dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
     end if
-    if (allocated(dene%dr_vdw)) then
+    if (grad%dr_vdw) then
         dQ%val = T%dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
@@ -851,7 +842,7 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     call dQ%init_from(T)
     if (grad%dcoords) then
         do my_i_atom = 1, size(sys%idx%i_atom)
-            allocate(dalpha_scs(my_i_atom)%dcoords(size(sys%idx%j_atom), 3))
+            allocate (dalpha_scs(my_i_atom)%dcoords(size(sys%idx%j_atom), 3))
         end do
         do i_xyz = 1, 3
             dQ%val = -T%dr(:, :, i_xyz)
@@ -905,12 +896,14 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     end if
 end function run_scs
 
-type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
+type(mbd_result) function mbd_energy( &
+        sys, alpha_0, C6, damp, dene, grad) result(res)
     type(mbd_system), intent(inout) :: sys
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
-    type(mbd_gradients), intent(inout) :: dene
+    type(mbd_gradients), intent(out) :: dene
+    type(mbd_grad), intent(in) :: grad
 
     real(dp), allocatable :: alpha(:, :)
     type(mbd_gradients), allocatable :: dalpha(:)
@@ -918,15 +911,14 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
     real(dp) :: k_point(3)
     type(mbd_result) :: res_k
     type(mbd_gradients) :: dene_k
-    type(mbd_grad) :: grad
 
     n_atoms = sys%siz()
     if (sys%do_rpa) then
-        alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha, grad)
+        alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha, mbd_grad())
     end if
     if (.not. allocated(sys%lattice)) then
         if (.not. sys%do_rpa) then
-            res = mbd_energy_single_real(sys, alpha_0, C6, damp, dene)
+            res = mbd_energy_single_real(sys, alpha_0, C6, damp, dene, grad)
         else
             res = rpa_energy_single_real(sys, alpha, damp)
             ! TODO gradients
@@ -948,7 +940,7 @@ type(mbd_result) function mbd_energy(sys, alpha_0, C6, damp, dene) result(res)
             k_point = res%k_pts(:, i_kpt)
             if (.not. sys%do_rpa) then
                 res_k = mbd_energy_single_complex( &
-                    sys, alpha_0, C6, damp, dene_k, k_point &
+                    sys, alpha_0, C6, damp, dene_k, grad, k_point &
                 )
                 if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
                 if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
@@ -1258,7 +1250,7 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
 
     n_atoms = size(alpha_0)
     omega = omega_eff(C6, alpha_0, domega, grad)
-    allocate(dalpha(0:ubound(alpha, 2)))
+    allocate (dalpha(0:ubound(alpha, 2)))
     do i_freq = 0, ubound(alpha, 2)
         alpha(:, i_freq) = alpha_osc(&
             alpha_0, omega, calc%omega_grid(i_freq), dalpha(i_freq), &
@@ -1271,7 +1263,7 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
         if (grad%dC6) then
             dalpha(i_freq)%dC6 = dalpha(i_freq)%domega*domega%dC6
         end if
-        if (allocated(dalpha(i_freq)%domega)) deallocate(dalpha(i_freq)%domega)
+        if (allocated(dalpha(i_freq)%domega)) deallocate (dalpha(i_freq)%domega)
     end do
 end function
 

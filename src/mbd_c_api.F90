@@ -8,7 +8,7 @@ use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
 use mbd, only: mbd_damping, mbd_energy, &
     mbd_scs_energy, mbd_scs_energy, dipole_matrix, mbd_result
-use mbd_gradients_type, only: mbd_gradients
+use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch
 use mbd_ts, only: ts_energy
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex
 use mbd_coulomb, only: dipole_energy, coulomb_energy
@@ -207,8 +207,9 @@ real(c_double) function cmbd_mbd_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    if (present(gradients)) allocate (dene%dcoords(n_atoms, 3))
-    res = mbd_energy(sys, alpha_0, C6, damping, dene)
+    res = mbd_energy( &
+        sys, alpha_0, C6, damping, dene, mbd_grad(dcoords=present(gradients)) &
+    )
     cmbd_mbd_energy = res%energy
     if (present(gradients)) gradients = transpose(dene%dcoords)
 end function cmbd_mbd_energy
@@ -229,7 +230,7 @@ real(c_double) function cmbd_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
     sys%do_rpa = .true.
-    res = mbd_energy(sys, alpha_0, C6, damping, dene)
+    res = mbd_energy(sys, alpha_0, C6, damping, dene, mbd_grad())
     sys%do_rpa = .false.
     cmbd_rpa_energy = res%energy
 end function cmbd_rpa_energy
@@ -253,10 +254,10 @@ real(c_double) function cmbd_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    if (present(gradients)) allocate (dene%dcoords(n_atoms, 3))
     sys%get_eigs = present(eigvals)
     sys%get_modes = present(eigvecs)
-    res = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damping, dene)
+    res = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damping, &
+        dene, mbd_grad(dcoords=present(gradients)))
     if (sys%has_exc()) return
     cmbd_mbd_rsscs_energy = res%energy
     if (present(gradients)) gradients = transpose(dene%dcoords)
@@ -279,7 +280,7 @@ real(c_double) function cmbd_mbd_scs_energy(sys_cp, n_atoms, alpha_0, C6, dampin
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    res = mbd_scs_energy(sys, 'scs', alpha_0, C6, damping, dene)
+    res = mbd_scs_energy(sys, 'scs', alpha_0, C6, damping, dene, mbd_grad())
     cmbd_mbd_scs_energy = res%energy
 end function cmbd_mbd_scs_energy
 

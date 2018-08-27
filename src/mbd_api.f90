@@ -151,12 +151,11 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     real(dp), intent(in) :: ratios(:)
 
     real(dp), allocatable :: ones(:)
-    type(mbd_gradients) :: dX
 
     allocate (ones(size(ratios)), source=1d0)
-    this%alpha_0 = scale_TS(this%free_values(1, :), ratios, ones, 1d0, dX)
-    this%C6 = scale_TS(this%free_values(2, :), ratios, ones, 2d0, dX)
-    this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3, dX)
+    this%alpha_0 = scale_TS(this%free_values(1, :), ratios, ones, 1d0)
+    this%C6 = scale_TS(this%free_values(2, :), ratios, ones, 2d0)
+    this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3)
 end subroutine
 
 

@@ -21,8 +21,7 @@ implicit none
 #ifndef MODULE_UNIT_TESTS
 private
 public :: mbd_damping, mbd_result, mbd_energy, dipole_matrix, mbd_scs_energy, &
-    sigma_selfint, scale_TS, set_damping_parameters, &
-    damping_fermi, test_frequency_grid, scalar
+    scale_TS, set_damping_parameters, damping_fermi, test_frequency_grid, scalar
 #endif
 
 type :: mbd_damping
@@ -114,7 +113,9 @@ type(mbd_result) function mbd_scs_energy( &
     )
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
-        damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs &
+        damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
+        mbd_grad(dV=dene%has_grad(), dV_free=allocated(dene%dalpha), &
+            dX_free=allocated(dene%dr_vdw)) &
     )
     damp_mbd%version = damping_types(2)
     res = mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd)
@@ -197,14 +198,11 @@ type(mbd_result) function mbd_scs_energy( &
 
         if (allocated(dene%dcoords)) allocate (dene_mbd%dcoords(n_atoms, 3))
         if (dene%has_grad()) then
-            allocate (dr_vdw_scs%dV(n_atoms))
             allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
             allocate (dene_mbd%dalpha(n_atoms))
             allocate (dene_mbd%dC6(n_atoms))
             allocate (dene_mbd%dr_vdw(n_atoms))
         end if
-        if (allocated(dene%dalpha)) allocate (dr_vdw_scs%dV_free(n_atoms))
-        if (allocated(dene%dr_vdw)) allocate (dr_vdw_scs%dX_free(n_atoms))
         allocate (dalpha_dyn(0:n_freq))
         allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
         my_ncatoms = size(sys%idx%j_atom)
@@ -1325,16 +1323,18 @@ end function
 !> q\frac{\partial\alpha_0}{\alpha_0}
 !> \right)
 !> \f]
-function scale_TS(X_free, V, V_free, q, dX) result(X)
+function scale_TS(X_free, V, V_free, q, dX, grad) result(X)
     real(dp), intent(in) :: X_free(:), V(:), V_free(:)
     real(dp), intent(in) :: q
-    type(mbd_gradients), intent(inout) :: dX
+    type(mbd_gradients), intent(out), optional :: dX
+    type(mbd_grad), intent(in), optional :: grad
     real(dp) :: X(size(X_free))
 
     X = X_free*(V/V_free)**q
-    if (allocated(dX%dX_free)) dX%dX_free = X/X_free
-    if (allocated(dX%dV)) dX%dV = X*q/V
-    if (allocated(dX%dV_free)) dX%dV_free = -X*q/V_free
+    if (.not. present(grad)) return
+    if (grad%dX_free) dX%dX_free = X/X_free
+    if (grad%dV) dX%dV = X*q/V
+    if (grad%dV_free) dX%dV_free = -X*q/V_free
 end function
 
 !> \f[

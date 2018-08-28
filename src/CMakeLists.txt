@@ -17,6 +17,10 @@ set(SRCS
     # mbd_density.f90
 )
 
+if(${CMAKE_Fortran_FLAGS_DEBUG} MATCHES ".*-std=f2003.*")
+    set_source_files_properties(mbd_c_api.F90 PROPERTIES COMPILE_FLAGS -std=f2008ts)
+endif()
+
 if(ENABLE_SCALAPACK_MPI)
     list(APPEND SRCS mbd_blacs.f90 mbd_scalapack.f90)
 endif()

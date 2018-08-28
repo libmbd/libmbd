@@ -503,7 +503,8 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         return
     end if
     if (.not. grad%any()) return
-    allocate (alpha_prime(3, 3*n_atoms), B_prime(3*n_atoms, 3), source=0d0)
+    allocate (alpha_prime(3, 3*n_atoms), source=0d0)
+    allocate (B_prime(3*n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
     call alpha_full%contract_n_transp('R', alpha_prime)
     call dQ%init_from(T)

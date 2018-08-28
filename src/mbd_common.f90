@@ -111,7 +111,7 @@ subroutine print_matrix(label, A, prec)
 end subroutine
 
 
-elemental pure function lower(str)
+pure function lower(str)
     character(len=*), intent(in) :: str
     character(len=len(str)) :: lower
 

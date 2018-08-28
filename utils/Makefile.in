@@ -7,7 +7,7 @@ $$(LIB): $objs
 	$$(FXX) $$(FXXOPT) -c $$<
 
 %.o: %.F90
-	$$(FXX) $$(FXXOPT) $$(MACROS) -c $$<
+	$$(FXX) $$(FXXOPT) $macros -c $$<
 
 $deps
 

@@ -100,7 +100,8 @@ if __name__ == '__main__':
             deps='\n'.join(
                 f'{objs[path]}: {" ".join(objs[p] for p in sorted(deps[path]))}'
                 for path in srcs
-            )
+            ),
+            macros=' '.join(f'-D{macro}' for macro in macros),
         ))
         if label == 'serial':
             conf = ConfigParser()

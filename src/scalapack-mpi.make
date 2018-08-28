@@ -7,7 +7,7 @@ $(LIB): mbd.o mbd_api.o mbd_blacs.o mbd_c_api.o mbd_common.o mbd_constants.o mbd
 	$(FXX) $(FXXOPT) -c $<
 
 %.o: %.F90
-	$(FXX) $(FXXOPT) $(MACROS) -c $<
+	$(FXX) $(FXXOPT) -DWITH_SCALAPACK -DWITH_MPI -c $<
 
 mbd.o: mbd_blacs.o mbd_common.o mbd_constants.o mbd_damping_type.o mbd_dipole.o mbd_gradients_type.o mbd_lapack.o mbd_matrix_type.o mbd_system_type.o
 mbd_api.o: mbd.o mbd_common.o mbd_constants.o mbd_damping_type.o mbd_gradients_type.o mbd_system_type.o mbd_ts.o mbd_vdw_param.o

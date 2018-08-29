@@ -10,7 +10,7 @@ use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
 use mbd_ts, only: ts_energy
 use mbd_common, only: printer
-use mbd_vdw_param, only: default_vdw_params, species_index
+use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 
 implicit none
 
@@ -246,7 +246,9 @@ function mbd_get_free_vdw_params(atom_types, table_type) result(free_values)
 
     select case (table_type)
     case ('ts')
-        free_values = default_vdw_params(:, species_index(atom_types))
+        free_values = ts_vdw_params(:, species_index(atom_types))
+    case ('tssurf')
+        free_values = tssurf_vdw_params(:, species_index(atom_types))
     end select
 end function
 

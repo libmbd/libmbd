@@ -188,10 +188,23 @@ def T_erfc(R, a):
 
 
 def from_volumes(species, volumes, kind='TS'):
-    alpha_0, C6, R_vdw = (
-        np.array([vdw_params[sp][param] for sp in species])
-        for param in ['alpha_0({})'.format(kind), 'C6({})'.format(kind), 'R_vdw']
-    )
+    if kind == 'TS':
+        alpha_0, C6, R_vdw = (
+            np.array([vdw_params[sp][param] for sp in species])
+            for param in 'alpha_0(TS) C6(TS) R_vdw(TS)'.split()
+        )
+    elif kind == 'BG':
+        alpha_0, C6, R_vdw = (
+            np.array([vdw_params[sp][param] for sp in species])
+            for param in 'alpha_0(BG) C6(BG) R_vdw(TS)'.split()
+        )
+    elif kind == 'TSsurf':
+        alpha_0, C6, R_vdw = (np.array([
+            vdw_params[sp][param] or vdw_params[sp][param.replace('TSsurf', 'TS')]
+            for sp in species
+        ]) for param in 'alpha_0(TSsurf) C6(TSsurf) R_vdw(TSsurf)'.split())
+    else:
+        raise ValueError('Unkonwn vdW parameter kind: {}'.format(kind))
     volumes = np.array(volumes)
     alpha_0 *= volumes
     C6 *= volumes**2

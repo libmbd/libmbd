@@ -9,4 +9,4 @@ MATHJAX_RELPATH = https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/
 PROJECT_NAME = "libmbd"
 EXTRACT_ALL = YES
 EXTRACT_PRIVATE = YES
-INPUT = ../src/mbd.F90 ../src/mbd_api.f90
+INPUT = ../src/mbd.f90 ../src/mbd_core.F90

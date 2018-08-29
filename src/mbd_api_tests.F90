@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_api_tests
 
-use mbd_api, only: mbd_input, mbd_calculation, mbd_get_free_vdw_params
+use mbd, only: mbd_input, mbd_calculation
 
 #ifdef WITH_MPI
 use mbd_mpi

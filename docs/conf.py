@@ -29,8 +29,8 @@ html_theme_options = {
     'github_user': 'azag0',
     'github_repo': 'libmbd',
     'extra_nav_links': {
-        'Fortran low-level API': 'doxygen/namespacembd.html',
-        'Fortran high-level API': 'doxygen/namespacembd__api.html',
+        'Fortran API': 'doxygen/namespacembd.html',
+        'Core Fortran module': 'doxygen/namespacembd__core.html',
     },
 }
 html_sidebars = {

@@ -1,11 +1,11 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-module mbd_api
+module mbd
 
 use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
-use mbd, only: mbd_scs_energy, mbd_result, scale_TS
+use mbd_core, only: mbd_scs_energy, mbd_result, scale_TS
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
 use mbd_ts, only: ts_energy

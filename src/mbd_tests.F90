@@ -2,14 +2,14 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #define MODULE_UNIT_TESTS
-#include "mbd.F90"
+#include "mbd_core.F90"
 
 #define MODULE_UNIT_TESTS
 #include "mbd_dipole.F90"
 
 program mbd_tests
 
-use mbd
+use mbd_core
 use mbd_dipole
 use mbd_common, only: diff7, findval, print_matrix
 

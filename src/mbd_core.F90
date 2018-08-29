@@ -2,7 +2,7 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifndef MBD_INCLUDED
-module mbd
+module mbd_core
 
 use mbd_constants
 use mbd_dipole, only: dipole_matrix
@@ -420,7 +420,7 @@ end function
 #ifndef MBD_INCLUDED
 #define MBD_INCLUDED
 #define MBD_TYPE 1
-#include "mbd.F90"
+#include "mbd_core.F90"
 #undef MBD_INCLUDED
 
 subroutine test_frequency_grid(calc)
@@ -800,6 +800,6 @@ function make_k_grid(g_grid, uc) result(k_grid)
     end do
 end function make_k_grid
 
-end module mbd
+end module
 
 #endif

@@ -1,9 +1,9 @@
 set(SRCS
-    mbd.F90
-    mbd_api.f90
+    mbd.f90
     mbd_c_api.F90
     mbd_common.f90
     mbd_constants.f90
+    mbd_core.F90
     mbd_coulomb.f90
     mbd_damping_type.f90
     mbd_dipole.F90

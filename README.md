@@ -1,7 +1,7 @@
 # Libmbd — many-body dispersion library
 
 
-[![Travis](https://img.shields.io/travis/azag0/libmbd.svg)](https://travis-ci.org/azag0/libmbd)
+[![Travis](https://travis-ci.org/azag0/libmbd.svg?branch=master)](https://travis-ci.org/azag0/libmbd)
 [![Codecov](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
 [![Python 2.7](https://img.shields.io/badge/Python-2.7-blue.svg)]()
 [![Python 3.7](https://img.shields.io/badge/Python-3.7-blue.svg)]()

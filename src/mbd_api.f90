@@ -43,6 +43,8 @@ type :: mbd_input
     integer :: k_grid(3)  ! number of k-points along reciprocal axes
     ! is there vacuum along some axes in a periodic calculation
     logical :: vacuum_axis(3) = [.false., .false., .false.]
+    character(len=3), allocatable :: atom_types(:)
+    character(len=10) :: vdw_params_kind = 'ts'
     real(dp), allocatable :: free_values(:, :)
     logical :: zero_negative_eigvals = .false.
 
@@ -104,7 +106,12 @@ subroutine mbd_calc_init(this, input)
         this%sys%lattice = input%lattice_vectors
     call this%calc%init_grid()
     call this%sys%init(this%calc)
-    this%free_values = input%free_values
+    if (allocated(input%free_values)) then
+        this%free_values = input%free_values
+    else
+        this%free_values = &
+            mbd_get_free_vdw_params(input%atom_types, input%vdw_params_kind)
+    end if
     if (input%xc == '') then
         this%damp%beta = input%mbd_beta
         this%damp%a = input%mbd_a

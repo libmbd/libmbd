@@ -64,7 +64,7 @@ If you have Pytest installed, you can run tests with
 pytest --pyargs pymbd -v --durations=3
 ```
 
-## Example
+## Examples
 
 ```python
 from pymbd import mbd_energy_species, ang
@@ -79,6 +79,32 @@ with MBDCalc() as calc:
     )
 assert abs(ene_f-ene_py) < 1e-15
 ```
+
+```fortran
+use mbd_api, only: mbd_input, mbd_calculation
+
+type(mbd_input) :: inp
+type(mbd_calculation) :: calc
+real(dp) :: energy, gradients(3, 2)
+integer :: code
+character(200) :: origin, msg
+
+inp%atom_types = ['Ar', 'Ar']
+inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 7.5d0], [3, 2])
+inp%xc = 'pbe'
+call calc%init(inp)
+call calc%get_exception(code, origin, msg)
+if (code > 0) then
+    print *, msg
+    stop
+end if
+call calc%update_vdw_params_from_ratios([0.98d0, 0.98d0])
+call calc%get_energy(energy)
+call calc%get_gradients(gradients)
+call calc%destroy()
+```
+
+
 
 ## Developing
 

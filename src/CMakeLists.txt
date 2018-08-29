@@ -22,7 +22,7 @@ if(${CMAKE_Fortran_FLAGS_DEBUG} MATCHES ".*-std=f2003.*")
 endif()
 
 if(ENABLE_SCALAPACK_MPI)
-    list(APPEND SRCS mbd_blacs.f90 mbd_scalapack.f90)
+    list(APPEND SRCS mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
 endif()
 
 add_library(mbd ${SRCS})

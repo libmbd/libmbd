@@ -6,7 +6,7 @@ program mbd_api_tests
 use mbd_api, only: mbd_input, mbd_calculation, mbd_get_free_vdw_params
 
 #ifdef WITH_MPI
-use mpi
+use mbd_mpi
 #endif
 
 implicit none

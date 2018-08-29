@@ -14,7 +14,7 @@ use mbd_matrix_type, only: mbd_index
 use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid
 #endif
 #ifdef WITH_MPI
-use mpi
+use mbd_mpi
 #endif
 
 implicit none

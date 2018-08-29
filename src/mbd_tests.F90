@@ -14,7 +14,7 @@ use mbd_dipole
 use mbd_common, only: diff7, findval, print_matrix
 
 #ifdef WITH_MPI
-use mpi
+use mbd_mpi
 #endif
 
 implicit none

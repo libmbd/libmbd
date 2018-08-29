@@ -43,7 +43,7 @@ subroutine test()
     integer :: code
     character(200) :: origin, msg
 
-    inp%free_values = mbd_get_free_vdw_params(['Ar', 'Ar'], 'ts')
+    inp%atom_types = ['Ar', 'Ar']
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2])
     inp%xc = 'xxx'
     call calc%init(inp)

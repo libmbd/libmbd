@@ -1,0 +1,9 @@
+[tool.poetry]
+name = "pymbd"
+version = "0.3.2"
+description = "Many-body dispersion method"
+authors = ["Jan Hermann <dev@janhermann.cz>"]
+
+[tool.poetry.dependencies]
+cffi = "^1"
+numpy = "*"

@@ -6,6 +6,7 @@ import numpy as np
 import pkg_resources
 import sys
 import csv
+import atexit
 from itertools import product
 try:
     from mpi4py import MPI
@@ -17,6 +18,8 @@ from ._libmbd import ffi as _ffi, lib as _lib
 
 ang = 1/0.529177249
 
+_interactive_calc = None
+
 
 def _array(obj, *args, **kwargs):
     if obj is not None:
@@ -25,6 +28,15 @@ def _array(obj, *args, **kwargs):
 
 def _cast(ctype, array):
     return _ffi.NULL if array is None else _ffi.cast(ctype, array.ctypes.data)
+
+
+def interactive():
+    global _interactive_calc
+    if not _interactive_calc:
+        _interactive_calc = MBDCalc()
+        _interactive_calc.__enter__()
+        atexit.register(_interactive_calc.__exit__, None, None, None)
+    return _interactive_calc
 
 
 class MBDCalc(object):

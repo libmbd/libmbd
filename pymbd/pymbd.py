@@ -30,13 +30,20 @@ def _cast(ctype, array):
     return _ffi.NULL if array is None else _ffi.cast(ctype, array.ctypes.data)
 
 
-def interactive():
+def interactive(*args, **kwargs):
     global _interactive_calc
     if not _interactive_calc:
-        _interactive_calc = MBDCalc()
+        _interactive_calc = MBDCalc(*args, **kwargs)
         _interactive_calc.__enter__()
         atexit.register(_interactive_calc.__exit__, None, None, None)
     return _interactive_calc
+
+
+def stop_interactive():
+    global _interactive_calc
+    if _interactive_calc:
+        _interactive_calc.__exit__(None, None, None)
+        _interactive_calc = None
 
 
 class MBDCalc(object):

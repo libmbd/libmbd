@@ -50,6 +50,8 @@ type :: mbd_input
 
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: lattice_vectors(:, :)
+
+    character(len=10) :: parallel_mode = 'auto'
 end type
 
 type mbd_calculation
@@ -104,8 +106,8 @@ subroutine mbd_calc_init(this, input)
     this%sys%k_grid = input%k_grid
     this%sys%vacuum_axis = input%vacuum_axis
     this%sys%coords = input%coords
-    if (allocated(input%lattice_vectors)) &
-        this%sys%lattice = input%lattice_vectors
+    if (allocated(input%lattice_vectors)) this%sys%lattice = input%lattice_vectors
+    this%sys%parallel_mode = input%parallel_mode
     call this%calc%init_grid()
     call this%sys%init(this%calc)
     if (allocated(input%free_values)) then

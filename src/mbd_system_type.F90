@@ -82,7 +82,7 @@ type :: mbd_system
     !> eigenproblems sequentialy.
     !> - `"k_points"`: parallelize over k-points (each MPI task solves entire
     !> eigenproblems for its k-points)
-    character(len=10) :: parallel_mode = 'atoms'
+    character(len=10) :: parallel_mode = 'auto'
     type(mbd_index) :: idx
 #ifdef WITH_SCALAPACK
     type(mbd_blacs_desc) :: blacs
@@ -109,6 +109,8 @@ subroutine mbd_system_init(this, calc)
     integer :: i_atom
 
     this%calc => calc
+    ! TODO put some logic here
+    if (this%parallel_mode == 'auto') this%parallel_mode = 'atoms'
 #ifdef WITH_SCALAPACK
     this%idx%parallel = this%parallel_mode == 'atoms'
     if (this%idx%parallel) then

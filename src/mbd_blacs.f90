@@ -39,14 +39,14 @@ interface all_reduce
 end interface
 
 external :: BLACS_PINFO, BLACS_GRIDINIT, BLACS_GRIDINFO, &
-    BLACS_GRIDEXIT, NUMROC, DESCINIT, DGSUM2D, ZGSUM2D
+    BLACS_GRIDEXIT, NUMROC, DESCINIT, DGSUM2D, ZGSUM2D, BLACS_GET
 integer :: NUMROC
 
 contains
 
 subroutine mbd_blacs_grid_init(this, comm)
     class(mbd_blacs_grid), intent(inout) :: this
-    integer, intent(in) :: comm
+    integer, intent(in), optional :: comm
 
     integer :: my_task, n_tasks, nprows
 
@@ -56,7 +56,11 @@ subroutine mbd_blacs_grid_init(this, comm)
     enddo
     this%nprows = nprows
     this%npcols = n_tasks/this%nprows
-    this%ctx = comm
+    if (present(comm)) then
+        this%ctx = comm
+    else
+        call BLACS_GET(0, 0, this%ctx)
+    end if
     call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &

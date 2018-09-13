@@ -1,5 +1,5 @@
 set(SRCS
-    mbd.f90
+    mbd.F90
     mbd_c_api.F90
     mbd_common.f90
     mbd_constants.f90

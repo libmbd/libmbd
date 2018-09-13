@@ -90,8 +90,6 @@ type :: mbd_system
 #endif
 #ifdef WITH_MPI
     integer :: comm = MPI_COMM_WORLD
-#else
-    integer :: comm = -1
 #endif
     contains
     procedure :: init => mbd_system_init
@@ -114,7 +112,11 @@ subroutine mbd_system_init(this, calc)
 #ifdef WITH_SCALAPACK
     this%idx%parallel = this%parallel_mode == 'atoms'
     if (this%idx%parallel) then
+#ifdef WITH_MPI
         call this%blacs_grid%init(this%comm)
+#else
+        call this%blacs_grid%init()
+#endif
         call this%blacs%init(this%siz(), this%blacs_grid)
         this%idx%i_atom = this%blacs%i_atom
         this%idx%j_atom = this%blacs%j_atom

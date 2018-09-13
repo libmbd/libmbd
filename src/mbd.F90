@@ -87,7 +87,9 @@ subroutine mbd_calc_init(this, input)
     class(mbd_calculation), target, intent(inout) :: this
     type(mbd_input), intent(in) :: input
 
+#ifdef WITH_MPI
     if (input%comm /= -1) this%sys%comm = input%comm
+#endif
     this%dispersion_type = input%dispersion_type
     this%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then

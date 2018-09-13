@@ -137,7 +137,7 @@ subroutine mbd_system_destroy(this)
     class(mbd_system), intent(inout) :: this
 #ifdef WITH_SCALAPACK
 
-    call this%blacs_grid%destroy()
+    if (this%idx%parallel) call this%blacs_grid%destroy()
 #endif
 end subroutine
 

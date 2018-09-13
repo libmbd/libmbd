@@ -119,7 +119,7 @@ type(mbd_result) function mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        call all_reduce(dene%dcoords, sys%blacs)
+        if (sys%idx%parallel) call all_reduce(dene%dcoords, sys%blacs)
 #endif
         dene%dcoords = dene%dcoords + dene_mbd%dcoords
     end if
@@ -135,7 +135,7 @@ type(mbd_result) function mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        call all_reduce(dene%dalpha, sys%blacs)
+        if (sys%idx%parallel) call all_reduce(dene%dalpha, sys%blacs)
 #endif
         dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
     end if
@@ -151,7 +151,7 @@ type(mbd_result) function mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        call all_reduce(dene%dC6, sys%blacs)
+        if (sys%idx%parallel) call all_reduce(dene%dC6, sys%blacs)
 #endif
     end if
     if (grad%dr_vdw) then
@@ -165,7 +165,7 @@ type(mbd_result) function mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        call all_reduce(dene%dr_vdw, sys%blacs)
+        if (sys%idx%parallel) call all_reduce(dene%dr_vdw, sys%blacs)
 #endif
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if

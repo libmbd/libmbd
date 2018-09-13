@@ -472,7 +472,7 @@ subroutine mbd_matrix_complex_contract_n_transp(this, dir, res)
         end do
     end do
 #ifdef WITH_SCALAPACK
-    call all_reduce(res, this%blacs)
+    if (this%idx%parallel) call all_reduce(res, this%blacs)
 #endif
 end subroutine
 
@@ -518,7 +518,7 @@ function contract_cross_33_complex(k_atom, A, A_prime, B, B_prime) result(res)
         end do
     end if
 #ifdef WITH_SCALAPACK
-    call all_reduce(res, A%blacs)
+    if (A%idx%parallel) call all_reduce(res, A%blacs)
 #endif
 end function
 
@@ -544,7 +544,7 @@ function mbd_matrix_complex_contract_n33diag_cols(A) result(res)
     end do
     res = res/3
 #ifdef WITH_SCALAPACK
-    call all_reduce(res, A%blacs)
+    if (A%idx%parallel) call all_reduce(res, A%blacs)
 #endif
 end function
 
@@ -568,7 +568,7 @@ function mbd_matrix_complex_contract_n33_rows(A) result(res)
         end associate
     end do
 #ifdef WITH_SCALAPACK
-    call all_reduce(res, A%blacs)
+    if (A%idx%parallel) call all_reduce(res, A%blacs)
 #endif
 end function
 

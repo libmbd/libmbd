@@ -11,7 +11,7 @@ private
 public :: mbd_blacs_desc, mbd_blacs_grid, all_reduce
 
 type :: mbd_blacs_grid
-    integer :: ctx = -1
+    integer :: ctx
     integer :: nprows
     integer :: npcols
     integer :: my_prow
@@ -26,7 +26,7 @@ type :: mbd_blacs_desc
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
     integer :: desc(9)
-    integer :: ctx = -1
+    integer :: ctx
 contains
     procedure :: init => mbd_blacs_desc_init
 end type
@@ -124,7 +124,6 @@ subroutine all_reduce_real_1d(A, blacs)
     real(dp), intent(inout) :: A(:)
     type(mbd_blacs_desc), intent(in) :: blacs
 
-    if (blacs%ctx == -1) return
     call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
 end subroutine
 
@@ -132,7 +131,6 @@ subroutine all_reduce_real_2d(A, blacs)
     real(dp), intent(inout) :: A(:, :)
     type(mbd_blacs_desc), intent(in) :: blacs
 
-    if (blacs%ctx == -1) return
     call DGSUM2D( &
         blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
     )
@@ -142,7 +140,6 @@ subroutine all_reduce_complex_1d(A, blacs)
     complex(dp), intent(inout) :: A(:)
     type(mbd_blacs_desc), intent(in) :: blacs
 
-    if (blacs%ctx == -1) return
     call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
 end subroutine
 
@@ -150,7 +147,6 @@ subroutine all_reduce_complex_2d(A, blacs)
     complex(dp), intent(inout) :: A(:, :)
     type(mbd_blacs_desc), intent(in) :: blacs
 
-    if (blacs%ctx == -1) return
     call ZGSUM2D( &
         blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
     )

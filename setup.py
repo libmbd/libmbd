@@ -74,15 +74,16 @@ if library_dirs:
     })
 
 LIBMBDC = 'pymbd/_libmbd.c'
+EXTPATH = 'pymbd._libmbd'
 try:
     import cffi
 except ImportError:
     if not os.path.exists(LIBMBDC):
         raise
-    ext = Extension(sources=[LIBMBDC], **ext_kwargs)
+    ext = Extension(EXTPATH, sources=[LIBMBDC], **ext_kwargs)
 else:
     ffibuilder = cffi.FFI()
-    ffibuilder.set_source('pymbd._libmbd', '#include "mbd.h"', **ext_kwargs)
+    ffibuilder.set_source(EXTPATH, '#include "mbd.h"', **ext_kwargs)
     with open('src/mbd.h') as f:
         ffibuilder.cdef(f.read())
     ext = ffibuilder.distutils_extension(tmpdir='.')

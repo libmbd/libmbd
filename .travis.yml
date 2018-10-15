@@ -20,6 +20,8 @@ matrix:
       env: TOXENV=py36-pip-serial BUILDS=
     - language: python
       python: 3.6
+      dist: xenial
+      sudo: required
       stage: deploy
       env: TOXENV=docs BUILDS=
       addons:

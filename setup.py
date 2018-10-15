@@ -73,7 +73,7 @@ if library_dirs:
         'library_dirs': library_dirs
     })
 
-LIBMBDC = 'src/_libmbd.c'
+LIBMBDC = 'pymbd/_libmbd.c'
 try:
     import cffi
 except ImportError:

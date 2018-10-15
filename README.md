@@ -52,11 +52,11 @@ make check
 
 ## Installing Pymbd
 
-Pymbd links against Libmbd, which can be either installed on the system, or built on the fly by Pip/Setuptools. The linking requires the cFFI Python package installed prior to installing Libmbd. If the installed Libmbd is built with ScaLAPACK/MPI, Mpi4py package is required. For the Pip/Setuptools build, Fortran compiler must be available on the system (ScaLAPACK/MPI is not supported by the Setuptools build), and Numpy must be installed prior to installing Pymbd.
+Pymbd links against Libmbd, which can be either installed on the system, or built on the fly by Pip/Setuptools. If the installed Libmbd is built with ScaLAPACK/MPI, the `MPI` extras is required. For the Pip/Setuptools build, Fortran compiler must be available on the system (ScaLAPACK/MPI is not supported by the Setuptools build), and Numpy must be installed prior to installing Pymbd.
 
 ```
-pip install cffi [numpy] [mpi4py]
-pip install git+https://github.com/azag0/libmbd.git
+pip install numpy
+pip install pymbd  # or pymbd[MPI]
 ```
 
 If you have Pytest installed, you can run tests with

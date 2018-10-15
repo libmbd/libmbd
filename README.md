@@ -2,8 +2,8 @@
 
 [![build](https://img.shields.io/travis/azag0/libmbd/master.svg)](https://travis-ci.org/azag0/libmbd)
 [![coverage](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
-![python](https://img.shields.io/pypi/pyversions/libmbd.svg)
-[![pypi](https://img.shields.io/pypi/v/libmbd.svg)](https://pypi.org/project/libmbd/)
+![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
+[![pypi](https://img.shields.io/pypi/v/pymbd.svg)](https://pypi.org/project/pymbd/)
 [![commits since](https://img.shields.io/github/commits-since/azag0/libmbd/latest.svg)](https://github.com/azag0/libmbd/releases)
 [![last commit](https://img.shields.io/github/last-commit/azag0/libmbd.svg)](https://github.com/azag0/libmbd/commits/master)
 [![license](https://img.shields.io/github/license/azag0/libmbd.svg)](https://github.com/azag0/libmbd/blob/master/LICENSE)
@@ -118,7 +118,8 @@ cmake .. -DENABLE_SCALAPACK_MPI=ON
 make
 make check
 cd ..
-pip install cffi mpi4py
+python3 -m venv venv && source venv/bin/activate
+pip install cffi numpy scipy mpi4py
 python setup.py build_ext -i
 pytest -v --durations=3
 ```

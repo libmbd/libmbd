@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
+import os
+import sys
 import csv
 from importlib.resources import open_text
+
+sys.path.append('.')
 
 if __name__ == '__main__':
     with open_text('pymbd', 'vdw-params.csv') as f:

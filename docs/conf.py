@@ -1,8 +1,14 @@
-#!/usr/bin/env python3
-import datetime
-import subprocess
 import os
+import datetime
+from configparser import ConfigParser
 
+conf = ConfigParser()
+conf.read('../setup.cfg')
+
+project = 'libmbd'
+version = conf.get('libmbd:info', 'version')
+author = conf.get('libmbd:info', 'author')
+description = conf.get('libmbd:info', 'description')
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -13,10 +19,7 @@ extensions = [
 ]
 source_suffix = '.rst'
 master_doc = 'index'
-project = 'libmbd'
-author = 'Jan Hermann'
 copyright = f'2018-{datetime.date.today().year}, {author}'
-version = '0.4.0a1'
 release = version
 language = None
 exclude_patterns = ['build', '.DS_Store']
@@ -24,10 +27,13 @@ pygments_style = 'sphinx'
 todo_include_todos = True
 html_theme = 'alabaster'
 html_theme_options = {
-    'description': 'Many-body dispersion library',
+    'description': description,
     'github_button': True,
     'github_user': 'azag0',
     'github_repo': 'libmbd',
+    'badge_branch': 'master',
+    'codecov_button': True,
+    'travis_button': True,
     'extra_nav_links': {
         'Fortran API': 'doxygen/namespacembd.html',
         'Core Fortran module': 'doxygen/namespacembd__core.html',
@@ -53,17 +59,5 @@ def skip_namedtuples(app, what, name, obj, skip, options):
         return True
 
 
-def run_doxygen(app, exception):
-    if os.environ.get('READTHEDOCS') != 'True':
-        return
-    if os.path.exists('_build/html/oxygen'):
-        return
-    subprocess.check_call(
-        '(cat Doxyfile; echo "OUTPUT_DIRECTORY=_build/html") | doxygen -',
-        shell=True
-    )
-
-
 def setup(app):
     app.connect('autodoc-skip-member', skip_namedtuples)
-    app.connect('build-finished', run_doxygen)

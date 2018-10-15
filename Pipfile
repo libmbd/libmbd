@@ -3,16 +3,5 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 name = "pypi"
 
-[packages]
-cffi = "*"
-
 [dev-packages]
-pytest = "*"
-ipykernel = "*"
-pymbd = {editable = true, path = ".", extras = ["mpi"]}
-sphinx = "*"
-breathe = "*"
 "flake8" = "*"
-
-[requires]
-python_version = "3.7"

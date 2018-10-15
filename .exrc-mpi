@@ -1,0 +1,5 @@
+let g:ale_fortran_gcc_executable = 'mpifort'
+let g:ale_fortran_gcc_options = '-J build-mpi/src -Wall -Wargument-mismatch -Wcharacter-truncation ' .
+            \ '-Wimplicit-procedure -Wextra -std=f2008ts -pedantic -fall-intrinsics ' .
+            \ '-Wfrontend-loop-interchange -DWITH_MPI -DWITH_SCALAPACK -I/usr/local/include ' .
+            \ '-cpp -I src'

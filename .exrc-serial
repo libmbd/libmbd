@@ -1,0 +1,6 @@
+let g:ale_fortran_gcc_executable = 'gfortran'
+let g:ale_fortran_gcc_options = '-J build-serial/src -Wall -Wargument-mismatch -Wcharacter-truncation ' .
+            \ '-Wimplicit-procedure -Wextra -std=f2008ts -pedantic -fall-intrinsics ' .
+            \ '-Wfrontend-loop-interchange -I/usr/local/include ' .
+            \ '-cpp -I src'
+

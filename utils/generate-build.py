@@ -106,7 +106,7 @@ if __name__ == '__main__':
         if label == 'serial':
             conf = ConfigParser()
             conf.read(config_file)
-            conf['info']['sources'] = \
+            conf['libmbd:info']['sources'] = \
                 '\n' + '\n'.join(path.name for path in ordered)
             with config_file.open('w') as f:
                 conf.write(f)

@@ -1,11 +1,12 @@
 # Libmbd — many-body dispersion library
 
-
-[![Travis](https://travis-ci.org/azag0/libmbd.svg?branch=master)](https://travis-ci.org/azag0/libmbd)
-[![Codecov](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
-[![Python 2.7](https://img.shields.io/badge/Python-2.7-blue.svg)]()
-[![Python 3.7](https://img.shields.io/badge/Python-3.7-blue.svg)]()
-[![MPL 2.0 license](https://img.shields.io/github/license/azag0/libmbd.svg)](https://github.com/azag0/libmbd/blob/master/LICENSE)
+[![build](https://img.shields.io/travis/azag0/libmbd/master.svg)](https://travis-ci.org/azag0/libmbd)
+[![coverage](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
+![python](https://img.shields.io/pypi/pyversions/libmbd.svg)
+[![pypi](https://img.shields.io/pypi/v/libmbd.svg)](https://pypi.org/project/libmbd/)
+[![commits since](https://img.shields.io/github/commits-since/azag0/libmbd/latest.svg)](https://github.com/azag0/libmbd/releases)
+[![last commit](https://img.shields.io/github/last-commit/azag0/libmbd.svg)](https://github.com/azag0/libmbd/commits/master)
+[![license](https://img.shields.io/github/license/azag0/libmbd.svg)](https://github.com/azag0/libmbd/blob/master/LICENSE)
 
 This project contains implementations of the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
 

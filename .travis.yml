@@ -1,41 +1,45 @@
-language: generic
+matrix:
+  include:
+    - language: python
+      python: 2.7
+      env: TOXENV=py27-cmake-serial-codecov BUILDS=Sbuild
+    - language: python
+      python: 2.7
+      env: TOXENV=py27-cmake-mpi-nodes1-codecov BUILDS=Mbuild
+    - language: python
+      python: 2.7
+      env: TOXENV=py27-cmake-mpi-nodes2 BUILDS=Mbuild
+    - language: python
+      python: 2.7
+      env: TOXENV=py27-pip-serial BUILDS=
+    - language: generic
+      os: osx
+      env: TOXENV=py36-cmake-mpi-nodes2 BUILDS=Mbuild
+    - language: generic
+      os: osx
+      env: TOXENV=py36-pip-serial BUILDS=
+    - language: python
+      python: 3.6
+      stage: deploy
+      env: TOXENV=docs BUILDS=
+      addons:
+        apt:
+          packages:
+            - doxygen
 addons:
   apt:
     packages:
-    - gfortran
-    - libblas-dev
-    - liblapack-dev
-    - mpi-default-dev
-    - mpi-default-bin
-    - libscalapack-mpi-dev
-matrix:
-  include:
-  - env: PYTHON=python CODECOV=1
-  - env: PYTHON=python MPI_NODES=1 CODECOV=1
-  - env: PYTHON=python MPI_NODES=2
-  - env: PYTHON=python WITH_PIP=1
-  - os: osx
-    env: PYTHON=python MPI_NODES=2
-  - os: osx
-    env: PYTHON=python3 WITH_PIP=1
-before_install:
-- |
-  if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      rm -rf /usr/local/include/c++
-      brew update
-      brew upgrade python
-      brew install gcc python@2 open-mpi scalapack
-  fi
-install:
-- ./.travis/install.sh
+      - gfortran
+      - libblas-dev
+      - liblapack-dev
+      - mpi-default-dev
+      - mpi-default-bin
+      - libscalapack-mpi-dev
+install: .travis/install.sh
 script:
-- ./.travis/script.sh
-after_success:
-- |
-  if [[ "$CODECOV" ]]; then
-      cp build/CMakeFiles/mbd.dir/src/*.f90.gc?? src/
-      bash <(curl -s https://codecov.io/bash) -F pytest
-  fi
+  - 'make test && { [[ $TOXENV != docs ]] || make doc; }'
+  - tox
+after_success: .travis/after-success.sh
 notifications:
   pushover:
     api_key:

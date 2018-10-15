@@ -1,20 +1,21 @@
 import os
 import sys
-import tempfile
-import cffi
 import shutil
-from setuptools import setup
+import tempfile
 if sys.version_info[0] > 2:
     from configparser import ConfigParser
 else:
     from ConfigParser import ConfigParser  # noqa
 
-blddir = os.environ.get('MBDBLDDIR', 'build/src')
-library_dirs = [blddir] if os.path.exists(blddir) else []
+from setuptools import setup, Extension  # noqa
 
-conf = ConfigParser()
-conf.read('setup.cfg')
-sources = ['src/' + name for name in conf.get('info', 'sources').split()]
+
+def update_dict(dct, update):
+    for key, val in update.items():
+        if key in dct:
+            dct[key].extend(val)
+        else:
+            dct[key] = val
 
 
 def libmbd_exists():
@@ -22,6 +23,8 @@ def libmbd_exists():
     import distutils.ccompiler
     from distutils.errors import LinkError
 
+    LIBMBD = os.environ.get('LIBMBD', 'build/src')
+    library_dirs = [LIBMBD] if os.path.exists(LIBMBD) else []
     tmpdir = tempfile.mkdtemp()
     src = os.path.join(tmpdir, 'test.c')
     with open(src, 'w') as f:
@@ -37,61 +40,64 @@ def libmbd_exists():
             output_dir=tmpdir
         )
     except LinkError:
-        return False
+        return None
     else:
-        return True
+        return library_dirs
     finally:
         shutil.rmtree(tmpdir)
 
 
-def update_dict(dct, update):
-    for key, val in update.items():
-        if key in dct:
-            dct[key].extend(val)
-        else:
-            dct[key] = val
+conf = ConfigParser()
+conf.read('setup.cfg')
 
-
-if libmbd_exists():
-    ext_args = {'libraries': ['mbd']}
+library_dirs = libmbd_exists()
+if library_dirs is not None:
+    ext_kwargs = {'libraries': ['mbd']}
     if library_dirs:
         if sys.platform == 'darwin':
-            ext_args['extra_link_args'] = ['-rpath', os.path.realpath(blddir)]
+            ext_kwargs['extra_link_args'] = ['-rpath', os.path.realpath(library_dirs[0])]
         else:
-            ext_args['runtime_library_dirs'] = [os.path.realpath(blddir)]
+            ext_kwargs['runtime_library_dirs'] = [os.path.realpath(library_dirs[0])]
 else:
-    from numpy.distutils.core import setup  # noqa
+    from numpy.distutils.core import setup, Extension  # noqa
     from numpy.distutils.system_info import get_info
-    ext_args = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
-    update_dict(ext_args, get_info('lapack_opt', 2))
+
+    sources = ['src/' + name for name in conf.get('libmbd:info', 'sources').split()]
+    ext_kwargs = {'libraries': [('mbd', {'sources': sources, 'language': 'f90'})]}
+    update_dict(ext_kwargs, get_info('lapack_opt', 2))
     library_dirs = ['build']
 
-
 if library_dirs:
-    update_dict(ext_args, {
+    update_dict(ext_kwargs, {
         'include_dirs': ['src'],
         'library_dirs': library_dirs
     })
-ffibuilder = cffi.FFI()
-ffibuilder.set_source(
-    'pymbd._libmbd',
-    '#include "mbd.h"',
-    **ext_args
-)
-with open('src/mbd.h') as f:
-    ffibuilder.cdef(f.read())
+
+LIBMBDC = 'src/_libmbd.c'
+try:
+    import cffi
+except ImportError:
+    if not os.path.exists(LIBMBDC):
+        raise
+    ext = Extension(sources=[LIBMBDC], **ext_kwargs)
+else:
+    ffibuilder = cffi.FFI()
+    ffibuilder.set_source('pymbd._libmbd', '#include "mbd.h"', **ext_kwargs)
+    with open('src/mbd.h') as f:
+        ffibuilder.cdef(f.read())
+    ext = ffibuilder.distutils_extension(tmpdir='.')
 
 with open('README.md') as f:
     long_description = f.read()
 
 setup(
     name='pymbd',
-    version='0.4.0a1',
-    description='Many-body dispersion method',
+    version=conf.get('libmbd:info', 'version'),
+    description=conf.get('libmbd:info', 'description'),
+    author=conf.get('libmbd:info', 'author'),
+    author_email='dev@janhermann.cz',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    author='Jan Hermann',
-    author_email='dev@janhermann.cz',
     url='https://github.com/azag0/libmbd',
     packages=['pymbd'],
     package_data={'pymbd': ['vdw-params.csv']},
@@ -110,9 +116,14 @@ setup(
         'Topic :: Scientific/Engineering :: Physics',
     ],
     license='Mozilla Public License 2.0',
-    install_requires=['cffi', 'numpy', 'scipy'],
-    ext_modules=[ffibuilder.distutils_extension()],
+    install_requires=[
+        'cffi',
+        'numpy',
+        'scipy'
+    ],
+    ext_modules=[ext],
     extras_require={
         'mpi': ['mpi4py'],
     },
+    python_requires='>=2.7,!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*',
 )

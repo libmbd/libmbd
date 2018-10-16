@@ -3,7 +3,6 @@ import re
 from pathlib import Path
 from string import Template
 import subprocess
-from configparser import ConfigParser
 
 
 def parse_modules(lines):
@@ -103,10 +102,3 @@ if __name__ == '__main__':
             ),
             macros=' '.join(f'-D{macro}' for macro in macros),
         ))
-        if label == 'serial':
-            conf = ConfigParser()
-            conf.read(config_file)
-            conf['libmbd:info']['sources'] = \
-                '\n' + '\n'.join(path.name for path in ordered)
-            with config_file.open('w') as f:
-                conf.write(f)

@@ -6,9 +6,9 @@ conf = ConfigParser()
 conf.read('../setup.cfg')
 
 project = 'libmbd'
-version = conf.get('libmbd:info', 'version')
-author = conf.get('libmbd:info', 'author')
-description = conf.get('libmbd:info', 'description')
+version = conf.get('metadata', 'version')
+author = conf.get('metadata', 'author')
+description = conf.get('metadata', 'description')
 
 extensions = [
     'sphinx.ext.autodoc',

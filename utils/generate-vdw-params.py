@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import sys
 import csv
 from importlib.resources import open_text

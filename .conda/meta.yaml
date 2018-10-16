@@ -1,0 +1,44 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: pymbd
+  version: {{ data.get('version') }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - python {{ python }}
+    - {{ compiler('fortran') }}
+    - cmake
+    - libopenblas
+  host:
+    - python
+    - pip
+    - cffi
+  run:
+    - python
+    - cffi
+    - numpy
+    - scipy
+    - libopenblas
+
+test:
+  requires:
+    - pytest
+  commands:
+    - pytest -vs --durations=3 --pyargs pymbd
+
+about:
+  home: https://github.com/azag0/libmbd
+  license: MPL-2.0
+  license_file: LICENSE
+  summary: Many-body dispersion library
+
+extra:
+  recipe-maintainers:
+    - azag0

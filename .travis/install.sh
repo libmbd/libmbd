@@ -7,7 +7,7 @@ if [[ $TRAVIS_OS_NAME = osx ]]; then
     brew update
     brew install gcc open-mpi scalapack
 fi
-if [[ $TOXENV = *cmake* ]]; then
+if [[ $TOXENV != docs ]]; then
     CMAKE_FLAGS=()
     if [[ $TOXENV = *codecov* ]]; then
         CMAKE_FLAGS+=(-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage")

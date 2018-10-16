@@ -3,6 +3,8 @@
 [![build](https://img.shields.io/travis/azag0/libmbd/master.svg)](https://travis-ci.org/azag0/libmbd)
 [![coverage](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
+[![release](https://img.shields.io/github/release/azag0/libmbd.svg)](https://github.com/azag0/libmbd/releases)
+[![conda](https://img.shields.io/conda/v/azag0/pymbd.svg)](https://anaconda.org/azag0/pymbd)
 [![pypi](https://img.shields.io/pypi/v/pymbd.svg)](https://pypi.org/project/pymbd/)
 [![commits since](https://img.shields.io/github/commits-since/azag0/libmbd/latest.svg)](https://github.com/azag0/libmbd/releases)
 [![last commit](https://img.shields.io/github/last-commit/azag0/libmbd.svg)](https://github.com/azag0/libmbd/commits/master)
@@ -12,13 +14,33 @@ This project contains implementations of the [many-body dispersion](http://dx.do
 
 - The Fortran implementation is the reference, most advanced implementation, with support for analytical gradients and distributed parallelism, and additional functionality beyond the MBD method itself. It provides a low-level and a high-level Fortran API, and a C API. Furthermore, Python bindings to the C API are provided.
 - The Python/Numpy implementation is intended for prototyping, and as a high-level language reference.
-- The Python/Tensorflow implemntation is an experiment that should enable rapid prototyping of machine learning applications with MBD.
+- The Python/Tensorflow implementation is an experiment that should enable rapid prototyping of machine learning applications with MBD.
 
 The Python-based implementations as well as Python bindings to the Libmbd C API are accessible from the Python package called Pymbd.
 
+## Installing Pymbd
+
+The easiest way to get Pymbd is to install the Pymbd [Conda](https://conda.io/docs/) package, which ships with pre-built Libmbd.
+
+```
+conda install -c azag0 pymbd
+```
+
+Alternatively, if you have Libmbd installed on your system (see below), you can install Pymbd via Pip, in which case it links against the installed Libmbd. To support Libmbd built with ScaLAPACK/MPI, the `MPI` extras is required.
+
+```
+pip install pymbd  # or pymbd[MPI]
+```
+
+In both cases, tests can be run with Pytest.
+
+```
+pytest -v --durations=3 --pyargs pymbd
+```
+
 ## Installing Libmbd
 
-Libmbd uses CMake for building and installation, and requires a Fortran compiler, Lapack, and optionally ScaLAPACK/MPI.
+Libmbd uses CMake for building and installation, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
 
 On Ubuntu:
 
@@ -48,21 +70,6 @@ Tests can be run with
 
 ```
 make check
-```
-
-## Installing Pymbd
-
-Pymbd links against Libmbd, which can be either installed on the system, or built on the fly by Pip/Setuptools. If the installed Libmbd is built with ScaLAPACK/MPI, the `MPI` extras is required. For the Pip/Setuptools build, Fortran compiler must be available on the system (ScaLAPACK/MPI is not supported by the Setuptools build), and Numpy must be installed prior to installing Pymbd.
-
-```
-pip install numpy
-pip install pymbd  # or pymbd[MPI]
-```
-
-If you have Pytest installed, you can run tests with
-
-```
-pytest --pyargs pymbd -v --durations=3
 ```
 
 ## Examples
@@ -105,21 +112,18 @@ call calc%get_gradients(gradients)
 call calc%destroy()
 ```
 
-
-
 ## Developing
 
-For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in `./build`
+For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in `./build`.
 
 ```
 git clone https://github.com/azag0/libmbd.git && cd libmbd
-mkdir build && cd build
-cmake .. -DENABLE_SCALAPACK_MPI=ON
-make
-make check
-cd ..
+mkdir build
+(cd build && cmake .. -DENABLE_SCALAPACK_MPI=ON)
+make -C build
+make -C build check
 python3 -m venv venv && source venv/bin/activate
 pip install cffi numpy scipy mpi4py
-python setup.py build_ext -i
+python setup.py build_ext -i -Isrc -Lbuild/src -Rbuild/src
 pytest -v --durations=3
 ```

@@ -1,33 +1,46 @@
-matrix:
+jobs:
   include:
     - language: python
       python: 2.7
-      env: TOXENV=py27-cmake-serial-codecov BUILDS=Sbuild
+      env: TOXENV=py27-serial-codecov BUILDS=Sbuild
     - language: python
       python: 2.7
-      env: TOXENV=py27-cmake-mpi-nodes1-codecov BUILDS=Mbuild
+      env: TOXENV=py27-mpi-nodes1-codecov BUILDS=Mbuild
     - language: python
       python: 2.7
-      env: TOXENV=py27-cmake-mpi-nodes2 BUILDS=Mbuild
-    - language: python
-      python: 2.7
-      env: TOXENV=py27-pip-serial BUILDS=
+      env: TOXENV=py27-mpi-nodes2 BUILDS=Mbuild
     - language: generic
       os: osx
-      env: TOXENV=py36-cmake-mpi-nodes2 BUILDS=Mbuild
-    - language: generic
-      os: osx
-      env: TOXENV=py36-pip-serial BUILDS=
+      env: TOXENV=py36-mpi-nodes2 BUILDS=Mbuild
     - language: python
       python: 3.6
       dist: xenial
       sudo: required
+      script: 'make doc && tox'
       stage: deploy
-      env: TOXENV=docs BUILDS=
+      env: TOXENV=docs
       addons:
         apt:
           packages:
             - doxygen
+    - language: generic
+      stage: anaconda
+      script: .travis/anaconda.sh
+      install: true
+      after_success: true
+    - language: generic
+      os: osx
+      stage: anaconda
+      script: .travis/anaconda.sh
+      install: true
+      after_success: true
+stages:
+  - name: test
+    if: branch != conda
+  - name: deploy
+    if: branch != conda
+  - name: anaconda
+    if: branch = conda
 addons:
   apt:
     packages:
@@ -39,7 +52,7 @@ addons:
       - libscalapack-mpi-dev
 install: .travis/install.sh
 script:
-  - 'make test && { [[ $TOXENV != docs ]] || make doc; }'
+  - make test
   - tox
 after_success: .travis/after-success.sh
 deploy:

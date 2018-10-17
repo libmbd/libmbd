@@ -16,7 +16,7 @@ inf = tf.constant(inf, tf.float64)
 ang = 1/0.529177249
 
 
-class MBDEvaluator:
+class MBDEvaluator(object):
     def __init__(self, gradients=False, **kwargs):
         self._inputs = coords, alpha_0, C6, R_vdw, beta = [
             tf.placeholder(tf.float64, shape=shape, name=name)
@@ -87,7 +87,7 @@ def dipole_matrix(coords, damping, beta=0., R_vdw=None, sigma=None, a=6.):
         dipmat = (1-damping_fermi(dists, S_vdw, a)[:, :, None, None]) * \
             T_erf_coulomb(Rs, sigmaij)
     else:
-        raise ValueError(f'Unsupported damping: {damping}')
+        raise ValueError('Unsupported damping: {}'.format(damping))
     n_atoms = tf.shape(coords)[0]
     return tf.reshape(
         tf.transpose(dipmat, (0, 2, 1, 3)),

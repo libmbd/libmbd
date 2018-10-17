@@ -6,7 +6,10 @@ from __future__ import division, print_function
 import numpy as np
 
 from .pymbd import _array, from_volumes
-from ._libmbd import ffi as _ffi, lib as _lib
+try:
+    from ._libmbd import ffi as _ffi, lib as _lib
+except ImportError as e:
+    raise Exception('Pymbd C extension unimportable, cannot use Fortran')
 
 with_mpi = _lib.cmbd_with_mpi
 with_scalapack = _lib.cmbd_with_scalapack

@@ -3,6 +3,11 @@ import sys
 
 from setuptools import setup, Extension
 
+if '--no-ext' in sys.argv:
+    sys.argv.remove('--no-ext')
+    setup()
+    sys.exit()
+
 MBD_BUILDER = 'utils/build-mbd-ext.py'
 LIBMBDC = 'pymbd/_libmbd.c'
 

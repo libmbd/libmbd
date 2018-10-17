@@ -38,6 +38,12 @@ In both cases, tests can be run with Pytest.
 pytest -v --durations=3 --pyargs pymbd
 ```
 
+If you don’t need the Fortran bindings in Pymbd, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable
+
+```
+pip install pymbd --install-option="--no-ext"
+```
+
 ## Installing Libmbd
 
 Libmbd uses CMake for building and installation, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.

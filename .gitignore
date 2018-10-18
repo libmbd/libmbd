@@ -8,3 +8,4 @@
 /dist/
 /docs/build/
 /Pipfile.lock
+/.env

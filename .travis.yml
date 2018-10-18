@@ -2,23 +2,22 @@ jobs:
   include:
     - language: python
       python: 2.7
-      env: TOXENV=py27-serial-codecov BUILDS=Sbuild
+      env: TOXENV=py27-serial-codecov MAKEENV=serial-build
     - language: python
       python: 2.7
-      env: TOXENV=py27-mpi-nodes1-codecov BUILDS=Mbuild
+      env: TOXENV=py27-mpi-nodes1-codecov-build MAKEENV=mpi-build
     - language: python
       python: 2.7
-      env: TOXENV=py27-mpi-nodes2 BUILDS=Mbuild
+      env: TOXENV=py27-mpi-nodes2-build MAKEENV=mpi-build
     - language: generic
       os: osx
-      env: TOXENV=py36-mpi-nodes2 BUILDS=Mbuild
+      env: TOXENV=py36-mpi-nodes2-build MAKEENV=mpi-build
     - language: python
       python: 3.6
       dist: xenial
       sudo: required
-      script: 'make doc && tox'
       stage: deploy
-      env: TOXENV=docs
+      env: TOXENV=doc MAKEENV=doc
       addons:
         apt:
           packages:
@@ -63,7 +62,7 @@ deploy:
   local-dir: docs/build
   on:
     branch: master
-    condition: $TOXENV = docs
+    condition: $TOXENV = doc
 notifications:
   pushover:
     api_key:

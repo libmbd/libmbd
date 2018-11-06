@@ -1,4 +1,4 @@
-# Libmbd — many-body dispersion library
+# Libmbd
 
 [![build](https://img.shields.io/travis/azag0/libmbd/master.svg)](https://travis-ci.org/azag0/libmbd)
 [![coverage](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
@@ -10,7 +10,7 @@
 [![last commit](https://img.shields.io/github/last-commit/azag0/libmbd.svg)](https://github.com/azag0/libmbd/commits/master)
 [![license](https://img.shields.io/github/license/azag0/libmbd.svg)](https://github.com/azag0/libmbd/blob/master/LICENSE)
 
-This project contains implementations of the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
+Libmbd contains implementations of the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
 
 - The Fortran implementation is the reference, most advanced implementation, with support for analytical gradients and distributed parallelism, and additional functionality beyond the MBD method itself. It provides a low-level and a high-level Fortran API, and a C API. Furthermore, Python bindings to the C API are provided.
 - The Python/Numpy implementation is intended for prototyping, and as a high-level language reference.
@@ -120,7 +120,7 @@ call calc%destroy()
 
 ## Developing
 
-For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in the build directory. Use [Tox](https://tox.readthedocs.io/) for comfortable running of Python tests.
+For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in the build directory. Use [Tox](https://tox.readthedocs.io/) for comfortable running of Python tests.
 
 ```
 pip install tox tox-venv  # or just make sure you have tox and tox-venv installed

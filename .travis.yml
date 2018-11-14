@@ -1,3 +1,4 @@
+dist: xenial
 jobs:
   include:
     - language: python
@@ -14,8 +15,6 @@ jobs:
       env: TOXENV=py36-mpi-nodes2-build MAKEENV=mpi-build
     - language: python
       python: 3.6
-      dist: xenial
-      sudo: required
       stage: deploy
       env: TOXENV=doc MAKEENV=doc
       addons:

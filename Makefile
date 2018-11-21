@@ -23,6 +23,9 @@ setup_serial-build: | build
 setup_serial-build-gfortran49: | build-gfortran49
 	cd -P $| && cmake $(SRCDIR) -DCMAKE_Fortran_COMPILER=gfortran-4.9
 
+setup_serial-build-gfortran5: | build-gfortran5
+	cd -P $| && cmake $(SRCDIR) -DCMAKE_Fortran_COMPILER=gfortran-5
+
 setup_mpi-build-mpi: | build-mpi
 	cd -P $| && cmake $(SRCDIR) -DENABLE_SCALAPACK_MPI=ON
 

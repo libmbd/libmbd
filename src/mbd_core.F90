@@ -292,6 +292,7 @@ type(mbd_result) function mbd_energy_single_complex( &
         else
             sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
             sys%calc%exc%msg = msg
+            return
         end if
     end if
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)

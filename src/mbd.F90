@@ -73,6 +73,7 @@ contains
     procedure :: update_lattice_vectors => mbd_calc_update_lattice_vectors
     procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
     procedure :: update_vdw_params_from_ratios => mbd_calc_update_vdw_params_from_ratios
+    procedure :: update_vdw_params_nl => mbd_calc_update_vdw_params_nl
     procedure :: get_energy => mbd_calc_get_energy
     procedure :: get_gradients => mbd_calc_get_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
@@ -178,12 +179,23 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
 end subroutine
 
 
+subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
+    class(mbd_calculation), intent(inout) :: this
+    real(dp), intent(in) :: alpha_0_ratios(:)
+    real(dp), intent(in) :: C6_ratios(:)
+
+    this%alpha_0 = this%free_values(1, :)*alpha_0_ratios
+    this%C6 = this%free_values(2, :)*C6_ratios
+    this%damp%r_vdw = 2.5d0*this%free_values(1, :)**(1d0/7)*alpha_0_ratios**(1d0/3)
+end subroutine
+
+
 subroutine mbd_calc_get_energy(this, energy)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(out) :: energy
 
     select case (this%dispersion_type)
-    case ('mbd')
+    case ('mbd', 'mbd-nl')
         this%results = mbd_energy( &
             this%sys, this%alpha_0, this%C6, this%damp, &
             this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &

@@ -15,6 +15,7 @@ public :: pmmul, pinvh, peigh, peigvalsh
 
 interface pmmul
     module procedure pmmul_real
+    module procedure pmmul_complex
 end interface
 
 interface pinvh
@@ -23,13 +24,15 @@ end interface
 
 interface peigh
     module procedure peigh_real
+    module procedure peigh_complex
 end interface
 
 interface peigvalsh
     module procedure peigvalsh_real
+    module procedure peigvalsh_complex
 end interface
 
-external :: PDSYEV, PDGETRF, PDGETRI, PDGEMM
+external :: PDSYEV, PZHEEV, PDGETRF, PDGETRI, PDGEMM, PZGEMM
 
 contains
 
@@ -49,7 +52,6 @@ subroutine pinvh_real(A, blacs, exc, src)
     if (present(src)) A = src
     allocate (i_pivot(n))
     call PDGETRF(n, n, A, 1, 1, blacs%desc, i_pivot, error_flag)
-    ! call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -101,6 +103,30 @@ function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     )
 end function
 
+function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
+    complex(dp), intent(in) :: A(:, :), B(:, :)
+    type(mbd_blacs_desc), intent(in) :: blacsA, blacsB, blacsC
+    logical, intent(in), optional :: transA, transB
+    complex(dp) :: C(size(A, 1), size(B, 2))
+
+    character :: transA_, transB_
+    integer :: n
+
+    transA_= 'N'
+    transB_ = 'N'
+    if (present(transA)) then
+        if (transA) transA_ = 'T'
+    end if
+    if (present(transB)) then
+        if (transB) transB_ = 'T'
+    end if
+    n = 3*blacsA%n_atoms
+    call PZGEMM( &
+        transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
+        B, 1, 1, blacsB%desc, 0d0, C, 1, 1, blacsC%desc &
+    )
+end function
+
 subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     type(mbd_blacs_desc), intent(in) :: blacs
@@ -140,6 +166,49 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
+subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
+    complex(dp), intent(inout) :: A(:, :)
+    type(mbd_blacs_desc), intent(in) :: blacs
+    real(dp), intent(out) :: eigs(:)
+    type(exception), intent(out), optional :: exc
+    complex(dp), intent(in), optional :: src(:, :)
+    logical, intent(in), optional :: vals_only
+
+    complex(dp), allocatable :: work_arr(:), vectors(:, :)
+    complex(dp) :: n_work_arr
+    real(dp), allocatable :: rwork_arr(:)
+    real(dp) :: n_rwork_arr
+    integer :: error_flag, n
+
+    n = 3*blacs%n_atoms
+    if (present(src)) A = src
+    if (.not. vals_only) then
+        allocate (vectors(size(A, 1), size(A, 2)))
+    else
+        allocate (vectors(1, 1))
+    end if
+    call PZHEEV( &
+        mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
+        1, 1, blacs%desc, n_work_arr, -1, n_rwork_arr, -1, error_flag &
+    )
+    allocate (work_arr(nint(dble(n_work_arr))), source=(0d0, 0d0))
+    allocate (rwork_arr(nint(n_rwork_arr)), source=0d0)
+    call PZHEEV( &
+        mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
+        1, 1, blacs%desc, work_arr, size(work_arr), rwork_arr, size(rwork_arr), &
+        error_flag &
+    )
+    if (error_flag /= 0) then
+        if (present(exc)) then
+            exc%code = MBD_EXC_LINALG
+            exc%origin = 'PZHEEV'
+            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+        end if
+        return
+    endif
+    if (mode(vals_only) == 'V') A = vectors
+end subroutine
+
 function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
     real(dp), target, intent(in) :: A(:, :)
     type(mbd_blacs_desc), intent(in) :: blacs
@@ -161,6 +230,29 @@ function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
         A_p => A_work
     end if
     call peigh_real(A_p, blacs, eigs, exc, vals_only=.true.)
+end function
+
+function peigvalsh_complex(A, blacs, exc, destroy) result(eigs)
+    complex(dp), target, intent(in) :: A(:, :)
+    type(mbd_blacs_desc), intent(in) :: blacs
+    type(exception), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    real(dp) :: eigs(3*blacs%n_atoms)
+
+    complex(dp), allocatable, target :: A_work(:, :)
+    complex(dp), pointer :: A_p(:, :)
+
+    nullify (A_p)
+    if (present(destroy)) then
+        if (destroy) then
+            A_p => A
+        end if
+    end if
+    if (.not. associated(A_p)) then
+        allocate (A_work(size(A, 1), size(A, 1)), source=A)
+        A_p => A_work
+    end if
+    call peigh_complex(A_p, blacs, eigs, exc, vals_only=.true.)
 end function
 
 end module

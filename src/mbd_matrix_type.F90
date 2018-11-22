@@ -72,8 +72,7 @@ type :: mbd_matrix_complex
     procedure :: mult_rows => mbd_matrix_complex_mult_rows
     procedure :: mult_cols_3n => mbd_matrix_complex_mult_cols_3n
     procedure :: mult_col => mbd_matrix_complex_mult_col
-    ! procedure :: mmul => mbd_matrix_complex_mmul
-    ! procedure :: invh => mbd_matrix_complex_invh
+    procedure :: mmul => mbd_matrix_complex_mmul
     procedure :: eigh => mbd_matrix_complex_eigh
     procedure :: eigvals => mbd_matrix_complex_eigvals
     procedure :: eigvalsh => mbd_matrix_complex_eigvalsh
@@ -375,12 +374,7 @@ subroutine mbd_matrix_complex_eigh(A, eigs, exc, src, vals_only)
     if (.not. A%idx%parallel) then
         call eigh(A%val, eigs, exc, src%val, vals_only)
     else
-#   if MBD_TYPE == 0
         call peigh(A%val, A%blacs, eigs, exc, src%val, vals_only)
-#   elif MBD_TYPE == 1
-        exc%code = MBD_EXC_UNIMPL
-        exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
-#   endif
     endif
 #else
     call eigh(A%val, eigs, exc, src%val, vals_only)
@@ -402,12 +396,7 @@ function mbd_matrix_complex_eigvalsh(A, exc, destroy) result(eigs)
     if (.not. A%idx%parallel) then
         eigs = eigvalsh(A%val, exc, destroy)
     else
-#   if MBD_TYPE == 0
         eigs = peigvalsh(A%val, A%blacs, exc, destroy)
-#   elif MBD_TYPE == 1
-        exc%code = MBD_EXC_UNIMPL
-        exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
-#   endif
     end if
 #else
     eigs = eigvalsh(A%val, exc, destroy)
@@ -428,7 +417,7 @@ function mbd_matrix_complex_eigvals(A, exc, destroy) result(eigs)
 #ifdef WITH_SCALAPACK
     if (A%idx%parallel) then
         exc%code = MBD_EXC_UNIMPL
-        exc%msg = 'Complex matrix diagonalization not implemented for scalapack'
+        exc%msg = 'Complex general matrix diagonalization not implemented for scalapack'
     else
         eigs = eigvals(A%val, exc, destroy)
     end if
@@ -572,24 +561,17 @@ function mbd_matrix_complex_contract_n33_rows(A) result(res)
 #endif
 end function
 
-#undef MBD_TYPE
-#ifndef MBD_INCLUDED
-#define MBD_INCLUDED
-#define MBD_TYPE 1
-#include "mbd_matrix_type.F90"
-#undef MBD_INCLUDED
-
-! #if MBD_TYPE == 0
+#if MBD_TYPE == 0
 type(mbd_matrix_real) function mbd_matrix_real_mmul( &
         A, B, transA, transB) result(C)
     class(mbd_matrix_real), intent(in) :: A
     type(mbd_matrix_real), intent(in) :: B
-! #elif MBD_TYPE == 1
-! type(mbd_matrix_complex) function mbd_matrix_complex_mmul( &
-!         A, B, transA, transB) result(C)
-!     class(mbd_matrix_complex), intent(in) :: A
-!     type(mbd_matrix_complex), intent(in) :: B
-! #endif
+#elif MBD_TYPE == 1
+type(mbd_matrix_complex) function mbd_matrix_complex_mmul( &
+        A, B, transA, transB) result(C)
+    class(mbd_matrix_complex), intent(in) :: A
+    type(mbd_matrix_complex), intent(in) :: B
+#endif
     logical, intent(in), optional :: transA, transB
 
     C%idx = A%idx
@@ -604,6 +586,13 @@ type(mbd_matrix_real) function mbd_matrix_real_mmul( &
     C%val = mmul(A%val, B%val, transA, transB)
 #endif
 end function
+
+#undef MBD_TYPE
+#ifndef MBD_INCLUDED
+#define MBD_INCLUDED
+#define MBD_TYPE 1
+#include "mbd_matrix_type.F90"
+#undef MBD_INCLUDED
 
 subroutine mbd_matrix_real_invh(A, exc, src)
     class(mbd_matrix_real), intent(inout) :: A

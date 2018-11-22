@@ -234,7 +234,6 @@ def test_benzene_rpa(calc):
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
-@no_scalapack
 def test_ethylcarbamate(calc):
     enes = [
         calc.mbd_energy_species(
@@ -260,7 +259,6 @@ def test_ethylcarbamate_python(calc):
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
-@no_scalapack
 def test_ethylcarbamate_scs(calc):
     enes = [
         calc.mbd_energy_species(

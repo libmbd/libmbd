@@ -14,6 +14,7 @@ public :: mmul, inv, invh, inverse, eig, eigh, eigvals, eigvalsh, &
 
 interface mmul
     module procedure mmul_real
+    module procedure mmul_complex
 end interface
 
 interface inv
@@ -150,6 +151,26 @@ function mmul_real(A, B, transA, transB) result(C)
     real(dp), intent(in) :: A(:, :), B(:, :)
     logical, intent(in), optional :: transA, transB
     real(dp) :: C(size(A, 1), size(B, 2))
+
+    character :: transA_, transB_
+    integer :: n
+
+    transA_= 'N'
+    transB_ = 'N'
+    if (present(transA)) then
+        if (transA) transA_ = 'T'
+    end if
+    if (present(transB)) then
+        if (transB) transB_ = 'T'
+    end if
+    n = size(A, 1)
+    call DGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
+end function
+
+function mmul_complex(A, B, transA, transB) result(C)
+    complex(dp), intent(in) :: A(:, :), B(:, :)
+    logical, intent(in), optional :: transA, transB
+    complex(dp) :: C(size(A, 1), size(B, 2))
 
     character :: transA_, transB_
     integer :: n

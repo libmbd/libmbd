@@ -5,7 +5,7 @@ module mbd
 
 use mbd_constants
 use mbd_system_type, only: mbd_system, mbd_calc
-use mbd_core, only: mbd_scs_energy, mbd_result, scale_TS
+use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_result, scale_TS
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
 use mbd_ts, only: ts_energy
@@ -22,7 +22,7 @@ type :: mbd_input
     integer :: comm = -1  ! MPI communicator
 
     ! which calculation will be done (mbd|ts)
-    character(len=30) :: dispersion_type = 'mbd'
+    character(len=30) :: dispersion_type = 'mbd-rsscs'
     logical :: calculate_forces = .true.
     logical :: calculate_spectrum = .false.
 
@@ -72,8 +72,7 @@ contains
     procedure :: update_coords => mbd_calc_update_coords
     procedure :: update_lattice_vectors => mbd_calc_update_lattice_vectors
     procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
-    procedure :: update_vdw_params_from_ratios => &
-        mbd_calc_update_vdw_params_from_ratios
+    procedure :: update_vdw_params_from_ratios => mbd_calc_update_vdw_params_from_ratios
     procedure :: get_energy => mbd_calc_get_energy
     procedure :: get_gradients => mbd_calc_get_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
@@ -185,6 +184,12 @@ subroutine mbd_calc_get_energy(this, energy)
 
     select case (this%dispersion_type)
     case ('mbd')
+        this%results = mbd_energy( &
+            this%sys, this%alpha_0, this%C6, this%damp, &
+            this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &
+        )
+        energy = this%results%energy
+    case ('mbd-rsscs')
         this%results = mbd_scs_energy( &
             this%sys, 'rsscs', this%alpha_0, this%C6, this%damp, &
             this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &

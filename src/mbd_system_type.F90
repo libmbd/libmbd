@@ -21,7 +21,7 @@ implicit none
 
 #ifndef MODULE_UNIT_TESTS
 private
-public :: mbd_system, mbd_calc, ang, clock_rate
+public :: mbd_system, mbd_calc, ang, clock_rate, get_freq_grid
 #endif
 real(dp), parameter :: ang = 1.8897259886d0
 integer, parameter :: n_timestamps = 100
@@ -217,23 +217,30 @@ subroutine mbd_calc_init_grid(this)
     allocate (this%omega_grid_w(0:n))
     this%omega_grid(0) = 0d0
     this%omega_grid_w(0) = 0d0
-    call get_omega_grid(n, 0.6d0, this%omega_grid(1:n), this%omega_grid_w(1:n))
+    call get_freq_grid(n, this%omega_grid(1:n), this%omega_grid_w(1:n))
     this%info%freq_n = &
         "Initialized a radial integration grid of " // trim(tostr(n)) // &
         " points."
 end subroutine
 
-subroutine get_omega_grid(n, L, x, w)
+subroutine get_freq_grid(n, x, w, L)
     integer, intent(in) :: n
-    real(dp), intent(in) :: L
     real(dp), intent(out) :: x(n), w(n)
+    real(dp), intent(in), optional :: L
 
+    real(dp) :: L_
+
+    if (present(L)) then
+        L_ = L
+    else
+        L_ = 0.6d0
+    end if
     call gauss_legendre(n, x, w)
-    w = 2*L/(1-x)**2*w
-    x = L*(1+x)/(1-x)
+    w = 2*L_/(1-x)**2*w
+    x = L_*(1+x)/(1-x)
     w = w(n:1:-1)
     x = x(n:1:-1)
-end subroutine get_omega_grid
+end subroutine get_freq_grid
 
 subroutine gauss_legendre(n, r, w)
     integer, intent(in) :: n

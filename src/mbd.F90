@@ -4,7 +4,7 @@
 module mbd
 
 use mbd_constants
-use mbd_system_type, only: mbd_system, mbd_calc
+use mbd_system_type, only: mbd_system, mbd_calc, get_freq_grid
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_result, scale_TS
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
@@ -16,7 +16,7 @@ implicit none
 
 private
 public :: mbd_input, mbd_calculation  ! types
-public :: mbd_get_free_vdw_params  ! subroutines
+public :: mbd_get_free_vdw_params, get_freq_grid  ! subroutines
 
 type :: mbd_input
     integer :: comm = -1  ! MPI communicator

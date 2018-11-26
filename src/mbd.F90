@@ -196,6 +196,7 @@ subroutine mbd_calc_get_energy(this, energy)
 
     select case (this%dispersion_type)
     case ('mbd', 'mbd-nl')
+        this%damp%version = 'fermi,dip'
         this%results = mbd_energy( &
             this%sys, this%alpha_0, this%C6, this%damp, &
             this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &

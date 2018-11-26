@@ -7,7 +7,7 @@ import pytest
 from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDCalc, with_scalapack
+from .fortran import MBDCalc, with_scalapack, MBDFortranException
 from .utils import numerical_gradients
 
 no_scalapack = pytest.mark.skipif(
@@ -108,6 +108,14 @@ peptide_meoh = [(
         0.7213, 0.7668, 0.6367, 0.6211, 0.5915, 0.8615, 0.5511,
         0.7415, 0.6022, 0.5701, 0.5759
     ]
+)]
+
+bulk_lithium = [(
+    np.array([(0., 0., 0.)])*ang,
+    np.array([(-1.7385, 1.7385, 1.7385), (1.7385, -1.7385, 1.7385), (1.7385, 1.7385, -1.7385)])*ang,
+    (4, 4, 4),
+    ['Li'],
+    [1.]
 )]
 
 
@@ -244,6 +252,17 @@ def test_ethylcarbamate(calc):
     ]
     ene_int = enes[0]-2*enes[1]
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
+
+
+def test_lithium(calc):
+    with pytest.raises(MBDFortranException):
+        [
+            calc.mbd_energy_species(
+                coords, species, vols, 0.83,
+                lattice=lattice, k_grid=k_grid
+            )
+            for coords, lattice, k_grid, species, vols in bulk_lithium
+        ]
 
 
 @no_scalapack

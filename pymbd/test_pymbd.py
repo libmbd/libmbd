@@ -1,6 +1,8 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
+import sys
+
 import numpy as np
 
 import pytest
@@ -12,7 +14,11 @@ from .utils import numerical_gradients
 
 no_scalapack = pytest.mark.skipif(
     with_scalapack,
-    reason="doesn't support scalapack"
+    reason="doesn't support ScaLAPACK"
+)
+no_complex_scalapack_macos_py27 = pytest.mark.skipif(
+    with_scalapack and sys.platform == 'darwin' and sys.version_info[0] == 2,
+    reason="vecLibFort doesn't work when compiled to Python 2"
 )
 
 benzene_dimer = [(
@@ -242,6 +248,7 @@ def test_benzene_rpa(calc):
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
+@no_complex_scalapack_macos_py27
 def test_ethylcarbamate(calc):
     enes = [
         calc.mbd_energy_species(
@@ -254,6 +261,7 @@ def test_ethylcarbamate(calc):
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
+@no_complex_scalapack_macos_py27
 def test_lithium(calc):
     with pytest.raises(MBDFortranException):
         [
@@ -278,6 +286,7 @@ def test_ethylcarbamate_python(calc):
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
+@no_complex_scalapack_macos_py27
 def test_ethylcarbamate_scs(calc):
     enes = [
         calc.mbd_energy_species(

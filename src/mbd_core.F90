@@ -6,10 +6,10 @@ module mbd_core
 
 use mbd_constants
 use mbd_dipole, only: dipole_matrix
-use mbd_matrix, only: matrix_real_t, matrix_complex_t, contract_cross_33
+use mbd_matrix, only: matrix_re_t, matrix_cplx_t, contract_cross_33
 use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
-use mbd_gradients, only: grad_t, grad_matrix_real_t, grad_matrix_complex_t, &
+use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
 use mbd_damping, only: damping_t
 use mbd_lapack, only: inverse
@@ -238,12 +238,12 @@ type(mbd_result) function mbd_energy_single_complex( &
 #endif
 
 #if MBD_TYPE == 0
-    type(matrix_real_t) :: relay, dQ, T, modes, c_lambda12i_c
-    type(grad_matrix_real_t) :: dT
+    type(matrix_re_t) :: relay, dQ, T, modes, c_lambda12i_c
+    type(grad_matrix_re_t) :: dT
     integer :: i_xyz
 #elif MBD_TYPE == 1
-    type(matrix_complex_t) :: relay, T, modes
-    type(grad_matrix_complex_t) :: dT
+    type(matrix_cplx_t) :: relay, T, modes
+    type(grad_matrix_cplx_t) :: dT
 #endif
     real(dp), allocatable :: eigs(:), omega(:)
     type(grad_t) :: domega
@@ -353,9 +353,9 @@ type(mbd_result) function rpa_energy_single_complex( &
 #endif
 
 #if MBD_TYPE == 0
-    type(matrix_real_t) :: relay, AT
+    type(matrix_re_t) :: relay, AT
 #elif MBD_TYPE == 1
-    type(matrix_complex_t) :: relay, AT
+    type(matrix_cplx_t) :: relay, AT
 #endif
     complex(dp), allocatable :: eigs(:)
     integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
@@ -474,12 +474,12 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(grad_request_t), intent(in) :: grad
     real(dp) :: alpha_scs(size(alpha))
 
-    type(matrix_real_t) :: alpha_full, dQ, T
+    type(matrix_re_t) :: alpha_full, dQ, T
     integer :: n_atoms, i_xyz, i_atom, my_i_atom
     type(damping_t) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:)
-    type(grad_matrix_real_t) :: dT
+    type(grad_matrix_re_t) :: dT
     type(grad_request_t) :: grad_req
 
     n_atoms = geom%siz()

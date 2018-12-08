@@ -5,11 +5,11 @@
 module mbd_dipole
 
 use mbd_constants
-use mbd_matrix, only: matrix_real_t, matrix_complex_t
+use mbd_matrix, only: matrix_re_t, matrix_cplx_t
 use mbd_geom, only: geom_t
 use mbd_damping, only: damping_t, damping_fermi, damping_sqrtfermi, &
     op1minus_grad
-use mbd_gradients, only: grad_t, grad_matrix_real_t, grad_matrix_complex_t, &
+use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_linalg, only: outer
@@ -50,11 +50,11 @@ contains
 !> \right)
 !> \f]
 #if MBD_TYPE == 0
-type(matrix_real_t) function dipole_matrix_real( &
+type(matrix_re_t) function dipole_matrix_real( &
         geom, damp, ddipmat, grad) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_REAL
 #elif MBD_TYPE == 1
-type(matrix_complex_t) function dipole_matrix_complex( &
+type(matrix_cplx_t) function dipole_matrix_complex( &
         geom, damp, ddipmat, grad, k_point) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
 #endif
@@ -63,9 +63,9 @@ type(matrix_complex_t) function dipole_matrix_complex( &
     type(damping_t), intent(in) :: damp
     type(grad_request_t), intent(in), optional :: grad
 #if MBD_TYPE == 0
-    type(grad_matrix_real_t), intent(out), optional :: ddipmat
+    type(grad_matrix_re_t), intent(out), optional :: ddipmat
 #elif MBD_TYPE == 1
-    type(grad_matrix_complex_t), intent(out), optional :: ddipmat
+    type(grad_matrix_cplx_t), intent(out), optional :: ddipmat
     real(dp), intent(in) :: k_point(3)
 #endif
 
@@ -74,7 +74,7 @@ type(matrix_complex_t) function dipole_matrix_complex( &
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
         n_atoms, my_i_atom, my_j_atom
     logical :: do_ewald, is_periodic
-    type(grad_matrix_real_t) :: dTpp, dT0pp
+    type(grad_matrix_re_t) :: dTpp, dT0pp
     type(grad_scalar_t) :: df
     type(grad_request_t) :: grad_
 #if MBD_TYPE == 0
@@ -236,10 +236,10 @@ end function
 
 #if MBD_TYPE == 0
 subroutine add_ewald_dipole_parts_real(geom, alpha, dipmat)
-    type(matrix_real_t), intent(inout) :: dipmat
+    type(matrix_re_t), intent(inout) :: dipmat
 #elif MBD_TYPE == 1
 subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
-    type(matrix_complex_t), intent(inout) :: dipmat
+    type(matrix_cplx_t), intent(inout) :: dipmat
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha
@@ -351,7 +351,7 @@ end subroutine
 
 function T_bare(r, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
-    type(grad_matrix_real_t), intent(out), optional :: dT
+    type(grad_matrix_re_t), intent(out), optional :: dT
     logical, intent(in), optional :: grad
     real(dp) :: T(3, 3)
 
@@ -453,12 +453,12 @@ end function
 function T_erf_coulomb(r, sigma, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma
-    type(grad_matrix_real_t), intent(out), optional :: dT
+    type(grad_matrix_re_t), intent(out), optional :: dT
     type(grad_request_t), intent(in), optional :: grad
     real(dp) :: T(3, 3)
 
     real(dp) :: theta, erf_theta, r_5, r_1, zeta, bare(3, 3)
-    type(grad_matrix_real_t) :: dbare
+    type(grad_matrix_re_t) :: dbare
     real(dp) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
     integer :: a, c
 
@@ -498,8 +498,8 @@ function damping_grad(f, df, T, dT, dfT, grad) result(fT)
     real(dp), intent(in) :: f
     type(grad_scalar_t), intent(in) :: df
     real(dp), intent(in) :: T(3, 3)
-    type(grad_matrix_real_t), intent(in) :: dT
-    type(grad_matrix_real_t), intent(out) :: dfT
+    type(grad_matrix_re_t), intent(in) :: dT
+    type(grad_matrix_re_t), intent(out) :: dfT
     type(grad_request_t), intent(in) :: grad
     real(dp) :: fT(3, 3)
 

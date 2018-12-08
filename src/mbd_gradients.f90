@@ -8,7 +8,7 @@ use mbd_constants
 implicit none
 
 private
-public :: grad_t, grad_matrix_real_t, grad_matrix_complex_t, grad_request_t, &
+public :: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, grad_request_t, &
     grad_scalar_t
 
 type :: grad_t
@@ -38,13 +38,13 @@ type :: grad_request_t
     procedure :: any => grad_request_any
 end type
 
-type :: grad_matrix_real_t
+type :: grad_matrix_re_t
     real(dp), allocatable :: dr(:, :, :)
     real(dp), allocatable :: dvdw(:, :)
     real(dp), allocatable :: dsigma(:, :)
 end type
 
-type :: grad_matrix_complex_t
+type :: grad_matrix_cplx_t
     complex(dp), allocatable :: dr(:, :, :)
     complex(dp), allocatable :: dvdw(:, :)
     complex(dp), allocatable :: dsigma(:, :)

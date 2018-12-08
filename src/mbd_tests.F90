@@ -102,7 +102,7 @@ end function
 
 subroutine test_T_bare_deriv()
     real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta
-    type(grad_matrix_real_t) :: dT
+    type(grad_matrix_re_t) :: dT
     integer :: a, b, c, i_step
 
     delta = 1d-2
@@ -127,7 +127,7 @@ end subroutine test_T_bare_deriv
 
 subroutine test_T_GG_deriv_expl()
     real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, sigma
-    type(grad_matrix_real_t) :: dT
+    type(grad_matrix_re_t) :: dT
     integer :: a, b, c, i_step
 
     delta = 1d-2
@@ -153,7 +153,7 @@ end subroutine test_T_GG_deriv_expl
 
 subroutine test_T_GG_deriv_impl()
     real(dp) :: r(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, sigma, sigma_diff
-    type(grad_matrix_real_t) :: dT
+    type(grad_matrix_re_t) :: dT
     integer :: a, b, i_step
 
     delta = 1d-3
@@ -177,7 +177,7 @@ end subroutine test_T_GG_deriv_impl
 subroutine test_T_fermi_deriv_impl()
     real(dp) :: r(3), T(3, 3), T0(3, 3), &
         diff(3, 3), T_diff_num(3, 3, -3:3), delta, rvdw, rvdw_diff, f
-    type(grad_matrix_real_t) :: dT, dT0
+    type(grad_matrix_re_t) :: dT, dT0
     type(grad_scalar_t) :: df
     integer :: a, b, i_step
 

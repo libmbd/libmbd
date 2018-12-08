@@ -9,7 +9,7 @@ use mbd_lapack, only: inverse, det, inv
 use mbd_geom, only: geom_t
 use mbd_dipole, only: dipole_matrix
 use mbd_damping, only: damping_t, damping_fermi
-use mbd_matrix, only: matrix_real_t
+use mbd_matrix, only: matrix_re_t
 
 implicit none
 
@@ -171,7 +171,7 @@ real(dp) function dipole_energy(geom, a0, w, w_t, C, damp)
     type(damping_t), intent(in) :: damp
 
     integer :: A, B, i, j, N
-    type(matrix_real_t) :: T
+    type(matrix_re_t) :: T
 
     N = geom%siz()
     T = dipole_matrix(geom, damp)

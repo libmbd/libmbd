@@ -11,7 +11,7 @@ use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
     mbd_grad_matrix_complex, mbd_grad => mbd_grad_switch
-use mbd_damping_type, only: mbd_damping
+use mbd_damping, only: damping_t
 use mbd_lapack, only: inverse
 use mbd_common, only: tostr, findval, shift_cell
 #ifdef WITH_SCALAPACK
@@ -45,7 +45,7 @@ type(mbd_result) function mbd_scs_energy( &
     character(len=*), intent(in) :: variant
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     type(mbd_gradients), intent(out) :: dene
     type(mbd_grad), intent(in) :: grad
 
@@ -55,7 +55,7 @@ type(mbd_result) function mbd_scs_energy( &
     type(mbd_gradients), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
     type(mbd_gradients) :: dene_mbd, dr_vdw_scs
     type(mbd_grad) :: grad_scs
-    type(mbd_damping) :: damp_scs, damp_mbd
+    type(damping_t) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
 
@@ -230,7 +230,7 @@ type(mbd_result) function mbd_energy_single_complex( &
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     type(mbd_gradients), intent(out) :: dene
     type(mbd_grad), intent(in) :: grad
 #if MBD_TYPE == 1
@@ -347,7 +347,7 @@ type(mbd_result) function rpa_energy_single_complex( &
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:, 0:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
 #if MBD_TYPE == 1
     real(dp), intent(in) :: k_point(3)
 #endif
@@ -359,7 +359,7 @@ type(mbd_result) function rpa_energy_single_complex( &
 #endif
     complex(dp), allocatable :: eigs(:)
     integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
-    type(mbd_damping) :: damp_alpha
+    type(damping_t) :: damp_alpha
 
     res%energy = 0d0
     damp_alpha = damp
@@ -469,14 +469,14 @@ end subroutine
 function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     type(mbd_gradients), intent(out) :: dalpha_scs(:)
     type(mbd_grad), intent(in) :: grad
     real(dp) :: alpha_scs(size(alpha))
 
     type(matrix_real_t) :: alpha_full, dQ, T
     integer :: n_atoms, i_xyz, i_atom, my_i_atom
-    type(mbd_damping) :: damp_local
+    type(damping_t) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:)
     type(mbd_grad_matrix_real) :: dT
@@ -571,7 +571,7 @@ type(mbd_result) function mbd_energy( &
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     type(mbd_gradients), intent(out) :: dene
     type(mbd_grad), intent(in) :: grad
 

@@ -5,7 +5,7 @@ module mbd_ts
 
 use mbd_constants
 use mbd_common, only: shift_cell, tostr
-use mbd_damping_type, only: mbd_damping, damping_fermi
+use mbd_damping, only: damping_t, damping_fermi
 use mbd_geom, only: geom_t
 
 implicit none
@@ -19,7 +19,7 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     real(dp) :: ene
 
     real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3), &

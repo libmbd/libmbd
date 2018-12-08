@@ -204,7 +204,7 @@ end subroutine test_T_fermi_deriv_impl
 subroutine test_mbd_deriv_expl()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :)
     real(dp), allocatable :: diff(:, :)
@@ -254,7 +254,7 @@ end subroutine test_mbd_deriv_expl
 subroutine test_scs_deriv_expl()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :)
     real(dp), allocatable :: diff(:, :, :)
@@ -318,7 +318,7 @@ end subroutine test_scs_deriv_expl
 subroutine test_scs_deriv_impl_alpha
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_0_diff(:), &
         alpha_scs(:, :)
@@ -374,7 +374,7 @@ end subroutine test_scs_deriv_impl_alpha
 subroutine test_scs_deriv_impl_vdw
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_scs(:, :), rvdw(:)
     integer :: i_atom, n_atoms, i_step, j_atom, my_i_atom, my_nratoms, &
@@ -430,7 +430,7 @@ end subroutine test_scs_deriv_impl_vdw
 subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
     type(mbd_result) :: res(-3:3)
@@ -474,7 +474,7 @@ end subroutine test_mbd_deriv_impl_alpha
 subroutine test_mbd_deriv_impl_C6()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
     type(mbd_result) :: res(-3:3)
@@ -518,7 +518,7 @@ end subroutine test_mbd_deriv_impl_C6
 subroutine test_mbd_deriv_impl_vdw()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
     type(mbd_result) :: res(-3:3)
@@ -562,7 +562,7 @@ end subroutine test_mbd_deriv_impl_vdw
 subroutine test_mbd_rsscs_deriv_expl()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :), gradients_anl(:, :)
     real(dp), allocatable :: diff(:, :)
@@ -611,7 +611,7 @@ end subroutine test_mbd_rsscs_deriv_expl
 subroutine test_mbd_rsscs_deriv_impl_alpha()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
     type(mbd_result) :: res(-3:3)
@@ -655,7 +655,7 @@ end subroutine test_mbd_rsscs_deriv_impl_alpha
 subroutine test_mbd_rsscs_deriv_impl_C6()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
     type(mbd_result) :: res(-3:3)
@@ -699,7 +699,7 @@ end subroutine test_mbd_rsscs_deriv_impl_C6
 subroutine test_mbd_rsscs_deriv_impl_vdw()
     real(dp) :: delta
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
     type(mbd_result) :: res(-3:3)

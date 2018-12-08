@@ -9,7 +9,7 @@ use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, mbd_result
 use mbd_dipole, only: dipole_matrix
-use mbd_damping_type, only: mbd_damping
+use mbd_damping, only: damping_t
 use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch
 use mbd_ts, only: ts_energy
 use mbd_matrix, only: matrix_real_t, matrix_complex_t
@@ -130,7 +130,7 @@ type(c_ptr) function cmbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a
     real(c_double), intent(in), value :: beta
     real(c_double), intent(in), value :: a
 
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
 
     allocate (damping)
     damping%version = f_string(version_c)
@@ -146,7 +146,7 @@ end function cmbd_init_damping
 subroutine cmbd_destroy_damping(damping_p) bind(c)
     type(c_ptr), value :: damping_p
 
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
 
     call c_f_pointer(damping_p, damping)
     if (allocated(damping%r_vdw)) deallocate (damping%r_vdw)
@@ -184,7 +184,7 @@ real(c_double) function cmbd_ts_energy(geom_cp, n_atoms, alpha_0, C6, damping_p,
 
     type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
 
     call c_f_pointer(geom_cp, geom_c)
     call c_f_pointer(geom_c%mbd_geom_f, geom)
@@ -202,7 +202,7 @@ real(c_double) function cmbd_mbd_energy(geom_cp, n_atoms, alpha_0, C6, damping_p
 
     type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
     type(mbd_result) :: res
     type(mbd_gradients) :: dene
 
@@ -225,7 +225,7 @@ real(c_double) function cmbd_rpa_energy(geom_cp, n_atoms, alpha_0, C6, damping_p
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(geom_t), pointer :: geom
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
     type(mbd_result) :: res
     type(mbd_gradients) :: dene
 
@@ -249,7 +249,7 @@ real(c_double) function cmbd_mbd_rsscs_energy(geom_cp, n_atoms, alpha_0, C6, dam
 
     type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
     type(mbd_result) :: res
     type(mbd_gradients) :: dene
 
@@ -276,7 +276,7 @@ real(c_double) function cmbd_mbd_scs_energy(geom_cp, n_atoms, alpha_0, C6, dampi
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
 
     type(geom_t), pointer :: geom
-    type(mbd_damping), pointer :: damping
+    type(damping_t), pointer :: damping
     type(mbd_result) :: res
     type(mbd_gradients) :: dene
 
@@ -293,7 +293,7 @@ subroutine cmbd_dipole_matrix(geom_cp, damping_p, k_point, dipmat_p) bind(c)
     type(c_ptr), intent(in), value :: dipmat_p
 
     type(geom_t), pointer :: geom
-    type(mbd_damping), pointer :: damp
+    type(damping_t), pointer :: damp
     type(matrix_real_t) :: dipmat
     type(matrix_complex_t) :: dipmat_c
     real(dp), pointer :: dipmat_re(:, :)
@@ -324,7 +324,7 @@ real(c_double) function cmbd_coulomb_energy( &
     character(c_char), intent(in) :: version(20)
 
     type(geom_t), pointer :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
 
     damp%version = f_string(version)
     damp%r_vdw = r_vdw
@@ -344,7 +344,7 @@ real(c_double) function cmbd_dipole_energy( &
     character(c_char), intent(in) :: version(20)
 
     type(geom_t), pointer :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
 
     damp%version = f_string(version)
     damp%r_vdw = r_vdw

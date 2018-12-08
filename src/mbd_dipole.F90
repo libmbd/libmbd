@@ -7,7 +7,7 @@ module mbd_dipole
 use mbd_constants
 use mbd_matrix, only: matrix_real_t, matrix_complex_t
 use mbd_geom, only: geom_t
-use mbd_damping_type, only: mbd_damping, damping_fermi, damping_sqrtfermi, &
+use mbd_damping, only: damping_t, damping_fermi, damping_sqrtfermi, &
     op1minus_grad
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
     mbd_grad_matrix_complex, mbd_grad_scalar, mbd_grad_switch
@@ -60,7 +60,7 @@ type(matrix_complex_t) function dipole_matrix_complex( &
 #endif
 
     type(geom_t), intent(inout) :: geom
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     type(mbd_grad_switch), intent(in), optional :: grad
 #if MBD_TYPE == 0
     type(mbd_grad_matrix_real), intent(out), optional :: ddipmat

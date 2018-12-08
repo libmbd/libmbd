@@ -8,7 +8,7 @@ use mbd_linalg, only: eye, outer, diag
 use mbd_lapack, only: inverse, det, inv
 use mbd_geom, only: geom_t
 use mbd_dipole, only: dipole_matrix
-use mbd_damping_type, only: mbd_damping, damping_fermi
+use mbd_damping, only: damping_t, damping_fermi
 use mbd_matrix, only: matrix_real_t
 
 implicit none
@@ -111,7 +111,7 @@ end subroutine
 real(dp) function coulomb_energy(geom, q, m, w_t, C, damp)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: q(:), m(:), w_t(:), C(:, :)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
 
     real(dp), allocatable :: O(:, :)
     real(dp) :: OAB(6, 6), OABm(6, 6), RA(3), RB(3), ene_ABi(4), prod_w_t, &
@@ -168,7 +168,7 @@ end function
 real(dp) function dipole_energy(geom, a0, w, w_t, C, damp)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: a0(:), w(:), w_t(:), C(:, :)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
 
     integer :: A, B, i, j, N
     type(matrix_real_t) :: T

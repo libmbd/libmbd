@@ -7,7 +7,7 @@ use mbd_constants
 use mbd_calc, only: calc_t, get_freq_grid
 use mbd_geom, only: geom_t
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_result, scale_TS
-use mbd_damping_type, only: mbd_damping
+use mbd_damping, only: damping_t
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
 use mbd_ts, only: ts_energy
 use mbd_common, only: printer
@@ -58,7 +58,7 @@ end type
 type mbd_calculation
     private
     type(geom_t) :: geom
-    type(mbd_damping) :: damp
+    type(damping_t) :: damp
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
     character(len=30) :: dispersion_type

@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-module mbd_damping_type
+module mbd_damping
 
 use mbd_constants
 use mbd_common, only: lower, exception_t
@@ -10,9 +10,9 @@ use mbd_gradients_type, only: mbd_grad_scalar, mbd_grad_switch
 implicit none
 
 private
-public :: mbd_damping, damping_fermi, damping_sqrtfermi, op1minus_grad
+public :: damping_t, damping_fermi, damping_sqrtfermi, op1minus_grad
 
-type :: mbd_damping
+type :: damping_t
     character(len=20) :: version
     real(dp) :: beta = 0d0
     real(dp) :: a = MBD_DAMPING_A
@@ -24,8 +24,8 @@ type :: mbd_damping
     real(dp), allocatable :: damping_custom(:, :)
     real(dp), allocatable :: potential_custom(:, :, :, :)
     contains
-    procedure :: set_params_from_xc => mbd_damping_set_params_from_xc
-end type mbd_damping
+    procedure :: set_params_from_xc => damping_set_params_from_xc
+end type
 
 contains
 
@@ -77,8 +77,8 @@ subroutine op1minus_grad(f, df)
     if (allocated(df%dvdw)) df%dvdw = -df%dvdw
 end subroutine
 
-type(exception_t) function mbd_damping_set_params_from_xc(this, xc, variant) result(exc)
-    class(mbd_damping), intent(inout) :: this
+type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(exc)
+    class(damping_t), intent(inout) :: this
     character(len=*), intent(in) :: xc
     character(len=*), intent(in) :: variant
 

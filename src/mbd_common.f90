@@ -8,7 +8,7 @@ use mbd_constants
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, lower, mbd_exc, diff7, &
+public :: tostr, diff3, diff5, print_matrix, lower, exception_t, diff7, &
     findval, printer, shift_cell
 
 interface tostr
@@ -16,7 +16,7 @@ interface tostr
     module procedure tostr_dble_
 end interface
 
-type :: mbd_exc
+type :: exception_t
     integer :: code = 0
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''

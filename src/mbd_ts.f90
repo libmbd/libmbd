@@ -6,7 +6,7 @@ module mbd_ts
 use mbd_constants
 use mbd_common, only: shift_cell, tostr
 use mbd_damping_type, only: mbd_damping, damping_fermi
-use mbd_geom, only: geom_t, ang
+use mbd_geom, only: geom_t
 
 implicit none
 

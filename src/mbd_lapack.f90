@@ -4,7 +4,7 @@
 module mbd_lapack
 
 use mbd_constants
-use mbd_common, only: exception => mbd_exc, tostr
+use mbd_common, only: exception_t, tostr
 
 implicit none
 
@@ -53,7 +53,7 @@ contains
 
 function inverse(A, exc)
     real(dp), intent(in) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     real(dp) :: inverse(size(A, 1), size(A, 2))
 
     call inv_real(inverse, exc, src=A)
@@ -61,7 +61,7 @@ end function
 
 function eigvalsh_real(A, exc, destroy) result(eigvals)
     real(dp), target, intent(in) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigvals(size(A, 1))
 
@@ -83,7 +83,7 @@ end function
 
 function eigvalsh_complex(A, exc, destroy) result(eigvals)
     complex(dp), target, intent(in) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigvals(size(A, 1))
 
@@ -105,7 +105,7 @@ end function
 
 function eigvals_real(A, exc, destroy) result(eigvals)
     real(dp), target, intent(in) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     complex(dp) :: eigvals(size(A, 1))
 
@@ -127,7 +127,7 @@ end function
 
 function eigvals_complex(A, exc, destroy) result(eigvals)
     complex(dp), target, intent(in) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     complex(dp) :: eigvals(size(A, 1))
 
@@ -189,7 +189,7 @@ end function
 
 subroutine inv_real(A, exc, src)
     real(dp), intent(inout) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
 
     real(dp), allocatable :: work_arr(:)
@@ -226,7 +226,7 @@ end subroutine
 
 subroutine inv_complex(A, exc, src)
     complex(dp), intent(inout) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
 
     integer, allocatable :: i_pivot(:)
@@ -262,7 +262,7 @@ end subroutine
 
 subroutine invh_real(A, exc, src)
     real(dp), intent(inout) :: A(:, :)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
 
     integer, allocatable :: i_pivot(:)
@@ -303,7 +303,7 @@ end subroutine
 subroutine eigh_real(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     real(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
@@ -329,7 +329,7 @@ end subroutine
 subroutine eig_real(A, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     complex(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
@@ -369,7 +369,7 @@ end subroutine
 subroutine eigh_complex(A, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
     real(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
@@ -398,7 +398,7 @@ end subroutine
 subroutine eig_complex(A, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
     complex(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
@@ -438,7 +438,7 @@ end subroutine
 function solve(A, b, exc) result(x)
     real(dp), intent(in) :: A(:, :), b(:)
     real(dp) :: x(size(b))
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
 
     real(dp) :: A_(size(b), size(b))
     integer :: i_pivot(size(b))

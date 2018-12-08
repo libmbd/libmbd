@@ -4,7 +4,8 @@
 module mbd
 
 use mbd_constants
-use mbd_geom, only: geom_t, mbd_calc, get_freq_grid
+use mbd_calc, only: calc_t, get_freq_grid
+use mbd_geom, only: geom_t
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_result, scale_TS
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
@@ -61,7 +62,7 @@ type mbd_calculation
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
     character(len=30) :: dispersion_type
-    type(mbd_calc) :: calc
+    type(calc_t) :: calc
     type(mbd_result) :: results
     type(mbd_gradients) :: denergy
     logical :: do_gradients

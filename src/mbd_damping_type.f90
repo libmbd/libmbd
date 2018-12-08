@@ -4,7 +4,7 @@
 module mbd_damping_type
 
 use mbd_constants
-use mbd_common, only: lower, mbd_exc
+use mbd_common, only: lower, exception_t
 use mbd_gradients_type, only: mbd_grad_scalar, mbd_grad_switch
 
 implicit none
@@ -77,7 +77,7 @@ subroutine op1minus_grad(f, df)
     if (allocated(df%dvdw)) df%dvdw = -df%dvdw
 end subroutine
 
-type(mbd_exc) function mbd_damping_set_params_from_xc(this, xc, variant) result(exc)
+type(exception_t) function mbd_damping_set_params_from_xc(this, xc, variant) result(exc)
     class(mbd_damping), intent(inout) :: this
     character(len=*), intent(in) :: xc
     character(len=*), intent(in) :: variant

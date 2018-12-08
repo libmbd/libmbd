@@ -5,7 +5,7 @@
 module mbd_matrix_type
 
 use mbd_constants
-use mbd_common, only: findval, exception => mbd_exc
+use mbd_common, only: findval, exception_t
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid, all_reduce
@@ -367,7 +367,7 @@ subroutine mbd_matrix_complex_eigh(A, eigs, exc, src, vals_only)
     type(mbd_matrix_complex), intent(in), optional :: src
 #endif
     real(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: vals_only
 
 #ifdef WITH_SCALAPACK
@@ -388,7 +388,7 @@ function mbd_matrix_real_eigvalsh(A, exc, destroy) result(eigs)
 function mbd_matrix_complex_eigvalsh(A, exc, destroy) result(eigs)
     class(mbd_matrix_complex), target, intent(in) :: A
 #endif
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3*A%idx%n_atoms)
 
@@ -410,7 +410,7 @@ function mbd_matrix_real_eigvals(A, exc, destroy) result(eigs)
 function mbd_matrix_complex_eigvals(A, exc, destroy) result(eigs)
     class(mbd_matrix_complex), target, intent(in) :: A
 #endif
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     complex(dp) :: eigs(3*A%idx%n_atoms)
 
@@ -597,7 +597,7 @@ end function
 subroutine mbd_matrix_real_invh(A, exc, src)
     class(mbd_matrix_real), intent(inout) :: A
     type(mbd_matrix_real), intent(in), optional :: src
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
 
 #ifdef WITH_SCALAPACK
     if (.not. A%idx%parallel) then

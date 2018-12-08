@@ -5,7 +5,8 @@ module mbd_c_api
 
 use iso_c_binding
 use mbd_constants
-use mbd_geom, only: geom_t, mbd_calc
+use mbd_calc, only: calc_t
+use mbd_geom, only: geom_t
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, mbd_result
 use mbd_dipole, only: dipole_matrix
 use mbd_damping_type, only: mbd_damping
@@ -43,7 +44,7 @@ contains
 type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     integer(c_int), intent(in), value :: n_freq
 
-    type(mbd_calc), pointer :: calc
+    type(calc_t), pointer :: calc
     type(cmbd_calc), pointer :: calc_c
 
     allocate (calc)
@@ -60,7 +61,7 @@ end function cmbd_init_calc
 subroutine cmbd_destroy_calc(calc_cp) bind(c)
     type(c_ptr), value :: calc_cp
 
-    type(mbd_calc), pointer :: calc
+    type(calc_t), pointer :: calc
     type(cmbd_calc), pointer :: calc_c
 
     call c_f_pointer(calc_cp, calc_c)
@@ -74,7 +75,7 @@ subroutine cmbd_get_exception(calc_cp, code, origin, msg) bind(c)
     integer(c_int), intent(out) :: code
     character(kind=c_char), intent(out) :: origin(50), msg(150)
 
-    type(mbd_calc), pointer :: calc
+    type(calc_t), pointer :: calc
 
     calc => get_mbd_calc(calc_cp)
     code = calc%exc%code
@@ -93,7 +94,7 @@ type(c_ptr) function cmbd_init_geom( &
     real(c_double), intent(in), optional :: lattice(3, 3)
     integer(c_int), intent(in), optional :: k_grid(3)
 
-    type(mbd_calc), pointer :: calc
+    type(calc_t), pointer :: calc
     type(geom_t), pointer :: geom
     type(cmbd_geom), pointer :: geom_c
 
@@ -165,7 +166,7 @@ end function
 
 function get_mbd_calc(calc_cp)
     type(c_ptr), intent(in), value :: calc_cp
-    type(mbd_calc), pointer :: get_mbd_calc
+    type(calc_t), pointer :: get_mbd_calc
 
     type(cmbd_calc), pointer :: calc_c
 

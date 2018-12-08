@@ -20,7 +20,7 @@ use mbd_mpi
 implicit none
 
 integer :: n_failed, n_all, rank
-type(mbd_calc), target :: calc
+type(calc_t), target :: calc
 
 #ifdef WITH_MPI
 integer :: err

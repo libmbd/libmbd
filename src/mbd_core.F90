@@ -7,7 +7,8 @@ module mbd_core
 use mbd_constants
 use mbd_dipole, only: dipole_matrix
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, contract_cross_33
-use mbd_geom, only: geom_t, mbd_calc
+use mbd_calc, only: calc_t
+use mbd_geom, only: geom_t
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
     mbd_grad_matrix_complex, mbd_grad => mbd_grad_switch
 use mbd_damping_type, only: mbd_damping
@@ -425,7 +426,7 @@ end function
 #undef MBD_INCLUDED
 
 subroutine test_frequency_grid(calc)
-    type(mbd_calc), intent(inout) :: calc
+    type(calc_t), intent(inout) :: calc
 
     real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
     type(mbd_gradients), allocatable :: dalpha(:)
@@ -628,7 +629,7 @@ type(mbd_result) function mbd_energy( &
 end function mbd_energy
 
 function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
-    type(mbd_calc), intent(in) :: calc
+    type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_gradients), allocatable, intent(out) :: dalpha(:)
@@ -747,7 +748,7 @@ end function
 !> \bar\alpha(u)\partial\bar\alpha(u)
 !> \f]
 function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
-    type(mbd_calc), intent(in) :: calc
+    type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha(:, 0:)
     real(dp), allocatable, intent(out), optional :: dC6_dalpha(:, :)
     logical, intent(in), optional :: grad
@@ -769,7 +770,7 @@ function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
 end function
 
 function make_g_grid(calc, n1, n2, n3) result(g_grid)
-    type(mbd_calc), intent(in) :: calc
+    type(calc_t), intent(in) :: calc
     integer, intent(in) :: n1, n2, n3
     real(dp) :: g_grid(3, n1*n2*n3)
 

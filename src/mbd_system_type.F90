@@ -10,6 +10,7 @@ use mbd_constants
 use mbd_common, only: mbd_exc, printer, tostr
 use mbd_lapack, only: inverse
 use mbd_matrix_type, only: mbd_index
+use mbd_clock, only: clock_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid
 #endif
@@ -24,7 +25,6 @@ private
 public :: mbd_system, mbd_calc, ang, clock_rate, get_freq_grid
 #endif
 real(dp), parameter :: ang = 1.8897259886d0
-integer, parameter :: n_timestamps = 100
 
 type :: mbd_param
     real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
@@ -40,12 +40,6 @@ type :: mbd_param
     integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
 
-type :: mbd_timing
-    logical :: measure_time = .true.
-    integer :: timestamps(n_timestamps), ts_counts(n_timestamps)
-    integer :: ts_cnt, ts_rate, ts_cnt_max, ts_aid
-end type mbd_timing
-
 type :: mbd_info
     character(len=120) :: ewald_alpha = '', ewald_rsum = '', ts_conv = '', &
         ewald_cutoff = '', ewald_recsum = '', freq_n = '', freq_error = '', &
@@ -56,7 +50,7 @@ end type mbd_info
 
 type :: mbd_calc
     type(mbd_param) :: param
-    type(mbd_timing) :: tm
+    type(clock_t) :: clock
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
     type(mbd_exc) :: exc
@@ -172,25 +166,11 @@ function mbd_system_supercell_circum(this, uc, radius) result(sc)
     where (this%vacuum_axis) sc = 0
 end function
 
-subroutine mbd_system_clock(this, id, always)
+subroutine mbd_system_clock(this, id)
     class(mbd_system), intent(inout) :: this
     integer, intent(in) :: id
-    logical, intent(in), optional :: always
 
-    associate (tm => this%calc%tm)
-        if (tm%measure_time .or. present(always)) then
-            call system_clock(tm%ts_cnt, tm%ts_rate, tm%ts_cnt_max)
-            if (id > 0) then
-                tm%timestamps(id) = tm%timestamps(id)-tm%ts_cnt
-            else
-                tm%ts_aid = abs(id)
-                tm%timestamps(tm%ts_aid) = &
-                    tm%timestamps(tm%ts_aid)+tm%ts_cnt
-                tm%ts_counts(tm%ts_aid) = &
-                    tm%ts_counts(tm%ts_aid)+1
-            end if
-        end if
-    end associate
+    call this%calc%clock%clock(id)
 end subroutine
 
 subroutine mbd_info_print(this, info)

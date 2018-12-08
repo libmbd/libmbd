@@ -4,7 +4,7 @@
 #ifndef LEGENDRE_PREC
 #define LEGENDRE_PREC 8
 #endif
-module mbd_system_type
+module mbd_geom
 
 use mbd_constants
 use mbd_common, only: mbd_exc, printer, tostr
@@ -22,7 +22,7 @@ implicit none
 
 #ifndef MODULE_UNIT_TESTS
 private
-public :: mbd_system, mbd_calc, ang, clock_rate, get_freq_grid
+public :: geom_t, mbd_calc, ang, clock_rate, get_freq_grid
 #endif
 real(dp), parameter :: ang = 1.8897259886d0
 
@@ -63,7 +63,7 @@ type :: mbd_calc
     procedure :: init_grid => mbd_calc_init_grid
 end type mbd_calc
 
-type :: mbd_system
+type :: geom_t
     type(mbd_calc), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
     logical :: vacuum_axis(3) = [.false., .false., .false.]
@@ -86,18 +86,18 @@ type :: mbd_system
     integer :: comm = MPI_COMM_WORLD
 #endif
     contains
-    procedure :: init => mbd_system_init
-    procedure :: destroy => mbd_system_destroy
-    procedure :: siz => mbd_system_siz
-    procedure :: has_exc => mbd_system_has_exc
-    procedure :: supercell_circum => mbd_system_supercell_circum
-    procedure :: clock => mbd_system_clock
-end type mbd_system
+    procedure :: init => geom_init
+    procedure :: destroy => geom_destroy
+    procedure :: siz => geom_siz
+    procedure :: has_exc => geom_has_exc
+    procedure :: supercell_circum => geom_supercell_circum
+    procedure :: clock => geom_clock
+end type geom_t
 
 contains
 
-subroutine mbd_system_init(this, calc)
-    class(mbd_system), intent(inout) :: this
+subroutine geom_init(this, calc)
+    class(geom_t), intent(inout) :: this
     type(mbd_calc), target, intent(in) :: calc
 
     integer :: i_atom
@@ -127,16 +127,16 @@ subroutine mbd_system_init(this, calc)
     this%idx%n_atoms = this%siz()
 end subroutine
 
-subroutine mbd_system_destroy(this)
-    class(mbd_system), intent(inout) :: this
+subroutine geom_destroy(this)
+    class(geom_t), intent(inout) :: this
 #ifdef WITH_SCALAPACK
 
     if (this%idx%parallel) call this%blacs_grid%destroy()
 #endif
 end subroutine
 
-integer function mbd_system_siz(this) result(siz)
-    class(mbd_system), intent(in) :: this
+integer function geom_siz(this) result(siz)
+    class(geom_t), intent(in) :: this
 
     if (allocated(this%coords)) then
         siz = size(this%coords, 2)
@@ -145,14 +145,14 @@ integer function mbd_system_siz(this) result(siz)
     end if
 end function
 
-logical function mbd_system_has_exc(this) result(has_exc)
-    class(mbd_system), intent(in) :: this
+logical function geom_has_exc(this) result(has_exc)
+    class(geom_t), intent(in) :: this
 
     has_exc = this%calc%exc%code /= 0
 end function
 
-function mbd_system_supercell_circum(this, uc, radius) result(sc)
-    class(mbd_system), intent(in) :: this
+function geom_supercell_circum(this, uc, radius) result(sc)
+    class(geom_t), intent(in) :: this
     real(dp), intent(in) :: uc(3, 3), radius
     integer :: sc(3)
 
@@ -166,8 +166,8 @@ function mbd_system_supercell_circum(this, uc, radius) result(sc)
     where (this%vacuum_axis) sc = 0
 end function
 
-subroutine mbd_system_clock(this, id)
-    class(mbd_system), intent(inout) :: this
+subroutine geom_clock(this, id)
+    class(geom_t), intent(inout) :: this
     integer, intent(in) :: id
 
     call this%calc%clock%clock(id)

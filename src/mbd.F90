@@ -4,7 +4,7 @@
 module mbd
 
 use mbd_constants
-use mbd_system_type, only: mbd_system, mbd_calc, get_freq_grid
+use mbd_geom, only: geom_t, mbd_calc, get_freq_grid
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_result, scale_TS
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
@@ -56,7 +56,7 @@ end type
 
 type mbd_calculation
     private
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
@@ -90,26 +90,26 @@ subroutine mbd_calc_init(this, input)
     type(mbd_input), intent(in) :: input
 
 #ifdef WITH_MPI
-    if (input%comm /= -1) this%sys%comm = input%comm
+    if (input%comm /= -1) this%geom%comm = input%comm
 #endif
     this%dispersion_type = input%dispersion_type
     this%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
-        this%sys%calc%get_eigs = .true.
-        this%sys%calc%get_modes = .true.
+        this%geom%calc%get_eigs = .true.
+        this%geom%calc%get_modes = .true.
     end if
     this%calc%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
     this%calc%param%n_frequency_grid = input%n_omega_grid
     this%calc%param%k_grid_shift = input%k_grid_shift
     this%calc%param%zero_negative_eigs = input%zero_negative_eigvals
-    this%sys%k_grid = input%k_grid
-    this%sys%vacuum_axis = input%vacuum_axis
-    this%sys%coords = input%coords
-    if (allocated(input%lattice_vectors)) this%sys%lattice = input%lattice_vectors
-    this%sys%parallel_mode = input%parallel_mode
+    this%geom%k_grid = input%k_grid
+    this%geom%vacuum_axis = input%vacuum_axis
+    this%geom%coords = input%coords
+    if (allocated(input%lattice_vectors)) this%geom%lattice = input%lattice_vectors
+    this%geom%parallel_mode = input%parallel_mode
     call this%calc%init_grid()
-    call this%sys%init(this%calc)
+    call this%geom%init(this%calc)
     if (allocated(input%free_values)) then
         this%free_values = input%free_values
     else
@@ -123,9 +123,9 @@ subroutine mbd_calc_init(this, input)
         this%damp%ts_sr = input%ts_sr
     else
         this%calc%exc = this%damp%set_params_from_xc(input%xc, 'MBD@rsSCS')
-        if (this%sys%has_exc()) return
+        if (this%geom%has_exc()) return
         this%calc%exc = this%damp%set_params_from_xc(input%xc, 'TS')
-        if (this%sys%has_exc()) return
+        if (this%geom%has_exc()) return
     end if
 end subroutine
 
@@ -134,7 +134,7 @@ subroutine mbd_calc_destroy(this)
     class(mbd_calculation), target, intent(inout) :: this
 
     deallocate (this%calc%omega_grid, this%calc%omega_grid_w)
-    call this%sys%destroy()
+    call this%geom%destroy()
 end subroutine
 
 
@@ -142,7 +142,7 @@ subroutine mbd_calc_update_coords(this, coords)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
 
-    this%sys%coords = coords
+    this%geom%coords = coords
 end subroutine
 
 
@@ -150,7 +150,7 @@ subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: latt_vecs(:, :)
 
-    this%sys%lattice = latt_vecs
+    this%geom%lattice = latt_vecs
 end subroutine
 
 
@@ -198,18 +198,18 @@ subroutine mbd_calc_get_energy(this, energy)
     case ('mbd', 'mbd-nl')
         this%damp%version = 'fermi,dip'
         this%results = mbd_energy( &
-            this%sys, this%alpha_0, this%C6, this%damp, &
+            this%geom, this%alpha_0, this%C6, this%damp, &
             this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &
         )
         energy = this%results%energy
     case ('mbd-rsscs')
         this%results = mbd_scs_energy( &
-            this%sys, 'rsscs', this%alpha_0, this%C6, this%damp, &
+            this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, &
             this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &
         )
         energy = this%results%energy
     case ('ts')
-        energy = ts_energy(this%sys, this%alpha_0, this%C6, this%damp)
+        energy = ts_energy(this%geom, this%alpha_0, this%C6, this%damp)
     end select
 end subroutine
 

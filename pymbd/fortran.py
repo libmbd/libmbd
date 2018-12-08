@@ -66,7 +66,7 @@ class MBDCalc(object):
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         n_atoms = len(coords)
-        system = _lib.cmbd_init_system(
+        geom = _lib.cmbd_init_geom(
             self._calc,
             n_atoms,
             _cast('double*', coords),
@@ -77,7 +77,7 @@ class MBDCalc(object):
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
         )
         ene = _lib.cmbd_ts_energy(
-            system,
+            geom,
             n_atoms,
             _cast('double*', alpha_0),
             _cast('double*', C6),
@@ -85,7 +85,7 @@ class MBDCalc(object):
             _ffi.NULL,
         )
         _lib.cmbd_destroy_damping(damping)
-        _lib.cmbd_destroy_system(system)
+        _lib.cmbd_destroy_geom(geom)
         self._check_exc()
         return ene
 
@@ -97,7 +97,7 @@ class MBDCalc(object):
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         k_grid = _array(k_grid, dtype='i4')
         n_atoms = len(coords)
-        system = _lib.cmbd_init_system(
+        geom = _lib.cmbd_init_geom(
             self._calc,
             n_atoms,
             _cast('double*', coords),
@@ -110,7 +110,7 @@ class MBDCalc(object):
         gradients = np.zeros((n_atoms, 3)) if force else None
         eigs, modes = None, None
         args = (
-            system,
+            geom,
             n_atoms,
             _cast('double*', alpha_0),
             _cast('double*', C6),
@@ -124,7 +124,7 @@ class MBDCalc(object):
             args += (_cast('double*', eigs), _cast('double*', modes))
         ene = getattr(_lib, 'cmbd_' + func)(*args)
         _lib.cmbd_destroy_damping(damping)
-        _lib.cmbd_destroy_system(system)
+        _lib.cmbd_destroy_geom(geom)
         self._check_exc()
         if spectrum:
             ene = ene, eigs, modes
@@ -137,7 +137,7 @@ class MBDCalc(object):
         coords, R_vdw, sigma, lattice, k_point = \
             map(_array, (coords, R_vdw, sigma, lattice, k_point))
         n_atoms = len(coords)
-        system = _lib.cmbd_init_system(
+        geom = _lib.cmbd_init_geom(
             self._calc,
             n_atoms,
             _cast('double*', coords),
@@ -155,13 +155,13 @@ class MBDCalc(object):
             dtype=float if k_point is None else complex,
         )
         _lib.cmbd_dipole_matrix(
-            system,
+            geom,
             damping,
             _cast('double*', k_point),
             _cast('double*', dipmat),
         )
         _lib.cmbd_destroy_damping(damping)
-        _lib.cmbd_destroy_system(system)
+        _lib.cmbd_destroy_geom(geom)
         self._check_exc()
         return dipmat
 
@@ -175,7 +175,7 @@ class MBDCalc(object):
 
     def dipole_energy(self, coords, a0, w, w_t, version, r_vdw, beta, a, C):
         n_atoms = len(coords)
-        system = _lib.cmbd_init_system(
+        geom = _lib.cmbd_init_geom(
             self._calc,
             n_atoms,
             _cast('double*', coords),
@@ -183,7 +183,7 @@ class MBDCalc(object):
             _ffi.NULL,
         )
         res = _lib.cmbd_dipole_energy(
-            system,
+            geom,
             n_atoms,
             _cast('double*', a0),
             _cast('double*', w),
@@ -199,7 +199,7 @@ class MBDCalc(object):
 
     def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, a, C):
         n_atoms = len(coords)
-        system = _lib.cmbd_init_system(
+        geom = _lib.cmbd_init_geom(
             self._calc,
             n_atoms,
             _cast('double*', coords),
@@ -207,7 +207,7 @@ class MBDCalc(object):
             _ffi.NULL,
         )
         res = _lib.cmbd_coulomb_energy(
-            system,
+            geom,
             n_atoms,
             _cast('double*', q),
             _cast('double*', m),

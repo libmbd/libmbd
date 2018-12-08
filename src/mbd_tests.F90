@@ -203,7 +203,7 @@ end subroutine test_T_fermi_deriv_impl
 
 subroutine test_mbd_deriv_expl()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :)
@@ -222,29 +222,29 @@ subroutine test_mbd_deriv_expl()
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+    res(0) = mbd_energy_single_real(geom, alpha_0, C6, damp, &
         dene, mbd_grad(dcoords=.true.))
     gradients_anl = dene%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom)+i_step*delta
-                res(i_step) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+                geom%coords = coords
+                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom)+i_step*delta
+                res(i_step) = mbd_energy_single_real(geom, alpha_0, C6, damp, &
                     dene, mbd_grad())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
@@ -253,7 +253,7 @@ end subroutine test_mbd_deriv_expl
 
 subroutine test_scs_deriv_expl()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :)
@@ -270,10 +270,10 @@ subroutine test_scs_deriv_expl()
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
-    my_nratoms = size(sys%idx%i_atom)
-    my_ncatoms = size(sys%idx%j_atom)
+    geom%coords = coords
+    call geom%init(calc)
+    my_nratoms = size(geom%idx%i_atom)
+    my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms, 3))
     allocate (gradients_anl(my_nratoms, my_ncatoms, 3))
     allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
@@ -282,31 +282,31 @@ subroutine test_scs_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     alpha_scs(:, 0) = &
-        run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad(dcoords=.true.))
+        run_scs(geom, alpha_0, damp, dalpha_scs, mbd_grad(dcoords=.true.))
     do my_i_atom = 1, my_nratoms
         gradients_anl(my_i_atom, :, :) = dalpha_scs(my_i_atom)%dcoords
     end do
     do j_atom = 1, n_atoms
-        my_j_atom = findval(sys%idx%j_atom, j_atom)
+        my_j_atom = findval(geom%idx%j_atom, j_atom)
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, j_atom) = sys%coords(i_xyz, j_atom) + &
+                geom%coords = coords
+                geom%coords(i_xyz, j_atom) = geom%coords(i_xyz, j_atom) + &
                     i_step*delta
                 alpha_scs(:, i_step) = &
-                    run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad())
+                    run_scs(geom, alpha_0, damp, dalpha_scs, mbd_grad())
             end do
             if (my_j_atom > 0) then
                 do my_i_atom = 1, my_nratoms
-                    i_atom = sys%idx%i_atom(my_i_atom)
+                    i_atom = geom%idx%i_atom(my_i_atom)
                     gradients(my_i_atom, my_j_atom, i_xyz) = &
                         diff7(alpha_scs(i_atom, :), delta)
                 end do
             end if
         end do
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('diff x', diff(:, :, 1))
@@ -317,7 +317,7 @@ end subroutine test_scs_deriv_expl
 
 subroutine test_scs_deriv_impl_alpha
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_0_diff(:), &
@@ -332,10 +332,10 @@ subroutine test_scs_deriv_impl_alpha
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
-    my_nratoms = size(sys%idx%i_atom)
-    my_ncatoms = size(sys%idx%j_atom)
+    geom%coords = coords
+    call geom%init(calc)
+    my_nratoms = size(geom%idx%i_atom)
+    my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
     allocate (gradients_anl(my_nratoms, my_ncatoms))
     allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
@@ -344,27 +344,27 @@ subroutine test_scs_deriv_impl_alpha
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     alpha_scs(:, 0) = &
-        run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad(dalpha=.true.))
+        run_scs(geom, alpha_0, damp, dalpha_scs, mbd_grad(dalpha=.true.))
     do my_i_atom = 1, my_nratoms
         gradients_anl(my_i_atom, :) = dalpha_scs(my_i_atom)%dalpha
     end do
     do j_atom = 1, n_atoms
-        my_j_atom = findval(sys%idx%j_atom, j_atom)
+        my_j_atom = findval(geom%idx%j_atom, j_atom)
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step*delta
             alpha_scs(:, i_step) = &
-                run_scs(sys, alpha_0_diff, damp, dalpha_scs, mbd_grad())
+                run_scs(geom, alpha_0_diff, damp, dalpha_scs, mbd_grad())
         end do
         if (my_j_atom > 0) then
             do my_i_atom = 1, my_nratoms
-                i_atom = sys%idx%i_atom(my_i_atom)
+                i_atom = geom%idx%i_atom(my_i_atom)
                 gradients(my_i_atom, my_j_atom) = diff7(alpha_scs(i_atom, :), delta)
             end do
     end if
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff)
@@ -373,7 +373,7 @@ end subroutine test_scs_deriv_impl_alpha
 
 subroutine test_scs_deriv_impl_vdw
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_scs(:, :), rvdw(:)
@@ -387,10 +387,10 @@ subroutine test_scs_deriv_impl_vdw
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
-    my_nratoms = size(sys%idx%i_atom)
-    my_ncatoms = size(sys%idx%j_atom)
+    geom%coords = coords
+    call geom%init(calc)
+    my_nratoms = size(geom%idx%i_atom)
+    my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
     allocate (gradients_anl(my_nratoms, my_ncatoms))
     allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
@@ -400,27 +400,27 @@ subroutine test_scs_deriv_impl_vdw
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     alpha_scs(:, 0) = &
-        run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad(dr_vdw=.true.))
+        run_scs(geom, alpha_0, damp, dalpha_scs, mbd_grad(dr_vdw=.true.))
     do my_i_atom = 1, my_nratoms
         gradients_anl(my_i_atom, :) = dalpha_scs(my_i_atom)%dr_vdw
     end do
     do j_atom = 1, n_atoms
-        my_j_atom = findval(sys%idx%j_atom, j_atom)
+        my_j_atom = findval(geom%idx%j_atom, j_atom)
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = rvdw
             damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step*delta
             alpha_scs(:, i_step) = &
-                run_scs(sys, alpha_0, damp, dalpha_scs, mbd_grad())
+                run_scs(geom, alpha_0, damp, dalpha_scs, mbd_grad())
         end do
         if (my_j_atom > 0) then
             do my_i_atom = 1, my_nratoms
-                i_atom = sys%idx%i_atom(my_i_atom)
+                i_atom = geom%idx%i_atom(my_i_atom)
                 gradients(my_i_atom, my_j_atom) = diff7(alpha_scs(i_atom, :), delta)
             end do
         end if
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff(:, :))
@@ -429,7 +429,7 @@ end subroutine test_scs_deriv_impl_vdw
 
 subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
@@ -444,14 +444,14 @@ subroutine test_mbd_deriv_impl_alpha()
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+    res(0) = mbd_energy_single_real(geom, alpha_0, C6, damp, &
         dene, mbd_grad(dalpha=.true.))
     gradients_anl = dene%dalpha
     do i_atom = 1, n_atoms
@@ -459,12 +459,12 @@ subroutine test_mbd_deriv_impl_alpha()
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_energy_single_real(sys, alpha_0_diff, C6, damp, &
+            res(i_step) = mbd_energy_single_real(geom, alpha_0_diff, C6, damp, &
                 dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', reshape(diff, [n_atoms, 1]))
@@ -473,7 +473,7 @@ end subroutine test_mbd_deriv_impl_alpha
 
 subroutine test_mbd_deriv_impl_C6()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
@@ -488,14 +488,14 @@ subroutine test_mbd_deriv_impl_C6()
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+    res(0) = mbd_energy_single_real(geom, alpha_0, C6, damp, &
         dene, mbd_grad(dC6=.true.))
     gradients_anl = dene%dC6
     do i_atom = 1, n_atoms
@@ -503,12 +503,12 @@ subroutine test_mbd_deriv_impl_C6()
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_energy_single_real(sys, alpha_0, C6_diff, damp, &
+            res(i_step) = mbd_energy_single_real(geom, alpha_0, C6_diff, damp, &
                 dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -517,7 +517,7 @@ end subroutine test_mbd_deriv_impl_C6
 
 subroutine test_mbd_deriv_impl_vdw()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
@@ -531,15 +531,15 @@ subroutine test_mbd_deriv_impl_vdw()
     allocate (gradients(n_atoms))
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%r_vdw = r_vdw
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+    res(0) = mbd_energy_single_real(geom, alpha_0, C6, damp, &
         dene, mbd_grad(dr_vdw=.true.))
     gradients_anl = dene%dr_vdw
     do i_atom = 1, n_atoms
@@ -547,12 +547,12 @@ subroutine test_mbd_deriv_impl_vdw()
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-            res(i_step) = mbd_energy_single_real(sys, alpha_0, C6, damp, &
+            res(i_step) = mbd_energy_single_real(geom, alpha_0, C6, damp, &
                 dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -561,7 +561,7 @@ end subroutine test_mbd_deriv_impl_vdw
 
 subroutine test_mbd_rsscs_deriv_expl()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :), gradients_anl(:, :)
@@ -579,29 +579,29 @@ subroutine test_mbd_rsscs_deriv_expl()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     coords(1, 3) = 1d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, mbd_grad(dcoords=.true.))
     gradients_anl = dene%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
-                sys%coords = coords
-                sys%coords(i_xyz, i_atom) = sys%coords(i_xyz, i_atom) + &
+                geom%coords = coords
+                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + &
                     i_step*delta
-                res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+                res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                     dene, mbd_grad())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
@@ -610,7 +610,7 @@ end subroutine test_mbd_rsscs_deriv_expl
 
 subroutine test_mbd_rsscs_deriv_impl_alpha()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
@@ -625,14 +625,14 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, mbd_grad(dalpha=.true.))
     gradients_anl = dene%dalpha
     do i_atom = 1, n_atoms
@@ -640,12 +640,12 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0_diff, C6, damp, &
+            res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
                 dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -654,7 +654,7 @@ end subroutine test_mbd_rsscs_deriv_impl_alpha
 
 subroutine test_mbd_rsscs_deriv_impl_C6()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
@@ -669,14 +669,14 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     coords(1, 3) = 1d0
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, mbd_grad(dC6=.true.))
     gradients_anl = dene%dC6
     do i_atom = 1, n_atoms
@@ -684,12 +684,12 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6_diff, damp, &
+            res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
                 dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 5d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
@@ -698,7 +698,7 @@ end subroutine test_mbd_rsscs_deriv_impl_C6
 
 subroutine test_mbd_rsscs_deriv_impl_vdw()
     real(dp) :: delta
-    type(mbd_system) :: sys
+    type(geom_t) :: geom
     type(mbd_damping) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
@@ -712,15 +712,15 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     allocate (gradients(n_atoms))
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
-    sys%coords = coords
-    call sys%init(calc)
+    geom%coords = coords
+    call geom%init(calc)
     damp%version = 'fermi,dip'
     r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%r_vdw = r_vdw
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, mbd_grad(dr_vdw=.true.))
     gradients_anl = dene%dr_vdw
     do i_atom = 1, n_atoms
@@ -728,12 +728,12 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damp, &
+            res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                 dene, mbd_grad())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
-    call sys%destroy()
+    call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))

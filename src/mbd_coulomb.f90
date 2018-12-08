@@ -6,7 +6,7 @@ module mbd_coulomb
 use mbd_constants
 use mbd_linalg, only: eye, outer, diag
 use mbd_lapack, only: inverse, det, inv
-use mbd_system_type, only: mbd_system
+use mbd_geom, only: geom_t
 use mbd_dipole, only: dipole_matrix
 use mbd_damping_type, only: mbd_damping, damping_fermi
 use mbd_matrix_type, only: mbd_matrix_real
@@ -108,8 +108,8 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
 end subroutine
 
-real(dp) function coulomb_energy(sys, q, m, w_t, C, damp)
-    type(mbd_system), intent(inout) :: sys
+real(dp) function coulomb_energy(geom, q, m, w_t, C, damp)
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: q(:), m(:), w_t(:), C(:, :)
     type(mbd_damping), intent(in) :: damp
 
@@ -121,13 +121,13 @@ real(dp) function coulomb_energy(sys, q, m, w_t, C, damp)
 
     allocate (notAB(size(C, 1)-6))
     O = matmul(matmul(C, diag(w_t)), transpose(C))
-    N = sys%siz()
+    N = geom%siz()
     prod_w_t = product(w_t)
     coulomb_energy = 0.d0
     do A = 1, N
         do B = A+1, N
-            RA = sys%coords(:, A)
-            RB = sys%coords(:, B)
+            RA = geom%coords(:, A)
+            RB = geom%coords(:, B)
             AB(:) = [(3*(A-1)+i, i = 1, 3), (3*(B-1)+i, i = 1, 3)]
             notAB(:) = [ &
                 (i, i = 1, 3*(A-1)), &
@@ -165,16 +165,16 @@ real(dp) function coulomb_energy(sys, q, m, w_t, C, damp)
     end do
 end function
 
-real(dp) function dipole_energy(sys, a0, w, w_t, C, damp)
-    type(mbd_system), intent(inout) :: sys
+real(dp) function dipole_energy(geom, a0, w, w_t, C, damp)
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: a0(:), w(:), w_t(:), C(:, :)
     type(mbd_damping), intent(in) :: damp
 
     integer :: A, B, i, j, N
     type(mbd_matrix_real) :: T
 
-    N = sys%siz()
-    T = dipole_matrix(sys, damp)
+    N = geom%siz()
+    T = dipole_matrix(geom, damp)
     do  A = 1, N
         do B = 1, N
             i = 3*(A-1)

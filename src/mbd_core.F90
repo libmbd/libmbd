@@ -7,7 +7,7 @@ module mbd_core
 use mbd_constants
 use mbd_dipole, only: dipole_matrix
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, contract_cross_33
-use mbd_system_type, only: mbd_system, mbd_calc
+use mbd_geom, only: geom_t, mbd_calc
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
     mbd_grad_matrix_complex, mbd_grad => mbd_grad_switch
 use mbd_damping_type, only: mbd_damping
@@ -39,8 +39,8 @@ end type
 contains
 
 type(mbd_result) function mbd_scs_energy( &
-        sys, variant, alpha_0, C6, damp, dene, grad) result(res)
-    type(mbd_system), intent(inout) :: sys
+        geom, variant, alpha_0, C6, damp, dene, grad) result(res)
+    type(geom_t), intent(inout) :: geom
     character(len=*), intent(in) :: variant
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
@@ -64,27 +64,27 @@ type(mbd_result) function mbd_scs_energy( &
     case ('rsscs')
         damping_types = [character(len=15) :: 'fermi,dip,gg', 'fermi,dip']
     end select
-    n_freq = ubound(sys%calc%omega_grid, 1)
-    n_atoms = sys%siz()
+    n_freq = ubound(geom%calc%omega_grid, 1)
+    n_atoms = geom%siz()
     allocate (alpha_dyn(n_atoms, 0:n_freq))
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
-    allocate (dalpha_dyn_scs(size(sys%idx%i_atom), 0:n_freq))
+    allocate (dalpha_dyn_scs(size(geom%idx%i_atom), 0:n_freq))
     if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
     grad_scs = mbd_grad( &
         dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
         dr_vdw=grad%dr_vdw &
     )
-    alpha_dyn = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha_dyn, grad)
+    alpha_dyn = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha_dyn, grad)
     damp_scs = damp
     damp_scs%version = damping_types(1)
     do i_freq = 0, n_freq
         alpha_dyn_scs(:, i_freq) = run_scs( &
-            sys, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
+            geom, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
         )
-        if (sys%has_exc()) return
+        if (geom%has_exc()) return
     end do
     C6_scs = C6_from_alpha( &
-        sys%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
+        geom%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
     )
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
@@ -92,15 +92,15 @@ type(mbd_result) function mbd_scs_energy( &
         mbd_grad(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
     )
     damp_mbd%version = damping_types(2)
-    res = mbd_energy(sys, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd, &
+    res = mbd_energy(geom, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd, &
         mbd_grad( &
             dcoords=grad%dcoords, &
             dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
         ) &
     )
-    if (sys%has_exc()) return
+    if (geom%has_exc()) return
     if (.not. grad%any()) return
-    freq_w = sys%calc%omega_grid_w
+    freq_w = geom%calc%omega_grid_w
     freq_w(0) = 1d0
     dene_dalpha_scs_dyn(:, 0) = dene_mbd%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV
     do i_freq = 1, n_freq
@@ -110,62 +110,62 @@ type(mbd_result) function mbd_scs_energy( &
     if (grad%dcoords) then
         allocate (dene%dcoords(n_atoms, 3), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%idx%i_atom(my_i_atom)
+            i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dcoords(sys%idx%j_atom, :) = &
-                    dene%dcoords(sys%idx%j_atom, :) + &
+                dene%dcoords(geom%idx%j_atom, :) = &
+                    dene%dcoords(geom%idx%j_atom, :) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (sys%idx%parallel) call all_reduce(dene%dcoords, sys%blacs)
+        if (geom%idx%parallel) call all_reduce(dene%dcoords, geom%blacs)
 #endif
         dene%dcoords = dene%dcoords + dene_mbd%dcoords
     end if
     if (grad%dalpha) then
         allocate (dene%dalpha(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%idx%i_atom(my_i_atom)
+            i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dalpha(sys%idx%j_atom) = dene%dalpha(sys%idx%j_atom) + &
+                dene%dalpha(geom%idx%j_atom) = dene%dalpha(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dalpha(sys%idx%j_atom)
+                    dalpha_dyn(i_freq)%dalpha(geom%idx%j_atom)
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (sys%idx%parallel) call all_reduce(dene%dalpha, sys%blacs)
+        if (geom%idx%parallel) call all_reduce(dene%dalpha, geom%blacs)
 #endif
         dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
     end if
     if (grad%dC6) then
         allocate (dene%dC6(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%idx%i_atom(my_i_atom)
+            i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dC6(sys%idx%j_atom) = dene%dC6(sys%idx%j_atom) + &
+                dene%dC6(geom%idx%j_atom) = dene%dC6(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dC6(sys%idx%j_atom)
+                    dalpha_dyn(i_freq)%dC6(geom%idx%j_atom)
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (sys%idx%parallel) call all_reduce(dene%dC6, sys%blacs)
+        if (geom%idx%parallel) call all_reduce(dene%dC6, geom%blacs)
 #endif
     end if
     if (grad%dr_vdw) then
         allocate (dene%dr_vdw(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
-            i_atom = sys%idx%i_atom(my_i_atom)
+            i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dr_vdw(sys%idx%j_atom) = dene%dr_vdw(sys%idx%j_atom) + &
+                dene%dr_vdw(geom%idx%j_atom) = dene%dr_vdw(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dr_vdw
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (sys%idx%parallel) call all_reduce(dene%dr_vdw, sys%blacs)
+        if (geom%idx%parallel) call all_reduce(dene%dr_vdw, geom%blacs)
 #endif
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
@@ -221,12 +221,12 @@ end function mbd_scs_energy
 !> \f]
 #if MBD_TYPE == 0
 type(mbd_result) function mbd_energy_single_real( &
-        sys, alpha_0, C6, damp, dene, grad) result(res)
+        geom, alpha_0, C6, damp, dene, grad) result(res)
 #elif MBD_TYPE == 1
 type(mbd_result) function mbd_energy_single_complex( &
-        sys, alpha_0, C6, damp, dene, grad, k_point) result(res)
+        geom, alpha_0, C6, damp, dene, grad, k_point) result(res)
 #endif
-    type(mbd_system), intent(inout) :: sys
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
@@ -249,13 +249,13 @@ type(mbd_result) function mbd_energy_single_complex( &
     integer :: n_negative_eigs, n_atoms
     character(120) :: msg
 
-    n_atoms = sys%siz()
+    n_atoms = geom%siz()
 #if MBD_TYPE == 0
-    T = dipole_matrix(sys, damp, dT, grad)
+    T = dipole_matrix(geom, damp, dT, grad)
 #elif MBD_TYPE == 1
-    T = dipole_matrix(sys, damp, dT, grad, k_point)
+    T = dipole_matrix(geom, damp, dT, grad, k_point)
 #endif
-    if (sys%has_exc()) return
+    if (geom%has_exc()) return
     if (grad%any()) then
         call relay%copy_from(T)
     else
@@ -264,12 +264,12 @@ type(mbd_result) function mbd_energy_single_complex( &
     omega = omega_eff(C6, alpha_0, domega, grad)
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
-    call sys%clock(21)
-    if (sys%calc%get_modes .or. grad%any()) then
+    call geom%clock(21)
+    if (geom%calc%get_modes .or. grad%any()) then
         call modes%alloc_from(relay)
         allocate (eigs(3*n_atoms))
-        call modes%eigh(eigs, sys%calc%exc, src=relay)
-        if (sys%calc%get_modes) then
+        call modes%eigh(eigs, geom%calc%exc, src=relay)
+        if (geom%calc%get_modes) then
 #if MBD_TYPE == 0
             call move_alloc(modes%val, res%modes)
 #elif MBD_TYPE == 1
@@ -277,21 +277,21 @@ type(mbd_result) function mbd_energy_single_complex( &
 #endif
         end if
     else
-        eigs = relay%eigvalsh(sys%calc%exc, destroy=.true.)
+        eigs = relay%eigvalsh(geom%calc%exc, destroy=.true.)
     end if
-    if (sys%has_exc()) return
-    call sys%clock(-21)
-    if (sys%calc%get_eigs) res%mode_eigs = eigs
+    if (geom%has_exc()) return
+    call geom%clock(-21)
+    if (geom%calc%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
             " negative eigenvalues"
-        if (sys%calc%param%zero_negative_eigs) then
+        if (geom%calc%param%zero_negative_eigs) then
             where (eigs < 0) eigs = 0d0
-            sys%calc%info%neg_eigvals = msg
+            geom%calc%info%neg_eigvals = msg
         else
-            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            sys%calc%exc%msg = msg
+            geom%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            geom%calc%exc%msg = msg
             return
         end if
     end if
@@ -339,12 +339,12 @@ end function
 
 #if MBD_TYPE == 0
 type(mbd_result) function rpa_energy_single_real( &
-        sys, alpha, damp) result(res)
+        geom, alpha, damp) result(res)
 #elif MBD_TYPE == 1
 type(mbd_result) function rpa_energy_single_complex( &
-        sys, alpha, damp, k_point) result(res)
+        geom, alpha, damp, k_point) result(res)
 #endif
-    type(mbd_system), intent(inout) :: sys
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:, 0:)
     type(mbd_damping), intent(in) :: damp
 #if MBD_TYPE == 1
@@ -362,14 +362,14 @@ type(mbd_result) function rpa_energy_single_complex( &
 
     res%energy = 0d0
     damp_alpha = damp
-    allocate (eigs(3*sys%siz()))
-    do i_freq = 0, ubound(sys%calc%omega_grid, 1)
+    allocate (eigs(3*geom%siz()))
+    do i_freq = 0, ubound(geom%calc%omega_grid, 1)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
         ! relay = T
 #if MBD_TYPE == 0
-        relay = dipole_matrix(sys, damp_alpha)
+        relay = dipole_matrix(geom, damp_alpha)
 #elif MBD_TYPE == 1
-        relay = dipole_matrix(sys, damp_alpha, k_point=k_point)
+        relay = dipole_matrix(geom, damp_alpha, k_point=k_point)
 #endif
         do my_i_atom = 1, size(relay%idx%i_atom)
             associate ( &
@@ -380,13 +380,13 @@ type(mbd_result) function rpa_energy_single_complex( &
             end associate
         end do
         ! relay = alpha*T
-        if (sys%calc%get_rpa_orders) AT = relay
+        if (geom%calc%get_rpa_orders) AT = relay
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1d0)
-        call sys%clock(23)
-        eigs = relay%eigvals(sys%calc%exc, destroy=.true.)
-        call sys%clock(-23)
-        if (sys%has_exc()) return
+        call geom%clock(23)
+        eigs = relay%eigvals(geom%calc%exc, destroy=.true.)
+        call geom%clock(-23)
+        if (geom%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
         ! Has to manually unroll the counting
         n_negative_eigs = 0
@@ -394,24 +394,24 @@ type(mbd_result) function rpa_energy_single_complex( &
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            sys%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            sys%calc%exc%msg = "1+AT matrix has " // &
+            geom%calc%exc%code = MBD_EXC_NEG_EIGVALS
+            geom%calc%exc%msg = "1+AT matrix has " // &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
             return
         end if
         res%energy = res%energy + &
-            1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
-        if (sys%calc%get_rpa_orders) then
-            call sys%clock(24)
-            eigs = AT%eigvals(sys%calc%exc, destroy=.true.)
-            call sys%clock(-24)
-            if (sys%has_exc()) return
-            allocate (res%rpa_orders(sys%calc%param%rpa_order_max))
-            do n_order = 2, sys%calc%param%rpa_order_max
+            1d0/(2*pi)*sum(log(dble(eigs)))*geom%calc%omega_grid_w(i_freq)
+        if (geom%calc%get_rpa_orders) then
+            call geom%clock(24)
+            eigs = AT%eigvals(geom%calc%exc, destroy=.true.)
+            call geom%clock(-24)
+            if (geom%has_exc()) return
+            allocate (res%rpa_orders(geom%calc%param%rpa_order_max))
+            do n_order = 2, geom%calc%param%rpa_order_max
                 res%rpa_orders(n_order) = res%rpa_orders(n_order) &
                     +(-1d0/(2*pi)*(-1)**n_order &
                     *sum(dble(eigs)**n_order)/n_order) &
-                    *sys%calc%omega_grid_w(i_freq)
+                    *geom%calc%omega_grid_w(i_freq)
             end do
         end if
     end do
@@ -465,8 +465,8 @@ end subroutine
 !> B'_{p,\zeta}=\sum_iB_{p,i\zeta}
 !> \end{gathered}
 !> \f]
-function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
-    type(mbd_system), intent(inout) :: sys
+function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:)
     type(mbd_damping), intent(in) :: damp
     type(mbd_gradients), intent(out) :: dalpha_scs(:)
@@ -481,26 +481,26 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(mbd_grad_matrix_real) :: dT
     type(mbd_grad) :: grad_T
 
-    n_atoms = sys%siz()
+    n_atoms = geom%siz()
     damp_local = damp
     damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
     grad_T = mbd_grad(dcoords=grad%dcoords, dsigma=grad%dalpha, dr_vdw=grad%dr_vdw)
-    T = dipole_matrix(sys, damp_local, dT, grad_T)
-    if (sys%has_exc()) return
+    T = dipole_matrix(geom, damp_local, dT, grad_T)
+    if (geom%has_exc()) return
     if (grad%any()) then
         call alpha_full%copy_from(T)
     else
         call alpha_full%move_from(T)
     end if
     call alpha_full%add_diag(1d0/alpha)
-    call sys%clock(32)
-    call alpha_full%invh(sys%calc%exc)
-    if (sys%has_exc()) return
-    call sys%clock(-32)
+    call geom%clock(32)
+    call alpha_full%invh(geom%calc%exc)
+    if (geom%has_exc()) return
+    call geom%clock(-32)
     alpha_scs = alpha_full%contract_n33diag_cols()
     if (any(alpha_scs < 0)) then
-        sys%calc%exc%code = MBD_EXC_NEG_POL
-        sys%calc%exc%msg = 'Screening leads to negative polarizability'
+        geom%calc%exc%code = MBD_EXC_NEG_POL
+        geom%calc%exc%msg = 'Screening leads to negative polarizability'
         return
     end if
     if (.not. grad%any()) return
@@ -510,8 +510,8 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     call alpha_full%contract_n_transp('R', alpha_prime)
     call dQ%init_from(T)
     if (grad%dcoords) then
-        do my_i_atom = 1, size(sys%idx%i_atom)
-            allocate (dalpha_scs(my_i_atom)%dcoords(size(sys%idx%j_atom), 3))
+        do my_i_atom = 1, size(geom%idx%i_atom)
+            allocate (dalpha_scs(my_i_atom)%dcoords(size(geom%idx%j_atom), 3))
         end do
         do i_xyz = 1, 3
             dQ%val = -dT%dr(:, :, i_xyz)
@@ -521,10 +521,10 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
                 grads_i = contract_cross_33( &
                     i_atom, dQ, alpha_prime, alpha_full, B_prime &
                 )
-                my_i_atom = findval(sys%idx%i_atom, i_atom)
+                my_i_atom = findval(geom%idx%i_atom, i_atom)
                 if (my_i_atom > 0) then
                     dalpha_scs(my_i_atom)%dcoords(:, i_xyz) = &
-                        grads_i(sys%idx%j_atom)
+                        grads_i(geom%idx%j_atom)
                 end if
             end do
         end do
@@ -543,9 +543,9 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
             grads_i = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
             )
-            my_i_atom = findval(sys%idx%i_atom, i_atom)
+            my_i_atom = findval(geom%idx%i_atom, i_atom)
             if (my_i_atom > 0) then
-                dalpha_scs(my_i_atom)%dalpha = grads_i(sys%idx%j_atom)
+                dalpha_scs(my_i_atom)%dalpha = grads_i(geom%idx%j_atom)
             end if
         end do
     end if
@@ -557,17 +557,17 @@ function run_scs(sys, alpha, damp, dalpha_scs, grad) result(alpha_scs)
             grads_i = contract_cross_33( &
                 i_atom, dQ, alpha_prime, alpha_full, B_prime &
             )
-            my_i_atom = findval(sys%idx%i_atom, i_atom)
+            my_i_atom = findval(geom%idx%i_atom, i_atom)
             if (my_i_atom > 0) then
-                dalpha_scs(my_i_atom)%dr_vdw = grads_i(sys%idx%j_atom)
+                dalpha_scs(my_i_atom)%dr_vdw = grads_i(geom%idx%j_atom)
             end if
         end do
     end if
 end function run_scs
 
 type(mbd_result) function mbd_energy( &
-        sys, alpha_0, C6, damp, dene, grad) result(res)
-    type(mbd_system), intent(inout) :: sys
+        geom, alpha_0, C6, damp, dene, grad) result(res)
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(mbd_damping), intent(in) :: damp
@@ -581,49 +581,49 @@ type(mbd_result) function mbd_energy( &
     type(mbd_result) :: res_k
     type(mbd_gradients) :: dene_k
 
-    n_atoms = sys%siz()
-    if (sys%calc%do_rpa) then
-        alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha, mbd_grad())
+    n_atoms = geom%siz()
+    if (geom%calc%do_rpa) then
+        alpha = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha, mbd_grad())
     end if
-    if (.not. allocated(sys%lattice)) then
-        if (.not. sys%calc%do_rpa) then
-            res = mbd_energy_single_real(sys, alpha_0, C6, damp, dene, grad)
+    if (.not. allocated(geom%lattice)) then
+        if (.not. geom%calc%do_rpa) then
+            res = mbd_energy_single_real(geom, alpha_0, C6, damp, dene, grad)
         else
-            res = rpa_energy_single_real(sys, alpha, damp)
+            res = rpa_energy_single_real(geom, alpha, damp)
             ! TODO gradients
         end if
     else
         res%k_pts = make_k_grid(make_g_grid( &
-            sys%calc, sys%k_grid(1), sys%k_grid(2), sys%k_grid(3) &
-        ), sys%lattice)
+            geom%calc, geom%k_grid(1), geom%k_grid(2), geom%k_grid(3) &
+        ), geom%lattice)
         n_kpts = size(res%k_pts, 2)
         res%energy = 0d0
-        if (sys%calc%get_eigs) &
+        if (geom%calc%get_eigs) &
             allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
-        if (sys%calc%get_modes) &
+        if (geom%calc%get_modes) &
             allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
-        if (sys%calc%get_rpa_orders) allocate ( &
-            res%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0d0 &
+        if (geom%calc%get_rpa_orders) allocate ( &
+            res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
         )
         do i_kpt = 1, n_kpts
             k_point = res%k_pts(:, i_kpt)
-            if (.not. sys%calc%do_rpa) then
+            if (.not. geom%calc%do_rpa) then
                 res_k = mbd_energy_single_complex( &
-                    sys, alpha_0, C6, damp, dene_k, grad, k_point &
+                    geom, alpha_0, C6, damp, dene_k, grad, k_point &
                 )
-                if (sys%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
-                if (sys%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+                if (geom%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
+                if (geom%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
             else
-                res_k = rpa_energy_single_complex(sys, alpha, damp, k_point)
-                if (sys%calc%get_rpa_orders) then
+                res_k = rpa_energy_single_complex(geom, alpha, damp, k_point)
+                if (geom%calc%get_rpa_orders) then
                     res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
                 end if
             end if
-            if (sys%has_exc()) return
+            if (geom%has_exc()) return
             res%energy = res%energy + res_k%energy
         end do ! k_point loop
         res%energy = res%energy/size(res%k_pts, 2)
-        if (sys%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
+        if (geom%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
     end if
 end function mbd_energy
 

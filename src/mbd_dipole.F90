@@ -6,7 +6,7 @@ module mbd_dipole
 
 use mbd_constants
 use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex
-use mbd_system_type, only: mbd_system
+use mbd_geom, only: geom_t
 use mbd_damping_type, only: mbd_damping, damping_fermi, damping_sqrtfermi, &
     op1minus_grad
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
@@ -51,15 +51,15 @@ contains
 !> \f]
 #if MBD_TYPE == 0
 type(mbd_matrix_real) function dipole_matrix_real( &
-        sys, damp, ddipmat, grad) result(dipmat)
+        geom, damp, ddipmat, grad) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_REAL
 #elif MBD_TYPE == 1
 type(mbd_matrix_complex) function dipole_matrix_complex( &
-        sys, damp, ddipmat, grad, k_point) result(dipmat)
+        geom, damp, ddipmat, grad, k_point) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
 #endif
 
-    type(mbd_system), intent(inout) :: sys
+    type(geom_t), intent(inout) :: geom
     type(mbd_damping), intent(in) :: damp
     type(mbd_grad_switch), intent(in), optional :: grad
 #if MBD_TYPE == 0
@@ -84,40 +84,40 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
 #endif
 
     do_ewald = .false.
-    is_periodic = allocated(sys%lattice)
-    n_atoms = sys%siz()
+    is_periodic = allocated(geom%lattice)
+    n_atoms = geom%siz()
     if (present(grad)) grad_ = grad
 #ifdef WITH_SCALAPACK
-    call dipmat%init(sys%idx, sys%blacs)
+    call dipmat%init(geom%idx, geom%blacs)
 #else
-    call dipmat%init(sys%idx)
+    call dipmat%init(geom%idx)
 #endif
     if (is_periodic) then
-        if (any(sys%vacuum_axis)) then
-            real_space_cutoff = sys%calc%param%dipole_low_dim_cutoff
-        else if (sys%calc%param%ewald_on) then
+        if (any(geom%vacuum_axis)) then
+            real_space_cutoff = geom%calc%param%dipole_low_dim_cutoff
+        else if (geom%calc%param%ewald_on) then
             if (grad%dcoords .or. grad%dr_vdw .or. grad%dsigma) then
-                sys%calc%exc%code = MBD_EXC_UNIMPL
-                sys%calc%exc%msg = 'Forces not implemented for periodic systems'
+                geom%calc%exc%code = MBD_EXC_UNIMPL
+                geom%calc%exc%msg = 'Forces not implemented for periodic systems'
                 return
             end if
             do_ewald = .true.
-            volume = max(abs(dble(product(eigvals(sys%lattice)))), 0.2d0)
+            volume = max(abs(dble(product(eigvals(geom%lattice)))), 0.2d0)
             ewald_alpha = 2.5d0/(volume)**(1d0/3)
             real_space_cutoff = &
-                6d0/ewald_alpha*sys%calc%param%ewald_real_cutoff_scaling
-            sys%calc%info%ewald_alpha = &
+                6d0/ewald_alpha*geom%calc%param%ewald_real_cutoff_scaling
+            geom%calc%info%ewald_alpha = &
                 'Ewald: using alpha = ' // trim(tostr(ewald_alpha)) // &
                 ', real cutoff = ' // trim(tostr(real_space_cutoff))
         else
-            real_space_cutoff = sys%calc%param%dipole_cutoff
+            real_space_cutoff = geom%calc%param%dipole_cutoff
         end if
-        range_cell = sys%supercell_circum(sys%lattice, real_space_cutoff)
+        range_cell = geom%supercell_circum(geom%lattice, real_space_cutoff)
     else
         range_cell(:) = 0
     end if
     if (is_periodic) then
-        sys%calc%info%ewald_rsum = &
+        geom%calc%info%ewald_rsum = &
             'Ewald: summing real part in cell vector range of ' // &
             trim(tostr(1+2*range_cell(1))) // 'x' // &
             trim(tostr(1+2*range_cell(2))) // 'x' // &
@@ -129,12 +129,12 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
         if (grad_%dr_vdw) allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
         if (grad_%dsigma) allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
     end associate
-    call sys%clock(11)
+    call geom%clock(11)
     idx_cell = [0, 0, -1]
     do i_cell = 1, product(1+2*range_cell)
         call shift_cell(idx_cell, -range_cell, range_cell)
         if (is_periodic) then
-            R_cell = matmul(sys%lattice, idx_cell)
+            R_cell = matmul(geom%lattice, idx_cell)
         else
             R_cell(:) = 0d0
         end if
@@ -145,7 +145,7 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
+                r = geom%coords(:, i_atom)-geom%coords(:, j_atom)-R_cell
                 r_norm = sqrt(sum(r**2))
                 if (is_periodic .and. r_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
@@ -224,24 +224,24 @@ type(mbd_matrix_complex) function dipole_matrix_complex( &
             end do ! j_atom
         end do ! i_atom
     end do ! i_cell
-    call sys%clock(-11)
+    call geom%clock(-11)
     if (do_ewald) then
 #if MBD_TYPE == 0
-        call add_ewald_dipole_parts_real(sys, ewald_alpha, dipmat)
+        call add_ewald_dipole_parts_real(geom, ewald_alpha, dipmat)
 #elif MBD_TYPE == 1
-        call add_ewald_dipole_parts_complex(sys, ewald_alpha, dipmat, k_point)
+        call add_ewald_dipole_parts_complex(geom, ewald_alpha, dipmat, k_point)
 #endif
     end if
 end function
 
 #if MBD_TYPE == 0
-subroutine add_ewald_dipole_parts_real(sys, alpha, dipmat)
+subroutine add_ewald_dipole_parts_real(geom, alpha, dipmat)
     type(mbd_matrix_real), intent(inout) :: dipmat
 #elif MBD_TYPE == 1
-subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
+subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
     type(mbd_matrix_complex), intent(inout) :: dipmat
 #endif
-    type(mbd_system), intent(inout) :: sys
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha
 #if MBD_TYPE == 1
     real(dp), intent(in) :: k_point(3)
@@ -260,18 +260,18 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
     real(dp) :: elem
 #endif
 
-    rec_unit_cell = 2*pi*inverse(transpose(sys%lattice))
-    volume = abs(dble(product(eigvals(sys%lattice))))
-    rec_space_cutoff = 10d0*alpha*sys%calc%param%ewald_rec_cutoff_scaling
-    range_G_vector = sys%supercell_circum(rec_unit_cell, rec_space_cutoff)
-    sys%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
+    rec_unit_cell = 2*pi*inverse(transpose(geom%lattice))
+    volume = abs(dble(product(eigvals(geom%lattice))))
+    rec_space_cutoff = 10d0*alpha*geom%calc%param%ewald_rec_cutoff_scaling
+    range_G_vector = geom%supercell_circum(rec_unit_cell, rec_space_cutoff)
+    geom%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
         trim(tostr(rec_space_cutoff))
-    sys%calc%info%ewald_recsum = &
+    geom%calc%info%ewald_recsum = &
         'Ewald: summing reciprocal part in G vector range of ' // &
         trim(tostr(1+2*range_G_vector(1))) // 'x' // &
         trim(tostr(1+2*range_G_vector(2))) // 'x' // &
         trim(tostr(1+2*range_G_vector(3)))
-    call sys%clock(12)
+    call geom%clock(12)
     idx_G_vector = [0, 0, -1]
     do i_G_vector = 1, product(1+2*range_G_vector)
         call shift_cell(idx_G_vector, -range_G_vector, range_G_vector)
@@ -292,7 +292,7 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
             i_atom = dipmat%idx%i_atom(my_i_atom)
             do my_j_atom = 1, size(dipmat%idx%j_atom)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
-                r = sys%coords(:, i_atom)-sys%coords(:, j_atom)
+                r = geom%coords(:, i_atom)-geom%coords(:, j_atom)
 #if MBD_TYPE == 1
                 Tpp = k_prefactor*exp(cmplx(0d0, 1d0, 8) &
                     *dot_product(G_vector, r))
@@ -339,7 +339,7 @@ subroutine add_ewald_dipole_parts_complex(sys, alpha, dipmat, k_point)
         end do ! j_atom
         end do ! i_atom
     end if
-    call sys%clock(-12)
+    call geom%clock(-12)
 end subroutine
 
 #undef MBD_TYPE

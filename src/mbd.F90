@@ -95,8 +95,8 @@ subroutine mbd_calc_init(this, input)
     this%dispersion_type = input%dispersion_type
     this%do_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
-        this%sys%get_eigs = .true.
-        this%sys%get_modes = .true.
+        this%sys%calc%get_eigs = .true.
+        this%sys%calc%get_modes = .true.
     end if
     this%calc%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc

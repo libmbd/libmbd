@@ -55,6 +55,10 @@ type :: mbd_calc
     real(dp), allocatable :: omega_grid_w(:)
     type(mbd_exc) :: exc
     type(mbd_info) :: info
+    logical :: do_rpa = .false.
+    logical :: get_eigs = .false.
+    logical :: get_modes = .false.
+    logical :: get_rpa_orders = .false.
     contains
     procedure :: init_grid => mbd_calc_init_grid
 end type mbd_calc
@@ -66,10 +70,6 @@ type :: mbd_system
     real(dp), allocatable :: lattice(:, :)  ! vectors in columns
     integer :: k_grid(3)
     integer :: supercell(3)
-    logical :: do_rpa = .false.
-    logical :: get_eigs = .false.
-    logical :: get_modes = .false.
-    logical :: get_rpa_orders = .false.
     !> Type of parallelization: `"atoms"` or `"k_points"`.
     !>
     !> - `"atoms"`: distribute matrices over all MPI tasks using ScaLAPACK, solve

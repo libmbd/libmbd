@@ -230,9 +230,9 @@ real(c_double) function cmbd_rpa_energy(sys_cp, n_atoms, alpha_0, C6, damping_p,
 
     sys => get_mbd_system(sys_cp)
     call c_f_pointer(damping_p, damping)
-    sys%do_rpa = .true.
+    sys%calc%do_rpa = .true.
     res = mbd_energy(sys, alpha_0, C6, damping, dene, mbd_grad())
-    sys%do_rpa = .false.
+    sys%calc%do_rpa = .false.
     cmbd_rpa_energy = res%energy
 end function cmbd_rpa_energy
 
@@ -255,8 +255,8 @@ real(c_double) function cmbd_mbd_rsscs_energy(sys_cp, n_atoms, alpha_0, C6, damp
     call c_f_pointer(sys_cp, sys_c)
     call c_f_pointer(sys_c%mbd_system_f, sys)
     call c_f_pointer(damping_p, damping)
-    sys%get_eigs = present(eigvals)
-    sys%get_modes = present(eigvecs)
+    sys%calc%get_eigs = present(eigvals)
+    sys%calc%get_modes = present(eigvecs)
     res = mbd_scs_energy(sys, 'rsscs', alpha_0, C6, damping, &
         dene, mbd_grad(dcoords=present(gradients)))
     if (sys%has_exc()) return

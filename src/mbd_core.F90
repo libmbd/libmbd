@@ -265,11 +265,11 @@ type(mbd_result) function mbd_energy_single_complex( &
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
     call sys%clock(21)
-    if (sys%get_modes .or. grad%any()) then
+    if (sys%calc%get_modes .or. grad%any()) then
         call modes%alloc_from(relay)
         allocate (eigs(3*n_atoms))
         call modes%eigh(eigs, sys%calc%exc, src=relay)
-        if (sys%get_modes) then
+        if (sys%calc%get_modes) then
 #if MBD_TYPE == 0
             call move_alloc(modes%val, res%modes)
 #elif MBD_TYPE == 1
@@ -281,7 +281,7 @@ type(mbd_result) function mbd_energy_single_complex( &
     end if
     if (sys%has_exc()) return
     call sys%clock(-21)
-    if (sys%get_eigs) res%mode_eigs = eigs
+    if (sys%calc%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
@@ -380,7 +380,7 @@ type(mbd_result) function rpa_energy_single_complex( &
             end associate
         end do
         ! relay = alpha*T
-        if (sys%get_rpa_orders) AT = relay
+        if (sys%calc%get_rpa_orders) AT = relay
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1d0)
         call sys%clock(23)
@@ -401,7 +401,7 @@ type(mbd_result) function rpa_energy_single_complex( &
         end if
         res%energy = res%energy + &
             1d0/(2*pi)*sum(log(dble(eigs)))*sys%calc%omega_grid_w(i_freq)
-        if (sys%get_rpa_orders) then
+        if (sys%calc%get_rpa_orders) then
             call sys%clock(24)
             eigs = AT%eigvals(sys%calc%exc, destroy=.true.)
             call sys%clock(-24)
@@ -582,11 +582,11 @@ type(mbd_result) function mbd_energy( &
     type(mbd_gradients) :: dene_k
 
     n_atoms = sys%siz()
-    if (sys%do_rpa) then
+    if (sys%calc%do_rpa) then
         alpha = alpha_dynamic_ts(sys%calc, alpha_0, C6, dalpha, mbd_grad())
     end if
     if (.not. allocated(sys%lattice)) then
-        if (.not. sys%do_rpa) then
+        if (.not. sys%calc%do_rpa) then
             res = mbd_energy_single_real(sys, alpha_0, C6, damp, dene, grad)
         else
             res = rpa_energy_single_real(sys, alpha, damp)
@@ -598,24 +598,24 @@ type(mbd_result) function mbd_energy( &
         ), sys%lattice)
         n_kpts = size(res%k_pts, 2)
         res%energy = 0d0
-        if (sys%get_eigs) &
+        if (sys%calc%get_eigs) &
             allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
-        if (sys%get_modes) &
+        if (sys%calc%get_modes) &
             allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
-        if (sys%get_rpa_orders) allocate ( &
+        if (sys%calc%get_rpa_orders) allocate ( &
             res%rpa_orders_k(sys%calc%param%rpa_order_max, n_kpts), source=0d0 &
         )
         do i_kpt = 1, n_kpts
             k_point = res%k_pts(:, i_kpt)
-            if (.not. sys%do_rpa) then
+            if (.not. sys%calc%do_rpa) then
                 res_k = mbd_energy_single_complex( &
                     sys, alpha_0, C6, damp, dene_k, grad, k_point &
                 )
-                if (sys%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
-                if (sys%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+                if (sys%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
+                if (sys%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
             else
                 res_k = rpa_energy_single_complex(sys, alpha, damp, k_point)
-                if (sys%get_rpa_orders) then
+                if (sys%calc%get_rpa_orders) then
                     res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
                 end if
             end if
@@ -623,7 +623,7 @@ type(mbd_result) function mbd_energy( &
             res%energy = res%energy + res_k%energy
         end do ! k_point loop
         res%energy = res%energy/size(res%k_pts, 2)
-        if (sys%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
+        if (sys%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
     end if
 end function mbd_energy
 

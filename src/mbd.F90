@@ -8,7 +8,7 @@ use mbd_calc, only: calc_t, get_freq_grid
 use mbd_geom, only: geom_t
 use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_result, scale_TS
 use mbd_damping, only: damping_t
-use mbd_gradients_type, only: mbd_gradients, mbd_grad_switch
+use mbd_gradients, only: grad_t, grad_request_t
 use mbd_ts, only: ts_energy
 use mbd_common, only: printer
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
@@ -64,7 +64,7 @@ type mbd_calculation
     character(len=30) :: dispersion_type
     type(calc_t) :: calc
     type(mbd_result) :: results
-    type(mbd_gradients) :: denergy
+    type(grad_t) :: denergy
     logical :: do_gradients
     real(dp), allocatable :: free_values(:, :)
 contains
@@ -200,13 +200,13 @@ subroutine mbd_calc_get_energy(this, energy)
         this%damp%version = 'fermi,dip'
         this%results = mbd_energy( &
             this%geom, this%alpha_0, this%C6, this%damp, &
-            this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &
+            this%denergy, grad_request_t(dcoords=this%do_gradients) &
         )
         energy = this%results%energy
     case ('mbd-rsscs')
         this%results = mbd_scs_energy( &
             this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, &
-            this%denergy, mbd_grad_switch(dcoords=this%do_gradients) &
+            this%denergy, grad_request_t(dcoords=this%do_gradients) &
         )
         energy = this%results%energy
     case ('ts')

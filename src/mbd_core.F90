@@ -9,8 +9,8 @@ use mbd_dipole, only: dipole_matrix
 use mbd_matrix, only: matrix_real_t, matrix_complex_t, contract_cross_33
 use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
-use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
-    mbd_grad_matrix_complex, mbd_grad => mbd_grad_switch
+use mbd_gradients, only: grad_t, grad_matrix_real_t, grad_matrix_complex_t, &
+    grad_scalar_t, grad_request_t
 use mbd_damping, only: damping_t
 use mbd_lapack, only: inverse
 use mbd_common, only: tostr, findval, shift_cell
@@ -46,15 +46,15 @@ type(mbd_result) function mbd_scs_energy( &
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(damping_t), intent(in) :: damp
-    type(mbd_gradients), intent(out) :: dene
-    type(mbd_grad), intent(in) :: grad
+    type(grad_t), intent(out) :: dene
+    type(grad_request_t), intent(in) :: grad
 
     real(dp), allocatable :: alpha_dyn(:, :), alpha_dyn_scs(:, :), &
         C6_scs(:), dC6_scs_dalpha_dyn_scs(:, :), &
         dene_dalpha_scs_dyn(:, :), freq_w(:)
-    type(mbd_gradients), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
-    type(mbd_gradients) :: dene_mbd, dr_vdw_scs
-    type(mbd_grad) :: grad_scs
+    type(grad_t), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
+    type(grad_t) :: dene_mbd, dr_vdw_scs
+    type(grad_request_t) :: grad_scs
     type(damping_t) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
@@ -71,7 +71,7 @@ type(mbd_result) function mbd_scs_energy( &
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
     allocate (dalpha_dyn_scs(size(geom%idx%i_atom), 0:n_freq))
     if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
-    grad_scs = mbd_grad( &
+    grad_scs = grad_request_t( &
         dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
         dr_vdw=grad%dr_vdw &
     )
@@ -90,11 +90,11 @@ type(mbd_result) function mbd_scs_energy( &
     damp_mbd = damp
     damp_mbd%r_vdw = scale_TS( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
-        mbd_grad(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
+        grad_request_t(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
     )
     damp_mbd%version = damping_types(2)
     res = mbd_energy(geom, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd, &
-        mbd_grad( &
+        grad_request_t( &
             dcoords=grad%dcoords, &
             dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
         ) &
@@ -231,22 +231,22 @@ type(mbd_result) function mbd_energy_single_complex( &
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(damping_t), intent(in) :: damp
-    type(mbd_gradients), intent(out) :: dene
-    type(mbd_grad), intent(in) :: grad
+    type(grad_t), intent(out) :: dene
+    type(grad_request_t), intent(in) :: grad
 #if MBD_TYPE == 1
     real(dp), intent(in) :: k_point(3)
 #endif
 
 #if MBD_TYPE == 0
     type(matrix_real_t) :: relay, dQ, T, modes, c_lambda12i_c
-    type(mbd_grad_matrix_real) :: dT
+    type(grad_matrix_real_t) :: dT
     integer :: i_xyz
 #elif MBD_TYPE == 1
     type(matrix_complex_t) :: relay, T, modes
-    type(mbd_grad_matrix_complex) :: dT
+    type(grad_matrix_complex_t) :: dT
 #endif
     real(dp), allocatable :: eigs(:), omega(:)
-    type(mbd_gradients) :: domega
+    type(grad_t) :: domega
     integer :: n_negative_eigs, n_atoms
     character(120) :: msg
 
@@ -429,8 +429,8 @@ subroutine test_frequency_grid(calc)
     type(calc_t), intent(inout) :: calc
 
     real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
-    type(mbd_gradients), allocatable :: dalpha(:)
-    type(mbd_grad) :: grad
+    type(grad_t), allocatable :: dalpha(:)
+    type(grad_request_t) :: grad
 
     alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha, grad)
     C6 = C6_from_alpha(calc, alpha)
@@ -470,8 +470,8 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:)
     type(damping_t), intent(in) :: damp
-    type(mbd_gradients), intent(out) :: dalpha_scs(:)
-    type(mbd_grad), intent(in) :: grad
+    type(grad_t), intent(out) :: dalpha_scs(:)
+    type(grad_request_t), intent(in) :: grad
     real(dp) :: alpha_scs(size(alpha))
 
     type(matrix_real_t) :: alpha_full, dQ, T
@@ -479,14 +479,14 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(damping_t) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:)
-    type(mbd_grad_matrix_real) :: dT
-    type(mbd_grad) :: grad_T
+    type(grad_matrix_real_t) :: dT
+    type(grad_request_t) :: grad_req
 
     n_atoms = geom%siz()
     damp_local = damp
     damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
-    grad_T = mbd_grad(dcoords=grad%dcoords, dsigma=grad%dalpha, dr_vdw=grad%dr_vdw)
-    T = dipole_matrix(geom, damp_local, dT, grad_T)
+    grad_req = grad_request_t(dcoords=grad%dcoords, dsigma=grad%dalpha, dr_vdw=grad%dr_vdw)
+    T = dipole_matrix(geom, damp_local, dT, grad_req)
     if (geom%has_exc()) return
     if (grad%any()) then
         call alpha_full%copy_from(T)
@@ -572,19 +572,19 @@ type(mbd_result) function mbd_energy( &
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     type(damping_t), intent(in) :: damp
-    type(mbd_gradients), intent(out) :: dene
-    type(mbd_grad), intent(in) :: grad
+    type(grad_t), intent(out) :: dene
+    type(grad_request_t), intent(in) :: grad
 
     real(dp), allocatable :: alpha(:, :)
-    type(mbd_gradients), allocatable :: dalpha(:)
+    type(grad_t), allocatable :: dalpha(:)
     integer :: n_atoms, n_kpts, i_kpt
     real(dp) :: k_point(3)
     type(mbd_result) :: res_k
-    type(mbd_gradients) :: dene_k
+    type(grad_t) :: dene_k
 
     n_atoms = geom%siz()
     if (geom%calc%do_rpa) then
-        alpha = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha, mbd_grad())
+        alpha = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha, grad_request_t())
     end if
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%calc%do_rpa) then
@@ -632,13 +632,13 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
     type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_gradients), allocatable, intent(out) :: dalpha(:)
-    type(mbd_grad), intent(in) :: grad
+    type(grad_t), allocatable, intent(out) :: dalpha(:)
+    type(grad_request_t), intent(in) :: grad
     real(dp) :: alpha(size(alpha_0), 0:ubound(calc%omega_grid, 1))
 
     integer :: i_freq, n_atoms
     real(dp), allocatable :: omega(:)
-    type(mbd_gradients) :: domega
+    type(grad_t) :: domega
 
     n_atoms = size(alpha_0)
     omega = omega_eff(C6, alpha_0, domega, grad)
@@ -646,7 +646,7 @@ function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
     do i_freq = 0, ubound(alpha, 2)
         alpha(:, i_freq) = alpha_osc(&
             alpha_0, omega, calc%omega_grid(i_freq), dalpha(i_freq), &
-            mbd_grad(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
+            grad_request_t(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
         )
         if (grad%dalpha) then
             dalpha(i_freq)%dalpha = dalpha(i_freq)%dalpha + &
@@ -670,8 +670,8 @@ function alpha_osc(alpha_0, omega, u, dalpha, grad) result(alpha)
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
     real(dp), intent(in) :: u
-    type(mbd_gradients), intent(out), optional :: dalpha
-    type(mbd_grad), intent(in), optional :: grad
+    type(grad_t), intent(out), optional :: dalpha
+    type(grad_request_t), intent(in), optional :: grad
     real(dp) :: alpha(size(alpha_0))
 
     alpha = alpha_0/(1+(u/omega)**2)
@@ -691,8 +691,8 @@ end function
 function scale_TS(X_free, V, V_free, q, dX, grad) result(X)
     real(dp), intent(in) :: X_free(:), V(:), V_free(:)
     real(dp), intent(in) :: q
-    type(mbd_gradients), intent(out), optional :: dX
-    type(mbd_grad), intent(in), optional :: grad
+    type(grad_t), intent(out), optional :: dX
+    type(grad_request_t), intent(in), optional :: grad
     real(dp) :: X(size(X_free))
 
     X = X_free*(V/V_free)**q
@@ -711,8 +711,8 @@ end function
 function omega_eff(C6, alpha, domega, grad) result(omega)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: alpha(:)
-    type(mbd_gradients), intent(out), optional :: domega
-    type(mbd_grad), intent(in), optional :: grad
+    type(grad_t), intent(out), optional :: domega
+    type(grad_request_t), intent(in), optional :: grad
     real(dp) :: omega(size(C6))
 
     omega = 4d0/3*C6/alpha**2

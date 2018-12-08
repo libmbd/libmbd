@@ -5,7 +5,7 @@ module mbd_damping
 
 use mbd_constants
 use mbd_common, only: lower, exception_t
-use mbd_gradients_type, only: mbd_grad_scalar, mbd_grad_switch
+use mbd_gradients, only: grad_scalar_t, grad_request_t
 
 implicit none
 
@@ -46,8 +46,8 @@ real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
     real(dp), intent(in) :: d
-    type(mbd_grad_scalar), intent(out), optional :: df
-    type(mbd_grad_switch), intent(in), optional :: grad
+    type(grad_scalar_t), intent(out), optional :: df
+    type(grad_request_t), intent(in), optional :: grad
 
     real(dp) :: pre, eta, r_1
 
@@ -70,7 +70,7 @@ end function
 
 subroutine op1minus_grad(f, df)
     real(dp), intent(inout) :: f
-    type(mbd_grad_scalar), intent(inout) :: df
+    type(grad_scalar_t), intent(inout) :: df
 
     f = 1-f
     if (allocated(df%dr)) df%dr = -df%dr

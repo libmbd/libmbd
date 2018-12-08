@@ -9,8 +9,8 @@ use mbd_matrix, only: matrix_real_t, matrix_complex_t
 use mbd_geom, only: geom_t
 use mbd_damping, only: damping_t, damping_fermi, damping_sqrtfermi, &
     op1minus_grad
-use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
-    mbd_grad_matrix_complex, mbd_grad_scalar, mbd_grad_switch
+use mbd_gradients, only: grad_t, grad_matrix_real_t, grad_matrix_complex_t, &
+    grad_scalar_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_linalg, only: outer
 use mbd_common, only: tostr, shift_cell
@@ -61,11 +61,11 @@ type(matrix_complex_t) function dipole_matrix_complex( &
 
     type(geom_t), intent(inout) :: geom
     type(damping_t), intent(in) :: damp
-    type(mbd_grad_switch), intent(in), optional :: grad
+    type(grad_request_t), intent(in), optional :: grad
 #if MBD_TYPE == 0
-    type(mbd_grad_matrix_real), intent(out), optional :: ddipmat
+    type(grad_matrix_real_t), intent(out), optional :: ddipmat
 #elif MBD_TYPE == 1
-    type(mbd_grad_matrix_complex), intent(out), optional :: ddipmat
+    type(grad_matrix_complex_t), intent(out), optional :: ddipmat
     real(dp), intent(in) :: k_point(3)
 #endif
 
@@ -74,9 +74,9 @@ type(matrix_complex_t) function dipole_matrix_complex( &
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
         n_atoms, my_i_atom, my_j_atom
     logical :: do_ewald, is_periodic
-    type(mbd_grad_matrix_real) :: dTpp, dT0pp
-    type(mbd_grad_scalar) :: df
-    type(mbd_grad_switch) :: grad_
+    type(grad_matrix_real_t) :: dTpp, dT0pp
+    type(grad_scalar_t) :: df
+    type(grad_request_t) :: grad_
 #if MBD_TYPE == 0
     real(dp) :: Tpp_final(3, 3)
 #elif MBD_TYPE == 1
@@ -351,7 +351,7 @@ end subroutine
 
 function T_bare(r, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
-    type(mbd_grad_matrix_real), intent(out), optional :: dT
+    type(grad_matrix_real_t), intent(out), optional :: dT
     logical, intent(in), optional :: grad
     real(dp) :: T(3, 3)
 
@@ -453,12 +453,12 @@ end function
 function T_erf_coulomb(r, sigma, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma
-    type(mbd_grad_matrix_real), intent(out), optional :: dT
-    type(mbd_grad_switch), intent(in), optional :: grad
+    type(grad_matrix_real_t), intent(out), optional :: dT
+    type(grad_request_t), intent(in), optional :: grad
     real(dp) :: T(3, 3)
 
     real(dp) :: theta, erf_theta, r_5, r_1, zeta, bare(3, 3)
-    type(mbd_grad_matrix_real) :: dbare
+    type(grad_matrix_real_t) :: dbare
     real(dp) :: tmp33(3, 3), tmp333(3, 3, 3), rr_r5(3, 3)
     integer :: a, c
 
@@ -496,11 +496,11 @@ end function
 
 function damping_grad(f, df, T, dT, dfT, grad) result(fT)
     real(dp), intent(in) :: f
-    type(mbd_grad_scalar), intent(in) :: df
+    type(grad_scalar_t), intent(in) :: df
     real(dp), intent(in) :: T(3, 3)
-    type(mbd_grad_matrix_real), intent(in) :: dT
-    type(mbd_grad_matrix_real), intent(out) :: dfT
-    type(mbd_grad_switch), intent(in) :: grad
+    type(grad_matrix_real_t), intent(in) :: dT
+    type(grad_matrix_real_t), intent(out) :: dfT
+    type(grad_request_t), intent(in) :: grad
     real(dp) :: fT(3, 3)
 
     integer :: c

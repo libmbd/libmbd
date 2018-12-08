@@ -13,7 +13,7 @@ set(SRCS
     mbd_lapack.f90
     mbd_linalg.F90
     mbd_matrix.F90
-    mbd_gradients_type.f90
+    mbd_gradients.f90
     mbd_ts.f90
     mbd_vdw_param.f90
     # mbd_density.f90

@@ -12,7 +12,7 @@ set(SRCS
     mbd_geom.F90
     mbd_lapack.f90
     mbd_linalg.F90
-    mbd_matrix_type.F90
+    mbd_matrix.F90
     mbd_gradients_type.f90
     mbd_ts.f90
     mbd_vdw_param.f90

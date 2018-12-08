@@ -6,7 +6,7 @@ module mbd_core
 
 use mbd_constants
 use mbd_dipole, only: dipole_matrix
-use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex, contract_cross_33
+use mbd_matrix, only: matrix_real_t, matrix_complex_t, contract_cross_33
 use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
 use mbd_gradients_type, only: mbd_gradients, mbd_grad_matrix_real, &
@@ -238,11 +238,11 @@ type(mbd_result) function mbd_energy_single_complex( &
 #endif
 
 #if MBD_TYPE == 0
-    type(mbd_matrix_real) :: relay, dQ, T, modes, c_lambda12i_c
+    type(matrix_real_t) :: relay, dQ, T, modes, c_lambda12i_c
     type(mbd_grad_matrix_real) :: dT
     integer :: i_xyz
 #elif MBD_TYPE == 1
-    type(mbd_matrix_complex) :: relay, T, modes
+    type(matrix_complex_t) :: relay, T, modes
     type(mbd_grad_matrix_complex) :: dT
 #endif
     real(dp), allocatable :: eigs(:), omega(:)
@@ -353,9 +353,9 @@ type(mbd_result) function rpa_energy_single_complex( &
 #endif
 
 #if MBD_TYPE == 0
-    type(mbd_matrix_real) :: relay, AT
+    type(matrix_real_t) :: relay, AT
 #elif MBD_TYPE == 1
-    type(mbd_matrix_complex) :: relay, AT
+    type(matrix_complex_t) :: relay, AT
 #endif
     complex(dp), allocatable :: eigs(:)
     integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
@@ -474,7 +474,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(mbd_grad), intent(in) :: grad
     real(dp) :: alpha_scs(size(alpha))
 
-    type(mbd_matrix_real) :: alpha_full, dQ, T
+    type(matrix_real_t) :: alpha_full, dQ, T
     integer :: n_atoms, i_xyz, i_atom, my_i_atom
     type(mbd_damping) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &

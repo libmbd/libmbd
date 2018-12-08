@@ -5,7 +5,7 @@
 module mbd_dipole
 
 use mbd_constants
-use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex
+use mbd_matrix, only: matrix_real_t, matrix_complex_t
 use mbd_geom, only: geom_t
 use mbd_damping_type, only: mbd_damping, damping_fermi, damping_sqrtfermi, &
     op1minus_grad
@@ -50,11 +50,11 @@ contains
 !> \right)
 !> \f]
 #if MBD_TYPE == 0
-type(mbd_matrix_real) function dipole_matrix_real( &
+type(matrix_real_t) function dipole_matrix_real( &
         geom, damp, ddipmat, grad) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_REAL
 #elif MBD_TYPE == 1
-type(mbd_matrix_complex) function dipole_matrix_complex( &
+type(matrix_complex_t) function dipole_matrix_complex( &
         geom, damp, ddipmat, grad, k_point) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
 #endif
@@ -236,10 +236,10 @@ end function
 
 #if MBD_TYPE == 0
 subroutine add_ewald_dipole_parts_real(geom, alpha, dipmat)
-    type(mbd_matrix_real), intent(inout) :: dipmat
+    type(matrix_real_t), intent(inout) :: dipmat
 #elif MBD_TYPE == 1
 subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
-    type(mbd_matrix_complex), intent(inout) :: dipmat
+    type(matrix_complex_t), intent(inout) :: dipmat
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha

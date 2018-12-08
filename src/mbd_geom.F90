@@ -6,7 +6,7 @@ module mbd_geom
 use mbd_constants
 use mbd_calc, only: calc_t
 use mbd_lapack, only: inverse
-use mbd_matrix_type, only: mbd_index
+use mbd_matrix, only: atom_index_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid
 #endif
@@ -35,7 +35,7 @@ type :: geom_t
     !> - `"k_points"`: parallelize over k-points (each MPI task solves entire
     !> eigenproblems for its k-points)
     character(len=10) :: parallel_mode = 'auto'
-    type(mbd_index) :: idx
+    type(atom_index_t) :: idx
 #ifdef WITH_SCALAPACK
     type(mbd_blacs_desc) :: blacs
     type(mbd_blacs_grid) :: blacs_grid

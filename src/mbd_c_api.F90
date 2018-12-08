@@ -12,7 +12,7 @@ use mbd_dipole, only: dipole_matrix
 use mbd_damping_type, only: mbd_damping
 use mbd_gradients_type, only: mbd_gradients, mbd_grad => mbd_grad_switch
 use mbd_ts, only: ts_energy
-use mbd_matrix_type, only: mbd_matrix_real, mbd_matrix_complex
+use mbd_matrix, only: matrix_real_t, matrix_complex_t
 use mbd_coulomb, only: dipole_energy, coulomb_energy
 
 implicit none
@@ -294,8 +294,8 @@ subroutine cmbd_dipole_matrix(geom_cp, damping_p, k_point, dipmat_p) bind(c)
 
     type(geom_t), pointer :: geom
     type(mbd_damping), pointer :: damp
-    type(mbd_matrix_real) :: dipmat
-    type(mbd_matrix_complex) :: dipmat_c
+    type(matrix_real_t) :: dipmat
+    type(matrix_complex_t) :: dipmat_c
     real(dp), pointer :: dipmat_re(:, :)
     complex(dp), pointer :: dipmat_cplx(:, :)
     integer :: n_atoms

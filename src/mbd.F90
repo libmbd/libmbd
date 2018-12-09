@@ -133,8 +133,8 @@ end subroutine
 subroutine mbd_calc_destroy(this)
     class(mbd_calculation), target, intent(inout) :: this
 
-    deallocate (this%calc%omega_grid, this%calc%omega_grid_w)
     call this%geom%destroy()
+    call this%calc%destroy()
 end subroutine
 
 subroutine mbd_calc_update_coords(this, coords)

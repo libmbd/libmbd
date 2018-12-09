@@ -49,6 +49,7 @@ type :: calc_t
     logical :: get_rpa_orders = .false.
     contains
     procedure :: init => calc_init
+    procedure :: destroy => calc_destroy
 end type
 
 abstract interface
@@ -88,6 +89,13 @@ subroutine calc_init(this)
     this%info%freq_n = &
         "Initialized a radial integration grid of " // trim(tostr(n)) // &
         " points."
+end subroutine
+
+subroutine calc_destroy(this)
+    class(calc_t), intent(inout) :: this
+
+    deallocate (this%omega_grid, this%omega_grid_w)
+    deallocate (this%clock%timestamps, this%clock%counts)
 end subroutine
 
 subroutine get_freq_grid(n, x, w, L)

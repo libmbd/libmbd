@@ -51,23 +51,3 @@ install(TARGETS mbd
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-
-if(CMAKE_TESTING_ENABLED)
-    add_executable(mbd_tests EXCLUDE_FROM_ALL mbd_tests.F90)
-    target_link_libraries(mbd_tests PRIVATE mbd)
-    add_test(mbd_tests mbd_tests)
-
-    add_executable(mbd_api_tests EXCLUDE_FROM_ALL mbd_api_tests.F90)
-    target_link_libraries(mbd_api_tests PRIVATE mbd)
-    add_test(mbd_api_tests mbd_api_tests)
-
-    if(ENABLE_SCALAPACK_MPI)
-        target_include_directories(mbd_tests PRIVATE ${MPI_Fortran_INCLUDE_PATH})
-        target_include_directories(mbd_api_tests PRIVATE ${MPI_Fortran_INCLUDE_PATH})
-        target_link_libraries(mbd_tests PRIVATE ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
-        target_link_libraries(mbd_api_tests PRIVATE ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
-        set_target_properties(mbd_tests mbd_api_tests PROPERTIES COMPILE_DEFINITIONS "WITH_MPI;WITH_SCALAPACK")
-    endif()
-
-    add_dependencies(check mbd_tests mbd_api_tests)
-endif()

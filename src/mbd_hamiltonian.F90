@@ -15,10 +15,8 @@ use mbd_utils, only: result_t, tostr
 
 implicit none
 
-#   ifndef MODULE_UNIT_TESTS
 private
 public :: get_mbd_hamiltonian_energy
-#   endif
 
 interface get_mbd_hamiltonian_energy
     module procedure get_mbd_hamiltonian_energy_real

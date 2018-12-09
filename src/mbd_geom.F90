@@ -17,10 +17,8 @@ use mbd_mpi
 
 implicit none
 
-#ifndef MODULE_UNIT_TESTS
 private
 public :: geom_t
-#endif
 
 type :: geom_t
     type(calc_t), pointer :: calc

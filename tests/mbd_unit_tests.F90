@@ -2,9 +2,9 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #define MODULE_UNIT_TESTS
-#include "mbd_dipole.F90"
+#include "../src/mbd_dipole.F90"
 
-program mbd_tests
+program mbd_unit_tests
 
 use mbd_constants
 use mbd_calc, only: calc_t

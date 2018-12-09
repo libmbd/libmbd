@@ -5,8 +5,8 @@
 module mbd_matrix
 
 use mbd_constants
-use mbd_common, only: findval, exception_t
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
+use mbd_utils, only: findval, exception_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh

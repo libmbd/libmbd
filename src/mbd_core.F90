@@ -5,16 +5,18 @@
 module mbd_core
 
 use mbd_constants
+use mbd_common, only: omega_eff, sigma_selfint
 use mbd_dipole, only: dipole_matrix
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t, contract_cross_33
 use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
-use mbd_hamiltonian, only: get_mbd_hamiltonian_energy, omega_eff
+use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
 use mbd_damping, only: damping_t
 use mbd_lapack, only: inverse
-use mbd_common, only: tostr, findval, shift_cell, result_t
+use mbd_rpa, only: get_mbd_rpa_energy
+use mbd_utils, only: tostr, findval, shift_cell, result_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: all_reduce
 #endif
@@ -167,85 +169,6 @@ end function mbd_scs_energy
 #define MBD_TYPE 0
 #endif
 
-#if MBD_TYPE == 0
-type(result_t) function rpa_energy_single_real( &
-        geom, alpha, damp) result(res)
-#elif MBD_TYPE == 1
-type(result_t) function rpa_energy_single_complex( &
-        geom, alpha, damp, k_point) result(res)
-#endif
-    type(geom_t), intent(inout) :: geom
-    real(dp), intent(in) :: alpha(:, 0:)
-    type(damping_t), intent(in) :: damp
-#if MBD_TYPE == 1
-    real(dp), intent(in) :: k_point(3)
-#endif
-
-#if MBD_TYPE == 0
-    type(matrix_re_t) :: relay, AT
-#elif MBD_TYPE == 1
-    type(matrix_cplx_t) :: relay, AT
-#endif
-    complex(dp), allocatable :: eigs(:)
-    integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
-    type(damping_t) :: damp_alpha
-
-    res%energy = 0d0
-    damp_alpha = damp
-    allocate (eigs(3*geom%siz()))
-    do i_freq = 0, ubound(geom%calc%omega_grid, 1)
-        damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
-        ! relay = T
-#if MBD_TYPE == 0
-        relay = dipole_matrix(geom, damp_alpha)
-#elif MBD_TYPE == 1
-        relay = dipole_matrix(geom, damp_alpha, k_point=k_point)
-#endif
-        do my_i_atom = 1, size(relay%idx%i_atom)
-            associate ( &
-                    i_atom => relay%idx%i_atom(my_i_atom), &
-                    relay_sub => relay%val(3*(my_i_atom-1)+1:, :) &
-            )
-                relay_sub(:3, :) = relay_sub(:3, :)*alpha(i_atom, i_freq)
-            end associate
-        end do
-        ! relay = alpha*T
-        if (geom%calc%get_rpa_orders) AT = relay
-        ! relay = 1+alpha*T
-        call relay%add_diag_scalar(1d0)
-        call geom%clock(23)
-        eigs = relay%eigvals(geom%calc%exc, destroy=.true.)
-        call geom%clock(-23)
-        if (geom%has_exc()) return
-        ! The count construct won't work here due to a bug in Cray compiler
-        ! Has to manually unroll the counting
-        n_negative_eigs = 0
-        do i = 1, size(eigs)
-           if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
-        end do
-        if (n_negative_eigs > 0) then
-            geom%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            geom%calc%exc%msg = "1+AT matrix has " // &
-                trim(tostr(n_negative_eigs)) // " negative eigenvalues"
-            return
-        end if
-        res%energy = res%energy + &
-            1d0/(2*pi)*sum(log(dble(eigs)))*geom%calc%omega_grid_w(i_freq)
-        if (geom%calc%get_rpa_orders) then
-            call geom%clock(24)
-            eigs = AT%eigvals(geom%calc%exc, destroy=.true.)
-            call geom%clock(-24)
-            if (geom%has_exc()) return
-            allocate (res%rpa_orders(geom%calc%param%rpa_order_max))
-            do n_order = 2, geom%calc%param%rpa_order_max
-                res%rpa_orders(n_order) = res%rpa_orders(n_order) &
-                    +(-1d0/(2*pi)*(-1)**n_order &
-                    *sum(dble(eigs)**n_order)/n_order) &
-                    *geom%calc%omega_grid_w(i_freq)
-            end do
-        end if
-    end do
-end function
 
 #undef MBD_TYPE
 #ifndef MBD_INCLUDED
@@ -419,7 +342,7 @@ type(result_t) function mbd_energy( &
         if (.not. geom%calc%do_rpa) then
             res = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, dene, grad)
         else
-            res = rpa_energy_single_real(geom, alpha, damp)
+            res = get_mbd_rpa_energy(geom, alpha, damp)
             ! TODO gradients
         end if
     else
@@ -442,7 +365,7 @@ type(result_t) function mbd_energy( &
                 if (geom%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
                 if (geom%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
             else
-                res_k = rpa_energy_single_complex(geom, alpha, damp, k_point)
+                res_k = get_mbd_rpa_energy(geom, alpha, damp, k_point)
                 if (geom%calc%get_rpa_orders) then
                     res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
                 end if
@@ -527,27 +450,6 @@ function scale_TS(X_free, V, V_free, q, dX, grad) result(X)
     if (grad%dX_free) dX%dX_free = X/X_free
     if (grad%dV) dX%dV = X*q/V
     if (grad%dV_free) dX%dV_free = -X*q/V_free
-end function
-
-!> \f[
-!> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
-!> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
-!> \f]
-!>
-!> \f[
-!> \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
-!> \partial\sigma_{ij}=
-!> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
-!> \f]
-function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
-    real(dp), intent(in) :: alpha(:)
-    real(dp), allocatable, intent(out), optional :: dsigma_dalpha(:)
-    logical, intent(in), optional :: grad
-    real(dp) :: sigma(size(alpha))
-
-    sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
-    if (.not. present(grad)) return
-    if (grad) dsigma_dalpha = sigma/(3*alpha)
 end function
 
 !> \f[

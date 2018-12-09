@@ -4,9 +4,9 @@
 module mbd_scalapack
 
 use mbd_constants
-use mbd_common, only: exception_t, tostr
 use mbd_lapack, only: mode
 use mbd_blacs, only: blacs_desc_t
+use mbd_utils, only: exception_t, tostr
 
 implicit none
 

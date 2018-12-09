@@ -5,7 +5,7 @@ module mbd_geom
 
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_common, only: shift_cell
+use mbd_utils, only: shift_cell
 use mbd_lapack, only: inverse
 use mbd_matrix, only: atom_index_t
 #ifdef WITH_SCALAPACK

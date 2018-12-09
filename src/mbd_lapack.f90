@@ -4,7 +4,7 @@
 module mbd_lapack
 
 use mbd_constants
-use mbd_common, only: exception_t, tostr
+use mbd_utils, only: exception_t, tostr
 
 implicit none
 

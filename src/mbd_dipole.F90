@@ -13,7 +13,7 @@ use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_linalg, only: outer
-use mbd_common, only: tostr, shift_cell
+use mbd_utils, only: tostr, shift_cell
 
 implicit none
 

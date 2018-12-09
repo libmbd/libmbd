@@ -11,7 +11,8 @@ EXTRACT_ALL = YES
 EXTRACT_PRIVATE = YES
 INPUT =
     ../src/mbd.F90
+    ../src/mbd_common.f90
     ../src/mbd_core.F90
-    ../src/mbd_dipole.F90
     ../src/mbd_damping.f90
+    ../src/mbd_dipole.F90
     ../src/mbd_hamiltonian.f90

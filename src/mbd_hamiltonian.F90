@@ -5,18 +5,19 @@
 module mbd_hamiltonian
 
 use mbd_constants
-use mbd_common, only: result_t, tostr
+use mbd_common, only: omega_eff
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, grad_request_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
+use mbd_utils, only: result_t, tostr
 
 implicit none
 
 #   ifndef MODULE_UNIT_TESTS
 private
-public :: get_mbd_hamiltonian_energy, omega_eff
+public :: get_mbd_hamiltonian_energy
 #   endif
 
 interface get_mbd_hamiltonian_energy
@@ -190,27 +191,9 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
 end function
 
 #if MBD_TYPE == 0
+#   undef MBD_TYPE
 #   define MBD_TYPE 1
 #   include "mbd_hamiltonian.F90"
-
-!> \f[
-!> \omega=\frac{4C_6}{3\alpha_{0}^2},\qquad
-!> \partial\omega=\omega\left(
-!> \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
-!> \right)
-!> \f]
-function omega_eff(C6, alpha, domega, grad) result(omega)
-    real(dp), intent(in) :: C6(:)
-    real(dp), intent(in) :: alpha(:)
-    type(grad_t), intent(out), optional :: domega
-    type(grad_request_t), intent(in), optional :: grad
-    real(dp) :: omega(size(C6))
-
-    omega = 4d0/3*C6/alpha**2
-    if (.not. present(grad)) return
-    if (grad%dC6) domega%dC6 = omega/C6
-    if (grad%dalpha) domega%dalpha = -2*omega/alpha
-end function
 
 end module
 

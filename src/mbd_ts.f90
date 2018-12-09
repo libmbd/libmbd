@@ -4,7 +4,7 @@
 module mbd_ts
 
 use mbd_constants
-use mbd_common, only: shift_cell, tostr
+use mbd_utils, only: shift_cell, tostr
 use mbd_damping, only: damping_t, damping_fermi
 use mbd_geom, only: geom_t
 

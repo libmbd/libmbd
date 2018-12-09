@@ -4,8 +4,8 @@
 module mbd_damping
 
 use mbd_constants
-use mbd_common, only: lower, exception_t
 use mbd_gradients, only: grad_scalar_t, grad_request_t
+use mbd_utils, only: lower, exception_t
 
 implicit none
 

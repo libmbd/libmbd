@@ -7,7 +7,7 @@ use iso_c_binding
 use mbd_constants
 use mbd_calc, only: calc_t
 use mbd_geom, only: geom_t
-use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, mbd_result
+use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, result_t
 use mbd_dipole, only: dipole_matrix
 use mbd_damping, only: damping_t
 use mbd_gradients, only: grad_t, grad_request_t
@@ -203,7 +203,7 @@ real(c_double) function cmbd_mbd_energy(geom_cp, n_atoms, alpha_0, C6, damping_p
     type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
-    type(mbd_result) :: res
+    type(result_t) :: res
     type(grad_t) :: dene
 
     call c_f_pointer(geom_cp, geom_c)
@@ -226,7 +226,7 @@ real(c_double) function cmbd_rpa_energy(geom_cp, n_atoms, alpha_0, C6, damping_p
 
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
-    type(mbd_result) :: res
+    type(result_t) :: res
     type(grad_t) :: dene
 
     geom => get_mbd_geom(geom_cp)
@@ -250,7 +250,7 @@ real(c_double) function cmbd_mbd_rsscs_energy(geom_cp, n_atoms, alpha_0, C6, dam
     type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
-    type(mbd_result) :: res
+    type(result_t) :: res
     type(grad_t) :: dene
 
     call c_f_pointer(geom_cp, geom_c)
@@ -277,7 +277,7 @@ real(c_double) function cmbd_mbd_scs_energy(geom_cp, n_atoms, alpha_0, C6, dampi
 
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
-    type(mbd_result) :: res
+    type(result_t) :: res
     type(grad_t) :: dene
 
     geom => get_mbd_geom(geom_cp)

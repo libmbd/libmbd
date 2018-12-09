@@ -22,10 +22,10 @@ implicit none
 
 #ifndef MODULE_UNIT_TESTS
 private
-public :: mbd_result, mbd_energy, mbd_scs_energy, scale_TS, test_frequency_grid
+public :: result_t, mbd_energy, mbd_scs_energy, scale_TS, test_frequency_grid
 #endif
 
-type :: mbd_result
+type :: result_t
     real(dp) :: energy
     real(dp), allocatable :: mode_eigs(:)
     real(dp), allocatable :: modes(:, :)
@@ -38,7 +38,7 @@ end type
 
 contains
 
-type(mbd_result) function mbd_scs_energy( &
+type(result_t) function mbd_scs_energy( &
         geom, variant, alpha_0, C6, damp, dene, grad) result(res)
     type(geom_t), intent(inout) :: geom
     character(len=*), intent(in) :: variant
@@ -220,10 +220,10 @@ end function mbd_scs_energy
 !> \end{aligned}
 !> \f]
 #if MBD_TYPE == 0
-type(mbd_result) function mbd_energy_single_real( &
+type(result_t) function mbd_energy_single_real( &
         geom, alpha_0, C6, damp, dene, grad) result(res)
 #elif MBD_TYPE == 1
-type(mbd_result) function mbd_energy_single_complex( &
+type(result_t) function mbd_energy_single_complex( &
         geom, alpha_0, C6, damp, dene, grad, k_point) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
@@ -338,10 +338,10 @@ type(mbd_result) function mbd_energy_single_complex( &
 end function
 
 #if MBD_TYPE == 0
-type(mbd_result) function rpa_energy_single_real( &
+type(result_t) function rpa_energy_single_real( &
         geom, alpha, damp) result(res)
 #elif MBD_TYPE == 1
-type(mbd_result) function rpa_energy_single_complex( &
+type(result_t) function rpa_energy_single_complex( &
         geom, alpha, damp, k_point) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
@@ -565,7 +565,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     end if
 end function run_scs
 
-type(mbd_result) function mbd_energy( &
+type(result_t) function mbd_energy( &
         geom, alpha_0, C6, damp, dene, grad) result(res)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
@@ -578,7 +578,7 @@ type(mbd_result) function mbd_energy( &
     type(grad_t), allocatable :: dalpha(:)
     integer :: n_atoms, n_kpts, i_kpt
     real(dp) :: k_point(3)
-    type(mbd_result) :: res_k
+    type(result_t) :: res_k
     type(grad_t) :: dene_k
 
     n_atoms = geom%siz()

@@ -210,7 +210,7 @@ subroutine test_mbd_deriv_expl()
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     real(dp), allocatable :: gradients_anl(:, :)
     integer :: i_atom, n_atoms, i_xyz, i_step
@@ -433,7 +433,7 @@ subroutine test_mbd_deriv_impl_alpha()
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
@@ -477,7 +477,7 @@ subroutine test_mbd_deriv_impl_C6()
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
@@ -521,7 +521,7 @@ subroutine test_mbd_deriv_impl_vdw()
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
@@ -568,7 +568,7 @@ subroutine test_mbd_rsscs_deriv_expl()
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_xyz, i_step
 
@@ -614,7 +614,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
@@ -658,7 +658,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
@@ -702,7 +702,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
-    type(mbd_result) :: res(-3:3)
+    type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 

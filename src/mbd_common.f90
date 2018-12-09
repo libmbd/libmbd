@@ -9,7 +9,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, lower, exception_t, diff7, &
-    findval, printer, shift_cell
+    findval, printer, shift_cell, result_t
 
 interface tostr
     module procedure tostr_int_
@@ -20,6 +20,17 @@ type :: exception_t
     integer :: code = 0
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''
+end type
+
+type :: result_t
+    real(dp) :: energy
+    real(dp), allocatable :: mode_eigs(:)
+    real(dp), allocatable :: modes(:, :)
+    real(dp), allocatable :: rpa_orders(:)
+    real(dp), allocatable :: mode_eigs_k(:, :)
+    complex(dp), allocatable :: modes_k(:, :, :)
+    complex(dp), allocatable :: modes_k_single(:, :)
+    real(dp), allocatable :: rpa_orders_k(:, :)
 end type
 
 abstract interface

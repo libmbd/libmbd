@@ -6,14 +6,15 @@ module mbd_c_api
 use iso_c_binding
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_geom, only: geom_t
-use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy, result_t
-use mbd_dipole, only: dipole_matrix
-use mbd_damping, only: damping_t
-use mbd_gradients, only: grad_t, grad_request_t
-use mbd_ts, only: ts_energy
-use mbd_matrix, only: matrix_re_t, matrix_cplx_t
+use mbd_common, only: result_t
+use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy
 use mbd_coulomb, only: dipole_energy, coulomb_energy
+use mbd_damping, only: damping_t
+use mbd_dipole, only: dipole_matrix
+use mbd_geom, only: geom_t
+use mbd_gradients, only: grad_t, grad_request_t
+use mbd_matrix, only: matrix_re_t, matrix_cplx_t
+use mbd_ts, only: ts_energy
 
 implicit none
 

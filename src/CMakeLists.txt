@@ -10,6 +10,7 @@ set(SRCS
     mbd_damping.f90
     mbd_dipole.F90
     mbd_geom.F90
+    mbd_hamiltonian.F90
     mbd_lapack.f90
     mbd_linalg.F90
     mbd_matrix.F90

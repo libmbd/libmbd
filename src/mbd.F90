@@ -5,12 +5,12 @@ module mbd
 
 use mbd_constants
 use mbd_calc, only: calc_t, get_freq_grid
-use mbd_geom, only: geom_t
-use mbd_core, only: mbd_energy, mbd_scs_energy, result_t, scale_TS
+use mbd_common, only: printer, result_t
+use mbd_core, only: mbd_energy, mbd_scs_energy, scale_TS
 use mbd_damping, only: damping_t
+use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_ts, only: ts_energy
-use mbd_common, only: printer
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 
 implicit none

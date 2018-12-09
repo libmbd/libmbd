@@ -4,7 +4,7 @@
 module mbd_ts
 
 use mbd_constants
-use mbd_utils, only: shift_cell, tostr
+use mbd_utils, only: shift_idx, tostr
 use mbd_damping, only: damping_t, damping_fermi
 use mbd_geom, only: geom_t
 
@@ -41,7 +41,7 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
         end if
         idx_cell = [0, 0, -1]
         do i_cell = 1, product(1+2*range_cell)
-            call shift_cell(idx_cell, -range_cell, range_cell)
+            call shift_idx(idx_cell, -range_cell, range_cell)
             if (is_periodic) then
                 R_cell = matmul(geom%lattice, idx_cell)
             else

@@ -109,7 +109,7 @@ subroutine mbd_calc_init(this, input)
     this%geom%coords = input%coords
     if (allocated(input%lattice_vectors)) this%geom%lattice = input%lattice_vectors
     this%geom%parallel_mode = input%parallel_mode
-    call this%calc%init_grid()
+    call this%calc%init()
     call this%geom%init(this%calc)
     if (allocated(input%free_values)) then
         this%free_values = input%free_values

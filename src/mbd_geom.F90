@@ -5,7 +5,7 @@ module mbd_geom
 
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_utils, only: shift_cell
+use mbd_utils, only: shift_idx
 use mbd_lapack, only: inverse
 use mbd_matrix, only: atom_index_t
 #ifdef WITH_SCALAPACK
@@ -145,7 +145,7 @@ function make_k_pts(k_grid, lattice, shift) result(k_pts)
 
     n_kpt = [0, 0, -1]
     do i_kpt = 1, product(k_grid)
-        call shift_cell(n_kpt, [0, 0, 0], k_grid-1)
+        call shift_idx(n_kpt, [0, 0, 0], k_grid-1)
         n_kpt_shifted = dble(n_kpt)
         if (present(shift)) n_kpt_shifted = n_kpt_shifted+shift
         where (2*n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted-dble(k_grid)

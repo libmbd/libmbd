@@ -48,7 +48,7 @@ type :: calc_t
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
     contains
-    procedure :: init_grid => calc_init_grid
+    procedure :: init => calc_init
 end type
 
 abstract interface
@@ -73,11 +73,12 @@ subroutine info_print(this, info)
     if (this%neg_eigvals /= '') call info(this%neg_eigvals)
 end subroutine
 
-subroutine calc_init_grid(this)
+subroutine calc_init(this)
     class(calc_t), intent(inout) :: this
 
     integer :: n
 
+    call this%clock%init(100)
     n = this%param%n_frequency_grid
     allocate (this%omega_grid(0:n))
     allocate (this%omega_grid_w(0:n))

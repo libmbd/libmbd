@@ -37,7 +37,7 @@ subroutine test()
     real(dp), parameter :: ang = 1.8897259886d0
 
     type(mbd_input) :: inp
-    type(mbd_calculation) :: calc
+    type(mbd_calculation), allocatable :: calc
     real(dp) :: energy
     real(dp), allocatable :: gradients(:, :)
     integer :: code
@@ -46,10 +46,12 @@ subroutine test()
     inp%atom_types = ['Ar', 'Ar']
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2])
     inp%xc = 'xxx'
+    allocate (calc)
     call calc%init(inp)
     call calc%get_exception(code, origin, msg)
     print *, msg
-    call calc%destroy()
+    deallocate (calc)
+    allocate (calc)
     inp%xc = 'pbe'
     call calc%init(inp)
     call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])

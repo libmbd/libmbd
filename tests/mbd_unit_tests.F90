@@ -35,7 +35,7 @@ call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
     rank = 0
 #endif
 
-call calc%init_grid()
+call calc%init()
 n_failed = 0
 n_all = 0
 call exec_test('T_bare derivative')

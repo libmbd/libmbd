@@ -13,7 +13,7 @@ use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_linalg, only: outer
-use mbd_utils, only: tostr, shift_cell
+use mbd_utils, only: tostr, shift_idx
 
 implicit none
 
@@ -129,7 +129,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     call geom%clock(11)
     idx_cell = [0, 0, -1]
     do i_cell = 1, product(1+2*range_cell)
-        call shift_cell(idx_cell, -range_cell, range_cell)
+        call shift_idx(idx_cell, -range_cell, range_cell)
         if (is_periodic) then
             R_cell = matmul(geom%lattice, idx_cell)
         else
@@ -271,7 +271,7 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
     call geom%clock(12)
     idx_G_vector = [0, 0, -1]
     do i_G_vector = 1, product(1+2*range_G_vector)
-        call shift_cell(idx_G_vector, -range_G_vector, range_G_vector)
+        call shift_idx(idx_G_vector, -range_G_vector, range_G_vector)
         if (i_G_vector == 1) cycle
         G_vector = matmul(rec_unit_cell, idx_G_vector)
 #if MBD_TYPE == 1

@@ -50,7 +50,7 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
 
     allocate (calc)
     calc%param%n_frequency_grid = n_freq
-    call calc%init_grid()
+    call calc%init()
     allocate (calc_c)
     calc_c%n_freq = ubound(calc%omega_grid, 1)
     calc_c%omega_grid = c_loc(calc%omega_grid)

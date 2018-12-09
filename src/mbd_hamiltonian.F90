@@ -5,7 +5,6 @@
 module mbd_hamiltonian
 
 use mbd_constants
-use mbd_common, only: omega_eff
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
 use mbd_geom, only: geom_t
@@ -72,14 +71,14 @@ contains
 !> \f]
 #if MBD_TYPE == 0
 type(result_t) function get_mbd_hamiltonian_energy_real( &
-        geom, alpha_0, C6, damp, dene, grad) result(res)
+        geom, alpha_0, omega, damp, dene, grad) result(res)
 #elif MBD_TYPE == 1
 type(result_t) function get_mbd_hamiltonian_energy_complex( &
-        geom, alpha_0, C6, damp, dene, grad, k_point) result(res)
+        geom, alpha_0, omega, damp, dene, grad, k_point) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    real(dp), intent(in) :: omega(:)
     type(damping_t), intent(in) :: damp
     type(grad_t), intent(out) :: dene
     type(grad_request_t), intent(in) :: grad
@@ -95,8 +94,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     type(matrix_cplx_t) :: relay, T, modes
     type(grad_matrix_cplx_t) :: dT
 #endif
-    real(dp), allocatable :: eigs(:), omega(:)
-    type(grad_t) :: domega
+    real(dp), allocatable :: eigs(:)
     integer :: n_negative_eigs, n_atoms
     character(120) :: msg
 
@@ -112,7 +110,6 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     else
         call relay%move_from(T)
     end if
-    omega = omega_eff(C6, alpha_0, domega, grad)
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
     call geom%clock(21)
@@ -166,18 +163,17 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     if (grad%dalpha) then
         dQ%val = T%val
         call dQ%mult_cross(omega*sqrt(alpha_0))
-        call dQ%mult_rows(1d0/(2*alpha_0)+domega%dalpha/omega)
-        call dQ%add_diag(omega*domega%dalpha)
+        call dQ%mult_rows(1d0/(2*alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%dalpha = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dalpha
+        dene%dalpha = 1d0/2*dQ%contract_n33_rows()
     end if
-    if (grad%dC6) then
+    if (grad%domega) then
         dQ%val = T%val
         call dQ%mult_cross(omega*sqrt(alpha_0))
-        call dQ%mult_rows(domega%dC6/omega)
-        call dQ%add_diag(omega*domega%dC6)
+        call dQ%mult_rows(1d0/omega)
+        call dQ%add_diag(omega)
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%dC6 = 1d0/2*dQ%contract_n33_rows()-3d0/2*domega%dC6
+        dene%domega = 1d0/2*dQ%contract_n33_rows()-3d0/2
     end if
     if (grad%dr_vdw) then
         dQ%val = dT%dvdw

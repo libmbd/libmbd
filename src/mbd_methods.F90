@@ -4,7 +4,7 @@
 module mbd_methods
 
 use mbd_constants
-use mbd_common, only: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_ts, C6_from_alpha
+use mbd_common, only: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_osc, C6_from_alpha
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
@@ -31,20 +31,25 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     type(grad_t), intent(out) :: dene
     type(grad_request_t), intent(in) :: grad
 
-    real(dp), allocatable :: alpha(:, :)
+    real(dp), allocatable :: alpha(:, :), omega(:)
     type(grad_t), allocatable :: dalpha(:)
-    integer :: n_atoms, n_kpts, i_kpt
-    real(dp) :: k_point(3)
+    integer :: n_kpts, i_kpt
     type(result_t) :: res_k
-    type(grad_t) :: dene_k
+    type(grad_t) :: domega, dene_k
+    type(grad_request_t) :: grad_ham
 
-    n_atoms = geom%siz()
+    omega = omega_eff(C6, alpha_0, domega, grad)
     if (geom%calc%do_rpa) then
-        alpha = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha, grad_request_t())
+        alpha = alpha_dynamic_osc(geom%calc, alpha_0, omega, dalpha, grad_request_t())
     end if
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%calc%do_rpa) then
-            res = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, dene, grad)
+            grad_ham = grad
+            if (grad%dC6) grad_ham%domega = .true.
+            res = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, dene, grad_ham)
+            if (grad%dC6) dene%dC6 = dene%domega*domega%dC6
+            if (grad%dalpha) dene%dalpha = dene%dalpha + dene%domega*domega%dalpha
+            if (allocated(dene%domega)) deallocate (dene%domega)
         else
             res = get_mbd_rpa_energy(geom, alpha, damp)
             ! TODO gradients
@@ -54,26 +59,27 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
         n_kpts = size(geom%k_pts, 2)
         res%energy = 0d0
         if (geom%calc%get_eigs) &
-            allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
+            allocate (res%mode_eigs_k(3*geom%siz(), n_kpts), source=0d0)
         if (geom%calc%get_modes) &
-            allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
+            allocate (res%modes_k(3*geom%siz(), 3*geom%siz(), n_kpts), source=(0d0, 0d0))
         if (geom%calc%get_rpa_orders) allocate ( &
             res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
         )
         do i_kpt = 1, n_kpts
-            k_point = geom%k_pts(:, i_kpt)
-            if (.not. geom%calc%do_rpa) then
-                res_k = get_mbd_hamiltonian_energy( &
-                    geom, alpha_0, C6, damp, dene_k, grad, k_point &
-                )
-                if (geom%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
-                if (geom%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
-            else
-                res_k = get_mbd_rpa_energy(geom, alpha, damp, k_point)
-                if (geom%calc%get_rpa_orders) then
-                    res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
+            associate (k_pt => geom%k_pts(:, i_kpt))
+                if (.not. geom%calc%do_rpa) then
+                    res_k = get_mbd_hamiltonian_energy( &
+                        geom, alpha_0, omega, damp, dene_k, grad, k_pt &
+                    )
+                    if (geom%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
+                    if (geom%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+                else
+                    res_k = get_mbd_rpa_energy(geom, alpha, damp, k_pt)
+                    if (geom%calc%get_rpa_orders) then
+                        res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
+                    end if
                 end if
-            end if
+            end associate
             if (geom%has_exc()) return
             res%energy = res%energy + res_k%energy
         end do ! k_point loop
@@ -94,9 +100,9 @@ type(result_t) function get_mbd_scs_energy( &
 
     real(dp), allocatable :: alpha_dyn(:, :), alpha_dyn_scs(:, :), &
         C6_scs(:), dC6_scs_dalpha_dyn_scs(:, :), &
-        dene_dalpha_scs_dyn(:, :), freq_w(:)
+        dene_dalpha_scs_dyn(:, :), freq_w(:), omega(:)
     type(grad_t), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
-    type(grad_t) :: dene_mbd, dr_vdw_scs
+    type(grad_t) :: dene_mbd, dr_vdw_scs, domega
     type(grad_request_t) :: grad_scs
     type(damping_t) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
@@ -114,11 +120,15 @@ type(result_t) function get_mbd_scs_energy( &
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
     allocate (dalpha_dyn_scs(size(geom%idx%i_atom), 0:n_freq))
     if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
+    omega = omega_eff(C6, alpha_0, domega, grad)
+    alpha_dyn = alpha_dynamic_osc( &
+        geom%calc, alpha_0, omega, dalpha_dyn, &
+        grad_request_t(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
+    )
     grad_scs = grad_request_t( &
         dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
         dr_vdw=grad%dr_vdw &
     )
-    alpha_dyn = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha_dyn, grad)
     damp_scs = damp
     damp_scs%version = damping_types(1)
     do i_freq = 0, n_freq
@@ -174,8 +184,11 @@ type(result_t) function get_mbd_scs_energy( &
             do i_freq = 0, n_freq
                 dene%dalpha(geom%idx%j_atom) = dene%dalpha(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
-                    dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dalpha(geom%idx%j_atom)
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * ( &
+                        dalpha_dyn(i_freq)%dalpha(geom%idx%j_atom) &
+                        + dalpha_dyn(i_freq)%domega(geom%idx%j_atom) &
+                        * domega%dalpha(geom%idx%j_atom) &
+                    )
             end do
         end do
 #ifdef WITH_SCALAPACK
@@ -191,7 +204,8 @@ type(result_t) function get_mbd_scs_energy( &
                 dene%dC6(geom%idx%j_atom) = dene%dC6(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
-                    dalpha_dyn(i_freq)%dC6(geom%idx%j_atom)
+                    dalpha_dyn(i_freq)%domega(geom%idx%j_atom) &
+                    * domega%dC6(geom%idx%j_atom)
             end do
         end do
 #ifdef WITH_SCALAPACK

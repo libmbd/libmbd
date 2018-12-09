@@ -11,7 +11,7 @@ use mbd_utils, only: tostr
 implicit none
 
 private
-public :: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_ts, C6_from_alpha
+public :: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_osc, C6_from_alpha
 
 contains
 
@@ -84,48 +84,24 @@ end function
 !> \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
 !> \right)
 !> \f]
-function alpha_osc(alpha_0, omega, u, dalpha, grad) result(alpha)
-    real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: omega(:)
-    real(dp), intent(in) :: u
-    type(grad_t), intent(out), optional :: dalpha
-    type(grad_request_t), intent(in), optional :: grad
-    real(dp) :: alpha(size(alpha_0))
-
-    alpha = alpha_0/(1+(u/omega)**2)
-    if (.not. present(grad)) return
-    if (grad%dalpha) dalpha%dalpha = alpha/alpha_0
-    if (grad%domega) dalpha%domega = alpha*2d0/omega/(1d0+(omega/u)**2)
-end function
-
-function alpha_dynamic_ts(calc, alpha_0, C6, dalpha, grad) result(alpha)
+function alpha_dynamic_osc(calc, alpha_0, omega, dalpha, grad) result(alpha)
     type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
-    real(dp), intent(in) :: C6(:)
+    real(dp), intent(in) :: omega(:)
     type(grad_t), allocatable, intent(out) :: dalpha(:)
     type(grad_request_t), intent(in) :: grad
     real(dp) :: alpha(size(alpha_0), 0:ubound(calc%omega_grid, 1))
 
     integer :: i_freq, n_atoms
-    real(dp), allocatable :: omega(:)
-    type(grad_t) :: domega
 
     n_atoms = size(alpha_0)
-    omega = omega_eff(C6, alpha_0, domega, grad)
     allocate (dalpha(0:ubound(alpha, 2)))
     do i_freq = 0, ubound(alpha, 2)
-        alpha(:, i_freq) = alpha_osc(&
-            alpha_0, omega, calc%omega_grid(i_freq), dalpha(i_freq), &
-            grad_request_t(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
-        )
-        if (grad%dalpha) then
-            dalpha(i_freq)%dalpha = dalpha(i_freq)%dalpha + &
-                dalpha(i_freq)%domega*domega%dalpha
-        end if
-        if (grad%dC6) then
-            dalpha(i_freq)%dC6 = dalpha(i_freq)%domega*domega%dC6
-        end if
-        if (allocated(dalpha(i_freq)%domega)) deallocate (dalpha(i_freq)%domega)
+        associate (alpha => alpha(:, i_freq), u => calc%omega_grid(i_freq))
+            alpha = alpha_0/(1+(u/omega)**2)
+            if (grad%dalpha) dalpha(i_freq)%dalpha = alpha/alpha_0
+            if (grad%domega) dalpha(i_freq)%domega = alpha*2d0/omega/(1d0+(omega/u)**2)
+        end associate
     end do
 end function
 
@@ -163,7 +139,7 @@ subroutine test_frequency_grid(calc)
     type(grad_t), allocatable :: dalpha(:)
     type(grad_request_t) :: grad
 
-    alpha = alpha_dynamic_ts(calc, [21d0], [99.5d0], dalpha, grad)
+    alpha = alpha_dynamic_osc(calc, [21d0], [99.5d0], dalpha, grad)
     C6 = C6_from_alpha(calc, alpha)
     error = abs(C6(1)/99.5d0-1d0)
     calc%info%freq_error = &

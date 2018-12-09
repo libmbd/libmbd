@@ -78,7 +78,7 @@ subroutine exec_test(test_name)
     case ('SCS derivative implicit alpha'); call test_scs_deriv_impl_alpha()
     case ('SCS derivative implicit Rvdw'); call test_scs_deriv_impl_vdw()
     case ('MBD derivative implicit alpha'); call test_mbd_deriv_impl_alpha()
-    case ('MBD derivative implicit C6'); call test_mbd_deriv_impl_C6()
+    case ('MBD derivative implicit C6'); call test_mbd_deriv_impl_omega()
     case ('MBD derivative implicit Rvdw'); call test_mbd_deriv_impl_vdw()
     case ('MBD@rsscs derivative explicit'); call test_mbd_rsscs_deriv_expl()
     case ('MBD@rsscs derivative implicit alpha'); call test_mbd_rsscs_deriv_impl_alpha()
@@ -213,7 +213,7 @@ subroutine test_mbd_deriv_expl()
     real(dp), allocatable :: gradients(:, :)
     real(dp), allocatable :: diff(:, :)
     real(dp), allocatable :: alpha_0(:)
-    real(dp), allocatable :: C6(:)
+    real(dp), allocatable :: omega(:)
     type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     real(dp), allocatable :: gradients_anl(:, :)
@@ -232,8 +232,8 @@ subroutine test_mbd_deriv_expl()
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    C6 = [65d0, 60d0, 70d0]
-    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, &
+    omega = [.7d0, .65d0, .75d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
         dene, grad_request_t(dcoords=.true.))
     gradients_anl = dene%dcoords
     do i_atom = 1, n_atoms
@@ -242,7 +242,7 @@ subroutine test_mbd_deriv_expl()
                 if (i_step == 0) cycle
                 geom%coords = coords
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom)+i_step*delta
-                res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, &
+                res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                     dene, grad_request_t())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
@@ -436,7 +436,7 @@ subroutine test_mbd_deriv_impl_alpha()
     type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
-        gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
+        gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), omega(:)
     type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
@@ -454,8 +454,8 @@ subroutine test_mbd_deriv_impl_alpha()
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    C6 = [65d0, 60d0, 70d0]
-    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, &
+    omega = [.7d0, .65d0, .75d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
         dene, grad_request_t(dalpha=.true.))
     gradients_anl = dene%dalpha
     do i_atom = 1, n_atoms
@@ -463,7 +463,7 @@ subroutine test_mbd_deriv_impl_alpha()
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
-            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0_diff, C6, damp, &
+            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0_diff, omega, damp, &
                 dene, grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
@@ -475,12 +475,12 @@ subroutine test_mbd_deriv_impl_alpha()
     end if
 end subroutine test_mbd_deriv_impl_alpha
 
-subroutine test_mbd_deriv_impl_C6()
+subroutine test_mbd_deriv_impl_omega()
     real(dp) :: delta
     type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
-        gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
+        gradients_anl(:), diff(:), alpha_0(:), omega_diff(:), omega(:)
     type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
@@ -498,16 +498,16 @@ subroutine test_mbd_deriv_impl_C6()
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    C6 = [65d0, 60d0, 70d0]
-    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, &
-        dene, grad_request_t(dC6=.true.))
-    gradients_anl = dene%dC6
+    omega = [.7d0, .65d0, .75d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+        dene, grad_request_t(domega=.true.))
+    gradients_anl = dene%domega
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
-            C6_diff = C6
-            C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
-            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, C6_diff, damp, &
+            omega_diff = omega
+            omega_diff(i_atom) = omega_diff(i_atom) + i_step*delta
+            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega_diff, damp, &
                 dene, grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
@@ -517,14 +517,14 @@ subroutine test_mbd_deriv_impl_C6()
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
-end subroutine test_mbd_deriv_impl_C6
+end subroutine
 
 subroutine test_mbd_deriv_impl_vdw()
     real(dp) :: delta
     type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
-        gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
+        gradients_anl(:), diff(:), alpha_0(:), omega(:), r_vdw(:)
     type(result_t) :: res(-3:3)
     type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
@@ -542,8 +542,8 @@ subroutine test_mbd_deriv_impl_vdw()
     damp%r_vdw = r_vdw
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
-    C6 = [65d0, 60d0, 70d0]
-    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, &
+    omega = [.7d0, .65d0, .75d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
         dene, grad_request_t(dr_vdw=.true.))
     gradients_anl = dene%dr_vdw
     do i_atom = 1, n_atoms
@@ -551,7 +551,7 @@ subroutine test_mbd_deriv_impl_vdw()
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, &
+            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                 dene, grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)

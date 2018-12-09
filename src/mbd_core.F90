@@ -27,7 +27,6 @@ public :: mbd_result, mbd_energy, mbd_scs_energy, scale_TS, test_frequency_grid
 
 type :: mbd_result
     real(dp) :: energy
-    real(dp), allocatable :: k_pts(:, :)
     real(dp), allocatable :: mode_eigs(:)
     real(dp), allocatable :: modes(:, :)
     real(dp), allocatable :: rpa_orders(:)
@@ -594,10 +593,8 @@ type(mbd_result) function mbd_energy( &
             ! TODO gradients
         end if
     else
-        res%k_pts = make_k_grid(make_g_grid( &
-            geom%calc, geom%k_grid(1), geom%k_grid(2), geom%k_grid(3) &
-        ), geom%lattice)
-        n_kpts = size(res%k_pts, 2)
+        call geom%ensure_k_pts()
+        n_kpts = size(geom%k_pts, 2)
         res%energy = 0d0
         if (geom%calc%get_eigs) &
             allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
@@ -607,7 +604,7 @@ type(mbd_result) function mbd_energy( &
             res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
         )
         do i_kpt = 1, n_kpts
-            k_point = res%k_pts(:, i_kpt)
+            k_point = geom%k_pts(:, i_kpt)
             if (.not. geom%calc%do_rpa) then
                 res_k = mbd_energy_single_complex( &
                     geom, alpha_0, C6, damp, dene_k, grad, k_point &
@@ -623,7 +620,7 @@ type(mbd_result) function mbd_energy( &
             if (geom%has_exc()) return
             res%energy = res%energy + res_k%energy
         end do ! k_point loop
-        res%energy = res%energy/size(res%k_pts, 2)
+        res%energy = res%energy/size(geom%k_pts, 2)
         if (geom%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
     end if
 end function mbd_energy
@@ -768,39 +765,6 @@ function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
         dC6_dalpha(:, i_freq) = dC6_dalpha(:, i_freq) + 6d0/pi*alpha(:, i_freq)
     end do
 end function
-
-function make_g_grid(calc, n1, n2, n3) result(g_grid)
-    type(calc_t), intent(in) :: calc
-    integer, intent(in) :: n1, n2, n3
-    real(dp) :: g_grid(3, n1*n2*n3)
-
-    integer :: g_kpt(3), i_kpt, kpt_range(3)
-    real(dp) :: g_kpt_shifted(3)
-
-    g_kpt = [0, 0, -1]
-    kpt_range = [n1, n2, n3]
-    do i_kpt = 1, n1*n2*n3
-        call shift_cell (g_kpt, [0, 0, 0], kpt_range-1)
-        g_kpt_shifted = dble(g_kpt)+calc%param%k_grid_shift
-        where (2*g_kpt_shifted > kpt_range)
-            g_kpt_shifted = g_kpt_shifted-dble(kpt_range)
-        end where
-        g_grid(:, i_kpt) = g_kpt_shifted/kpt_range
-    end do
-end function make_g_grid
-
-function make_k_grid(g_grid, uc) result(k_grid)
-    real(dp), intent(in) :: g_grid(:, :), uc(3, 3)
-    real(dp) :: k_grid(3, size(g_grid, 2))
-
-    integer :: i_kpt
-    real(dp) :: ruc(3, 3)
-
-    ruc = 2*pi*inverse(transpose(uc))
-    do i_kpt = 1, size(g_grid, 2)
-        k_grid(:, i_kpt) = matmul(ruc, g_grid(:, i_kpt))
-    end do
-end function make_k_grid
 
 end module
 

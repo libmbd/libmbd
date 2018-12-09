@@ -5,6 +5,7 @@ module mbd_geom
 
 use mbd_constants
 use mbd_calc, only: calc_t
+use mbd_common, only: shift_cell
 use mbd_lapack, only: inverse
 use mbd_matrix, only: atom_index_t
 #ifdef WITH_SCALAPACK
@@ -27,6 +28,8 @@ type :: geom_t
     logical :: vacuum_axis(3) = [.false., .false., .false.]
     real(dp), allocatable :: lattice(:, :)  ! vectors in columns
     integer :: k_grid(3)
+    real(dp), allocatable :: k_pts(:, :)
+
     integer :: supercell(3)
     !> Type of parallelization: `"atoms"` or `"k_points"`.
     !>
@@ -49,6 +52,7 @@ type :: geom_t
     procedure :: siz => geom_siz
     procedure :: has_exc => geom_has_exc
     procedure :: supercell_circum => geom_supercell_circum
+    procedure :: ensure_k_pts => geom_ensure_k_pts
     procedure :: clock => geom_clock
 end type geom_t
 
@@ -122,6 +126,34 @@ function geom_supercell_circum(this, uc, radius) result(sc)
         layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
     where (this%vacuum_axis) sc = 0
+end function
+
+subroutine geom_ensure_k_pts(this)
+    class(geom_t), intent(inout) :: this
+
+    if (allocated(this%k_pts)) return
+    if (.not. allocated(this%lattice)) return
+    this%k_pts = make_k_pts(this%k_grid, this%lattice, this%calc%param%k_grid_shift)
+end subroutine
+
+function make_k_pts(k_grid, lattice, shift) result(k_pts)
+    integer, intent(in) :: k_grid(3)
+    real(dp), intent(in) :: lattice(3, 3)
+    real(dp), intent(in), optional :: shift
+    real(dp) :: k_pts(3, product(k_grid))
+
+    integer :: n_kpt(3), i_kpt
+    real(dp) :: n_kpt_shifted(3)
+
+    n_kpt = [0, 0, -1]
+    do i_kpt = 1, product(k_grid)
+        call shift_cell(n_kpt, [0, 0, 0], k_grid-1)
+        n_kpt_shifted = dble(n_kpt)
+        if (present(shift)) n_kpt_shifted = n_kpt_shifted+shift
+        where (2*n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted-dble(k_grid)
+        k_pts(:, i_kpt) = n_kpt_shifted/k_grid
+    end do
+    k_pts = matmul(2*pi*inverse(transpose(lattice)), k_pts)
 end function
 
 subroutine geom_clock(this, id)

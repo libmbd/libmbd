@@ -101,9 +101,9 @@ type(c_ptr) function cmbd_init_geom( &
     calc => get_mbd_calc(calc_cp)
     allocate (geom)
     geom%coords = coords
-    call geom%init(calc)
     if (present(lattice)) geom%lattice = lattice
     if (present(k_grid)) geom%k_grid = k_grid
+    call geom%init(calc)
     allocate (geom_c)
     geom_c%mbd_geom_f = c_loc(geom)
     cmbd_init_geom = c_loc(geom_c)

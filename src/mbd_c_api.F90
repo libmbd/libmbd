@@ -6,13 +6,13 @@ module mbd_c_api
 use iso_c_binding
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_core, only: mbd_energy, mbd_scs_energy, mbd_scs_energy
 use mbd_coulomb, only: dipole_energy, coulomb_energy
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
+use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: ts_energy
 use mbd_utils, only: result_t
 
@@ -210,7 +210,7 @@ real(c_double) function cmbd_mbd_energy(geom_cp, n_atoms, alpha_0, C6, damping_p
     call c_f_pointer(geom_cp, geom_c)
     call c_f_pointer(geom_c%mbd_geom_f, geom)
     call c_f_pointer(damping_p, damping)
-    res = mbd_energy( &
+    res = get_mbd_energy( &
         geom, alpha_0, C6, damping, dene, grad_request_t(dcoords=present(gradients)) &
     )
     cmbd_mbd_energy = res%energy
@@ -233,7 +233,7 @@ real(c_double) function cmbd_rpa_energy(geom_cp, n_atoms, alpha_0, C6, damping_p
     geom => get_mbd_geom(geom_cp)
     call c_f_pointer(damping_p, damping)
     geom%calc%do_rpa = .true.
-    res = mbd_energy(geom, alpha_0, C6, damping, dene, grad_request_t())
+    res = get_mbd_energy(geom, alpha_0, C6, damping, dene, grad_request_t())
     geom%calc%do_rpa = .false.
     cmbd_rpa_energy = res%energy
 end function cmbd_rpa_energy
@@ -259,7 +259,7 @@ real(c_double) function cmbd_mbd_rsscs_energy(geom_cp, n_atoms, alpha_0, C6, dam
     call c_f_pointer(damping_p, damping)
     geom%calc%get_eigs = present(eigvals)
     geom%calc%get_modes = present(eigvecs)
-    res = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damping, &
+    res = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damping, &
         dene, grad_request_t(dcoords=present(gradients)))
     if (geom%has_exc()) return
     cmbd_mbd_rsscs_energy = res%energy
@@ -283,7 +283,7 @@ real(c_double) function cmbd_mbd_scs_energy(geom_cp, n_atoms, alpha_0, C6, dampi
 
     geom => get_mbd_geom(geom_cp)
     call c_f_pointer(damping_p, damping)
-    res = mbd_scs_energy(geom, 'scs', alpha_0, C6, damping, dene, grad_request_t())
+    res = get_mbd_scs_energy(geom, 'scs', alpha_0, C6, damping, dene, grad_request_t())
     cmbd_mbd_scs_energy = res%energy
 end function cmbd_mbd_scs_energy
 

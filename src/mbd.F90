@@ -5,10 +5,11 @@ module mbd
 
 use mbd_constants
 use mbd_calc, only: calc_t, get_freq_grid
-use mbd_core, only: mbd_energy, mbd_scs_energy, scale_TS
+use mbd_common, only: scale_ts
 use mbd_damping, only: damping_t
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
+use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: ts_energy
 use mbd_utils, only: printer, result_t
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
@@ -85,7 +86,6 @@ end type
 
 contains
 
-
 subroutine mbd_calc_init(this, input)
     class(mbd_calculation), target, intent(inout) :: this
     type(mbd_input), intent(in) :: input
@@ -130,14 +130,12 @@ subroutine mbd_calc_init(this, input)
     end if
 end subroutine
 
-
 subroutine mbd_calc_destroy(this)
     class(mbd_calculation), target, intent(inout) :: this
 
     deallocate (this%calc%omega_grid, this%calc%omega_grid_w)
     call this%geom%destroy()
 end subroutine
-
 
 subroutine mbd_calc_update_coords(this, coords)
     class(mbd_calculation), intent(inout) :: this
@@ -146,14 +144,12 @@ subroutine mbd_calc_update_coords(this, coords)
     this%geom%coords = coords
 end subroutine
 
-
 subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%geom%lattice = latt_vecs
 end subroutine
-
 
 subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     class(mbd_calculation), intent(inout) :: this
@@ -165,7 +161,6 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     this%C6 = C6
     this%damp%r_vdw = r_vdw
 end subroutine
-
 
 subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     class(mbd_calculation), intent(inout) :: this
@@ -179,7 +174,6 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3)
 end subroutine
 
-
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(in) :: alpha_0_ratios(:)
@@ -190,7 +184,6 @@ subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     this%damp%r_vdw = 2.5d0*this%free_values(1, :)**(1d0/7)*alpha_0_ratios**(1d0/3)
 end subroutine
 
-
 subroutine mbd_calc_get_energy(this, energy)
     class(mbd_calculation), intent(inout) :: this
     real(dp), intent(out) :: energy
@@ -198,13 +191,13 @@ subroutine mbd_calc_get_energy(this, energy)
     select case (this%dispersion_type)
     case ('mbd', 'mbd-nl')
         this%damp%version = 'fermi,dip'
-        this%results = mbd_energy( &
+        this%results = get_mbd_energy( &
             this%geom, this%alpha_0, this%C6, this%damp, &
             this%denergy, grad_request_t(dcoords=this%do_gradients) &
         )
         energy = this%results%energy
     case ('mbd-rsscs')
-        this%results = mbd_scs_energy( &
+        this%results = get_mbd_scs_energy( &
             this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, &
             this%denergy, grad_request_t(dcoords=this%do_gradients) &
         )
@@ -214,7 +207,6 @@ subroutine mbd_calc_get_energy(this, energy)
     end select
 end subroutine
 
-
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     class(mbd_calculation), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
@@ -222,14 +214,12 @@ subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     gradients = transpose(this%denergy%dcoords)
 end subroutine
 
-
 subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)  ! 3 by 3  (dE/d{abc}_i)
     class(mbd_calculation), intent(in) :: this
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
 end subroutine
-
 
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     class(mbd_calculation), intent(inout) :: this
@@ -242,7 +232,6 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
         modes = this%results%modes
     end if
 end subroutine
-
 
 subroutine mbd_calc_get_exception(this, code, origin, msg)
     class(mbd_calculation), intent(inout) :: this
@@ -259,14 +248,12 @@ subroutine mbd_calc_get_exception(this, code, origin, msg)
     this%calc%exc%msg = ''
 end subroutine
 
-
 subroutine mbd_calc_print_info(this, info)
     class(mbd_calculation), intent(inout) :: this
     procedure(printer) :: info
 
     call this%calc%info%print(info)
 end subroutine
-
 
 function mbd_get_free_vdw_params(atom_types, table_type) result(free_values)
     character(len=*), intent(in) :: atom_types(:)  ! e.g. ['Ar', 'Ar']

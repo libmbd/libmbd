@@ -5,7 +5,6 @@ set(SRCS
     mbd_clock.f90
     mbd_common.f90
     mbd_constants.f90
-    mbd_core.F90
     mbd_coulomb.f90
     mbd_damping.f90
     # mbd_density.f90
@@ -16,6 +15,7 @@ set(SRCS
     mbd_lapack.f90
     mbd_linalg.F90
     mbd_matrix.F90
+    mbd_methods.F90
     mbd_rpa.F90
     mbd_scs.f90
     mbd_ts.f90

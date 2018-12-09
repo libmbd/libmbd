@@ -2,16 +2,20 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #define MODULE_UNIT_TESTS
-#include "mbd_core.F90"
 #include "mbd_dipole.F90"
 
 program mbd_tests
 
-use mbd_core
-use mbd_dipole
-use mbd_hamiltonian
-use mbd_scs
-use mbd_utils, only: diff7, findval, print_matrix
+use mbd_constants
+use mbd_calc, only: calc_t
+use mbd_damping, only: damping_t, damping_fermi
+use mbd_dipole, only: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
+use mbd_geom, only: geom_t
+use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_request_t, grad_scalar_t
+use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
+use mbd_methods, only: get_mbd_scs_energy
+use mbd_scs, only: run_scs
+use mbd_utils, only: diff7, findval, print_matrix, tostr, result_t
 
 #ifdef WITH_MPI
 use mbd_mpi
@@ -585,7 +589,7 @@ subroutine test_mbd_rsscs_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+    res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, grad_request_t(dcoords=.true.))
     gradients_anl = dene%dcoords
     do i_atom = 1, n_atoms
@@ -595,7 +599,7 @@ subroutine test_mbd_rsscs_deriv_expl()
                 geom%coords = coords
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + &
                     i_step*delta
-                res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+                res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                     dene, grad_request_t())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
@@ -632,7 +636,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+    res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, grad_request_t(dalpha=.true.))
     gradients_anl = dene%dalpha
     do i_atom = 1, n_atoms
@@ -640,7 +644,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
+            res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
                 dene, grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
@@ -676,7 +680,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+    res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, grad_request_t(dC6=.true.))
     gradients_anl = dene%dC6
     do i_atom = 1, n_atoms
@@ -684,7 +688,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
+            res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
                 dene, grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
@@ -720,7 +724,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
-    res(0) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+    res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
         dene, grad_request_t(dr_vdw=.true.))
     gradients_anl = dene%dr_vdw
     do i_atom = 1, n_atoms
@@ -728,7 +732,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
-            res(i_step) = mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+            res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                 dene, grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)

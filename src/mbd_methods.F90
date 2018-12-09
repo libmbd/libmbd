@@ -1,0 +1,218 @@
+! This Source Code Form is subject to the terms of the Mozilla Public
+! License, v. 2.0. If a copy of the MPL was not distributed with this
+! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+module mbd_methods
+
+use mbd_constants
+use mbd_common, only: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_ts, C6_from_alpha
+use mbd_geom, only: geom_t
+use mbd_gradients, only: grad_t, grad_request_t
+use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
+use mbd_damping, only: damping_t
+use mbd_rpa, only: get_mbd_rpa_energy
+use mbd_scs, only: run_scs
+use mbd_utils, only: result_t
+#ifdef WITH_SCALAPACK
+use mbd_blacs, only: all_reduce
+#endif
+
+implicit none
+
+private
+public :: get_mbd_energy, get_mbd_scs_energy
+
+contains
+
+type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) result(res)
+    type(geom_t), intent(inout) :: geom
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    type(damping_t), intent(in) :: damp
+    type(grad_t), intent(out) :: dene
+    type(grad_request_t), intent(in) :: grad
+
+    real(dp), allocatable :: alpha(:, :)
+    type(grad_t), allocatable :: dalpha(:)
+    integer :: n_atoms, n_kpts, i_kpt
+    real(dp) :: k_point(3)
+    type(result_t) :: res_k
+    type(grad_t) :: dene_k
+
+    n_atoms = geom%siz()
+    if (geom%calc%do_rpa) then
+        alpha = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha, grad_request_t())
+    end if
+    if (.not. allocated(geom%lattice)) then
+        if (.not. geom%calc%do_rpa) then
+            res = get_mbd_hamiltonian_energy(geom, alpha_0, C6, damp, dene, grad)
+        else
+            res = get_mbd_rpa_energy(geom, alpha, damp)
+            ! TODO gradients
+        end if
+    else
+        call geom%ensure_k_pts()
+        n_kpts = size(geom%k_pts, 2)
+        res%energy = 0d0
+        if (geom%calc%get_eigs) &
+            allocate (res%mode_eigs_k(3*n_atoms, n_kpts), source=0d0)
+        if (geom%calc%get_modes) &
+            allocate (res%modes_k(3*n_atoms, 3*n_atoms, n_kpts), source=(0d0, 0d0))
+        if (geom%calc%get_rpa_orders) allocate ( &
+            res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
+        )
+        do i_kpt = 1, n_kpts
+            k_point = geom%k_pts(:, i_kpt)
+            if (.not. geom%calc%do_rpa) then
+                res_k = get_mbd_hamiltonian_energy( &
+                    geom, alpha_0, C6, damp, dene_k, grad, k_point &
+                )
+                if (geom%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
+                if (geom%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+            else
+                res_k = get_mbd_rpa_energy(geom, alpha, damp, k_point)
+                if (geom%calc%get_rpa_orders) then
+                    res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
+                end if
+            end if
+            if (geom%has_exc()) return
+            res%energy = res%energy + res_k%energy
+        end do ! k_point loop
+        res%energy = res%energy/size(geom%k_pts, 2)
+        if (geom%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
+    end if
+end function
+
+type(result_t) function get_mbd_scs_energy( &
+        geom, variant, alpha_0, C6, damp, dene, grad) result(res)
+    type(geom_t), intent(inout) :: geom
+    character(len=*), intent(in) :: variant
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    type(damping_t), intent(in) :: damp
+    type(grad_t), intent(out) :: dene
+    type(grad_request_t), intent(in) :: grad
+
+    real(dp), allocatable :: alpha_dyn(:, :), alpha_dyn_scs(:, :), &
+        C6_scs(:), dC6_scs_dalpha_dyn_scs(:, :), &
+        dene_dalpha_scs_dyn(:, :), freq_w(:)
+    type(grad_t), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
+    type(grad_t) :: dene_mbd, dr_vdw_scs
+    type(grad_request_t) :: grad_scs
+    type(damping_t) :: damp_scs, damp_mbd
+    integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
+    character(len=15) :: damping_types(2)
+
+    select case (variant)
+    case ('scs')
+        damping_types = [character(len=15) :: 'dip,gg', 'dip,1mexp']
+    case ('rsscs')
+        damping_types = [character(len=15) :: 'fermi,dip,gg', 'fermi,dip']
+    end select
+    n_freq = ubound(geom%calc%omega_grid, 1)
+    n_atoms = geom%siz()
+    allocate (alpha_dyn(n_atoms, 0:n_freq))
+    allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
+    allocate (dalpha_dyn_scs(size(geom%idx%i_atom), 0:n_freq))
+    if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
+    grad_scs = grad_request_t( &
+        dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
+        dr_vdw=grad%dr_vdw &
+    )
+    alpha_dyn = alpha_dynamic_ts(geom%calc, alpha_0, C6, dalpha_dyn, grad)
+    damp_scs = damp
+    damp_scs%version = damping_types(1)
+    do i_freq = 0, n_freq
+        alpha_dyn_scs(:, i_freq) = run_scs( &
+            geom, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
+        )
+        if (geom%has_exc()) return
+    end do
+    C6_scs = C6_from_alpha( &
+        geom%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
+    )
+    damp_mbd = damp
+    damp_mbd%r_vdw = scale_TS( &
+        damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
+        grad_request_t(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
+    )
+    damp_mbd%version = damping_types(2)
+    res = get_mbd_energy(geom, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd, &
+        grad_request_t( &
+            dcoords=grad%dcoords, &
+            dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
+        ) &
+    )
+    if (geom%has_exc()) return
+    if (.not. grad%any()) return
+    freq_w = geom%calc%omega_grid_w
+    freq_w(0) = 1d0
+    dene_dalpha_scs_dyn(:, 0) = dene_mbd%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV
+    do i_freq = 1, n_freq
+        dene_dalpha_scs_dyn(:, i_freq) = &
+            dene_mbd%dC6*dC6_scs_dalpha_dyn_scs(:, i_freq)
+    end do
+    if (grad%dcoords) then
+        allocate (dene%dcoords(n_atoms, 3), source=0d0)
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = geom%idx%i_atom(my_i_atom)
+            do i_freq = 0, n_freq
+                dene%dcoords(geom%idx%j_atom, :) = &
+                    dene%dcoords(geom%idx%j_atom, :) + &
+                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
+            end do
+        end do
+#ifdef WITH_SCALAPACK
+        if (geom%idx%parallel) call all_reduce(dene%dcoords, geom%blacs)
+#endif
+        dene%dcoords = dene%dcoords + dene_mbd%dcoords
+    end if
+    if (grad%dalpha) then
+        allocate (dene%dalpha(n_atoms), source=0d0)
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = geom%idx%i_atom(my_i_atom)
+            do i_freq = 0, n_freq
+                dene%dalpha(geom%idx%j_atom) = dene%dalpha(geom%idx%j_atom) + &
+                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
+                    dalpha_dyn(i_freq)%dalpha(geom%idx%j_atom)
+            end do
+        end do
+#ifdef WITH_SCALAPACK
+        if (geom%idx%parallel) call all_reduce(dene%dalpha, geom%blacs)
+#endif
+        dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
+    end if
+    if (grad%dC6) then
+        allocate (dene%dC6(n_atoms), source=0d0)
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = geom%idx%i_atom(my_i_atom)
+            do i_freq = 0, n_freq
+                dene%dC6(geom%idx%j_atom) = dene%dC6(geom%idx%j_atom) + &
+                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
+                    dalpha_dyn(i_freq)%dC6(geom%idx%j_atom)
+            end do
+        end do
+#ifdef WITH_SCALAPACK
+        if (geom%idx%parallel) call all_reduce(dene%dC6, geom%blacs)
+#endif
+    end if
+    if (grad%dr_vdw) then
+        allocate (dene%dr_vdw(n_atoms), source=0d0)
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = geom%idx%i_atom(my_i_atom)
+            do i_freq = 0, n_freq
+                dene%dr_vdw(geom%idx%j_atom) = dene%dr_vdw(geom%idx%j_atom) + &
+                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    dalpha_dyn_scs(my_i_atom, i_freq)%dr_vdw
+            end do
+        end do
+#ifdef WITH_SCALAPACK
+        if (geom%idx%parallel) call all_reduce(dene%dr_vdw, geom%blacs)
+#endif
+        dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
+    end if
+end function
+
+end module

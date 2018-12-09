@@ -17,6 +17,7 @@ set(SRCS
     mbd_linalg.F90
     mbd_matrix.F90
     mbd_rpa.F90
+    mbd_scs.f90
     mbd_ts.f90
     mbd_utils.f90
     mbd_vdw_param.f90

@@ -10,6 +10,7 @@ program mbd_tests
 use mbd_core
 use mbd_dipole
 use mbd_hamiltonian
+use mbd_scs
 use mbd_utils, only: diff7, findval, print_matrix
 
 #ifdef WITH_MPI

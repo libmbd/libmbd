@@ -4,12 +4,16 @@
 module mbd_utils
 
 use mbd_constants
+#ifdef WITH_MPI
+use mbd_mpi
+#endif
 
 implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, lower, exception_t, diff7, &
-    findval, printer, shift_idx, result_t, clock_t
+    findval, abstract_printer, null_printer, stdout_printer, &
+    shift_idx, result_t, clock_t
 
 interface tostr
     module procedure tostr_int
@@ -46,12 +50,27 @@ type :: clock_t
 end type
 
 abstract interface
-    subroutine printer(msg)
+    subroutine abstract_printer(msg)
         character(len=*), intent(in) :: msg
     end subroutine
 end interface
 
 contains
+
+subroutine null_printer(msg)
+    character(len=*), intent(in) :: msg
+end subroutine
+
+subroutine stdout_printer(msg)
+    character(len=*), intent(in) :: msg
+#ifdef WITH_MPI
+    integer :: rank, err
+
+    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
+    if (rank /= 0) return
+#endif
+    print *, msg
+end subroutine
 
 character(len=50) elemental function tostr_int(k, format) result(s)
     integer, intent(in) :: k

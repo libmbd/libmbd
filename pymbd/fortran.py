@@ -2,6 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import division, print_function
+from contextlib import contextmanager
 
 import numpy as np
 
@@ -60,6 +61,14 @@ class MBDCalc(object):
             _ndarray(self._calc.omega_grid, (self.n_freq+1,)).copy(),
             _ndarray(self._calc.omega_grid_w, (self.n_freq+1,)).copy(),
         )
+
+    @contextmanager
+    def muted(self):
+        self._calc.muted, muted_before = True, self._calc.muted
+        try:
+            yield
+        finally:
+            self._calc.muted = muted_before
 
     def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
                   lattice=None, d=20., damping='fermi'):

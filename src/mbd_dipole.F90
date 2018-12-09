@@ -103,9 +103,10 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
             ewald_alpha = 2.5d0/(volume)**(1d0/3)
             real_space_cutoff = &
                 6d0/ewald_alpha*geom%calc%param%ewald_real_cutoff_scaling
-            geom%calc%info%ewald_alpha = &
-                'Ewald: using alpha = ' // trim(tostr(ewald_alpha)) // &
-                ', real cutoff = ' // trim(tostr(real_space_cutoff))
+            call geom%calc%print( &
+                'Ewald: using alpha = ' // trim(tostr(ewald_alpha)) &
+                // ', real cutoff = ' // trim(tostr(real_space_cutoff)) &
+            )
         else
             real_space_cutoff = geom%calc%param%dipole_cutoff
         end if
@@ -114,11 +115,12 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
         range_cell(:) = 0
     end if
     if (is_periodic) then
-        geom%calc%info%ewald_rsum = &
-            'Ewald: summing real part in cell vector range of ' // &
-            trim(tostr(1+2*range_cell(1))) // 'x' // &
-            trim(tostr(1+2*range_cell(2))) // 'x' // &
-            trim(tostr(1+2*range_cell(3)))
+        call geom%calc%print( &
+            'Ewald: summing real part in cell vector range of ' &
+            // trim(tostr(1+2*range_cell(1))) // 'x' &
+            // trim(tostr(1+2*range_cell(2))) // 'x' &
+            // trim(tostr(1+2*range_cell(3))) &
+        )
     end if
     associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
         allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
@@ -261,13 +263,15 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
     volume = abs(dble(product(eigvals(geom%lattice))))
     rec_space_cutoff = 10d0*alpha*geom%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = geom%supercell_circum(rec_unit_cell, rec_space_cutoff)
-    geom%calc%info%ewald_cutoff = 'Ewald: using reciprocal cutoff = ' // &
-        trim(tostr(rec_space_cutoff))
-    geom%calc%info%ewald_recsum = &
-        'Ewald: summing reciprocal part in G vector range of ' // &
-        trim(tostr(1+2*range_G_vector(1))) // 'x' // &
-        trim(tostr(1+2*range_G_vector(2))) // 'x' // &
-        trim(tostr(1+2*range_G_vector(3)))
+    call geom%calc%print( &
+        'Ewald: using reciprocal cutoff = ' // trim(tostr(rec_space_cutoff)) &
+    )
+    call geom%calc%print( &
+        'Ewald: summing reciprocal part in G vector range of ' &
+        // trim(tostr(1+2*range_G_vector(1))) // 'x' &
+        // trim(tostr(1+2*range_G_vector(2))) // 'x' &
+        // trim(tostr(1+2*range_G_vector(3))) &
+    )
     call geom%clock(12)
     idx_G_vector = [0, 0, -1]
     do i_G_vector = 1, product(1+2*range_G_vector)

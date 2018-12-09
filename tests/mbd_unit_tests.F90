@@ -16,7 +16,6 @@ use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
 use mbd_methods, only: get_mbd_scs_energy
 use mbd_scs, only: run_scs
 use mbd_utils, only: diff7, findval, print_matrix, tostr, result_t
-
 #ifdef WITH_MPI
 use mbd_mpi
 #endif

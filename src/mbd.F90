@@ -11,7 +11,7 @@ use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: ts_energy
-use mbd_utils, only: printer, result_t
+use mbd_utils, only: result_t
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 
 implicit none
@@ -81,7 +81,6 @@ contains
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
     procedure :: get_exception => mbd_calc_get_exception
-    procedure :: print_info => mbd_calc_print_info
 end type
 
 contains
@@ -246,13 +245,6 @@ subroutine mbd_calc_get_exception(this, code, origin, msg)
     this%calc%exc%code = 0
     this%calc%exc%origin = ''
     this%calc%exc%msg = ''
-end subroutine
-
-subroutine mbd_calc_print_info(this, info)
-    class(mbd_calculation), intent(inout) :: this
-    procedure(printer) :: info
-
-    call this%calc%info%print(info)
 end subroutine
 
 function mbd_get_free_vdw_params(atom_types, table_type) result(free_values)

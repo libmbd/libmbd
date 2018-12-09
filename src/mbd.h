@@ -7,6 +7,7 @@ struct cmbd_calc {
     int n_freq;
     double* omega_grid;
     double* omega_grid_w;
+    _Bool* muted;
 };
 
 struct cmbd_calc* cmbd_init_calc(int n_freq);

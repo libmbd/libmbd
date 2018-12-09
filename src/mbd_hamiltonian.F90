@@ -136,7 +136,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
             " negative eigenvalues"
         if (geom%calc%param%zero_negative_eigs) then
             where (eigs < 0) eigs = 0d0
-            geom%calc%info%neg_eigvals = msg
+            call geom%calc%print(msg)
         else
             geom%calc%exc%code = MBD_EXC_NEG_EIGVALS
             geom%calc%exc%msg = msg

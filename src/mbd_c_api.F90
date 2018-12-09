@@ -34,6 +34,7 @@ type, bind(c) :: cmbd_calc
     type(c_ptr) :: omega_grid = c_null_ptr
     type(c_ptr) :: omega_grid_w = c_null_ptr
     type(c_ptr) :: mbd_calc_f = c_null_ptr
+    type(c_ptr) :: muted = c_null_ptr
 end type
 
 type, bind(c) :: cmbd_geom
@@ -56,6 +57,7 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     calc_c%omega_grid = c_loc(calc%omega_grid)
     calc_c%omega_grid_w = c_loc(calc%omega_grid_w)
     calc_c%mbd_calc_f = c_loc(calc)
+    calc_c%muted = c_loc(calc%muted)
     cmbd_init_calc = c_loc(calc_c)
 end function cmbd_init_calc
 

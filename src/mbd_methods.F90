@@ -38,6 +38,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     type(result_t) :: res_k
     type(grad_t) :: domega, dene_k
     type(grad_request_t) :: grad_ham
+    logical :: muted_before
 
     omega = omega_qho(C6, alpha_0, domega, grad)
     if (geom%calc%do_rpa) then
@@ -83,7 +84,12 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             end associate
             if (geom%has_exc()) return
             res%energy = res%energy + res_k%energy
-        end do ! k_point loop
+            if (i_kpt == 1) then
+                muted_before = geom%calc%muted
+                geom%calc%muted = .true.
+            end if
+        end do
+        geom%calc%muted = muted_before
         res%energy = res%energy/size(geom%k_pts, 2)
         if (geom%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
     end if
@@ -108,6 +114,7 @@ type(result_t) function get_mbd_scs_energy( &
     type(damping_t) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
+    logical :: muted_before
 
     select case (variant)
     case ('scs')
@@ -137,7 +144,12 @@ type(result_t) function get_mbd_scs_energy( &
             geom, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
         )
         if (geom%has_exc()) return
+        if (i_freq == 0) then
+            muted_before = geom%calc%muted
+            geom%calc%muted = .true.
+        end if
     end do
+    geom%calc%muted = muted_before
     C6_scs = C6_from_alpha( &
         geom%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
     )
@@ -240,9 +252,9 @@ subroutine test_frequency_grid(calc)
     alpha = alpha_dyn_qho(calc, [21d0], [99.5d0], dalpha, grad)
     C6 = C6_from_alpha(calc, alpha)
     error = abs(C6(1)/99.5d0-1d0)
-    calc%info%freq_error = &
-        "Relative quadrature error in C6 of carbon atom: " // &
-        trim(tostr(error))
+    call calc%print( &
+        "Relative quadrature error in C6 of carbon atom: " // trim(tostr(error)) &
+    )
 end subroutine
 
 end module

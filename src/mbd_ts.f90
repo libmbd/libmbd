@@ -88,9 +88,11 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
         if (.not. is_periodic) exit
         if (i_shell > 1 .and. &
                 abs(ene_shell) < geom%calc%param%ts_energy_accuracy) then
-            geom%calc%info%ts_conv = "Periodic TS converged in " // &
-                trim(tostr(i_shell)) // " shells, " // &
-                trim(tostr(i_shell*shell_thickness/ang)) // " angstroms"
+            call geom%calc%print( &
+                "Periodic TS converged in " // trim(tostr(i_shell)) &
+                // " shells, " // trim(tostr(i_shell*shell_thickness/ang)) &
+                // " angstroms" &
+            )
             exit
         endif
     end do ! i_shell

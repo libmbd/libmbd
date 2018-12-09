@@ -7,7 +7,7 @@
 module mbd_calc
 
 use mbd_constants
-use mbd_utils, only: tostr, exception_t, clock_t
+use mbd_utils, only: tostr, exception_t, clock_t, abstract_printer, stdout_printer
 
 implicit none
 
@@ -28,51 +28,25 @@ type :: param_t
     integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
 
-type :: info_t
-    character(len=120) :: ewald_alpha = '', ewald_rsum = '', ts_conv = '', &
-        ewald_cutoff = '', ewald_recsum = '', freq_n = '', freq_error = '', &
-        neg_eigvals = ''
-    contains
-    procedure :: print => info_print
-end type
-
 type :: calc_t
     type(param_t) :: param
     type(clock_t) :: clock
     real(dp), allocatable :: omega_grid(:)
     real(dp), allocatable :: omega_grid_w(:)
     type(exception_t) :: exc
-    type(info_t) :: info
+    logical :: muted = .false.
+    procedure(abstract_printer), pointer, nopass :: printer => stdout_printer
     logical :: do_rpa = .false.
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
     logical :: get_rpa_orders = .false.
     contains
     procedure :: init => calc_init
+    procedure :: print => calc_print
     procedure :: destroy => calc_destroy
 end type
 
-abstract interface
-    subroutine printer(msg)
-        character(len=*), intent(in) :: msg
-    end subroutine
-end interface
-
 contains
-
-subroutine info_print(this, info)
-    class(info_t), intent(in) :: this
-    procedure(printer) :: info
-
-    if (this%freq_n /= '') call info(this%freq_n)
-    if (this%freq_error /= '') call info(this%freq_error)
-    if (this%ewald_alpha /= '') call info(this%ewald_alpha)
-    if (this%ewald_rsum /= '') call info(this%ewald_rsum)
-    if (this%ewald_cutoff /= '') call info(this%ewald_cutoff)
-    if (this%ewald_recsum /= '') call info(this%ewald_recsum)
-    if (this%ts_conv /= '') call info(this%ts_conv)
-    if (this%neg_eigvals /= '') call info(this%neg_eigvals)
-end subroutine
 
 subroutine calc_init(this)
     class(calc_t), intent(inout) :: this
@@ -86,9 +60,18 @@ subroutine calc_init(this)
     this%omega_grid(0) = 0d0
     this%omega_grid_w(0) = 0d0
     call get_freq_grid(n, this%omega_grid(1:n), this%omega_grid_w(1:n))
-    this%info%freq_n = &
+    call this%print( &
         "Initialized a radial integration grid of " // trim(tostr(n)) // &
-        " points."
+        " points." &
+    )
+end subroutine
+
+subroutine calc_print(this, msg)
+    class(calc_t), intent(inout) :: this
+    character(len=*), intent(in) :: msg
+
+    if (this%muted) return
+    call this%printer(msg)
 end subroutine
 
 subroutine calc_destroy(this)

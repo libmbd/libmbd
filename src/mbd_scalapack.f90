@@ -4,9 +4,9 @@
 module mbd_scalapack
 
 use mbd_constants
-use mbd_common, only: exception => mbd_exc, tostr
+use mbd_common, only: exception_t, tostr
 use mbd_lapack, only: mode
-use mbd_blacs, only: mbd_blacs_desc
+use mbd_blacs, only: blacs_desc_t
 
 implicit none
 
@@ -38,8 +38,8 @@ contains
 
 subroutine pinvh_real(A, blacs, exc, src)
     real(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
-    type(exception), intent(out), optional :: exc
+    type(blacs_desc_t), intent(in) :: blacs
+    type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
 
     integer, allocatable :: i_pivot(:), iwork_arr(:)
@@ -81,7 +81,7 @@ end subroutine
 
 function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     real(dp), intent(in) :: A(:, :), B(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacsA, blacsB, blacsC
+    type(blacs_desc_t), intent(in) :: blacsA, blacsB, blacsC
     logical, intent(in), optional :: transA, transB
     real(dp) :: C(size(A, 1), size(B, 2))
 
@@ -105,7 +105,7 @@ end function
 
 function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     complex(dp), intent(in) :: A(:, :), B(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacsA, blacsB, blacsC
+    type(blacs_desc_t), intent(in) :: blacsA, blacsB, blacsC
     logical, intent(in), optional :: transA, transB
     complex(dp) :: C(size(A, 1), size(B, 2))
 
@@ -129,9 +129,9 @@ end function
 
 subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
     real(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
@@ -168,9 +168,9 @@ end subroutine
 
 subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
     real(dp), intent(out) :: eigs(:)
-    type(exception), intent(out), optional :: exc
+    type(exception_t), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
@@ -211,8 +211,8 @@ end subroutine
 
 function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
     real(dp), target, intent(in) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
-    type(exception), intent(out), optional :: exc
+    type(blacs_desc_t), intent(in) :: blacs
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3*blacs%n_atoms)
 
@@ -234,8 +234,8 @@ end function
 
 function peigvalsh_complex(A, blacs, exc, destroy) result(eigs)
     complex(dp), target, intent(in) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
-    type(exception), intent(out), optional :: exc
+    type(blacs_desc_t), intent(in) :: blacs
+    type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3*blacs%n_atoms)
 

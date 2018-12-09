@@ -8,7 +8,7 @@ use mbd_constants
 use mbd_common, only: findval, exception_t
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
 #ifdef WITH_SCALAPACK
-use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid, all_reduce
+use mbd_blacs, only: blacs_desc_t, all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
 #endif
 
@@ -30,7 +30,7 @@ type :: matrix_re_t
     real(dp), allocatable :: val(:, :)
     type(atom_index_t) :: idx
 #ifdef WITH_SCALAPACK
-    type(mbd_blacs_desc) :: blacs
+    type(blacs_desc_t) :: blacs
 #endif
     contains
     procedure :: siz => matrix_re_siz
@@ -60,7 +60,7 @@ type :: matrix_cplx_t
     complex(dp), allocatable :: val(:, :)
     type(atom_index_t) :: idx
 #ifdef WITH_SCALAPACK
-    type(mbd_blacs_desc) :: blacs
+    type(blacs_desc_t) :: blacs
 #endif
     contains
     procedure :: siz => matrix_cplx_siz
@@ -127,7 +127,7 @@ subroutine matrix_cplx_init(this, idx)
 #endif
     type(atom_index_t), intent(in) :: idx
 #ifdef WITH_SCALAPACK
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
 #endif
 
     this%idx = idx

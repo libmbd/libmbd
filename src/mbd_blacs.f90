@@ -8,27 +8,27 @@ use mbd_constants
 implicit none
 
 private
-public :: mbd_blacs_desc, mbd_blacs_grid, all_reduce
+public :: blacs_desc_t, blacs_grid_t, all_reduce
 
-type :: mbd_blacs_grid
+type :: blacs_grid_t
     integer :: ctx
     integer :: nprows
     integer :: npcols
     integer :: my_prow
     integer :: my_pcol
 contains
-    procedure :: init => mbd_blacs_grid_init
-    procedure :: destroy => mbd_blacs_grid_destroy
+    procedure :: init => blacs_grid_init
+    procedure :: destroy => blacs_grid_destroy
 end type
 
-type :: mbd_blacs_desc
+type :: blacs_desc_t
     integer, allocatable :: i_atom(:)
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
     integer :: desc(9)
     integer :: ctx
 contains
-    procedure :: init => mbd_blacs_desc_init
+    procedure :: init => blacs_desc_init
 end type
 
 interface all_reduce
@@ -44,8 +44,8 @@ integer :: NUMROC
 
 contains
 
-subroutine mbd_blacs_grid_init(this, comm)
-    class(mbd_blacs_grid), intent(inout) :: this
+subroutine blacs_grid_init(this, comm)
+    class(blacs_grid_t), intent(inout) :: this
     integer, intent(in), optional :: comm
 
     integer :: my_task, n_tasks, nprows
@@ -68,15 +68,15 @@ subroutine mbd_blacs_grid_init(this, comm)
 end subroutine
 
 ! TODO this should be made a destructor once support for gfortran 4.9 is dropped
-subroutine mbd_blacs_grid_destroy(this)
-    class(mbd_blacs_grid), intent(inout) :: this
+subroutine blacs_grid_destroy(this)
+    class(blacs_grid_t), intent(inout) :: this
 
     call BLACS_GRIDEXIT(this%ctx)
 end subroutine
 
-subroutine mbd_blacs_desc_init(this, n_atoms, grid)
-    class(mbd_blacs_desc), intent(out) :: this
-    type(mbd_blacs_grid), intent(in) :: grid
+subroutine blacs_desc_init(this, n_atoms, grid)
+    class(blacs_desc_t), intent(out) :: this
+    type(blacs_grid_t), intent(in) :: grid
     integer, intent(in) :: n_atoms
 
     integer :: blocksize, my_nratoms, my_ncatoms, ierr
@@ -122,14 +122,14 @@ end function
 
 subroutine all_reduce_real_1d(A, blacs)
     real(dp), intent(inout) :: A(:)
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
 
     call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_real_2d(A, blacs)
     real(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
 
     call DGSUM2D( &
         blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
@@ -138,14 +138,14 @@ end subroutine
 
 subroutine all_reduce_complex_1d(A, blacs)
     complex(dp), intent(inout) :: A(:)
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
 
     call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_complex_2d(A, blacs)
     complex(dp), intent(inout) :: A(:, :)
-    type(mbd_blacs_desc), intent(in) :: blacs
+    type(blacs_desc_t), intent(in) :: blacs
 
     call ZGSUM2D( &
         blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &

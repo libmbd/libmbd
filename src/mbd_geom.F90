@@ -8,7 +8,7 @@ use mbd_calc, only: calc_t
 use mbd_lapack, only: inverse
 use mbd_matrix, only: atom_index_t
 #ifdef WITH_SCALAPACK
-use mbd_blacs, only: mbd_blacs_desc, mbd_blacs_grid
+use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
 #ifdef WITH_MPI
 use mbd_mpi
@@ -37,8 +37,8 @@ type :: geom_t
     character(len=10) :: parallel_mode = 'auto'
     type(atom_index_t) :: idx
 #ifdef WITH_SCALAPACK
-    type(mbd_blacs_desc) :: blacs
-    type(mbd_blacs_grid) :: blacs_grid
+    type(blacs_desc_t) :: blacs
+    type(blacs_grid_t) :: blacs_grid
 #endif
 #ifdef WITH_MPI
     integer :: comm = MPI_COMM_WORLD

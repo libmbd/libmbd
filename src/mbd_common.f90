@@ -11,7 +11,7 @@ use mbd_utils, only: tostr
 implicit none
 
 private
-public :: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_osc, C6_from_alpha
+public :: omega_qho, alpha_dyn_qho, C6_from_alpha, sigma_selfint, scale_with_ratio
 
 contains
 
@@ -21,7 +21,7 @@ contains
 !> \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
 !> \right)
 !> \f]
-function omega_eff(C6, alpha, domega, grad) result(omega)
+function omega_qho(C6, alpha, domega, grad) result(omega)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: alpha(:)
     type(grad_t), intent(out), optional :: domega
@@ -35,56 +35,13 @@ function omega_eff(C6, alpha, domega, grad) result(omega)
 end function
 
 !> \f[
-!> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
-!> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
-!> \f]
-!>
-!> \f[
-!> \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
-!> \partial\sigma_{ij}=
-!> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
-!> \f]
-function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
-    real(dp), intent(in) :: alpha(:)
-    real(dp), allocatable, intent(out), optional :: dsigma_dalpha(:)
-    logical, intent(in), optional :: grad
-    real(dp) :: sigma(size(alpha))
-
-    sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
-    if (.not. present(grad)) return
-    if (grad) dsigma_dalpha = sigma/(3*alpha)
-end function
-
-!> \f[
-!> \bar X=X\left(\frac{\bar\alpha_0}{\alpha_0}\right)^q,\qquad
-!> \partial\bar X=\bar X\left(
-!> \frac{\partial X}{X}+
-!> q\frac{\partial\bar\alpha_0}{\bar\alpha_0}-
-!> q\frac{\partial\alpha_0}{\alpha_0}
-!> \right)
-!> \f]
-function scale_ts(X_free, V, V_free, q, dX, grad) result(X)
-    real(dp), intent(in) :: X_free(:), V(:), V_free(:)
-    real(dp), intent(in) :: q
-    type(grad_t), intent(out), optional :: dX
-    type(grad_request_t), intent(in), optional :: grad
-    real(dp) :: X(size(X_free))
-
-    X = X_free*(V/V_free)**q
-    if (.not. present(grad)) return
-    if (grad%dX_free) dX%dX_free = X/X_free
-    if (grad%dV) dX%dV = X*q/V
-    if (grad%dV_free) dX%dV_free = -X*q/V_free
-end function
-
-!> \f[
 !> \alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
 !> \partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(
 !> \frac{\partial\alpha_0}{\alpha_0}+
 !> \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
 !> \right)
 !> \f]
-function alpha_dynamic_osc(calc, alpha_0, omega, dalpha, grad) result(alpha)
+function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
     type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
@@ -132,19 +89,47 @@ function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
     end do
 end function
 
-subroutine test_frequency_grid(calc)
-    type(calc_t), intent(inout) :: calc
+!> \f[
+!> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
+!> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
+!> \f]
+!>
+!> \f[
+!> \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
+!> \partial\sigma_{ij}=
+!> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
+!> \f]
+function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
+    real(dp), intent(in) :: alpha(:)
+    real(dp), allocatable, intent(out), optional :: dsigma_dalpha(:)
+    logical, intent(in), optional :: grad
+    real(dp) :: sigma(size(alpha))
 
-    real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
-    type(grad_t), allocatable :: dalpha(:)
-    type(grad_request_t) :: grad
+    sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
+    if (.not. present(grad)) return
+    if (grad) dsigma_dalpha = sigma/(3*alpha)
+end function
 
-    alpha = alpha_dynamic_osc(calc, [21d0], [99.5d0], dalpha, grad)
-    C6 = C6_from_alpha(calc, alpha)
-    error = abs(C6(1)/99.5d0-1d0)
-    calc%info%freq_error = &
-        "Relative quadrature error in C6 of carbon atom: " // &
-        trim(tostr(error))
-end subroutine
+!> \f[
+!> x'=x\left(\frac{y'}y\right)^q,\qquad
+!> \partial x'=x\left(
+!> \frac{\partial x}x+
+!> q\frac{\partial y'}{y'}-
+!> q\frac{\partial y}{y}
+!> \right)
+!> \f]
+function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)
+    real(dp), intent(in) :: x(:), yp(:), y(:)
+    real(dp), intent(in) :: q
+    type(grad_t), intent(out), optional :: dx
+    type(grad_request_t), intent(in), optional :: grad
+    real(dp) :: xp(size(x))
+
+    xp = x*(yp/y)**q
+    if (.not. present(grad)) return
+    if (grad%dX_free) dx%dX_free = xp/x
+    if (grad%dV) dx%dV = xp*q/yp
+    if (grad%dV_free) dx%dV_free = -xp*q/y
+end function
 
 end module

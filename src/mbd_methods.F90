@@ -4,14 +4,15 @@
 module mbd_methods
 
 use mbd_constants
-use mbd_common, only: omega_eff, sigma_selfint, scale_ts, alpha_dynamic_osc, C6_from_alpha
+use mbd_calc, only: calc_t
+use mbd_common, only: omega_qho, alpha_dyn_qho, scale_with_ratio, C6_from_alpha
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
 use mbd_damping, only: damping_t
 use mbd_rpa, only: get_mbd_rpa_energy
 use mbd_scs, only: run_scs
-use mbd_utils, only: result_t
+use mbd_utils, only: result_t, tostr
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: all_reduce
 #endif
@@ -38,9 +39,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     type(grad_t) :: domega, dene_k
     type(grad_request_t) :: grad_ham
 
-    omega = omega_eff(C6, alpha_0, domega, grad)
+    omega = omega_qho(C6, alpha_0, domega, grad)
     if (geom%calc%do_rpa) then
-        alpha = alpha_dynamic_osc(geom%calc, alpha_0, omega, dalpha, grad_request_t())
+        alpha = alpha_dyn_qho(geom%calc, alpha_0, omega, dalpha, grad_request_t())
     end if
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%calc%do_rpa) then
@@ -120,8 +121,8 @@ type(result_t) function get_mbd_scs_energy( &
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
     allocate (dalpha_dyn_scs(size(geom%idx%i_atom), 0:n_freq))
     if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
-    omega = omega_eff(C6, alpha_0, domega, grad)
-    alpha_dyn = alpha_dynamic_osc( &
+    omega = omega_qho(C6, alpha_0, domega, grad)
+    alpha_dyn = alpha_dyn_qho( &
         geom%calc, alpha_0, omega, dalpha_dyn, &
         grad_request_t(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
     )
@@ -141,7 +142,7 @@ type(result_t) function get_mbd_scs_energy( &
         geom%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
     )
     damp_mbd = damp
-    damp_mbd%r_vdw = scale_TS( &
+    damp_mbd%r_vdw = scale_with_ratio( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
         grad_request_t(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
     )
@@ -228,5 +229,20 @@ type(result_t) function get_mbd_scs_energy( &
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
 end function
+
+subroutine test_frequency_grid(calc)
+    type(calc_t), intent(inout) :: calc
+
+    real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
+    type(grad_t), allocatable :: dalpha(:)
+    type(grad_request_t) :: grad
+
+    alpha = alpha_dyn_qho(calc, [21d0], [99.5d0], dalpha, grad)
+    C6 = C6_from_alpha(calc, alpha)
+    error = abs(C6(1)/99.5d0-1d0)
+    calc%info%freq_error = &
+        "Relative quadrature error in C6 of carbon atom: " // &
+        trim(tostr(error))
+end subroutine
 
 end module

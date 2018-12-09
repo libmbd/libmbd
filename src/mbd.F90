@@ -5,7 +5,7 @@ module mbd
 
 use mbd_constants
 use mbd_calc, only: calc_t, get_freq_grid
-use mbd_common, only: scale_ts
+use mbd_common, only: scale_with_ratio
 use mbd_damping, only: damping_t
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
@@ -169,9 +169,9 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     real(dp), allocatable :: ones(:)
 
     allocate (ones(size(ratios)), source=1d0)
-    this%alpha_0 = scale_TS(this%free_values(1, :), ratios, ones, 1d0)
-    this%C6 = scale_TS(this%free_values(2, :), ratios, ones, 2d0)
-    this%damp%r_vdw = scale_TS(this%free_values(3, :), ratios, ones, 1d0/3)
+    this%alpha_0 = scale_with_ratio(this%free_values(1, :), ratios, ones, 1d0)
+    this%C6 = scale_with_ratio(this%free_values(2, :), ratios, ones, 2d0)
+    this%damp%r_vdw = scale_with_ratio(this%free_values(3, :), ratios, ones, 1d0/3)
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)

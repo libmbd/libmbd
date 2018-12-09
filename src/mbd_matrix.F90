@@ -1,16 +1,16 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef MBD_INCLUDED
+#ifndef MBD_TYPE
 module mbd_matrix
 
 use mbd_constants
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
 use mbd_utils, only: findval, exception_t
-#ifdef WITH_SCALAPACK
+#   ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
-#endif
+#   endif
 
 implicit none
 
@@ -21,17 +21,17 @@ type :: atom_index_t
     integer, allocatable :: i_atom(:)
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
-#ifdef WITH_SCALAPACK
+#   ifdef WITH_SCALAPACK
     logical :: parallel
-#endif
+#   endif
 end type
 
 type :: matrix_re_t
     real(dp), allocatable :: val(:, :)
     type(atom_index_t) :: idx
-#ifdef WITH_SCALAPACK
+#   ifdef WITH_SCALAPACK
     type(blacs_desc_t) :: blacs
-#endif
+#   endif
     contains
     procedure :: siz => matrix_re_siz
     procedure :: init => matrix_re_init
@@ -59,9 +59,9 @@ end type
 type :: matrix_cplx_t
     complex(dp), allocatable :: val(:, :)
     type(atom_index_t) :: idx
-#ifdef WITH_SCALAPACK
+#   ifdef WITH_SCALAPACK
     type(blacs_desc_t) :: blacs
-#endif
+#   endif
     contains
     procedure :: siz => matrix_cplx_siz
     procedure :: init => matrix_cplx_init
@@ -92,10 +92,7 @@ end interface
 
 contains
 
-#endif
-
-#ifndef MBD_TYPE
-#define MBD_TYPE 0
+#   define MBD_TYPE 0
 #endif
 
 #if MBD_TYPE == 0
@@ -587,12 +584,10 @@ type(matrix_cplx_t) function matrix_cplx_mmul( &
 #endif
 end function
 
-#undef MBD_TYPE
-#ifndef MBD_INCLUDED
-#define MBD_INCLUDED
-#define MBD_TYPE 1
+#if MBD_TYPE == 0
+#   undef MBD_TYPE
+#   define MBD_TYPE 1
 #include "mbd_matrix.F90"
-#undef MBD_INCLUDED
 
 subroutine matrix_re_invh(A, exc, src)
     class(matrix_re_t), intent(inout) :: A

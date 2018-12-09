@@ -9,7 +9,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, lower, exception_t, diff7, &
-    findval, printer, shift_cell, result_t
+    findval, printer, shift_cell, result_t, clock_t
 
 interface tostr
     module procedure tostr_int_
@@ -33,6 +33,16 @@ type :: result_t
     real(dp), allocatable :: rpa_orders_k(:, :)
 end type
 
+integer, parameter :: n_timestamps = 100
+
+type :: clock_t
+    logical :: active = .true.
+    integer :: timestamps(n_timestamps), counts(n_timestamps)
+    integer, private :: cnt, rate, cnt_max, aid
+    contains
+    procedure :: clock => clock_clock
+end type clock_t
+
 abstract interface
     subroutine printer(msg)
         character(len=*), intent(in) :: msg
@@ -40,7 +50,6 @@ abstract interface
 end interface
 
 contains
-
 
 character(len=50) elemental function tostr_int_(k, format)
     implicit none
@@ -56,7 +65,6 @@ character(len=50) elemental function tostr_int_(k, format)
     tostr_int_ = adjustl(tostr_int_)
 end function tostr_int_
 
-
 character(len=50) elemental function tostr_dble_(x, format)
     implicit none
 
@@ -71,14 +79,12 @@ character(len=50) elemental function tostr_dble_(x, format)
     tostr_dble_ = adjustl(tostr_dble_)
 end function tostr_dble_
 
-
 real(dp) pure function diff3(x, delta)
     real(dp), intent(in) :: x(-1:)
     real(dp), intent(in) :: delta
 
     diff3 = (x(1)-x(-1))/(2*delta)
 end function
-
 
 real(dp) pure function diff5(x, delta)
     real(dp), intent(in) :: x(-2:)
@@ -87,14 +93,12 @@ real(dp) pure function diff5(x, delta)
     diff5 = (1.d0/12*x(-2)-2.d0/3*x(-1)+2.d0/3*x(1)-1.d0/12*x(2))/delta
 end function
 
-
 real(dp) pure function diff7(x, delta)
     real(dp), intent(in) :: x(-3:)
     real(dp), intent(in) :: delta
 
     diff7 = (-1.d0/60*x(-3)+3.d0/20*x(-2)-3.d0/4*x(-1)+3.d0/4*x(1)-3.d0/20*x(2)+1.d0/60*x(3))/delta
 end function
-
 
 subroutine print_matrix(label, A, prec)
     character(len=*), intent(in) :: label
@@ -121,7 +125,6 @@ subroutine print_matrix(label, A, prec)
     end do
 end subroutine
 
-
 pure function lower(str)
     character(len=*), intent(in) :: str
     character(len=len(str)) :: lower
@@ -137,7 +140,6 @@ pure function lower(str)
         end select
     end do
 end function
-
 
 integer pure function findval(array, val)
     integer, intent(in) :: array(:), val
@@ -168,6 +170,21 @@ subroutine shift_cell(ijk, first_cell, last_cell)
             ijk(i_dim) = first_cell(i_dim)
         end if
     end do
+end subroutine
+
+subroutine clock_clock(this, id)
+    class(clock_t), intent(inout) :: this
+    integer, intent(in) :: id
+
+    if (.not. this%active) return
+    call system_clock(this%cnt, this%rate, this%cnt_max)
+    if (id > 0) then
+        this%timestamps(id) = this%timestamps(id)-this%cnt
+    else
+        this%aid = abs(id)
+        this%timestamps(this%aid) = this%timestamps(this%aid)+this%cnt
+        this%counts(this%aid) = this%counts(this%aid)+1
+    end if
 end subroutine
 
 end module

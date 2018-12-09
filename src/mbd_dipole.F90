@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef MBD_INCLUDED
+#ifndef MBD_TYPE
 module mbd_dipole
 
 use mbd_constants
@@ -17,10 +17,10 @@ use mbd_utils, only: tostr, shift_cell
 
 implicit none
 
-#ifndef MODULE_UNIT_TESTS
+#   ifndef MODULE_UNIT_TESTS
 private
 public :: dipole_matrix
-#endif
+#   endif
 
 interface dipole_matrix
     module procedure dipole_matrix_real
@@ -29,10 +29,7 @@ end interface
 
 contains
 
-#endif
-
-#ifndef MBD_TYPE
-#define MBD_TYPE 0
+#   define MBD_TYPE 0
 #endif
 
 !> \f[
@@ -342,12 +339,10 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
     call geom%clock(-12)
 end subroutine
 
-#undef MBD_TYPE
-#ifndef MBD_INCLUDED
-#define MBD_INCLUDED
-#define MBD_TYPE 1
-#include "mbd_dipole.F90"
-#undef MBD_INCLUDED
+#if MBD_TYPE == 0
+#   undef MBD_TYPE
+#   define MBD_TYPE 1
+#   include "mbd_dipole.F90"
 
 function T_bare(r, dT, grad) result(T)
     real(dp), intent(in) :: r(3)

@@ -7,8 +7,7 @@
 module mbd_calc
 
 use mbd_constants
-use mbd_clock, only: clock_t
-use mbd_utils, only: tostr, exception_t
+use mbd_utils, only: tostr, exception_t, clock_t
 
 implicit none
 

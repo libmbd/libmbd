@@ -2,7 +2,6 @@ set(SRCS
     mbd.F90
     mbd_c_api.F90
     mbd_calc.F90
-    mbd_clock.f90
     mbd_common.f90
     mbd_constants.f90
     mbd_coulomb.f90

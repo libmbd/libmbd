@@ -103,7 +103,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter S_r of method TS unknown for ' // trim(xc)
         end select
-    case ('mbd@rsscs')
+    case ('mbd-rsscs')
         select case (lower(xc))
         case ('pbe')
             this%beta = 0.83d0
@@ -115,7 +115,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter beta of method MBD@rsSCS unknown for ' // trim(xc)
         end select
-    case ('mbd@ts')
+    case ('mbd-ts')
         select case (lower(xc))
         case ('pbe')
             this%beta = 0.81d0
@@ -127,7 +127,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter beta of method MBD@TS unknown for ' // trim(xc)
         end select
-    case ('mbd@scs')
+    case ('mbd-scs')
         this%beta = 1d0
         select case (lower(xc))
         case ('pbe')

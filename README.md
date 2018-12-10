@@ -95,10 +95,10 @@ assert abs(ene_f-ene_py) < 1e-15
 ```
 
 ```fortran
-use mbd, only: mbd_input, mbd_calculation
+use mbd, only: mbd_input, mbd_calc
 
 type(mbd_input) :: inp
-type(mbd_calculation) :: calc
+type(mbd_calc) :: calc
 real(dp) :: energy, gradients(3, 2)
 integer :: code
 character(200) :: origin, msg

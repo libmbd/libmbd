@@ -9,8 +9,8 @@ serial-%:
 	make -C $* check
 
 mpi-%: serial-%
-	mpirun -n 2 $*/src/mbd_tests
-	mpirun -n 2 $*/src/mbd_api_tests
+	mpirun -n 2 $*/tests/mbd_unit_tests
+	mpirun -n 2 $*/tests/mbd_api_tests
 
 doc:
 	cd docs && doxygen

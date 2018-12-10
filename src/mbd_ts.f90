@@ -4,9 +4,9 @@
 module mbd_ts
 
 use mbd_constants
-use mbd_common, only: shift_cell, tostr
-use mbd_damping_type, only: mbd_damping, damping_fermi
-use mbd_system_type, only: mbd_system, ang
+use mbd_utils, only: shift_idx, tostr
+use mbd_damping, only: damping_t, damping_fermi
+use mbd_geom, only: geom_t
 
 implicit none
 
@@ -15,11 +15,11 @@ public :: ts_energy
 
 contains
 
-function ts_energy(sys, alpha_0, C6, damp) result(ene)
-    type(mbd_system), intent(inout) :: sys
+function ts_energy(geom, alpha_0, C6, damp) result(ene)
+    type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
-    type(mbd_damping), intent(in) :: damp
+    type(damping_t), intent(in) :: damp
     real(dp) :: ene
 
     real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3), &
@@ -28,33 +28,33 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
     real(dp), parameter :: shell_thickness = 10d0
     logical :: is_periodic
 
-    is_periodic = allocated(sys%lattice)
+    is_periodic = allocated(geom%lattice)
     ene = 0d0
     i_shell = 0
     do
         i_shell = i_shell+1
         ene_shell = 0d0
         if (is_periodic) then
-            range_cell = sys%supercell_circum(sys%lattice, i_shell*shell_thickness)
+            range_cell = geom%supercell_circum(geom%lattice, i_shell*shell_thickness)
         else
             range_cell = [0, 0, 0]
         end if
         idx_cell = [0, 0, -1]
         do i_cell = 1, product(1+2*range_cell)
-            call shift_cell(idx_cell, -range_cell, range_cell)
+            call shift_idx(idx_cell, -range_cell, range_cell)
             if (is_periodic) then
-                R_cell = matmul(sys%lattice, idx_cell)
+                R_cell = matmul(geom%lattice, idx_cell)
             else
                 R_cell = [0d0, 0d0, 0d0]
             end if
-            do i_atom = 1, sys%siz()
+            do i_atom = 1, geom%siz()
                 do j_atom = 1, i_atom
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = sys%coords(:, i_atom)-sys%coords(:, j_atom)-R_cell
+                    r = geom%coords(:, i_atom)-geom%coords(:, j_atom)-R_cell
                     r_norm = sqrt(sum(r**2))
-                    if (r_norm > sys%calc%param%ts_cutoff_radius) cycle
+                    if (r_norm > geom%calc%param%ts_cutoff_radius) cycle
                     if (is_periodic) then
                         if (r_norm >= i_shell*shell_thickness &
                             .or. r_norm < (i_shell-1)*shell_thickness) then
@@ -87,10 +87,12 @@ function ts_energy(sys, alpha_0, C6, damp) result(ene)
         ene = ene+ene_shell
         if (.not. is_periodic) exit
         if (i_shell > 1 .and. &
-                abs(ene_shell) < sys%calc%param%ts_energy_accuracy) then
-            sys%calc%info%ts_conv = "Periodic TS converged in " // &
-                trim(tostr(i_shell)) // " shells, " // &
-                trim(tostr(i_shell*shell_thickness/ang)) // " angstroms"
+                abs(ene_shell) < geom%calc%param%ts_energy_accuracy) then
+            call geom%calc%print( &
+                "Periodic TS converged in " // trim(tostr(i_shell)) &
+                // " shells, " // trim(tostr(i_shell*shell_thickness/ang)) &
+                // " angstroms" &
+            )
             exit
         endif
     end do ! i_shell

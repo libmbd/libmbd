@@ -4,7 +4,7 @@
 module mbd_vdw_param
 
 use mbd_constants
-use mbd_common, only: lower
+use mbd_utils, only: lower
 
 implicit none
 

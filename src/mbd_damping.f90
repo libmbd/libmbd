@@ -1,18 +1,18 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-module mbd_damping_type
+module mbd_damping
 
 use mbd_constants
-use mbd_common, only: lower, mbd_exc
-use mbd_gradients_type, only: mbd_grad_scalar, mbd_grad_switch
+use mbd_gradients, only: grad_scalar_t, grad_request_t
+use mbd_utils, only: lower, exception_t
 
 implicit none
 
 private
-public :: mbd_damping, damping_fermi, damping_sqrtfermi, op1minus_grad
+public :: damping_t, damping_fermi, damping_sqrtfermi, op1minus_grad
 
-type :: mbd_damping
+type :: damping_t
     character(len=20) :: version
     real(dp) :: beta = 0d0
     real(dp) :: a = MBD_DAMPING_A
@@ -24,8 +24,8 @@ type :: mbd_damping
     real(dp), allocatable :: damping_custom(:, :)
     real(dp), allocatable :: potential_custom(:, :, :, :)
     contains
-    procedure :: set_params_from_xc => mbd_damping_set_params_from_xc
-end type mbd_damping
+    procedure :: set_params_from_xc => damping_set_params_from_xc
+end type
 
 contains
 
@@ -46,8 +46,8 @@ real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
     real(dp), intent(in) :: d
-    type(mbd_grad_scalar), intent(out), optional :: df
-    type(mbd_grad_switch), intent(in), optional :: grad
+    type(grad_scalar_t), intent(out), optional :: df
+    type(grad_request_t), intent(in), optional :: grad
 
     real(dp) :: pre, eta, r_1
 
@@ -70,15 +70,15 @@ end function
 
 subroutine op1minus_grad(f, df)
     real(dp), intent(inout) :: f
-    type(mbd_grad_scalar), intent(inout) :: df
+    type(grad_scalar_t), intent(inout) :: df
 
     f = 1-f
     if (allocated(df%dr)) df%dr = -df%dr
     if (allocated(df%dvdw)) df%dvdw = -df%dvdw
 end subroutine
 
-type(mbd_exc) function mbd_damping_set_params_from_xc(this, xc, variant) result(exc)
-    class(mbd_damping), intent(inout) :: this
+type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(exc)
+    class(damping_t), intent(inout) :: this
     character(len=*), intent(in) :: xc
     character(len=*), intent(in) :: variant
 
@@ -103,7 +103,7 @@ type(mbd_exc) function mbd_damping_set_params_from_xc(this, xc, variant) result(
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter S_r of method TS unknown for ' // trim(xc)
         end select
-    case ('mbd@rsscs')
+    case ('mbd-rsscs')
         select case (lower(xc))
         case ('pbe')
             this%beta = 0.83d0
@@ -115,7 +115,7 @@ type(mbd_exc) function mbd_damping_set_params_from_xc(this, xc, variant) result(
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter beta of method MBD@rsSCS unknown for ' // trim(xc)
         end select
-    case ('mbd@ts')
+    case ('mbd-ts')
         select case (lower(xc))
         case ('pbe')
             this%beta = 0.81d0
@@ -127,7 +127,7 @@ type(mbd_exc) function mbd_damping_set_params_from_xc(this, xc, variant) result(
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter beta of method MBD@TS unknown for ' // trim(xc)
         end select
-    case ('mbd@scs')
+    case ('mbd-scs')
         this%beta = 1d0
         select case (lower(xc))
         case ('pbe')

@@ -7,6 +7,7 @@ implicit none
 
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
+real(dp), parameter :: ang = 1.8897259886d0
 
 real(dp), parameter :: TS_ENERGY_ACCURACY = 1d-6
 real(dp), parameter :: TS_FORCES_ACCURACY = 1d-7

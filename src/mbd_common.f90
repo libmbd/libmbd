@@ -4,159 +4,132 @@
 module mbd_common
 
 use mbd_constants
+use mbd_calc, only: calc_t
+use mbd_gradients, only: grad_t, grad_request_t
+use mbd_utils, only: tostr
 
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, lower, mbd_exc, diff7, &
-    findval, printer, shift_cell
-
-interface tostr
-    module procedure tostr_int_
-    module procedure tostr_dble_
-end interface
-
-type :: mbd_exc
-    integer :: code = 0
-    character(50) :: origin = '(unknown)'
-    character(150) :: msg = ''
-end type
-
-abstract interface
-    subroutine printer(msg)
-        character(len=*), intent(in) :: msg
-    end subroutine
-end interface
+public :: omega_qho, alpha_dyn_qho, C6_from_alpha, sigma_selfint, scale_with_ratio
 
 contains
 
+!> \f[
+!> \omega=\frac{4C_6}{3\alpha_{0}^2},\qquad
+!> \partial\omega=\omega\left(
+!> \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
+!> \right)
+!> \f]
+function omega_qho(C6, alpha, domega, grad) result(omega)
+    real(dp), intent(in) :: C6(:)
+    real(dp), intent(in) :: alpha(:)
+    type(grad_t), intent(out), optional :: domega
+    type(grad_request_t), intent(in), optional :: grad
+    real(dp) :: omega(size(C6))
 
-character(len=50) elemental function tostr_int_(k, format)
-    implicit none
-
-    integer, intent(in) :: k
-    character(*), intent(in), optional :: format
-
-    if (present(format)) then
-        write (tostr_int_, format) k
-    else
-        write (tostr_int_, "(i20)") k
-    end if
-    tostr_int_ = adjustl(tostr_int_)
-end function tostr_int_
-
-
-character(len=50) elemental function tostr_dble_(x, format)
-    implicit none
-
-    double precision, intent(in) :: x
-    character(*), intent(in), optional :: format
-
-    if (present(format)) then
-        write (tostr_dble_, format) x
-    else
-        write (tostr_dble_, "(g50.17e3)") x
-    end if
-    tostr_dble_ = adjustl(tostr_dble_)
-end function tostr_dble_
-
-
-real(dp) pure function diff3(x, delta)
-    real(dp), intent(in) :: x(-1:)
-    real(dp), intent(in) :: delta
-
-    diff3 = (x(1)-x(-1))/(2*delta)
+    omega = 4d0/3*C6/alpha**2
+    if (.not. present(grad)) return
+    if (grad%dC6) domega%dC6 = omega/C6
+    if (grad%dalpha) domega%dalpha = -2*omega/alpha
 end function
 
+!> \f[
+!> \alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
+!> \partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(
+!> \frac{\partial\alpha_0}{\alpha_0}+
+!> \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
+!> \right)
+!> \f]
+function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
+    type(calc_t), intent(in) :: calc
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: omega(:)
+    type(grad_t), allocatable, intent(out) :: dalpha(:)
+    type(grad_request_t), intent(in) :: grad
+    real(dp) :: alpha(size(alpha_0), 0:ubound(calc%omega_grid, 1))
 
-real(dp) pure function diff5(x, delta)
-    real(dp), intent(in) :: x(-2:)
-    real(dp), intent(in) :: delta
+    integer :: i_freq, n_atoms
 
-    diff5 = (1.d0/12*x(-2)-2.d0/3*x(-1)+2.d0/3*x(1)-1.d0/12*x(2))/delta
-end function
-
-
-real(dp) pure function diff7(x, delta)
-    real(dp), intent(in) :: x(-3:)
-    real(dp), intent(in) :: delta
-
-    diff7 = (-1.d0/60*x(-3)+3.d0/20*x(-2)-3.d0/4*x(-1)+3.d0/4*x(1)-3.d0/20*x(2)+1.d0/60*x(3))/delta
-end function
-
-
-subroutine print_matrix(label, A, prec)
-    character(len=*), intent(in) :: label
-    real(dp), intent(in) :: A(:, :)
-    integer, optional, intent(in) :: prec
-
-    integer :: m, n, i, j, prec_
-    character(len=10) :: fm
-
-    if (present(prec)) then
-        prec_ = prec
-    else
-        prec_ = 3
-    end if
-    m = size(A, 1)
-    n = size(A, 2)
-    write (fm, '("(g",i2,".",i1,")")') prec_+8, prec_
-    write (6, '(A,":")') label
-    do i = 1, m
-        do j = 1, n
-            write (6, fm, advance="no") A(i, j)
-        end do
-        write (6, *)
-    end do
-end subroutine
-
-
-pure function lower(str)
-    character(len=*), intent(in) :: str
-    character(len=len(str)) :: lower
-
-    integer :: i
-
-    do i = 1, len(str)
-        select case (str(i:i))
-            case ('A':'Z')
-                lower(i:i) = achar(iachar(str(i:i))+32)
-            case default
-                lower(i:i) = str(i:i)
-        end select
+    n_atoms = size(alpha_0)
+    allocate (dalpha(0:ubound(alpha, 2)))
+    do i_freq = 0, ubound(alpha, 2)
+        associate (alpha => alpha(:, i_freq), u => calc%omega_grid(i_freq))
+            alpha = alpha_0/(1+(u/omega)**2)
+            if (grad%dalpha) dalpha(i_freq)%dalpha = alpha/alpha_0
+            if (grad%domega) dalpha(i_freq)%domega = alpha*2d0/omega/(1d0+(omega/u)**2)
+        end associate
     end do
 end function
 
+!> \f[
+!> \bar C_6=\frac3\pi\int_0^\infty\mathrm du\,\bar\alpha(u)^2,\qquad
+!> \partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du
+!> \bar\alpha(u)\partial\bar\alpha(u)
+!> \f]
+function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
+    type(calc_t), intent(in) :: calc
+    real(dp), intent(in) :: alpha(:, 0:)
+    real(dp), allocatable, intent(out), optional :: dC6_dalpha(:, :)
+    logical, intent(in), optional :: grad
+    real(dp) :: C6(size(alpha, 1))
 
-integer pure function findval(array, val)
-    integer, intent(in) :: array(:), val
+    integer :: i_freq, n_atoms
 
-    integer :: i
-
-    findval = 0
-    do i = 1, size(array)
-        if (val == array(i)) then
-            findval = i
-            return
-        end if
+    n_atoms = size(alpha, 1)
+    C6 = 0d0
+    do i_freq = 0, ubound(alpha, 2)
+        C6 = C6 + 3d0/pi*alpha(:, i_freq)**2*calc%omega_grid_w(i_freq)
+    end do
+    if (.not. present(grad)) return
+    if (.not. grad) return
+    allocate (dC6_dalpha(n_atoms, 0:ubound(alpha, 2)), source=0d0)
+    do i_freq = 0, ubound(alpha, 2)
+        dC6_dalpha(:, i_freq) = dC6_dalpha(:, i_freq) + 6d0/pi*alpha(:, i_freq)
     end do
 end function
 
-subroutine shift_cell(ijk, first_cell, last_cell)
-    integer, intent(inout) :: ijk(3)
-    integer, intent(in) :: first_cell(3), last_cell(3)
+!> \f[
+!> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
+!> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
+!> \f]
+!>
+!> \f[
+!> \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
+!> \partial\sigma_{ij}=
+!> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
+!> \f]
+function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
+    real(dp), intent(in) :: alpha(:)
+    real(dp), allocatable, intent(out), optional :: dsigma_dalpha(:)
+    logical, intent(in), optional :: grad
+    real(dp) :: sigma(size(alpha))
 
-    integer :: i_dim, i
+    sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
+    if (.not. present(grad)) return
+    if (grad) dsigma_dalpha = sigma/(3*alpha)
+end function
 
-    do i_dim = 3, 1, -1
-        i = ijk(i_dim)+1
-        if (i <= last_cell(i_dim)) then
-            ijk(i_dim) = i
-            return
-        else
-            ijk(i_dim) = first_cell(i_dim)
-        end if
-    end do
-end subroutine
+!> \f[
+!> x'=x\left(\frac{y'}y\right)^q,\qquad
+!> \partial x'=x\left(
+!> \frac{\partial x}x+
+!> q\frac{\partial y'}{y'}-
+!> q\frac{\partial y}{y}
+!> \right)
+!> \f]
+function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)
+    real(dp), intent(in) :: x(:), yp(:), y(:)
+    real(dp), intent(in) :: q
+    type(grad_t), intent(out), optional :: dx
+    type(grad_request_t), intent(in), optional :: grad
+    real(dp) :: xp(size(x))
+
+    xp = x*(yp/y)**q
+    if (.not. present(grad)) return
+    if (grad%dX_free) dx%dX_free = xp/x
+    if (grad%dV) dx%dV = xp*q/yp
+    if (grad%dV_free) dx%dV_free = -xp*q/y
+end function
 
 end module

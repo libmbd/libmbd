@@ -17,7 +17,7 @@ use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 implicit none
 
 private
-public :: mbd_input, mbd_calculation  ! types
+public :: mbd_input, mbd_calc  ! types
 public :: mbd_get_free_vdw_params, get_freq_grid  ! subroutines
 
 type :: mbd_input
@@ -56,7 +56,7 @@ type :: mbd_input
     character(len=10) :: parallel_mode = 'auto'
 end type
 
-type mbd_calculation
+type mbd_calc
     private
     type(geom_t) :: geom
     type(damping_t) :: damp
@@ -86,7 +86,7 @@ end type
 contains
 
 subroutine mbd_calc_init(this, input)
-    class(mbd_calculation), target, intent(inout) :: this
+    class(mbd_calc), target, intent(inout) :: this
     type(mbd_input), intent(in) :: input
 
 #ifdef WITH_MPI
@@ -130,28 +130,28 @@ subroutine mbd_calc_init(this, input)
 end subroutine
 
 subroutine mbd_calc_destroy(this)
-    class(mbd_calculation), target, intent(inout) :: this
+    class(mbd_calc), target, intent(inout) :: this
 
     call this%geom%destroy()
     call this%calc%destroy()
 end subroutine
 
 subroutine mbd_calc_update_coords(this, coords)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
 
     this%geom%coords = coords
 end subroutine
 
 subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%geom%lattice = latt_vecs
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: r_vdw(:)
@@ -162,7 +162,7 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: ratios(:)
 
     real(dp), allocatable :: ones(:)
@@ -174,7 +174,7 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(in) :: alpha_0_ratios(:)
     real(dp), intent(in) :: C6_ratios(:)
 
@@ -184,7 +184,7 @@ subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
 end subroutine
 
 subroutine mbd_calc_get_energy(this, energy)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(out) :: energy
 
     select case (this%dispersion_type)
@@ -207,21 +207,21 @@ subroutine mbd_calc_get_energy(this, energy)
 end subroutine
 
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
-    class(mbd_calculation), intent(in) :: this
+    class(mbd_calc), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
 
     gradients = transpose(this%denergy%dcoords)
 end subroutine
 
 subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)  ! 3 by 3  (dE/d{abc}_i)
-    class(mbd_calculation), intent(in) :: this
+    class(mbd_calc), intent(in) :: this
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
 end subroutine
 
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     real(dp), intent(out) :: spectrum(:)
     real(dp), intent(out), optional :: modes(:, :)
     ! TODO document that this can be called only once
@@ -233,7 +233,7 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
 end subroutine
 
 subroutine mbd_calc_get_exception(this, code, origin, msg)
-    class(mbd_calculation), intent(inout) :: this
+    class(mbd_calc), intent(inout) :: this
     integer, intent(out) :: code
     character(*), intent(out) :: origin
     character(*), intent(out) :: msg

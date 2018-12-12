@@ -17,10 +17,8 @@ use mbd_utils, only: tostr, shift_idx
 
 implicit none
 
-#   ifndef MODULE_UNIT_TESTS
 private
-public :: dipole_matrix
-#   endif
+public :: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
 
 interface dipole_matrix
     module procedure dipole_matrix_real
@@ -33,18 +31,27 @@ contains
 #endif
 
 !> \f[
-!> T_{(ij)ab}\equiv\frac{\partial^2}{\partial R_a\partial R_b}\frac1R=
-!> \frac{-3R_aR_b+R^2\delta_{ab}}{R^5},\qquad
-!> \mathbf R\equiv \mathbf R_{ij}\equiv\mathbf R_j-\mathbf R_i
+!> \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf m}\mathbf T(\mathbf R_{\mathbf
+!> mij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf mij}},\quad\mathbf
+!> R_{\mathbf mij}=\mathbf R_j+\mathbf R_\mathbf m-\mathbf R_i
 !> \f]
 !>
 !> \f[
-!> \frac{\partial\mathbf T_{ij}}{\partial\mathbf R_k}=
-!> \frac{\partial\mathbf T}{\partial\mathbf R}(\delta_{jk}-\delta_{ik}),\qquad
-!> \frac{\partial T_{ab}}{\partial R_c}=-3\left(
-!> \frac{R_a\delta_{bc}+R_b\delta_{ca}+R_c\delta_{ab}}{R^5}-
-!> \frac{5R_aR_bR_c}{R^7}
-!> \right)
+!> \frac{\partial\mathbf T_{ij}}{\partial\mathbf R_k}=\frac{\partial\mathbf
+!> T(\mathbf R_{ij})}{\partial\mathbf R_{ij}}(\delta_{jk}-\delta_{ik})
+!> \f]
+!>
+!> \f[
+!> \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
+!> =\sum_\mathbf m^{|\mathbf R_{\mathbf mij}|<R_\text c}\mathbf
+!> T^\text{erfc}(\mathbf R_{\mathbf mij},\gamma)\mathrm e^{-\mathrm i\mathbf
+!> q\cdot\mathbf R_{\mathbf mij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
+!> n}^{0<|\mathbf k_\mathbf n|<k_\text c}\mathbf{\hat k}_\mathbf
+!> n\otimes\mathbf{\hat k}_\mathbf n\,\mathrm e^{-\frac{k_\mathbf
+!> n^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf n\cdot\mathbf R_{ij}} \\
+!> -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
+!> \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
+!> n+\mathbf q
 !> \f]
 #if MBD_TYPE == 0
 type(matrix_re_t) function dipole_matrix_real( &
@@ -348,6 +355,14 @@ end subroutine
 #   define MBD_TYPE 1
 #   include "mbd_dipole.F90"
 
+!> \f[
+!> T_{ab}(\mathbf r)=\frac{\partial^2}{\partial r_a\partial r_b}\frac1r=
+!> \frac{-3r_ar_b+r^2\delta_{ab}}{r^5},\qquad
+!> \frac{\partial T_{ab}}{\partial r_c}=-3\left(
+!> \frac{r_a\delta_{bc}+r_b\delta_{ca}+r_c\delta_{ab}}{r^5}-
+!> \frac{5r_ar_br_c}{r^7}
+!> \right)
+!> \f]
 function T_bare(r, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
     type(grad_matrix_re_t), intent(out), optional :: dT
@@ -425,28 +440,28 @@ end function
 
 !> \f[
 !> \begin{gathered}
-!> T^\text{GG}_{(ij)ab}\equiv
-!> \frac{\partial^2}{\partial R_a\partial R_b}\frac{\operatorname{erf}(\zeta)}R=
-!> \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}+
-!> 2\zeta^2\Theta(\zeta)\frac{R_aR_b}{R^5}, \\\\
-!> \Theta(\zeta)=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\qquad
-!> \zeta=\frac{R_{(ij)}}{\sigma_{(ij)}}
+!> T^\text{GG}_{ab}(\mathbf r,\sigma)=
+!> \frac{\partial^2}{\partial r_a\partial r_b}\frac{\operatorname{erf}(\zeta)}r=
+!> \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}(\mathbf r)+
+!> 2\zeta^2\Theta(\zeta)\frac{r_ar_b}{r^5}, \\\\
+!> \Theta(\zeta)=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\quad
+!> \zeta=\frac r\sigma
 !> \end{gathered}
 !> \f]
 !>
 !> \f[
 !> \begin{aligned}
-!> \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dR_c}&=
-!> 2\zeta\Theta(\zeta)\left(T_{ab}+(3-2\zeta^2)\frac{R_aR_b}{R^5}\right)
-!> \frac{\mathrm d\zeta}{\mathrm dR_c} \\\\
+!> \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dr_c}&=
+!> 2\zeta\Theta(\zeta)\left(T_{ab}(\mathbf r)+(3-2\zeta^2)\frac{r_ar_b}{r^5}\right)
+!> \frac{\mathrm d\zeta}{\mathrm dr_c} \\\\
 !> &\qquad+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
-!> \frac{\partial T_{ab}}{\partial R_c}-
+!> \frac{\partial T_{ab}}{\partial r_c}-
 !> 2\zeta^2\Theta(\zeta)\left(
-!> \frac13\frac{\partial T_{ab}}{\partial R_c}+
-!> \frac{R_c\delta_{ab}}{R^5}
+!> \frac13\frac{\partial T_{ab}}{\partial r_c}+
+!> \frac{r_c\delta_{ab}}{r^5}
 !> \right) \\\\
-!> \qquad\frac{\mathrm d\zeta}{\mathrm dR_c}&=
-!> \frac{R_c}{R\sigma}-\frac R{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dR_c}
+!> \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=
+!> \frac{r_c}{r\sigma}-\frac r{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dr_c}
 !> \end{aligned}
 !> \f]
 function T_erf_coulomb(r, sigma, dT, grad) result(T)

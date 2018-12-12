@@ -1,9 +1,6 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#define MODULE_UNIT_TESTS
-#include "../src/mbd_dipole.F90"
-
 program mbd_unit_tests
 
 use mbd_constants

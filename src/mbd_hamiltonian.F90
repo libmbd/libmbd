@@ -39,13 +39,16 @@ type(result_t) function get_mbd_hamiltonian_energy_real( &
 #elif MBD_TYPE == 1
 !> \f[
 !> \begin{gathered}
-!> E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q}\big)-
-!> 3\sum_i\frac{\omega_i}2,\qquad
-!> \mathbf Q_{ij}=\omega_i^2\delta_{ij}\mathbf I+
-!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}
-!> \\ \mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad
-!> \boldsymbol\Lambda\equiv\operatorname{diag}(\{\tilde\omega_i^2\}),\qquad
-!> \operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\sum_i\tilde\omega_i
+!> E_\text{MBD}(\mathbf q)=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf
+!> q)}\big)- 3\sum_i\frac{\omega_i}2,\qquad
+!> \mathbf Q_{ij}(\mathbf q)=\omega_i^2\delta_{ij}\mathbf I+
+!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}(\mathbf q)
+!> \\ \mathbf Q(\mathbf q)\equiv
+!> \mathbf C(\mathbf q)\boldsymbol\Lambda(\mathbf q)\mathbf C(\mathbf q)^\text T,\qquad
+!> \boldsymbol\Lambda(\mathbf q)
+!> \equiv\operatorname{diag}(\{\tilde\omega_i(\mathbf q)^2\}),\qquad
+!> \operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf q)}\big)
+!> =\sum_i\tilde\omega_i(\mathbf q)
 !> \end{gathered}
 !> \f]
 !>

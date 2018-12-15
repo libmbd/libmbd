@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> Performing self-consistent screening.
 module mbd_scs
 
 use mbd_constants
@@ -20,14 +22,11 @@ public :: run_scs
 contains
 
 !> \f[
+!> \begin{gathered}
 !> \bar\alpha_i=\tfrac13\operatorname{Tr}
 !> \big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad
 !> \boldsymbol{\bar\alpha}=(\boldsymbol\alpha^{-1}+\mathbf T_\text{GG})^{-1}
-!> \f]
-!>
-!> \f[
-!> \begin{gathered}
-!> \partial\boldsymbol{\bar\alpha}=
+!> \\\\ \partial\boldsymbol{\bar\alpha}=
 !> -\boldsymbol{\bar\alpha}(
 !> \partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG}
 !> )\boldsymbol{\bar\alpha},\qquad
@@ -35,8 +34,8 @@ contains
 !> -\frac13\sum_{\zeta\eta}\big(
 !> B_{i\zeta,j\eta}\bar\alpha'_{\zeta,j\eta}+
 !> B'_{j\eta,\zeta}\bar\alpha_{j\eta,i\zeta}
-!> \big) \\\\
-!> \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
+!> \big)
+!> \\\\ \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
 !> \quad A_{i\zeta,j\eta}=
 !> \frac{\partial(\alpha_i^{-1})}{\partial X_i}
 !> \delta_{ij}\delta_{\zeta\eta}+

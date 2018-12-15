@@ -113,7 +113,7 @@ if (code > 0) then
     stop
 end if
 call calc%update_vdw_params_from_ratios([0.98d0, 0.98d0])
-call calc%get_energy(energy)
+call calc%evaluate_vdw_method(energy)
 call calc%get_gradients(gradients)
 call calc%destroy()
 ```

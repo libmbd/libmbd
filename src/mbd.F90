@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> High-level Fortran API.
 module mbd
 
 use mbd_constants
@@ -106,7 +108,7 @@ contains
     procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
     procedure :: update_vdw_params_from_ratios => mbd_calc_update_vdw_params_from_ratios
     procedure :: update_vdw_params_nl => mbd_calc_update_vdw_params_nl
-    procedure :: get_energy => mbd_calc_get_energy
+    procedure :: evaluate_vdw_method => mbd_calc_evaluate_vdw_method
     procedure :: get_gradients => mbd_calc_get_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
@@ -115,8 +117,10 @@ end type
 
 contains
 
+!> Initialize an MBD calculation from an MBD input.
 subroutine mbd_calc_init(this, input)
     class(mbd_calc), target, intent(inout) :: this
+    !> MBD input.
     type(mbd_input), intent(in) :: input
 
 #ifdef WITH_MPI
@@ -161,6 +165,7 @@ subroutine mbd_calc_init(this, input)
     end if
 end subroutine
 
+!> Finalize an MBD calculation.
 subroutine mbd_calc_destroy(this)
     class(mbd_calc), target, intent(inout) :: this
 
@@ -168,24 +173,32 @@ subroutine mbd_calc_destroy(this)
     call this%calc%destroy()
 end subroutine
 
+!> Update atomic coordinates.
 subroutine mbd_calc_update_coords(this, coords)
     class(mbd_calc), intent(inout) :: this
+    !> (\f$3\times N\f$, a.u.) New atomic coordinates.
     real(dp), intent(in) :: coords(:, :)
 
     this%geom%coords = coords
 end subroutine
 
+!> Update unit-cell lattice vectors.
 subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     class(mbd_calc), intent(inout) :: this
+    !> (\f$3\times 3\f$, a.u.) New lattice vectors in columns.
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%geom%lattice = latt_vecs
 end subroutine
 
+!> Update vdW parameters in a custom way.
 subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     class(mbd_calc), intent(inout) :: this
+    !> (a.u.) New atomic static polarizabilities.
     real(dp), intent(in) :: alpha_0(:)
+    !> (a.u.) New atomic \f$C_6\f$ coefficients.
     real(dp), intent(in) :: C6(:)
+    !> (a.u.) New atomic vdW radii.
     real(dp), intent(in) :: r_vdw(:)
 
     this%alpha_0 = alpha_0
@@ -193,8 +206,10 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     this%damp%r_vdw = r_vdw
 end subroutine
 
+!> Update vdW parameters based on scaling of free-atom values.
 subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     class(mbd_calc), intent(inout) :: this
+    !> Ratios of atomic volumes in the system and in vacuum.
     real(dp), intent(in) :: ratios(:)
 
     real(dp), allocatable :: ones(:)
@@ -205,9 +220,14 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     this%damp%r_vdw = scale_with_ratio(this%free_values(3, :), ratios, ones, 1d0/3)
 end subroutine
 
+!> Update vdW parameters for the MBD-NL method.
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     class(mbd_calc), intent(inout) :: this
+    !> Ratios of free-atom exact static polarizabilities and those from the VV
+    !> functional.
     real(dp), intent(in) :: alpha_0_ratios(:)
+    !> Ratios of free-atom exact \f$C_6\f$ coefficients and those from the VV
+    !> functional.
     real(dp), intent(in) :: C6_ratios(:)
 
     this%alpha_0 = this%free_values(1, :)*alpha_0_ratios
@@ -215,8 +235,11 @@ subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     this%damp%r_vdw = 2.5d0*this%free_values(1, :)**(1d0/7)*alpha_0_ratios**(1d0/3)
 end subroutine
 
-subroutine mbd_calc_get_energy(this, energy)
+!> Evaluate a given vdW method for a given system and vdW parameters, retrieve
+!> energy.
+subroutine mbd_calc_evaluate_vdw_method(this, energy)
     class(mbd_calc), intent(inout) :: this
+    !> (a.u.) VdW energy.
     real(dp), intent(out) :: energy
 
     select case (this%method)
@@ -238,36 +261,69 @@ subroutine mbd_calc_get_energy(this, energy)
     end select
 end subroutine
 
+!> Retrieve nuclear energy gradients if they were requested in the MBD input.
+!>
+!> The gradients are calculated together with the energy, so a call to this
+!> method must be preceeded by a call to `mbd_calc%%evaluate_mbd_method()`. For
+!> the same reason, the gradients must be requested prior to this called via
+!> `mbd_input%%calculate_forces`.
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     class(mbd_calc), intent(in) :: this
+    !> (\f$3\times N\f$, a.u.) Energy gradients, \f$\mathrm dE/\mathrm d\mathbf
+    !> R_i\f$, index \f$i\f$ runs over columns.
     real(dp), intent(out) :: gradients(:, :)
 
     gradients = transpose(this%denergy%dcoords)
 end subroutine
 
-subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)  ! 3 by 3  (dE/d{abc}_i)
+!> Provide lattice-vector energy gradients if they were requested in the MBD input.
+!>
+!> The gradients are actually calculated together with the energy, so a call to
+!> this method must be preceeded by a call to `mbd_calc%%evaluate_mbd_method()`.
+!> For the same reason, the gradients must be requested prior to this called via
+!> `mbd_input%%calculate_forces`.
+subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
     class(mbd_calc), intent(in) :: this
+    !> (\f$3\times 3\f$, a.u.) Energy gradients, \f$\mathrm dE/\mathrm d\mathbf
+    !> a_i\f$, index \f$i\f$ runs over columns.
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
 end subroutine
 
+!> Provide MBD spectrum if it was requested in the MBD input.
+!>
+!> The spectrum is actually calculated together with the energy, so a call to
+!> this method must be preceeded by a call to `mbd_calc%%evaluate_mbd_method()`.
+!> For the same reason, the spectrum must be requested prior to this called via
+!> `mbd_input%%calculate_spectrum`.
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     class(mbd_calc), intent(inout) :: this
+    !> (\f$3N\f$, a.u.) Energies (frequencies) of coupled MBD modues,
+    !> \f$\omega_i\f$.
     real(dp), intent(out) :: spectrum(:)
-    real(dp), intent(out), optional :: modes(:, :)
-    ! TODO document that this can be called only once
+    !> (\f$3N\times 3N\f$) Coupled-mode wave functions (MBD eigenstates),
+    !> \f$\psi_j\f$, in the basis of uncoupled states,
+    !> \f$C_{ij}=\langle\phi_i|\psi_j\rangle\f$, index \f$j\f$ runs over columns.
+    !>
+    !> To save memory, the argument must be allocatable, and the method
+    !> transfers allocation from the internal state to the argument. For this
+    !> reason, the method can be called only once wih this optional argument per
+    !> calculation.
+    real(dp), intent(out), allocatable, optional :: modes(:, :)
 
     spectrum = this%results%mode_eigs
-    if (present(modes)) then
-        modes = this%results%modes
-    end if
+    if (present(modes)) call move_alloc(this%results%modes, modes)
 end subroutine
 
+!> Retrieve an exception in the MBD calculation if it occured.
 subroutine mbd_calc_get_exception(this, code, origin, msg)
     class(mbd_calc), intent(inout) :: this
+    !> Exception code, values defined in `mbd_constants`.
     integer, intent(out) :: code
+    !> Exception origin.
     character(*), intent(out) :: origin
+    !> Exception message.
     character(*), intent(out) :: msg
 
     code = this%calc%exc%code

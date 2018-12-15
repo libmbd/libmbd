@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> Formulas used at multiple places of the code.
 module mbd_common
 
 use mbd_constants
@@ -90,14 +92,13 @@ function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
 end function
 
 !> \f[
+!> \begin{gathered}
 !> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
 !> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
-!> \f]
-!>
-!> \f[
-!> \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
+!> \\\\ \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
 !> \partial\sigma_{ij}=
 !> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
+!> \end{gathered}
 !> \f]
 function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
     real(dp), intent(in) :: alpha(:)

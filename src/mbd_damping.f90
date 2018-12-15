@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> Damping functions.
 module mbd_damping
 
 use mbd_constants
@@ -30,17 +32,16 @@ end type
 contains
 
 !> \f[
+!> \begin{gathered}
 !> f_{(ij)}=\frac1{1+\exp\big({-}a(\eta-1)\big)},\qquad
 !> \eta=\frac{R_{(ij)}}{S_{\text{vdW}(ij)}}\equiv
 !> \frac{R_{(ij)}}{\beta R_{\text{vdW}(ij)}}
-!> \f]
-!>
-!> \f[
-!> \frac{\mathrm df}{\mathrm dR_c}=
+!> \\\\ \frac{\mathrm df}{\mathrm dR_c}=
 !> \frac a{2+2\cosh\big(a(\eta-1)\big)}\frac{\mathrm d\eta}{\mathrm dR_c},\qquad
 !> \frac{\mathrm d\eta}{\mathrm dR_c}=
 !> \frac{R_c}{RS_\text{vdW}}-
 !> \frac{R}{S_\text{vdW}^2}\frac{\mathrm dS_\text{vdW}}{\mathrm dR_c}
+!> \end{gathered}
 !> \f]
 real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     real(dp), intent(in) :: r(3)

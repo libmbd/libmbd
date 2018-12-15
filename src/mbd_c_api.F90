@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> Implementation of C API.
 module mbd_c_api
 
 use iso_c_binding
@@ -17,6 +19,14 @@ use mbd_ts, only: ts_energy
 use mbd_utils, only: result_t
 
 implicit none
+
+private
+public :: cmbd_with_scalapack, cmbd_with_mpi
+public :: cmbd_calc, cmbd_geom
+public :: cmbd_init_calc, cmbd_destroy_calc, cmbd_init_geom, &
+    cmbd_destroy_geom, cmbd_init_damping, cmbd_destroy_damping, cmbd_get_exception
+public :: cmbd_ts_energy, cmbd_mbd_energy, cmbd_rpa_energy, cmbd_mbd_rsscs_energy, &
+    cmbd_mbd_scs_energy, cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy
 
 #ifdef WITH_MPI
 logical(c_bool), bind(c) :: cmbd_with_mpi = .true.

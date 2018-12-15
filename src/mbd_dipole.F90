@@ -2,6 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifndef MBD_TYPE
+
+!> Construction of dipole tensors and dipole matrices.
 module mbd_dipole
 
 use mbd_constants
@@ -20,6 +22,7 @@ implicit none
 private
 public :: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
 
+!> Form either a real or a complex dipole matrix.
 interface dipole_matrix
     module procedure dipole_matrix_real
     module procedure dipole_matrix_complex
@@ -31,27 +34,23 @@ contains
 #endif
 
 !> \f[
+!> \begin{gathered}
 !> \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf m}\mathbf T(\mathbf R_{\mathbf
 !> mij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf mij}},\quad\mathbf
 !> R_{\mathbf mij}=\mathbf R_j+\mathbf R_\mathbf m-\mathbf R_i
-!> \f]
-!>
-!> \f[
-!> \frac{\partial\mathbf T_{ij}}{\partial\mathbf R_k}=\frac{\partial\mathbf
+!> \\\\ \frac{\partial\mathbf T_{ij}}{\partial\mathbf R_k}=\frac{\partial\mathbf
 !> T(\mathbf R_{ij})}{\partial\mathbf R_{ij}}(\delta_{jk}-\delta_{ik})
-!> \f]
-!>
-!> \f[
-!> \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
+!> \\\\ \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
 !> =\sum_\mathbf m^{|\mathbf R_{\mathbf mij}|<R_\text c}\mathbf
 !> T^\text{erfc}(\mathbf R_{\mathbf mij},\gamma)\mathrm e^{-\mathrm i\mathbf
 !> q\cdot\mathbf R_{\mathbf mij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
 !> n}^{0<|\mathbf k_\mathbf n|<k_\text c}\mathbf{\hat k}_\mathbf
 !> n\otimes\mathbf{\hat k}_\mathbf n\,\mathrm e^{-\frac{k_\mathbf
-!> n^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf n\cdot\mathbf R_{ij}} \\
-!> -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
+!> n^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf n\cdot\mathbf R_{ij}}
+!> \\\\ -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
 !> \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
 !> n+\mathbf q
+!> \end{gathered}
 !> \f]
 #if MBD_TYPE == 0
 type(matrix_re_t) function dipole_matrix_real( &
@@ -240,6 +239,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     end if
 end function
 
+!> \private
 #if MBD_TYPE == 0
 subroutine add_ewald_dipole_parts_real(geom, alpha, dipmat)
     type(matrix_re_t), intent(inout) :: dipmat
@@ -439,28 +439,23 @@ function T_erfc(rxyz, alpha) result(T)
 end function
 
 !> \f[
-!> \begin{gathered}
-!> T^\text{GG}_{ab}(\mathbf r,\sigma)=
+!> \begin{aligned}
+!> T^\text{GG}_{ab}(\mathbf r,\sigma)&=
 !> \frac{\partial^2}{\partial r_a\partial r_b}\frac{\operatorname{erf}(\zeta)}r=
 !> \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}(\mathbf r)+
-!> 2\zeta^2\Theta(\zeta)\frac{r_ar_b}{r^5}, \\\\
-!> \Theta(\zeta)=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\quad
+!> 2\zeta^2\Theta(\zeta)\frac{r_ar_b}{r^5}
+!> \\\\ \Theta(\zeta)&=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),
 !> \zeta=\frac r\sigma
-!> \end{gathered}
-!> \f]
-!>
-!> \f[
-!> \begin{aligned}
-!> \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dr_c}&=
+!> \\\\ \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dr_c}&=
 !> 2\zeta\Theta(\zeta)\left(T_{ab}(\mathbf r)+(3-2\zeta^2)\frac{r_ar_b}{r^5}\right)
-!> \frac{\mathrm d\zeta}{\mathrm dr_c} \\\\
-!> &\qquad+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
+!> \frac{\mathrm d\zeta}{\mathrm dr_c}
+!> \\\\ &+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
 !> \frac{\partial T_{ab}}{\partial r_c}-
 !> 2\zeta^2\Theta(\zeta)\left(
 !> \frac13\frac{\partial T_{ab}}{\partial r_c}+
 !> \frac{r_c\delta_{ab}}{r^5}
-!> \right) \\\\
-!> \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=
+!> \right)
+!> \\\\ \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=
 !> \frac{r_c}{r\sigma}-\frac r{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dr_c}
 !> \end{aligned}
 !> \f]

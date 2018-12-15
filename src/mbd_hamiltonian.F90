@@ -2,6 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifndef MBD_TYPE
+
+!> Forming and solving MBD Hamiltonian.
 module mbd_hamiltonian
 
 use mbd_constants
@@ -17,6 +19,7 @@ implicit none
 private
 public :: get_mbd_hamiltonian_energy
 
+!> Form and solve either a real or a complex MBD Hamiltonian.
 interface get_mbd_hamiltonian_energy
     module procedure get_mbd_hamiltonian_energy_real
     module procedure get_mbd_hamiltonian_energy_complex
@@ -32,8 +35,8 @@ contains
 !> E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-
 !> 3\sum_i\frac{\omega_i}2,\qquad
 !> \mathbf Q_{ij}=\omega_i^2\delta_{ij}\mathbf I+
-!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij} \\\\
-!> \mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad
+!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}
+!> \\\\ \mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad
 !> \boldsymbol\Lambda\equiv\operatorname{diag}(\{\tilde\omega_i^2\}),\qquad
 !> \operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\sum_i\tilde\omega_i
 !> \end{gathered}
@@ -45,8 +48,8 @@ contains
 !> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T
 !> \partial\mathbf Q
 !> \big)-
-!> 3\sum_i\frac{\partial\omega_i}2 \\\\
-!> \frac{\partial E_\text{MBD}}{\partial X_i}&=
+!> 3\sum_i\frac{\partial\omega_i}2
+!> \\\\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
 !> \frac12\sum_{p\zeta}(
 !> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T
 !> )_{p,i\zeta}
@@ -64,8 +67,8 @@ contains
 !> \frac{\partial\omega_j}{\omega_j}+
 !> \frac12\frac{\partial\alpha_{0,i}}{\alpha_{0,i}}+
 !> \frac12\frac{\partial\alpha_{0,j}}{\alpha_{0,j}}
-!> \right) \\\\
-!> &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
+!> \right)
+!> \\\\ &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
 !> \partial\mathbf T_{ij}
 !> \end{aligned}
 !> \f]

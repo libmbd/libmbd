@@ -11,13 +11,6 @@ integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
 real(dp), parameter :: ang = 1.8897259886d0
 
-real(dp), parameter :: TS_ENERGY_ACCURACY = 1d-6
-real(dp), parameter :: TS_FORCES_ACCURACY = 1d-7
-integer, parameter :: N_FREQUENCY_GRID = 15
-real(dp), parameter :: K_GRID_SHIFT = 0.5d0
-real(dp), parameter :: TS_DAMPING_D = 20d0
-real(dp), parameter :: MBD_DAMPING_A = 6d0
-
 integer, parameter :: MBD_EXC_NEG_EIGVALS = 1
 integer, parameter :: MBD_EXC_NEG_POL = 2
 integer, parameter :: MBD_EXC_LINALG = 3

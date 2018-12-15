@@ -4,6 +4,8 @@
 #ifndef LEGENDRE_PREC
 #define LEGENDRE_PREC 8
 #endif
+#include "defaults.h"
+
 module mbd_calc
 
 use mbd_constants

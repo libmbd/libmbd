@@ -5,7 +5,7 @@ set(SRCS
     mbd_common.f90
     mbd_constants.f90
     mbd_coulomb.f90
-    mbd_damping.f90
+    mbd_damping.F90
     # mbd_density.f90
     mbd_dipole.F90
     mbd_geom.F90

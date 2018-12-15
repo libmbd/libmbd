@@ -21,7 +21,7 @@ public :: run_scs
 
 contains
 
-!> \f[
+!> $$
 !> \begin{gathered}
 !> \bar\alpha_i=\tfrac13\operatorname{Tr}
 !> \big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad
@@ -43,7 +43,7 @@ contains
 !> \bar\alpha'_{\zeta,p}=\sum_i\bar\alpha_{i\zeta,p},\quad
 !> B'_{p,\zeta}=\sum_iB_{p,i\zeta}
 !> \end{gathered}
-!> \f]
+!> $$
 function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:)

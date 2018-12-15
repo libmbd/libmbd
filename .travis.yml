@@ -17,10 +17,6 @@ jobs:
       python: 3.6
       stage: deploy
       env: TOXENV=doc MAKEENV=doc
-      addons:
-        apt:
-          packages:
-            - doxygen
     - language: generic
       stage: anaconda
       script: .travis/anaconda.sh

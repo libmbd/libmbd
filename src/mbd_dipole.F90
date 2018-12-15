@@ -23,25 +23,10 @@ private
 public :: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
 
 !> Form either a real or a complex dipole matrix.
-interface dipole_matrix
-    module procedure dipole_matrix_real
-    module procedure dipole_matrix_complex
-end interface
-
-contains
-
-#   define MBD_TYPE 0
-#endif
-
-#if MBD_TYPE == 0
-!> \f[
-!> \mathbf T_{ij}\equiv\mathbf T_{ij}(\mathbf q=0)
-!> \f]
-type(matrix_re_t) function dipole_matrix_real( &
-        geom, damp, ddipmat, grad) result(dipmat)
-    use mbd_constants, only: ZERO => ZERO_REAL
-#elif MBD_TYPE == 1
-!> \f[
+!>
+!> The real-typed version is equivalent to \(\mathbf q=0\).
+!>
+!> $$
 !> \begin{gathered}
 !> \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf m}\mathbf T(\mathbf R_{\mathbf
 !> mij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf mij}},\quad\mathbf
@@ -58,7 +43,22 @@ type(matrix_re_t) function dipole_matrix_real( &
 !> \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
 !> n+\mathbf q
 !> \end{gathered}
-!> \f]
+!> $$
+interface dipole_matrix
+    module procedure dipole_matrix_real
+    module procedure dipole_matrix_complex
+end interface
+
+contains
+
+#   define MBD_TYPE 0
+#endif
+
+#if MBD_TYPE == 0
+type(matrix_re_t) function dipole_matrix_real( &
+        geom, damp, ddipmat, grad) result(dipmat)
+    use mbd_constants, only: ZERO => ZERO_REAL
+#elif MBD_TYPE == 1
 type(matrix_cplx_t) function dipole_matrix_complex( &
         geom, damp, ddipmat, grad, k_point) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
@@ -357,14 +357,14 @@ end subroutine
 #   define MBD_TYPE 1
 #   include "mbd_dipole.F90"
 
-!> \f[
+!> $$
 !> T_{ab}(\mathbf r)=\frac{\partial^2}{\partial r_a\partial r_b}\frac1r=
 !> \frac{-3r_ar_b+r^2\delta_{ab}}{r^5},\qquad
 !> \frac{\partial T_{ab}}{\partial r_c}=-3\left(
 !> \frac{r_a\delta_{bc}+r_b\delta_{ca}+r_c\delta_{ab}}{r^5}-
 !> \frac{5r_ar_br_c}{r^7}
 !> \right)
-!> \f]
+!> $$
 function T_bare(r, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
     type(grad_matrix_re_t), intent(out), optional :: dT
@@ -409,7 +409,7 @@ function T_bare(r, dT, grad) result(T)
     end forall
 end function
 
-!> \f[
+!> $$
 !> \begin{aligned}
 !> B(R,\gamma)
 !> &=\operatorname{erfc}(\gamma R)
@@ -418,14 +418,14 @@ end function
 !> &=-\frac4{\sqrt\pi}(\gamma R)^2\mathrm e^{-(\gamma R)^2}
 !> (R\partial\gamma+\gamma\partial R)
 !> \end{aligned}
-!> \f]
+!> $$
 real(dp) function B_erfc(r, a) result(B)
     real(dp), intent(in) :: r, a
 
     B = (erfc(a*r)+(2*a*r/sqrt(pi))*exp(-(a*r)**2))/r**3
 end function
 
-!> \f[
+!> $$
 !> \begin{aligned}
 !> C(r,\gamma)
 !> &=3\operatorname{erfc}(\gamma R)
@@ -434,14 +434,14 @@ end function
 !> &=-\frac8{\sqrt\pi}(\gamma R)^4\mathrm e^{-(\gamma R)^2}
 !> (R\partial\gamma+\gamma\partial R)
 !> \end{aligned}
-!> \f]
+!> $$
 real(dp) elemental function C_erfc(r, a) result(C)
     real(dp), intent(in) :: r, a
 
     C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
 end function
 
-!> \f[
+!> $$
 !> \begin{aligned}
 !> \mathbf T^\text{erfc}(\gamma)
 !> &=\frac{-3\mathbf R\otimes\mathbf RC(R,\gamma )+R^2\mathbf IB(R,\gamma)}{R^5}
@@ -449,7 +449,7 @@ end function
 !> &=\partial\mathbf T+\frac{-3\mathbf R\otimes\mathbf R\partial C(R,\gamma )
 !> +R^2\mathbf I\partial B(R,\gamma)}{R^5}
 !> \end{aligned}
-!> \f]
+!> $$
 function T_erfc(rxyz, alpha) result(T)
     real(dp), intent(in) :: rxyz(3), alpha
     real(dp) :: T(3, 3)
@@ -469,7 +469,7 @@ function T_erfc(rxyz, alpha) result(T)
     end do
 end function
 
-!> \f[
+!> $$
 !> \begin{aligned}
 !> T^\text{GG}_{ab}(\mathbf r,\sigma)&=
 !> \frac{\partial^2}{\partial r_a\partial r_b}\frac{\operatorname{erf}(\zeta)}r=
@@ -489,7 +489,7 @@ end function
 !> \\ \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=
 !> \frac{r_c}{r\sigma}-\frac r{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dr_c}
 !> \end{aligned}
-!> \f]
+!> $$
 function T_erf_coulomb(r, sigma, dT, grad) result(T)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma

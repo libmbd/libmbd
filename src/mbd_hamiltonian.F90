@@ -20,24 +20,10 @@ private
 public :: get_mbd_hamiltonian_energy
 
 !> Form and solve either a real or a complex MBD Hamiltonian.
-interface get_mbd_hamiltonian_energy
-    module procedure get_mbd_hamiltonian_energy_real
-    module procedure get_mbd_hamiltonian_energy_complex
-end interface
-
-contains
-
-#   define MBD_TYPE 0
-#endif
-
-#if MBD_TYPE == 0
-!> \f[
-!> E_\text{MBD}\equiv E_\text{MBD}(\mathbf q=0)
-!> \f]
-type(result_t) function get_mbd_hamiltonian_energy_real( &
-        geom, alpha_0, omega, damp, dene, grad) result(res)
-#elif MBD_TYPE == 1
-!> \f[
+!>
+!> The real-typed version is equivalent to \(\mathbf q=0\).
+!>
+!> $$
 !> \begin{gathered}
 !> E_\text{MBD}(\mathbf q)=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf
 !> q)}\big)- 3\sum_i\frac{\omega_i}2,\qquad
@@ -50,9 +36,9 @@ type(result_t) function get_mbd_hamiltonian_energy_real( &
 !> \operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf q)}\big)
 !> =\sum_i\tilde\omega_i(\mathbf q)
 !> \end{gathered}
-!> \f]
+!> $$
 !>
-!> \f[
+!> $$
 !> \begin{aligned}
 !> \partial E_\text{MBD}&=\frac14\operatorname{Tr}\big(
 !> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T
@@ -66,9 +52,9 @@ type(result_t) function get_mbd_hamiltonian_energy_real( &
 !> \frac{\partial Q_{p,i\zeta}}{\partial X_i}-
 !> \frac32\frac{\partial\omega_i}{\partial X_i}
 !> \end{aligned}
-!> \f]
+!> $$
 !>
-!> \f[
+!> $$
 !> \begin{aligned}
 !> \partial\mathbf Q_{ij}=&
 !> 2\delta_{ij}\omega_i\partial\omega_i\mathbf I+
@@ -81,7 +67,21 @@ type(result_t) function get_mbd_hamiltonian_energy_real( &
 !> \\ &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
 !> \partial\mathbf T_{ij}
 !> \end{aligned}
-!> \f]
+!> $$
+interface get_mbd_hamiltonian_energy
+    module procedure get_mbd_hamiltonian_energy_real
+    module procedure get_mbd_hamiltonian_energy_complex
+end interface
+
+contains
+
+#   define MBD_TYPE 0
+#endif
+
+#if MBD_TYPE == 0
+type(result_t) function get_mbd_hamiltonian_energy_real( &
+        geom, alpha_0, omega, damp, dene, grad) result(res)
+#elif MBD_TYPE == 1
 type(result_t) function get_mbd_hamiltonian_energy_complex( &
         geom, alpha_0, omega, damp, dene, grad, k_point) result(res)
 #endif

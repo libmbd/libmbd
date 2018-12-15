@@ -13,7 +13,7 @@ mpi-%: serial-%
 	mpirun -n 2 $*/tests/mbd_api_tests
 
 doc:
-	cd docs && doxygen
+	ford docs/libmbd.md
 
 setup: $(addprefix setup_,$(MAKEENV))
 

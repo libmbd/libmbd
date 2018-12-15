@@ -42,49 +42,49 @@ type :: mbd_input
     real(dp) :: ts_f_acc = TS_FORCES_ACCURACY
     !> Number of imaginary frequency grid points.
     integer :: n_omega_grid = N_FREQUENCY_GRID
-    !> Off-\f$\Gamma\f$ shift of the \f$k\f$-point grid in units of
-    !> inter-\f$k\f$-point distance.
+    !> Off-\(\Gamma\) shift of the \(k\)-point grid in units of
+    !> inter-\(k\)-point distance.
     real(dp) :: k_grid_shift = K_GRID_SHIFT
     !> Whether to zero out negative eigenvalues.
     logical :: zero_negative_eigvals = .false.
     !> XC functional for automatic setting of damping parameters.
     character(len=20) :: xc = ''
-    !> TS damping parameter \f$d\f$.
+    !> TS damping parameter \(d\).
     real(dp) :: ts_d = TS_DAMPING_D
-    !> Custom TS damping parameter \f$s_R\f$.
+    !> Custom TS damping parameter \(s_R\).
     !>
     !> Leave as is to use a value based on the XC functional.
     real(dp) :: ts_sr = -1
-    !> MBD damping parameter \f$a\f$.
+    !> MBD damping parameter \(a\).
     real(dp) :: mbd_a = MBD_DAMPING_A
-    !> Custom MBD damping parameter \f$\beta\f$.
+    !> Custom MBD damping parameter \(\beta\).
     !>
     !> Leave as is to use a value based on the XC functional.
     real(dp) :: mbd_beta = -1
     !> Which free-atom reference vdW parameters to use for scaling.
     !>
     !> - `ts`: Values from original TS method.
-    !> - `tssurf`: Values from the TS\f$^\text{surf}\f$ approach.
+    !> - `tssurf`: Values from the TS\(^\text{surf}\) approach.
     character(len=10) :: vdw_params_kind = 'ts'
-    !> (\f$N\f$) Atom types used for picking free-atom reference values.
+    !> (\(N\)) Atom types used for picking free-atom reference values.
     character(len=3), allocatable :: atom_types(:)
-    !> (\f$N\times3\f$, a.u.) Custom free-atom vdW paramters to use for scaling.
+    !> (\(N\times3\), a.u.) Custom free-atom vdW paramters to use for scaling.
     !>
     !> Columns contain static polarizabilities, C6 coefficients, and vdW radii.
     real(dp), allocatable :: free_values(:, :)
-    !> (\f$3\times N\f$, a.u.) Atomic coordinates.
+    !> (\(3\times N\), a.u.) Atomic coordinates.
     real(dp), allocatable :: coords(:, :)
-    !> (\f$3\times 3\f$, a.u.) Lattice vectors in columns, unallocated if not
+    !> (\(3\times 3\), a.u.) Lattice vectors in columns, unallocated if not
     !> periodic.
     real(dp), allocatable :: lattice_vectors(:, :)
-    !> Number of \f$k\f$-points along reciprocal axes.
+    !> Number of \(k\)-points along reciprocal axes.
     integer :: k_grid(3)
     !> Is there vacuum along some axes in a periodic calculation?
     logical :: vacuum_axis(3) = [.false., .false., .false.]
     !> Parallelization scheme.
     !>
-    !> - `auto`: Pick based on system system size and number of \f$k\f$-points.
-    !> - `kpoints`: Parallelize over \f$k\f$-points.
+    !> - `auto`: Pick based on system system size and number of \(k\)-points.
+    !> - `kpoints`: Parallelize over \(k\)-points.
     !> - `atoms`: Parallelize over atom pairs.
     character(len=10) :: parallel_mode = 'auto'
 end type
@@ -177,7 +177,7 @@ end subroutine
 !> Update atomic coordinates.
 subroutine mbd_calc_update_coords(this, coords)
     class(mbd_calc), intent(inout) :: this
-    !> (\f$3\times N\f$, a.u.) New atomic coordinates.
+    !> (\(3\times N\), a.u.) New atomic coordinates.
     real(dp), intent(in) :: coords(:, :)
 
     this%geom%coords = coords
@@ -186,7 +186,7 @@ end subroutine
 !> Update unit-cell lattice vectors.
 subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     class(mbd_calc), intent(inout) :: this
-    !> (\f$3\times 3\f$, a.u.) New lattice vectors in columns.
+    !> (\(3\times 3\), a.u.) New lattice vectors in columns.
     real(dp), intent(in) :: latt_vecs(:, :)
 
     this%geom%lattice = latt_vecs
@@ -197,7 +197,7 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     class(mbd_calc), intent(inout) :: this
     !> (a.u.) New atomic static polarizabilities.
     real(dp), intent(in) :: alpha_0(:)
-    !> (a.u.) New atomic \f$C_6\f$ coefficients.
+    !> (a.u.) New atomic \(C_6\) coefficients.
     real(dp), intent(in) :: C6(:)
     !> (a.u.) New atomic vdW radii.
     real(dp), intent(in) :: r_vdw(:)
@@ -227,7 +227,7 @@ subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     !> Ratios of free-atom exact static polarizabilities and those from the VV
     !> functional.
     real(dp), intent(in) :: alpha_0_ratios(:)
-    !> Ratios of free-atom exact \f$C_6\f$ coefficients and those from the VV
+    !> Ratios of free-atom exact \(C_6\) coefficients and those from the VV
     !> functional.
     real(dp), intent(in) :: C6_ratios(:)
 
@@ -270,8 +270,8 @@ end subroutine
 !> `mbd_input%%calculate_forces`.
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     class(mbd_calc), intent(in) :: this
-    !> (\f$3\times N\f$, a.u.) Energy gradients, \f$\mathrm dE/\mathrm d\mathbf
-    !> R_i\f$, index \f$i\f$ runs over columns.
+    !> (\(3\times N\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
+    !> R_i\(, index \)i\) runs over columns.
     real(dp), intent(out) :: gradients(:, :)
 
     gradients = transpose(this%denergy%dcoords)
@@ -285,8 +285,8 @@ end subroutine
 !> `mbd_input%%calculate_forces`.
 subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
     class(mbd_calc), intent(in) :: this
-    !> (\f$3\times 3\f$, a.u.) Energy gradients, \f$\mathrm dE/\mathrm d\mathbf
-    !> a_i\f$, index \f$i\f$ runs over columns.
+    !> (\(3\times 3\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
+    !> a_i\(, index \)i\) runs over columns.
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
@@ -300,12 +300,12 @@ end subroutine
 !> `mbd_input%%calculate_spectrum`.
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     class(mbd_calc), intent(inout) :: this
-    !> (\f$3N\f$, a.u.) Energies (frequencies) of coupled MBD modues,
-    !> \f$\omega_i\f$.
+    !> (\(3N\), a.u.) Energies (frequencies) of coupled MBD modues,
+    !> \(\omega_i\).
     real(dp), intent(out) :: spectrum(:)
-    !> (\f$3N\times 3N\f$) Coupled-mode wave functions (MBD eigenstates),
-    !> \f$\psi_j\f$, in the basis of uncoupled states,
-    !> \f$C_{ij}=\langle\phi_i|\psi_j\rangle\f$, index \f$j\f$ runs over columns.
+    !> (\(3N\times 3N\)) Coupled-mode wave functions (MBD eigenstates),
+    !> \(\psi_j\), in the basis of uncoupled states,
+    !> \(C_{ij}=\langle\phi_i|\psi_j\rangle\), index \(j\) runs over columns.
     !>
     !> To save memory, the argument must be allocatable, and the method
     !> transfers allocation from the internal state to the argument. For this

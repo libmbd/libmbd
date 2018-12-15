@@ -32,7 +32,7 @@ end type
 
 contains
 
-!> \f[
+!> $$
 !> \begin{gathered}
 !> f_{(ij)}=\frac1{1+\exp\big({-}a(\eta-1)\big)},\qquad
 !> \eta=\frac{R_{(ij)}}{S_{\text{vdW}(ij)}}\equiv
@@ -43,7 +43,7 @@ contains
 !> \frac{R_c}{RS_\text{vdW}}-
 !> \frac{R}{S_\text{vdW}^2}\frac{\mathrm dS_\text{vdW}}{\mathrm dR_c}
 !> \end{gathered}
-!> \f]
+!> $$
 real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw

@@ -34,10 +34,6 @@ html_theme_options = {
     'badge_branch': 'master',
     'codecov_button': True,
     'travis_button': True,
-    'extra_nav_links': {
-        'Fortran API': 'doxygen/namespacembd.html',
-        'Core Fortran module': 'doxygen/namespacembd__core.html',
-    },
 }
 html_sidebars = {
     '**': [

@@ -30,13 +30,20 @@ contains
 #   define MBD_TYPE 0
 #endif
 
+#if MBD_TYPE == 0
+!> \f[
+!> E_\text{MBD}\equiv E_\text{MBD}(\mathbf q=0)
+!> \f]
+type(result_t) function get_mbd_hamiltonian_energy_real( &
+        geom, alpha_0, omega, damp, dene, grad) result(res)
+#elif MBD_TYPE == 1
 !> \f[
 !> \begin{gathered}
-!> E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q})-
+!> E_\text{MBD}=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q}\big)-
 !> 3\sum_i\frac{\omega_i}2,\qquad
 !> \mathbf Q_{ij}=\omega_i^2\delta_{ij}\mathbf I+
 !> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}
-!> \\\\ \mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad
+!> \\ \mathbf Q\equiv\mathbf C\boldsymbol\Lambda\mathbf C^\text T,\qquad
 !> \boldsymbol\Lambda\equiv\operatorname{diag}(\{\tilde\omega_i^2\}),\qquad
 !> \operatorname{Tr}\big(\sqrt{\mathbf Q}\big)=\sum_i\tilde\omega_i
 !> \end{gathered}
@@ -49,7 +56,7 @@ contains
 !> \partial\mathbf Q
 !> \big)-
 !> 3\sum_i\frac{\partial\omega_i}2
-!> \\\\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
+!> \\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
 !> \frac12\sum_{p\zeta}(
 !> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T
 !> )_{p,i\zeta}
@@ -68,14 +75,10 @@ contains
 !> \frac12\frac{\partial\alpha_{0,i}}{\alpha_{0,i}}+
 !> \frac12\frac{\partial\alpha_{0,j}}{\alpha_{0,j}}
 !> \right)
-!> \\\\ &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
+!> \\ &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
 !> \partial\mathbf T_{ij}
 !> \end{aligned}
 !> \f]
-#if MBD_TYPE == 0
-type(result_t) function get_mbd_hamiltonian_energy_real( &
-        geom, alpha_0, omega, damp, dene, grad) result(res)
-#elif MBD_TYPE == 1
 type(result_t) function get_mbd_hamiltonian_energy_complex( &
         geom, alpha_0, omega, damp, dene, grad, k_point) result(res)
 #endif

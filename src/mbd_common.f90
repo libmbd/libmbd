@@ -95,7 +95,7 @@ end function
 !> \begin{gathered}
 !> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
 !> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
-!> \\\\ \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
+!> \\ \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
 !> \partial\sigma_{ij}=
 !> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
 !> \end{gathered}

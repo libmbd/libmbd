@@ -37,7 +37,7 @@ contains
 !> f_{(ij)}=\frac1{1+\exp\big({-}a(\eta-1)\big)},\qquad
 !> \eta=\frac{R_{(ij)}}{S_{\text{vdW}(ij)}}\equiv
 !> \frac{R_{(ij)}}{\beta R_{\text{vdW}(ij)}}
-!> \\\\ \frac{\mathrm df}{\mathrm dR_c}=
+!> \\ \frac{\mathrm df}{\mathrm dR_c}=
 !> \frac a{2+2\cosh\big(a(\eta-1)\big)}\frac{\mathrm d\eta}{\mathrm dR_c},\qquad
 !> \frac{\mathrm d\eta}{\mathrm dR_c}=
 !> \frac{R_c}{RS_\text{vdW}}-

@@ -26,7 +26,7 @@ contains
 !> \bar\alpha_i=\tfrac13\operatorname{Tr}
 !> \big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad
 !> \boldsymbol{\bar\alpha}=(\boldsymbol\alpha^{-1}+\mathbf T_\text{GG})^{-1}
-!> \\\\ \partial\boldsymbol{\bar\alpha}=
+!> \\ \partial\boldsymbol{\bar\alpha}=
 !> -\boldsymbol{\bar\alpha}(
 !> \partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG}
 !> )\boldsymbol{\bar\alpha},\qquad
@@ -35,7 +35,7 @@ contains
 !> B_{i\zeta,j\eta}\bar\alpha'_{\zeta,j\eta}+
 !> B'_{j\eta,\zeta}\bar\alpha_{j\eta,i\zeta}
 !> \big)
-!> \\\\ \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
+!> \\ \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
 !> \quad A_{i\zeta,j\eta}=
 !> \frac{\partial(\alpha_i^{-1})}{\partial X_i}
 !> \delta_{ij}\delta_{\zeta\eta}+

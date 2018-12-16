@@ -20,7 +20,7 @@ use mbd_utils, only: tostr, shift_idx
 implicit none
 
 private
-public :: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
+public :: dipole_matrix, T_bare, T_erf_coulomb, damping_grad, T_erfc, B_erfc, C_erfc
 
 interface dipole_matrix
     !! Form either a real or a complex dipole matrix.
@@ -44,6 +44,37 @@ interface dipole_matrix
     !! \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
     !! n+\mathbf q
     !! \end{gathered}
+    !! $$
+    !!
+    !! $$
+    !! \mathbf a:=(\mathbf a_1,\mathbf a_2,\mathbf a_3),\quad\mathbf b:=(\mathbf
+    !! b_1,\mathbf b_2,\mathbf b_3)
+    !! \\ \mathbf b=2\pi(\mathbf a^{-1})^\mathrm T,\qquad \partial\mathbf
+    !! b=\big((\partial\mathbf a)\mathbf a^{-1}\big)^\mathrm T\mathbf b
+    !! \\ \mathbf R_\mathbf m=\mathbf a\mathbf m,\qquad\partial\mathbf R_\mathbf
+    !! m=(\partial\mathbf a)\mathbf m,
+    !! \\ \mathbf G_\mathbf n=\mathbf b\mathbf n,\qquad \partial\mathbf
+    !! G_\mathbf n=\big((\partial\mathbf a)\mathbf a^{-1}\big)^\mathrm T\mathbf
+    !! G_\mathbf n
+    !! $$
+    !!
+    !! $$
+    !! \partial\left(\frac{4\pi}{V_\text{uc}}\right)=-\frac{4\pi}{V_\text{uc}^2}\partial
+    !! V_\text{uc},
+    !! \\ \partial\mathbf{\hat k}_\mathbf n=\frac1{k_\mathbf
+    !! n}\left(\partial\mathbf k_\mathbf n-\frac{\mathbf k_\mathbf n}{k_\mathbf
+    !! n^2}\mathbf k_\mathbf n\cdot\partial\mathbf k_\mathbf n\right)
+    !! \\ \partial\left(-\frac{k_\mathbf n^2}{4\gamma^2}\right)=-\frac{\mathbf
+    !! k_\mathbf n\cdot\partial\mathbf k_\mathbf n}{2\gamma^2}+\frac{k_\mathbf
+    !! n^2}{2\gamma^3}\partial\gamma
+    !! \\ \partial\left(\frac{4\gamma^3}{3\sqrt\pi}\right)=\frac{4\gamma^2}{9\sqrt\pi}
+    !! $$
+    !!
+    !! $$
+    !! \gamma:=\frac{2.5}{\sqrt[3]{V_\text{uc}}},
+    !! \qquad\partial\gamma=-\frac{2.5}3(V_\text{uc})^{-\frac43}\partial
+    !! V_\text{uc}
+    !! \\ R_\text c:=\frac6\gamma,\quad k_\text c:=10\gamma
     !! $$
     module procedure dipole_matrix_real
     module procedure dipole_matrix_complex
@@ -360,7 +391,7 @@ function T_bare(r, dT, grad) result(T)
     !! $$
     !! T_{ab}(\mathbf r)=\frac{\partial^2}{\partial r_a\partial r_b}\frac1r=
     !! \frac{-3r_ar_b+r^2\delta_{ab}}{r^5},\qquad
-    !! \frac{\partial T_{ab}}{\partial r_c}=-3\left(
+    !! \frac{\partial T_{ab}(\mathbf r)}{\partial r_c}=-3\left(
     !! \frac{r_a\delta_{bc}+r_b\delta_{ca}+r_c\delta_{ab}}{r^5}-
     !! \frac{5r_ar_br_c}{r^7}
     !! \right)
@@ -443,11 +474,11 @@ end function
 function T_erfc(rxyz, alpha) result(T)
     !! $$
     !! \begin{aligned}
-    !! \mathbf T^\text{erfc}(\gamma)
-    !! &=\frac{-3\mathbf R\otimes\mathbf RC(R,\gamma )+R^2\mathbf IB(R,\gamma)}{R^5}
-    !! \\ \mathbf\partial \mathbf T^\text{erfc}(\gamma)
-    !! &=\partial\mathbf T+\frac{-3\mathbf R\otimes\mathbf R\partial C(R,\gamma )
-    !! +R^2\mathbf I\partial B(R,\gamma)}{R^5}
+    !! T_{ab}^\text{erfc}(\mathbf r,\gamma)
+    !! &=\frac{-3r_ar_bC(r,\gamma)+r^2\delta_{ab}B(r,\gamma)}{r^5}
+    !! \\ \mathbf\partial T_{ab}^\text{erfc}(\mathbf r,\gamma)
+    !! &=\partial T_{ab}(\mathbf r)+\frac{-3r_ar_b\partial C(r,\gamma )
+    !! +r^2\delta_{ab}\partial B(r,\gamma)}{r^5}
     !! \end{aligned}
     !! $$
     real(dp), intent(in) :: rxyz(3), alpha
@@ -475,15 +506,15 @@ function T_erf_coulomb(r, sigma, dT, grad) result(T)
     !! \frac{\partial^2}{\partial r_a\partial r_b}\frac{\operatorname{erf}(\zeta)}r=
     !! \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}(\mathbf r)+
     !! 2\zeta^2\Theta(\zeta)\frac{r_ar_b}{r^5}
-    !! \\ \Theta(\zeta)&=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),
+    !! \\ \Theta(\zeta)&=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),\qquad
     !! \zeta=\frac r\sigma
-    !! \\ \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dr_c}&=
+    !! \\ \frac{\mathrm d T_{ab}^\text{GG}(\mathbf r,\sigma)}{\mathrm dr_c}&=
     !! 2\zeta\Theta(\zeta)\left(T_{ab}(\mathbf r)+(3-2\zeta^2)\frac{r_ar_b}{r^5}\right)
     !! \frac{\mathrm d\zeta}{\mathrm dr_c}
     !! \\ &+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
-    !! \frac{\partial T_{ab}}{\partial r_c}-
+    !! \frac{\partial T_{ab}(\mathbf r)}{\partial r_c}-
     !! 2\zeta^2\Theta(\zeta)\left(
-    !! \frac13\frac{\partial T_{ab}}{\partial r_c}+
+    !! \frac13\frac{\partial T_{ab}(\mathbf r)}{\partial r_c}+
     !! \frac{r_c\delta_{ab}}{r^5}
     !! \right)
     !! \\ \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=

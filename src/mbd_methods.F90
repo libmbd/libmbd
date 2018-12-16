@@ -28,6 +28,17 @@ contains
 
 type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) result(res)
     !! Get MBD energy.
+    !!
+    !! For a nonperiodic system, the method just transforms \(C_6\) coefficients
+    !! to frequencies, and performs a single call to
+    !! [[get_mbd_hamiltonian_energy]]. For a periodic system, the method
+    !! integrates the energy over the frist Brillouin zone.
+    !!
+    !! $$
+    !! E=\int_\text{FBZ}\mathrm d\mathbf q\,E(\mathbf q)\approx\frac1N\sum_i^NE(\mathbf q_i)
+    !! \\ \mathbf q_i=\mathbf b\mathbf n_i,\qquad\partial\mathbf
+    !! q_i=\big((\partial\mathbf a)\mathbf a\big)^\mathrm T\mathbf q_i
+    !! $$
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)

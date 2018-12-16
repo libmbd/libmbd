@@ -8,8 +8,8 @@ module mbd
 
 use mbd_constants
 use mbd_calc, only: calc_t, get_freq_grid
-use mbd_common, only: scale_with_ratio
 use mbd_damping, only: damping_t
+use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy

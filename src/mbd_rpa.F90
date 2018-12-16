@@ -5,9 +5,9 @@
 module mbd_rpa
 
 use mbd_constants
-use mbd_common, only: sigma_selfint
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
+use mbd_formulas, only: sigma_selfint
 use mbd_geom, only: geom_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
 use mbd_utils, only: result_t, tostr

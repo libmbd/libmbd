@@ -2,12 +2,12 @@ set(SRCS
     mbd.F90
     mbd_c_api.F90
     mbd_calc.F90
-    mbd_common.f90
     mbd_constants.f90
     mbd_coulomb.f90
     mbd_damping.F90
     # mbd_density.f90
     mbd_dipole.F90
+    mbd_formulas.f90
     mbd_geom.F90
     mbd_gradients.f90
     mbd_hamiltonian.F90

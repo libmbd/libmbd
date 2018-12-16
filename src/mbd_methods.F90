@@ -7,7 +7,7 @@ module mbd_methods
 
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_common, only: omega_qho, alpha_dyn_qho, scale_with_ratio, C6_from_alpha
+use mbd_formulas, only: omega_qho, alpha_dyn_qho, scale_with_ratio, C6_from_alpha
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy

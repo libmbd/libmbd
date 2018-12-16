@@ -6,9 +6,9 @@
 module mbd_scs
 
 use mbd_constants
-use mbd_common, only: sigma_selfint
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
+use mbd_formulas, only: sigma_selfint
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_request_t
 use mbd_matrix, only: matrix_re_t, contract_cross_33

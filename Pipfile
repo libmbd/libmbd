@@ -5,4 +5,4 @@ name = "pypi"
 
 [dev-packages]
 "flake8" = "*"
-ford = {ref = "97259b395c463fcb97dab324e6a9d35052712836", git = "https://github.com/azag0/ford"}
+ford = {ref = "7b44574da7ec20f4ab4b1842ec7561de2a601930", git = "https://github.com/azag0/ford"}

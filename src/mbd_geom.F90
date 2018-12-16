@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> Representing a molecule or a crystal unit cell.
 module mbd_geom
 
 use mbd_constants
@@ -29,11 +31,11 @@ type :: geom_t
     real(dp), allocatable :: k_pts(:, :)
 
     integer :: supercell(3)
-    !> Type of parallelization: `"atoms"` or `"k_points"`.
+    !> Type of parallelization:
     !>
-    !> - `"atoms"`: distribute matrices over all MPI tasks using ScaLAPACK, solve
+    !> - `atoms`: distribute matrices over all MPI tasks using ScaLAPACK, solve
     !> eigenproblems sequentialy.
-    !> - `"k_points"`: parallelize over k-points (each MPI task solves entire
+    !> - `k_points`: parallelize over k-points (each MPI task solves entire
     !> eigenproblems for its k-points)
     character(len=10) :: parallel_mode = 'auto'
     type(atom_index_t) :: idx

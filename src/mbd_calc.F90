@@ -6,6 +6,7 @@
 #endif
 #include "defaults.h"
 
+!> Representing an MBD calculation.
 module mbd_calc
 
 use mbd_constants
@@ -14,7 +15,7 @@ use mbd_utils, only: tostr, exception_t, clock_t, abstract_printer, stdout_print
 implicit none
 
 private
-public :: calc_t, get_freq_grid
+public :: calc_t, param_t, get_freq_grid
 
 !> Calculation-wide paramters.
 type :: param_t

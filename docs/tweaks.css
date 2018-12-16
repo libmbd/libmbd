@@ -1,3 +1,6 @@
 footer .text-center, .jumbotron {
     display: none;
 }
+.codesum h3, .list-group h3 {
+    font-size: 18px;
+}

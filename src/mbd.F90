@@ -267,13 +267,13 @@ end subroutine
 !> Retrieve nuclear energy gradients if they were requested in the MBD input.
 !>
 !> The gradients are calculated together with the energy, so a call to this
-!> method must be preceeded by a call to `mbd_calc%%evaluate_mbd_method()`. For
-!> the same reason, the gradients must be requested prior to this called via
-!> `mbd_input%%calculate_forces`.
+!> method must be preceeded by a call to [[mbd_calc(type):evaluate_vdw_method]].
+!> For the same reason, the gradients must be requested prior to this called via
+!> [[mbd_input(type):calculate_forces]].
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     class(mbd_calc), intent(in) :: this
     !> (\(3\times N\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
-    !> R_i\(, index \)i\) runs over columns.
+    !> R_i\), index \(i\) runs over columns.
     real(dp), intent(out) :: gradients(:, :)
 
     gradients = transpose(this%denergy%dcoords)
@@ -282,13 +282,14 @@ end subroutine
 !> Provide lattice-vector energy gradients if they were requested in the MBD input.
 !>
 !> The gradients are actually calculated together with the energy, so a call to
-!> this method must be preceeded by a call to `mbd_calc%%evaluate_mbd_method()`.
-!> For the same reason, the gradients must be requested prior to this called via
-!> `mbd_input%%calculate_forces`.
+!> this method must be preceeded by a call to
+!> [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the gradients
+!> must be requested prior to this called via
+!> [[mbd_input(type):calculate_forces]].
 subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
     class(mbd_calc), intent(in) :: this
     !> (\(3\times 3\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
-    !> a_i\(, index \)i\) runs over columns.
+    !> a_i\), index \(i\) runs over columns.
     real(dp), intent(out) :: latt_derivs(:, :)
 
     ! TODO
@@ -297,9 +298,10 @@ end subroutine
 !> Provide MBD spectrum if it was requested in the MBD input.
 !>
 !> The spectrum is actually calculated together with the energy, so a call to
-!> this method must be preceeded by a call to `mbd_calc%%evaluate_mbd_method()`.
+!> this method must be preceeded by a call to
+!> [[mbd_calc(type):evaluate_vdw_method]].
 !> For the same reason, the spectrum must be requested prior to this called via
-!> `mbd_input%%calculate_spectrum`.
+!> [[mbd_input(type):calculate_spectrum]].
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     class(mbd_calc), intent(inout) :: this
     !> (\(3N\), a.u.) Energies (frequencies) of coupled MBD modues,
@@ -322,7 +324,7 @@ end subroutine
 !> Retrieve an exception in the MBD calculation if it occured.
 subroutine mbd_calc_get_exception(this, code, origin, msg)
     class(mbd_calc), intent(inout) :: this
-    !> Exception code, values defined in `mbd_constants`.
+    !> Exception code, values defined in [[mbd_constants]].
     integer, intent(out) :: code
     !> Exception origin.
     character(*), intent(out) :: origin

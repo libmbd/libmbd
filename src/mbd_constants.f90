@@ -10,6 +10,7 @@ implicit none
 integer, parameter :: dp = kind(0.d0)
 real(dp), parameter :: pi = acos(-1.d0)
 real(dp), parameter :: ang = 1.8897259886d0
+    !! Value of angstrom in atomic units
 
 integer, parameter :: MBD_EXC_NEG_EIGVALS = 1
     !! Negative eigenvalue exception

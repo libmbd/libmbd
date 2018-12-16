@@ -1,6 +1,8 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+!> Utility types, interfaces, and procedures.
 module mbd_utils
 
 use mbd_constants
@@ -53,6 +55,7 @@ type, public :: atom_index_t
 #   endif
 end type
 
+!> Used for measuring performance.
 type :: clock_t
     logical :: active = .true.
     integer, allocatable :: timestamps(:), counts(:)
@@ -74,6 +77,7 @@ subroutine null_printer(msg)
     character(len=*), intent(in) :: msg
 end subroutine
 
+!> Print to standard output on zero-rank process only.
 subroutine stdout_printer(msg)
     character(len=*), intent(in) :: msg
 #ifdef WITH_MPI

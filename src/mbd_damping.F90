@@ -3,8 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "defaults.h"
 
-!> Damping functions.
 module mbd_damping
+!! Damping functions.
 
 use mbd_constants
 use mbd_gradients, only: grad_scalar_t, grad_request_t
@@ -15,8 +15,8 @@ implicit none
 private
 public :: damping_t, damping_fermi, damping_sqrtfermi, op1minus_grad
 
-!> Represents a damping function.
 type :: damping_t
+    !! Represents a damping function.
     character(len=20) :: version
     real(dp) :: beta = 0d0
     real(dp) :: a = MBD_DAMPING_A
@@ -33,19 +33,19 @@ end type
 
 contains
 
-!> $$
-!> \begin{gathered}
-!> f_{(ij)}=\frac1{1+\exp\big({-}a(\eta-1)\big)},\qquad
-!> \eta=\frac{R_{(ij)}}{S_{\text{vdW}(ij)}}\equiv
-!> \frac{R_{(ij)}}{\beta R_{\text{vdW}(ij)}}
-!> \\ \frac{\mathrm df}{\mathrm dR_c}=
-!> \frac a{2+2\cosh\big(a(\eta-1)\big)}\frac{\mathrm d\eta}{\mathrm dR_c},\qquad
-!> \frac{\mathrm d\eta}{\mathrm dR_c}=
-!> \frac{R_c}{RS_\text{vdW}}-
-!> \frac{R}{S_\text{vdW}^2}\frac{\mathrm dS_\text{vdW}}{\mathrm dR_c}
-!> \end{gathered}
-!> $$
 real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
+    !! $$
+    !! \begin{gathered}
+    !! f_{(ij)}=\frac1{1+\exp\big({-}a(\eta-1)\big)},\qquad
+    !! \eta=\frac{R_{(ij)}}{S_{\text{vdW}(ij)}}\equiv
+    !! \frac{R_{(ij)}}{\beta R_{\text{vdW}(ij)}}
+    !! \\ \frac{\mathrm df}{\mathrm dR_c}=
+    !! \frac a{2+2\cosh\big(a(\eta-1)\big)}\frac{\mathrm d\eta}{\mathrm dR_c},\qquad
+    !! \frac{\mathrm d\eta}{\mathrm dR_c}=
+    !! \frac{R_c}{RS_\text{vdW}}-
+    !! \frac{R}{S_\text{vdW}^2}\frac{\mathrm dS_\text{vdW}}{\mathrm dR_c}
+    !! \end{gathered}
+    !! $$
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: s_vdw
     real(dp), intent(in) :: d

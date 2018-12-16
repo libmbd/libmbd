@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Utility types, interfaces, and procedures.
 module mbd_utils
+!! Utility types, interfaces, and procedures.
 
 use mbd_constants
 #ifdef WITH_MPI
@@ -26,15 +26,15 @@ interface findval
     module procedure findval_int
 end interface
 
-!> Represents an exception.
 type :: exception_t
+    !! Represents an exception.
     integer :: code = 0
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''
 end type
 
-!> Stores results from an MBD calculation
 type :: result_t
+    !! Stores results from an MBD calculation
     real(dp) :: energy
     real(dp), allocatable :: mode_eigs(:)
     real(dp), allocatable :: modes(:, :)
@@ -45,8 +45,8 @@ type :: result_t
     real(dp), allocatable :: rpa_orders_k(:, :)
 end type
 
-!> Maps from atom indexes to positions in matrices.
 type, public :: atom_index_t
+    !! Maps from atom indexes to positions in matrices.
     integer, allocatable :: i_atom(:)
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
@@ -55,8 +55,8 @@ type, public :: atom_index_t
 #   endif
 end type
 
-!> Used for measuring performance.
 type :: clock_t
+    !! Used for measuring performance.
     logical :: active = .true.
     integer, allocatable :: timestamps(:), counts(:)
     contains
@@ -64,8 +64,8 @@ type :: clock_t
     procedure :: clock => clock_clock
 end type
 
-!> Logging subroutine.
 abstract interface
+    !! Logging subroutine.
     subroutine abstract_printer(msg)
         character(len=*), intent(in) :: msg
     end subroutine
@@ -77,8 +77,8 @@ subroutine null_printer(msg)
     character(len=*), intent(in) :: msg
 end subroutine
 
-!> Print to standard output on zero-rank process only.
 subroutine stdout_printer(msg)
+    !! Print to standard output on zero-rank process only.
     character(len=*), intent(in) :: msg
 #ifdef WITH_MPI
     integer :: rank, err

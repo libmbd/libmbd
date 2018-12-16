@@ -3,8 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifndef MBD_TYPE
 
-!> Forming and solving MBD Hamiltonian.
 module mbd_hamiltonian
+!! Forming and solving MBD Hamiltonian.
 
 use mbd_constants
 use mbd_damping, only: damping_t
@@ -19,56 +19,56 @@ implicit none
 private
 public :: get_mbd_hamiltonian_energy
 
-!> Form and solve either a real or a complex MBD Hamiltonian.
-!>
-!> The real-typed version is equivalent to \(\mathbf q=0\).
-!>
-!> $$
-!> \begin{gathered}
-!> E_\text{MBD}(\mathbf q)=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf
-!> q)}\big)- 3\sum_i\frac{\omega_i}2,\qquad
-!> \mathbf Q_{ij}(\mathbf q)=\omega_i^2\delta_{ij}\mathbf I+
-!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}(\mathbf q)
-!> \\ \mathbf Q(\mathbf q)\equiv
-!> \mathbf C(\mathbf q)\boldsymbol\Lambda(\mathbf q)\mathbf C(\mathbf q)^\text T,\qquad
-!> \boldsymbol\Lambda(\mathbf q)
-!> \equiv\operatorname{diag}(\{\tilde\omega_i(\mathbf q)^2\}),\qquad
-!> \operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf q)}\big)
-!> =\sum_i\tilde\omega_i(\mathbf q)
-!> \end{gathered}
-!> $$
-!>
-!> $$
-!> \begin{aligned}
-!> \partial E_\text{MBD}&=\frac14\operatorname{Tr}\big(
-!> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T
-!> \partial\mathbf Q
-!> \big)-
-!> 3\sum_i\frac{\partial\omega_i}2
-!> \\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
-!> \frac12\sum_{p\zeta}(
-!> \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T
-!> )_{p,i\zeta}
-!> \frac{\partial Q_{p,i\zeta}}{\partial X_i}-
-!> \frac32\frac{\partial\omega_i}{\partial X_i}
-!> \end{aligned}
-!> $$
-!>
-!> $$
-!> \begin{aligned}
-!> \partial\mathbf Q_{ij}=&
-!> 2\delta_{ij}\omega_i\partial\omega_i\mathbf I+
-!> \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}\left(
-!> \frac{\partial\omega_i}{\omega_i}+
-!> \frac{\partial\omega_j}{\omega_j}+
-!> \frac12\frac{\partial\alpha_{0,i}}{\alpha_{0,i}}+
-!> \frac12\frac{\partial\alpha_{0,j}}{\alpha_{0,j}}
-!> \right)
-!> \\ &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
-!> \partial\mathbf T_{ij}
-!> \end{aligned}
-!> $$
 interface get_mbd_hamiltonian_energy
+    !! Form and solve either a real or a complex MBD Hamiltonian.
+    !!
+    !! The real-typed version is equivalent to \(\mathbf q=0\).
+    !!
+    !! $$
+    !! \begin{gathered}
+    !! E_\text{MBD}(\mathbf q)=\frac12\operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf
+    !! q)}\big)- 3\sum_i\frac{\omega_i}2,\qquad
+    !! \mathbf Q_{ij}(\mathbf q)=\omega_i^2\delta_{ij}\mathbf I+
+    !! \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}(\mathbf q)
+    !! \\ \mathbf Q(\mathbf q)\equiv
+    !! \mathbf C(\mathbf q)\boldsymbol\Lambda(\mathbf q)\mathbf C(\mathbf q)^\text T,\qquad
+    !! \boldsymbol\Lambda(\mathbf q)
+    !! \equiv\operatorname{diag}(\{\tilde\omega_i(\mathbf q)^2\}),\qquad
+    !! \operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf q)}\big)
+    !! =\sum_i\tilde\omega_i(\mathbf q)
+    !! \end{gathered}
+    !! $$
+    !!
+    !! $$
+    !! \begin{aligned}
+    !! \partial E_\text{MBD}&=\frac14\operatorname{Tr}\big(
+    !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T
+    !! \partial\mathbf Q
+    !! \big)-
+    !! 3\sum_i\frac{\partial\omega_i}2
+    !! \\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
+    !! \frac12\sum_{p\zeta}(
+    !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T
+    !! )_{p,i\zeta}
+    !! \frac{\partial Q_{p,i\zeta}}{\partial X_i}-
+    !! \frac32\frac{\partial\omega_i}{\partial X_i}
+    !! \end{aligned}
+    !! $$
+    !!
+    !! $$
+    !! \begin{aligned}
+    !! \partial\mathbf Q_{ij}=&
+    !! 2\delta_{ij}\omega_i\partial\omega_i\mathbf I+
+    !! \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}\left(
+    !! \frac{\partial\omega_i}{\omega_i}+
+    !! \frac{\partial\omega_j}{\omega_j}+
+    !! \frac12\frac{\partial\alpha_{0,i}}{\alpha_{0,i}}+
+    !! \frac12\frac{\partial\alpha_{0,j}}{\alpha_{0,j}}
+    !! \right)
+    !! \\ &+\omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}
+    !! \partial\mathbf T_{ij}
+    !! \end{aligned}
+    !! $$
     module procedure get_mbd_hamiltonian_energy_real
     module procedure get_mbd_hamiltonian_energy_complex
 end interface

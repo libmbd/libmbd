@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Obtaining TS energies.
 module mbd_ts
+!! Obtaining TS energies.
 
 use mbd_constants
 use mbd_utils, only: shift_idx, tostr
@@ -17,8 +17,8 @@ public :: ts_energy
 
 contains
 
-!> Get TS energy.
 function ts_energy(geom, alpha_0, C6, damp) result(ene)
+    !! Get TS energy.
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)

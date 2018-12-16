@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Representing a molecule or a crystal unit cell.
 module mbd_geom
+!! Representing a molecule or a crystal unit cell.
 
 use mbd_constants
 use mbd_calc, only: calc_t
@@ -21,8 +21,8 @@ implicit none
 private
 public :: geom_t
 
-!> Represents a molecule or a crystal unit cell.
 type :: geom_t
+    !! Represents a molecule or a crystal unit cell.
     type(calc_t), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
     logical :: vacuum_axis(3) = [.false., .false., .false.]
@@ -31,15 +31,16 @@ type :: geom_t
     real(dp), allocatable :: k_pts(:, :)
 
     integer :: supercell(3)
-    !> Type of parallelization:
-    !>
-    !> - `atoms`: distribute matrices over all MPI tasks using ScaLAPACK, solve
-    !> eigenproblems sequentialy.
-    !> - `k_points`: parallelize over k-points (each MPI task solves entire
-    !> eigenproblems for its k-points)
     character(len=10) :: parallel_mode = 'auto'
+        !! Type of parallelization:
+        !!
+        !! - `atoms`: distribute matrices over all MPI tasks using ScaLAPACK,
+        !! solve eigenproblems sequentialy.
+        !! - `k_points`: parallelize over k-points (each MPI task solves entire
+        !! eigenproblems for its k-points)
     type(atom_index_t) :: idx
 #ifdef WITH_SCALAPACK
+    ! TODO makes these two private (see use in mbd_methods, mbd_dipole)
     type(blacs_desc_t) :: blacs
     type(blacs_grid_t) :: blacs_grid
 #endif
@@ -65,8 +66,8 @@ subroutine geom_init(this, calc)
     integer :: i_atom
 
     this%calc => calc
-    ! TODO put some logic here
     if (this%parallel_mode == 'auto') this%parallel_mode = 'atoms'
+        ! TODO put some logic here
 #ifdef WITH_SCALAPACK
     this%idx%parallel = this%parallel_mode == 'atoms'
     if (this%idx%parallel) then

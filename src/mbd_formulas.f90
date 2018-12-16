@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Common formulas used at multiple places.
 module mbd_formulas
+!! Common formulas used at multiple places.
 
 use mbd_constants
 use mbd_calc, only: calc_t
@@ -17,13 +17,13 @@ public :: omega_qho, alpha_dyn_qho, C6_from_alpha, sigma_selfint, scale_with_rat
 
 contains
 
-!> $$
-!> \omega=\frac{4C_6}{3\alpha_{0}^2},\qquad
-!> \partial\omega=\omega\left(
-!> \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
-!> \right)
-!> $$
 function omega_qho(C6, alpha, domega, grad) result(omega)
+    !! $$
+    !! \omega=\frac{4C_6}{3\alpha_{0}^2},\qquad
+    !! \partial\omega=\omega\left(
+    !! \frac{\partial C_6}{C_6}-\frac{2\partial\alpha_0}{\alpha_0}
+    !! \right)
+    !! $$
     real(dp), intent(in) :: C6(:)
     real(dp), intent(in) :: alpha(:)
     type(grad_t), intent(out), optional :: domega
@@ -36,14 +36,14 @@ function omega_qho(C6, alpha, domega, grad) result(omega)
     if (grad%dalpha) domega%dalpha = -2*omega/alpha
 end function
 
-!> $$
-!> \alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
-!> \partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(
-!> \frac{\partial\alpha_0}{\alpha_0}+
-!> \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
-!> \right)
-!> $$
 function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
+    !! $$
+    !! \alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
+    !! \partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(
+    !! \frac{\partial\alpha_0}{\alpha_0}+
+    !! \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
+    !! \right)
+    !! $$
     type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
@@ -64,12 +64,12 @@ function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
     end do
 end function
 
-!> $$
-!> \bar C_6=\frac3\pi\int_0^\infty\mathrm du\,\bar\alpha(u)^2,\qquad
-!> \partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du
-!> \bar\alpha(u)\partial\bar\alpha(u)
-!> $$
 function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
+    !! $$
+    !! \bar C_6=\frac3\pi\int_0^\infty\mathrm du\,\bar\alpha(u)^2,\qquad
+    !! \partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du
+    !! \bar\alpha(u)\partial\bar\alpha(u)
+    !! $$
     type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha(:, 0:)
     real(dp), allocatable, intent(out), optional :: dC6_dalpha(:, :)
@@ -91,16 +91,16 @@ function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
     end do
 end function
 
-!> $$
-!> \begin{gathered}
-!> \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
-!> \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
-!> \\ \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
-!> \partial\sigma_{ij}=
-!> \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
-!> \end{gathered}
-!> $$
 function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
+    !! $$
+    !! \begin{gathered}
+    !! \sigma_i(u)=\left(\frac13\sqrt{\frac2\pi}\alpha_i(u)\right)^{\frac13},\qquad
+    !! \partial\sigma_i=\sigma_i\frac{\partial\alpha_i}{3\alpha_i}
+    !! \\ \sigma_{ij}(u)=\sqrt{\sigma_i(u)^2+\sigma_j(u)^2},\qquad
+    !! \partial\sigma_{ij}=
+    !! \frac{\sigma_i\partial\sigma_i+\sigma_j\partial\sigma_j}{\sigma_{ij}}
+    !! \end{gathered}
+    !! $$
     real(dp), intent(in) :: alpha(:)
     real(dp), allocatable, intent(out), optional :: dsigma_dalpha(:)
     logical, intent(in), optional :: grad
@@ -111,15 +111,15 @@ function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
     if (grad) dsigma_dalpha = sigma/(3*alpha)
 end function
 
-!> $$
-!> x'=x\left(\frac{y'}y\right)^q,\qquad
-!> \partial x'=x\left(
-!> \frac{\partial x}x+
-!> q\frac{\partial y'}{y'}-
-!> q\frac{\partial y}{y}
-!> \right)
-!> $$
 function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)
+    !! $$
+    !! x'=x\left(\frac{y'}y\right)^q,\qquad
+    !! \partial x'=x\left(
+    !! \frac{\partial x}x+
+    !! q\frac{\partial y'}{y'}-
+    !! q\frac{\partial y}{y}
+    !! \right)
+    !! $$
     real(dp), intent(in) :: x(:), yp(:), y(:)
     real(dp), intent(in) :: q
     type(grad_t), intent(out), optional :: dx

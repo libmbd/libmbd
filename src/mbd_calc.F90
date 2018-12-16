@@ -6,8 +6,8 @@
 #endif
 #include "defaults.h"
 
-!> Representing an MBD calculation.
 module mbd_calc
+!! Representing an MBD calculation.
 
 use mbd_constants
 use mbd_utils, only: tostr, exception_t, clock_t, abstract_printer, stdout_printer
@@ -17,8 +17,8 @@ implicit none
 private
 public :: calc_t, param_t, get_freq_grid
 
-!> Calculation-wide paramters.
 type :: param_t
+    !! Calculation-wide paramters.
     real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
     real(dp) :: ts_cutoff_radius = 50d0*ang
     real(dp) :: dipole_low_dim_cutoff = 100d0*ang
@@ -32,8 +32,8 @@ type :: param_t
     integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
 
-!> Represents an MBD calculation.
 type :: calc_t
+    !! Represents an MBD calculation.
     type(param_t) :: param
     type(clock_t) :: clock
     real(dp), allocatable :: omega_grid(:)

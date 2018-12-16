@@ -3,8 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifndef MBD_TYPE
 
-!> Construction of dipole tensors and dipole matrices.
 module mbd_dipole
+!! Construction of dipole tensors and dipole matrices.
 
 use mbd_constants
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
@@ -22,29 +22,29 @@ implicit none
 private
 public :: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
 
-!> Form either a real or a complex dipole matrix.
-!>
-!> The real-typed version is equivalent to \(\mathbf q=0\).
-!>
-!> $$
-!> \begin{gathered}
-!> \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf m}\mathbf T(\mathbf R_{\mathbf
-!> mij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf mij}},\quad\mathbf
-!> R_{\mathbf mij}=\mathbf R_j+\mathbf R_\mathbf m-\mathbf R_i
-!> \\ \frac{\mathrm d\mathbf R_{\mathbf mij}}{\mathrm d\mathbf R_k}=(\delta_{jk}-\delta_{ik})\mathbf I
-!> \\ \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
-!> =\sum_\mathbf m^{|\mathbf R_{\mathbf mij}|<R_\text c}\mathbf
-!> T^\text{erfc}(\mathbf R_{\mathbf mij},\gamma)\mathrm e^{-\mathrm i\mathbf
-!> q\cdot\mathbf R_{\mathbf mij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
-!> n}^{0<|\mathbf k_\mathbf n|<k_\text c}\mathbf{\hat k}_\mathbf
-!> n\otimes\mathbf{\hat k}_\mathbf n\,\mathrm e^{-\frac{k_\mathbf
-!> n^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf n\cdot\mathbf R_{ij}}
-!> \\ -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
-!> \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
-!> n+\mathbf q
-!> \end{gathered}
-!> $$
 interface dipole_matrix
+    !! Form either a real or a complex dipole matrix.
+    !!
+    !! The real-typed version is equivalent to \(\mathbf q=0\).
+    !!
+    !! $$
+    !! \begin{gathered}
+    !! \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf m}\mathbf T(\mathbf R_{\mathbf
+    !! mij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf mij}},\quad\mathbf
+    !! R_{\mathbf mij}=\mathbf R_j+\mathbf R_\mathbf m-\mathbf R_i
+    !! \\ \frac{\mathrm d\mathbf R_{\mathbf mij}}{\mathrm d\mathbf R_k}=(\delta_{jk}-\delta_{ik})\mathbf I
+    !! \\ \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
+    !! =\sum_\mathbf m^{|\mathbf R_{\mathbf mij}|<R_\text c}\mathbf
+    !! T^\text{erfc}(\mathbf R_{\mathbf mij},\gamma)\mathrm e^{-\mathrm i\mathbf
+    !! q\cdot\mathbf R_{\mathbf mij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
+    !! n}^{0<|\mathbf k_\mathbf n|<k_\text c}\mathbf{\hat k}_\mathbf
+    !! n\otimes\mathbf{\hat k}_\mathbf n\,\mathrm e^{-\frac{k_\mathbf
+    !! n^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf n\cdot\mathbf R_{ij}}
+    !! \\ -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
+    !! \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
+    !! n+\mathbf q
+    !! \end{gathered}
+    !! $$
     module procedure dipole_matrix_real
     module procedure dipole_matrix_complex
 end interface
@@ -241,7 +241,6 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     end if
 end function
 
-!> \private
 #if MBD_TYPE == 0
 subroutine add_ewald_dipole_parts_real(geom, alpha, dipmat)
     type(matrix_re_t), intent(inout) :: dipmat
@@ -357,15 +356,15 @@ end subroutine
 #   define MBD_TYPE 1
 #   include "mbd_dipole.F90"
 
-!> $$
-!> T_{ab}(\mathbf r)=\frac{\partial^2}{\partial r_a\partial r_b}\frac1r=
-!> \frac{-3r_ar_b+r^2\delta_{ab}}{r^5},\qquad
-!> \frac{\partial T_{ab}}{\partial r_c}=-3\left(
-!> \frac{r_a\delta_{bc}+r_b\delta_{ca}+r_c\delta_{ab}}{r^5}-
-!> \frac{5r_ar_br_c}{r^7}
-!> \right)
-!> $$
 function T_bare(r, dT, grad) result(T)
+    !! $$
+    !! T_{ab}(\mathbf r)=\frac{\partial^2}{\partial r_a\partial r_b}\frac1r=
+    !! \frac{-3r_ar_b+r^2\delta_{ab}}{r^5},\qquad
+    !! \frac{\partial T_{ab}}{\partial r_c}=-3\left(
+    !! \frac{r_a\delta_{bc}+r_b\delta_{ca}+r_c\delta_{ab}}{r^5}-
+    !! \frac{5r_ar_br_c}{r^7}
+    !! \right)
+    !! $$
     real(dp), intent(in) :: r(3)
     type(grad_matrix_re_t), intent(out), optional :: dT
     logical, intent(in), optional :: grad
@@ -409,48 +408,48 @@ function T_bare(r, dT, grad) result(T)
     end forall
 end function
 
-!> $$
-!> \begin{aligned}
-!> B(R,\gamma)
-!> &=\operatorname{erfc}(\gamma R)
-!> +\frac{2\gamma R}{\sqrt\pi}\mathrm e^{-(\gamma R)^2}
-!> \\ \partial B(R,\gamma)
-!> &=-\frac4{\sqrt\pi}(\gamma R)^2\mathrm e^{-(\gamma R)^2}
-!> (R\partial\gamma+\gamma\partial R)
-!> \end{aligned}
-!> $$
 real(dp) function B_erfc(r, a) result(B)
+    !! $$
+    !! \begin{aligned}
+    !! B(R,\gamma)
+    !! &=\operatorname{erfc}(\gamma R)
+    !! +\frac{2\gamma R}{\sqrt\pi}\mathrm e^{-(\gamma R)^2}
+    !! \\ \partial B(R,\gamma)
+    !! &=-\frac4{\sqrt\pi}(\gamma R)^2\mathrm e^{-(\gamma R)^2}
+    !! (R\partial\gamma+\gamma\partial R)
+    !! \end{aligned}
+    !! $$
     real(dp), intent(in) :: r, a
 
     B = (erfc(a*r)+(2*a*r/sqrt(pi))*exp(-(a*r)**2))/r**3
 end function
 
-!> $$
-!> \begin{aligned}
-!> C(r,\gamma)
-!> &=3\operatorname{erfc}(\gamma R)
-!> +\frac{2\gamma R}{\sqrt\pi}(3+2(\gamma R)^2)\mathrm e^{-(\gamma R)^2}
-!> \\ \partial C(R,\gamma)
-!> &=-\frac8{\sqrt\pi}(\gamma R)^4\mathrm e^{-(\gamma R)^2}
-!> (R\partial\gamma+\gamma\partial R)
-!> \end{aligned}
-!> $$
 real(dp) elemental function C_erfc(r, a) result(C)
+    !! $$
+    !! \begin{aligned}
+    !! C(r,\gamma)
+    !! &=3\operatorname{erfc}(\gamma R)
+    !! +\frac{2\gamma R}{\sqrt\pi}(3+2(\gamma R)^2)\mathrm e^{-(\gamma R)^2}
+    !! \\ \partial C(R,\gamma)
+    !! &=-\frac8{\sqrt\pi}(\gamma R)^4\mathrm e^{-(\gamma R)^2}
+    !! (R\partial\gamma+\gamma\partial R)
+    !! \end{aligned}
+    !! $$
     real(dp), intent(in) :: r, a
 
     C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
 end function
 
-!> $$
-!> \begin{aligned}
-!> \mathbf T^\text{erfc}(\gamma)
-!> &=\frac{-3\mathbf R\otimes\mathbf RC(R,\gamma )+R^2\mathbf IB(R,\gamma)}{R^5}
-!> \\ \mathbf\partial \mathbf T^\text{erfc}(\gamma)
-!> &=\partial\mathbf T+\frac{-3\mathbf R\otimes\mathbf R\partial C(R,\gamma )
-!> +R^2\mathbf I\partial B(R,\gamma)}{R^5}
-!> \end{aligned}
-!> $$
 function T_erfc(rxyz, alpha) result(T)
+    !! $$
+    !! \begin{aligned}
+    !! \mathbf T^\text{erfc}(\gamma)
+    !! &=\frac{-3\mathbf R\otimes\mathbf RC(R,\gamma )+R^2\mathbf IB(R,\gamma)}{R^5}
+    !! \\ \mathbf\partial \mathbf T^\text{erfc}(\gamma)
+    !! &=\partial\mathbf T+\frac{-3\mathbf R\otimes\mathbf R\partial C(R,\gamma )
+    !! +R^2\mathbf I\partial B(R,\gamma)}{R^5}
+    !! \end{aligned}
+    !! $$
     real(dp), intent(in) :: rxyz(3), alpha
     real(dp) :: T(3, 3)
 
@@ -469,28 +468,28 @@ function T_erfc(rxyz, alpha) result(T)
     end do
 end function
 
-!> $$
-!> \begin{aligned}
-!> T^\text{GG}_{ab}(\mathbf r,\sigma)&=
-!> \frac{\partial^2}{\partial r_a\partial r_b}\frac{\operatorname{erf}(\zeta)}r=
-!> \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}(\mathbf r)+
-!> 2\zeta^2\Theta(\zeta)\frac{r_ar_b}{r^5}
-!> \\ \Theta(\zeta)&=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),
-!> \zeta=\frac r\sigma
-!> \\ \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dr_c}&=
-!> 2\zeta\Theta(\zeta)\left(T_{ab}(\mathbf r)+(3-2\zeta^2)\frac{r_ar_b}{r^5}\right)
-!> \frac{\mathrm d\zeta}{\mathrm dr_c}
-!> \\ &+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
-!> \frac{\partial T_{ab}}{\partial r_c}-
-!> 2\zeta^2\Theta(\zeta)\left(
-!> \frac13\frac{\partial T_{ab}}{\partial r_c}+
-!> \frac{r_c\delta_{ab}}{r^5}
-!> \right)
-!> \\ \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=
-!> \frac{r_c}{r\sigma}-\frac r{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dr_c}
-!> \end{aligned}
-!> $$
 function T_erf_coulomb(r, sigma, dT, grad) result(T)
+    !! $$
+    !! \begin{aligned}
+    !! T^\text{GG}_{ab}(\mathbf r,\sigma)&=
+    !! \frac{\partial^2}{\partial r_a\partial r_b}\frac{\operatorname{erf}(\zeta)}r=
+    !! \big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)T_{ab}(\mathbf r)+
+    !! 2\zeta^2\Theta(\zeta)\frac{r_ar_b}{r^5}
+    !! \\ \Theta(\zeta)&=\frac{2\zeta}{\sqrt\pi}\exp(-\zeta^2),
+    !! \zeta=\frac r\sigma
+    !! \\ \frac{\mathrm d T_{ab}^\text{GG}}{\mathrm dr_c}&=
+    !! 2\zeta\Theta(\zeta)\left(T_{ab}(\mathbf r)+(3-2\zeta^2)\frac{r_ar_b}{r^5}\right)
+    !! \frac{\mathrm d\zeta}{\mathrm dr_c}
+    !! \\ &+\big(\operatorname{erf}(\zeta)-\Theta(\zeta)\big)
+    !! \frac{\partial T_{ab}}{\partial r_c}-
+    !! 2\zeta^2\Theta(\zeta)\left(
+    !! \frac13\frac{\partial T_{ab}}{\partial r_c}+
+    !! \frac{r_c\delta_{ab}}{r^5}
+    !! \right)
+    !! \\ \qquad\frac{\mathrm d\zeta}{\mathrm dr_c}&=
+    !! \frac{r_c}{r\sigma}-\frac r{\sigma^2}\frac{\mathrm d\sigma}{\mathrm dr_c}
+    !! \end{aligned}
+    !! $$
     real(dp), intent(in) :: r(3)
     real(dp), intent(in) :: sigma
     type(grad_matrix_re_t), intent(out), optional :: dT

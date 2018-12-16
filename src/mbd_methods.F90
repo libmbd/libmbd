@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Obtaining MBD energies.
 module mbd_methods
+!! Obtaining MBD energies.
 
 use mbd_constants
 use mbd_calc, only: calc_t
@@ -26,8 +26,8 @@ public :: get_mbd_energy, get_mbd_scs_energy
 
 contains
 
-!> Get MBD energy.
 type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) result(res)
+    !! Get MBD energy.
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: C6(:)
@@ -98,9 +98,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     end if
 end function
 
-!> Get screened MBD energy.
 type(result_t) function get_mbd_scs_energy( &
         geom, variant, alpha_0, C6, damp, dene, grad) result(res)
+    !! Get screened MBD energy.
     type(geom_t), intent(inout) :: geom
     character(len=*), intent(in) :: variant
     real(dp), intent(in) :: alpha_0(:)

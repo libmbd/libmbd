@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Derivatives.
 module mbd_gradients
+!! Derivatives.
 
 use mbd_constants
 
@@ -13,8 +13,8 @@ private
 public :: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, grad_request_t, &
     grad_scalar_t
 
-!> Derivatives with respect to various quantities
 type :: grad_t
+    !! Derivatives with respect to various quantities
     real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
     real(dp), allocatable :: dalpha(:)
     real(dp), allocatable :: dalpha_dyn(:, :)  ! n_atoms by 0:n_freq
@@ -26,8 +26,8 @@ type :: grad_t
     real(dp), allocatable :: dX_free(:)
 end type
 
-!> Used to request derivatives with respect to function arguments
 type :: grad_request_t
+    !! Used to request derivatives with respect to function arguments
     logical :: dcoords = .false.
     logical :: dalpha = .false.
     logical :: dalpha_dyn = .false.
@@ -42,22 +42,22 @@ type :: grad_request_t
     procedure :: any => grad_request_any
 end type
 
-!> Derivatives of a real dipole matrix with respect to various quantities
 type :: grad_matrix_re_t
+    !! Derivatives of a real dipole matrix with respect to various quantities
     real(dp), allocatable :: dr(:, :, :)
     real(dp), allocatable :: dvdw(:, :)
     real(dp), allocatable :: dsigma(:, :)
 end type
 
-!> Derivatives of a compelx dipole matrix with respect to various quantities
 type :: grad_matrix_cplx_t
+    !! Derivatives of a compelx dipole matrix with respect to various quantities
     complex(dp), allocatable :: dr(:, :, :)
     complex(dp), allocatable :: dvdw(:, :)
     complex(dp), allocatable :: dsigma(:, :)
 end type
 
-!> Derivatives of a scalar with respect to various quantities
 type :: grad_scalar_t
+    !! Derivatives of a scalar with respect to various quantities
     real(dp), allocatable :: dr(:)  ! explicit derivative
     real(dp), allocatable :: dvdw
 end type

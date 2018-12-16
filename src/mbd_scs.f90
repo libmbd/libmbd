@@ -2,8 +2,8 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Performing self-consistent screening.
 module mbd_scs
+!! Performing self-consistent screening.
 
 use mbd_constants
 use mbd_damping, only: damping_t
@@ -21,30 +21,30 @@ public :: run_scs
 
 contains
 
-!> $$
-!> \begin{gathered}
-!> \bar\alpha_i=\tfrac13\operatorname{Tr}
-!> \big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad
-!> \boldsymbol{\bar\alpha}=(\boldsymbol\alpha^{-1}+\mathbf T_\text{GG})^{-1}
-!> \\ \partial\boldsymbol{\bar\alpha}=
-!> -\boldsymbol{\bar\alpha}(
-!> \partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG}
-!> )\boldsymbol{\bar\alpha},\qquad
-!> \frac{\partial\bar\alpha_i}{\partial X_j}=
-!> -\frac13\sum_{\zeta\eta}\big(
-!> B_{i\zeta,j\eta}\bar\alpha'_{\zeta,j\eta}+
-!> B'_{j\eta,\zeta}\bar\alpha_{j\eta,i\zeta}
-!> \big)
-!> \\ \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
-!> \quad A_{i\zeta,j\eta}=
-!> \frac{\partial(\alpha_i^{-1})}{\partial X_i}
-!> \delta_{ij}\delta_{\zeta\eta}+
-!> \frac{\partial T^\text{GG}_{i\zeta,j\eta}}{\partial X_i},\quad
-!> \bar\alpha'_{\zeta,p}=\sum_i\bar\alpha_{i\zeta,p},\quad
-!> B'_{p,\zeta}=\sum_iB_{p,i\zeta}
-!> \end{gathered}
-!> $$
 function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
+    !! $$
+    !! \begin{gathered}
+    !! \bar\alpha_i=\tfrac13\operatorname{Tr}
+    !! \big(\textstyle\sum_j\boldsymbol{\bar\alpha}_{ij}\big),\qquad
+    !! \boldsymbol{\bar\alpha}=(\boldsymbol\alpha^{-1}+\mathbf T_\text{GG})^{-1}
+    !! \\ \partial\boldsymbol{\bar\alpha}=
+    !! -\boldsymbol{\bar\alpha}(
+    !! \partial\boldsymbol\alpha^{-1}+\partial\mathbf T_\text{GG}
+    !! )\boldsymbol{\bar\alpha},\qquad
+    !! \frac{\partial\bar\alpha_i}{\partial X_j}=
+    !! -\frac13\sum_{\zeta\eta}\big(
+    !! B_{i\zeta,j\eta}\bar\alpha'_{\zeta,j\eta}+
+    !! B'_{j\eta,\zeta}\bar\alpha_{j\eta,i\zeta}
+    !! \big)
+    !! \\ \mathbf B=\boldsymbol{\bar\alpha}\mathbf A,
+    !! \quad A_{i\zeta,j\eta}=
+    !! \frac{\partial(\alpha_i^{-1})}{\partial X_i}
+    !! \delta_{ij}\delta_{\zeta\eta}+
+    !! \frac{\partial T^\text{GG}_{i\zeta,j\eta}}{\partial X_i},\quad
+    !! \bar\alpha'_{\zeta,p}=\sum_i\bar\alpha_{i\zeta,p},\quad
+    !! B'_{p,\zeta}=\sum_iB_{p,i\zeta}
+    !! \end{gathered}
+    !! $$
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:)
     type(damping_t), intent(in) :: damp

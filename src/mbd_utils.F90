@@ -24,12 +24,14 @@ interface findval
     module procedure findval_int
 end interface
 
+!> Represents an exception.
 type :: exception_t
     integer :: code = 0
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''
 end type
 
+!> Stores results from an MBD calculation
 type :: result_t
     real(dp) :: energy
     real(dp), allocatable :: mode_eigs(:)
@@ -41,6 +43,16 @@ type :: result_t
     real(dp), allocatable :: rpa_orders_k(:, :)
 end type
 
+!> Maps from atom indexes to positions in matrices.
+type, public :: atom_index_t
+    integer, allocatable :: i_atom(:)
+    integer, allocatable :: j_atom(:)
+    integer :: n_atoms
+#   ifdef WITH_SCALAPACK
+    logical :: parallel
+#   endif
+end type
+
 type :: clock_t
     logical :: active = .true.
     integer, allocatable :: timestamps(:), counts(:)
@@ -49,6 +61,7 @@ type :: clock_t
     procedure :: clock => clock_clock
 end type
 
+!> Logging subroutine.
 abstract interface
     subroutine abstract_printer(msg)
         character(len=*), intent(in) :: msg

@@ -5,6 +5,7 @@ license: by
 src_dir: ../src
 output_dir: build/fortran
 css: tweaks.css
+hide_undoc: true
 preprocessor: gfortran -cpp -E -P -DWITH_MPI -DWITH_SCALAPACK
 exclude:
     mbd_blacs.f90
@@ -16,5 +17,5 @@ exclude:
     mbd_mpi.F90
     mbd_rpa.F90
     mbd_scalapack.f90
-    mbd_utils.F90
+    mbd_vdw_param.f90
 ---

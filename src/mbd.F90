@@ -22,6 +22,7 @@ implicit none
 private
 public :: mbd_input, mbd_calc
 
+!> Contains user input to an MBD calculation.
 type :: mbd_input
     !> VdW method to use to calculate energy and gradients.
     !>
@@ -89,6 +90,7 @@ type :: mbd_input
     character(len=10) :: parallel_mode = 'auto'
 end type
 
+!> Represents an MBD calculation.
 type mbd_calc
     private
     type(geom_t) :: geom

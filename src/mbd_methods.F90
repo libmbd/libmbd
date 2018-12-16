@@ -26,6 +26,7 @@ public :: get_mbd_energy, get_mbd_scs_energy
 
 contains
 
+!> Get MBD energy.
 type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) result(res)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
@@ -97,6 +98,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     end if
 end function
 
+!> Get screened MBD energy.
 type(result_t) function get_mbd_scs_energy( &
         geom, variant, alpha_0, C6, damp, dene, grad) result(res)
     type(geom_t), intent(inout) :: geom

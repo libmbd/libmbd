@@ -15,6 +15,7 @@ implicit none
 private
 public :: damping_t, damping_fermi, damping_sqrtfermi, op1minus_grad
 
+!> Represents a damping function.
 type :: damping_t
     character(len=20) :: version
     real(dp) :: beta = 0d0

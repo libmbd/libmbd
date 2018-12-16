@@ -5,9 +5,8 @@ module mbd_geom
 
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_utils, only: shift_idx
 use mbd_lapack, only: inverse
-use mbd_matrix, only: atom_index_t
+use mbd_utils, only: shift_idx, atom_index_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
@@ -20,6 +19,7 @@ implicit none
 private
 public :: geom_t
 
+!> Represents a molecule or a crystal unit cell.
 type :: geom_t
     type(calc_t), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms

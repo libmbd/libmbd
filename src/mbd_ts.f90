@@ -17,6 +17,7 @@ public :: ts_energy
 
 contains
 
+!> Get TS energy.
 function ts_energy(geom, alpha_0, C6, damp) result(ene)
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)

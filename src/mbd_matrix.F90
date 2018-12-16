@@ -6,7 +6,7 @@ module mbd_matrix
 
 use mbd_constants
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
-use mbd_utils, only: findval, exception_t
+use mbd_utils, only: findval, exception_t, atom_index_t
 #   ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
@@ -15,16 +15,7 @@ use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
 implicit none
 
 private
-public :: matrix_re_t, matrix_cplx_t, contract_cross_33, atom_index_t
-
-type :: atom_index_t
-    integer, allocatable :: i_atom(:)
-    integer, allocatable :: j_atom(:)
-    integer :: n_atoms
-#   ifdef WITH_SCALAPACK
-    logical :: parallel
-#   endif
-end type
+public :: matrix_re_t, matrix_cplx_t, contract_cross_33
 
 type :: matrix_re_t
     real(dp), allocatable :: val(:, :)

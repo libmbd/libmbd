@@ -2,7 +2,7 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-!> Formulas used at multiple places of the code.
+!> Procedures, types, and interfaces used across multiple modules.
 module mbd_common
 
 use mbd_constants

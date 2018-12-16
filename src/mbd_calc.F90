@@ -16,6 +16,7 @@ implicit none
 private
 public :: calc_t, get_freq_grid
 
+!> Calculation-wide paramters.
 type :: param_t
     real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
     real(dp) :: ts_cutoff_radius = 50d0*ang
@@ -30,6 +31,7 @@ type :: param_t
     integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
 
+!> Represents an MBD calculation.
 type :: calc_t
     type(param_t) :: param
     type(clock_t) :: clock

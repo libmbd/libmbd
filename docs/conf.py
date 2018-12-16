@@ -15,7 +15,6 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'breathe',
 ]
 source_suffix = '.rst'
 master_doc = 'index'
@@ -44,10 +43,6 @@ html_sidebars = {
     ]
 }
 htmlhelp_basename = f'{project}doc'
-
-breathe_projects_source = {
-    'fortran-c-api': ('../src', ['mbd.h'])
-}
 
 
 def skip_namedtuples(app, what, name, obj, skip, options):

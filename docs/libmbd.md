@@ -3,7 +3,7 @@ project: Libmbd
 summary: Many-body dispersion library
 license: by
 src_dir: ../src
-output_dir: build/fortran
+output_dir: build
 css: tweaks.css
 hide_undoc: true
 preprocessor: gfortran -cpp -E -P -DWITH_MPI -DWITH_SCALAPACK

@@ -99,7 +99,7 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
             exit
         endif
     end do ! i_shell
-end function ts_energy
+end function
 
 elemental function combine_C6(C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     real(dp), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j

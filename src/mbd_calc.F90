@@ -103,7 +103,7 @@ subroutine get_freq_grid(n, x, w, L)
     x = L_*(1+x)/(1-x)
     w = w(n:1:-1)
     x = x(n:1:-1)
-end subroutine get_freq_grid
+end subroutine
 
 subroutine gauss_legendre(n, r, w)
     integer, intent(in) :: n

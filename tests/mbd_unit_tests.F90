@@ -123,7 +123,7 @@ subroutine test_T_bare_deriv()
     end do
     if (failed(maxval(abs(diff)), 1d-10)) then
     end if
-end subroutine test_T_bare_deriv
+end subroutine
 
 subroutine test_T_GG_deriv_expl()
     real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, sigma
@@ -149,7 +149,7 @@ subroutine test_T_GG_deriv_expl()
     end do
     if (failed(maxval(abs(diff)), 1d-10)) then
     end if
-end subroutine test_T_GG_deriv_expl
+end subroutine
 
 subroutine test_T_GG_deriv_impl()
     real(dp) :: r(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, sigma, sigma_diff
@@ -172,7 +172,7 @@ subroutine test_T_GG_deriv_impl()
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTGG', diff)
     end if
-end subroutine test_T_GG_deriv_impl
+end subroutine
 
 subroutine test_T_fermi_deriv_impl()
     real(dp) :: r(3), T(3, 3), T0(3, 3), &
@@ -199,7 +199,7 @@ subroutine test_T_fermi_deriv_impl()
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTfermi', diff)
     end if
-end subroutine test_T_fermi_deriv_impl
+end subroutine
 
 subroutine test_mbd_deriv_expl()
     real(dp) :: delta
@@ -249,7 +249,7 @@ subroutine test_mbd_deriv_expl()
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
-end subroutine test_mbd_deriv_expl
+end subroutine
 
 subroutine test_scs_deriv_expl()
     real(dp) :: delta
@@ -313,7 +313,7 @@ subroutine test_scs_deriv_expl()
         call print_matrix('diff y', diff(:, :, 2))
         call print_matrix('diff z', diff(:, :, 3))
     end if
-end subroutine test_scs_deriv_expl
+end subroutine
 
 subroutine test_scs_deriv_impl_alpha
     real(dp) :: delta
@@ -369,7 +369,7 @@ subroutine test_scs_deriv_impl_alpha
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff)
     end if
-end subroutine test_scs_deriv_impl_alpha
+end subroutine
 
 subroutine test_scs_deriv_impl_vdw
     real(dp) :: delta
@@ -425,7 +425,7 @@ subroutine test_scs_deriv_impl_vdw
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff(:, :))
     end if
-end subroutine test_scs_deriv_impl_vdw
+end subroutine
 
 subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: delta
@@ -469,7 +469,7 @@ subroutine test_mbd_deriv_impl_alpha()
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', reshape(diff, [n_atoms, 1]))
     end if
-end subroutine test_mbd_deriv_impl_alpha
+end subroutine
 
 subroutine test_mbd_deriv_impl_omega()
     real(dp) :: delta
@@ -557,7 +557,7 @@ subroutine test_mbd_deriv_impl_vdw()
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
-end subroutine test_mbd_deriv_impl_vdw
+end subroutine
 
 subroutine test_mbd_rsscs_deriv_expl()
     real(dp) :: delta
@@ -606,7 +606,7 @@ subroutine test_mbd_rsscs_deriv_expl()
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
-end subroutine test_mbd_rsscs_deriv_expl
+end subroutine
 
 subroutine test_mbd_rsscs_deriv_impl_alpha()
     real(dp) :: delta
@@ -650,7 +650,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
-end subroutine test_mbd_rsscs_deriv_impl_alpha
+end subroutine
 
 subroutine test_mbd_rsscs_deriv_impl_C6()
     real(dp) :: delta
@@ -694,7 +694,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     if (failed(maxval(abs(diff)), 5d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
-end subroutine test_mbd_rsscs_deriv_impl_C6
+end subroutine
 
 subroutine test_mbd_rsscs_deriv_impl_vdw()
     real(dp) :: delta
@@ -738,6 +738,6 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
-end subroutine test_mbd_rsscs_deriv_impl_vdw
+end subroutine
 
 end program

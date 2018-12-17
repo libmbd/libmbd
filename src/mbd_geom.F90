@@ -54,7 +54,7 @@ type, public :: geom_t
     procedure :: supercell_circum => geom_supercell_circum
     procedure :: ensure_k_pts => geom_ensure_k_pts
     procedure :: clock => geom_clock
-end type geom_t
+end type
 
 contains
 

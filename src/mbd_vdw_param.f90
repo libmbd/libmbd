@@ -240,6 +240,6 @@ integer elemental function species_index(species)
         i = -1
     end select
     species_index = i
-end function species_index
+end function
 
 end module

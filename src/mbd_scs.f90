@@ -142,6 +142,6 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
             end if
         end do
     end if
-end function run_scs
+end function
 
 end module

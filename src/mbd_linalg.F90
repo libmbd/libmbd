@@ -69,4 +69,4 @@ function make_diag_real(d) result(A)
     forall (i = 1:size(d)) A(i, i) = d(i)
 end function
 
-end module mbd_linalg
+end module

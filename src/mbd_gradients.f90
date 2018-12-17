@@ -10,10 +10,8 @@ use mbd_constants
 implicit none
 
 private
-public :: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, grad_request_t, &
-    grad_scalar_t
 
-type :: grad_t
+type, public :: grad_t
     !! Derivatives with respect to various quantities
     real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
     real(dp), allocatable :: dalpha(:)
@@ -26,7 +24,7 @@ type :: grad_t
     real(dp), allocatable :: dX_free(:)
 end type
 
-type :: grad_request_t
+type, public :: grad_request_t
     !! Used to request derivatives with respect to function arguments
     logical :: dcoords = .false.
     logical :: dalpha = .false.
@@ -42,21 +40,21 @@ type :: grad_request_t
     procedure :: any => grad_request_any
 end type
 
-type :: grad_matrix_re_t
+type, public :: grad_matrix_re_t
     !! Derivatives of a real dipole matrix with respect to various quantities
     real(dp), allocatable :: dr(:, :, :)
     real(dp), allocatable :: dvdw(:, :)
     real(dp), allocatable :: dsigma(:, :)
 end type
 
-type :: grad_matrix_cplx_t
+type, public :: grad_matrix_cplx_t
     !! Derivatives of a compelx dipole matrix with respect to various quantities
     complex(dp), allocatable :: dr(:, :, :)
     complex(dp), allocatable :: dvdw(:, :)
     complex(dp), allocatable :: dsigma(:, :)
 end type
 
-type :: grad_scalar_t
+type, public :: grad_scalar_t
     !! Derivatives of a scalar with respect to various quantities
     real(dp), allocatable :: dr(:)  ! explicit derivative
     real(dp), allocatable :: dvdw

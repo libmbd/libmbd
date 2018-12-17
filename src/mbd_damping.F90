@@ -13,9 +13,9 @@ use mbd_utils, only: lower, exception_t
 implicit none
 
 private
-public :: damping_t, damping_fermi, damping_sqrtfermi, op1minus_grad
+public :: damping_fermi, damping_sqrtfermi, op1minus_grad
 
-type :: damping_t
+type, public :: damping_t
     !! Represents a damping function.
     character(len=20) :: version
     real(dp) :: beta = 0d0

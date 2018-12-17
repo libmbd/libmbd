@@ -15,9 +15,9 @@ use mbd_utils, only: tostr, exception_t, clock_t, abstract_printer, stdout_print
 implicit none
 
 private
-public :: calc_t, param_t, get_freq_grid
+public :: get_freq_grid
 
-type :: param_t
+type, public :: param_t
     !! Calculation-wide paramters.
     real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
     real(dp) :: ts_cutoff_radius = 50d0*ang
@@ -32,7 +32,7 @@ type :: param_t
     integer :: n_frequency_grid = N_FREQUENCY_GRID
 end type
 
-type :: calc_t
+type, public :: calc_t
     !! Represents an MBD calculation.
     type(param_t) :: param
     type(clock_t) :: clock

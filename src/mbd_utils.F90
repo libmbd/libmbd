@@ -13,9 +13,8 @@ use mbd_mpi
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, lower, exception_t, diff7, &
-    findval, abstract_printer, null_printer, stdout_printer, &
-    shift_idx, result_t, clock_t
+public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, &
+    abstract_printer, null_printer, stdout_printer, shift_idx
 
 interface tostr
     module procedure tostr_int
@@ -26,14 +25,14 @@ interface findval
     module procedure findval_int
 end interface
 
-type :: exception_t
+type, public :: exception_t
     !! Represents an exception.
     integer :: code = 0
     character(50) :: origin = '(unknown)'
     character(150) :: msg = ''
 end type
 
-type :: result_t
+type, public :: result_t
     !! Stores results from an MBD calculation
     real(dp) :: energy
     real(dp), allocatable :: mode_eigs(:)
@@ -55,7 +54,7 @@ type, public :: atom_index_t
 #   endif
 end type
 
-type :: clock_t
+type, public :: clock_t
     !! Used for measuring performance.
     logical :: active = .true.
     integer, allocatable :: timestamps(:), counts(:)

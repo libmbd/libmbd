@@ -8,9 +8,9 @@ use mbd_constants
 implicit none
 
 private
-public :: blacs_desc_t, blacs_grid_t, all_reduce
+public :: all_reduce
 
-type :: blacs_grid_t
+type, public :: blacs_grid_t
     integer :: ctx
     integer :: nprows
     integer :: npcols
@@ -21,7 +21,7 @@ contains
     procedure :: destroy => blacs_grid_destroy
 end type
 
-type :: blacs_desc_t
+type, public :: blacs_desc_t
     integer, allocatable :: i_atom(:)
     integer, allocatable :: j_atom(:)
     integer :: n_atoms

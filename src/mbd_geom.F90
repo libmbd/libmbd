@@ -19,9 +19,8 @@ use mbd_mpi
 implicit none
 
 private
-public :: geom_t
 
-type :: geom_t
+type, public :: geom_t
     !! Represents a molecule or a crystal unit cell.
     type(calc_t), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms

@@ -20,9 +20,8 @@ use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 implicit none
 
 private
-public :: mbd_input, mbd_calc
 
-type :: mbd_input
+type, public :: mbd_input
     !! Contains user input to an MBD calculation.
     character(len=30) :: method = 'mbd-rsscs'
         !! VdW method to use to calculate energy and gradients.
@@ -93,7 +92,7 @@ type :: mbd_input
         !! - `atoms`: Parallelize over atom pairs.
 end type
 
-type mbd_calc
+type, public :: mbd_calc
     !! Represents an MBD calculation.
     private
     type(geom_t) :: geom

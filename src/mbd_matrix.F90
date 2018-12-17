@@ -15,9 +15,9 @@ use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
 implicit none
 
 private
-public :: matrix_re_t, matrix_cplx_t, contract_cross_33
+public :: contract_cross_33
 
-type :: matrix_re_t
+type, public :: matrix_re_t
     real(dp), allocatable :: val(:, :)
     type(atom_index_t) :: idx
 #   ifdef WITH_SCALAPACK
@@ -47,7 +47,7 @@ type :: matrix_re_t
     procedure :: alloc_from => matrix_re_alloc_from
 end type
 
-type :: matrix_cplx_t
+type, public :: matrix_cplx_t
     complex(dp), allocatable :: val(:, :)
     type(atom_index_t) :: idx
 #   ifdef WITH_SCALAPACK

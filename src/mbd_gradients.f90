@@ -24,6 +24,30 @@ type, public :: grad_t
     real(dp), allocatable :: dX_free(:)
 end type
 
+type, public :: grad_matrix_re_t
+    !! Derivatives of a real dipole matrix with respect to various quantities
+    real(dp), allocatable :: dr(:, :, :)
+    real(dp), allocatable :: dvdw(:, :)
+    real(dp), allocatable :: dsigma(:, :)
+    real(dp), allocatable :: dgamma(:, :)
+end type
+
+type, public :: grad_matrix_cplx_t
+    !! Derivatives of a compelx dipole matrix with respect to various quantities
+    complex(dp), allocatable :: dr(:, :, :)
+    complex(dp), allocatable :: dvdw(:, :)
+    complex(dp), allocatable :: dsigma(:, :)
+    complex(dp), allocatable :: dgamma(:, :)
+end type
+
+type, public :: grad_scalar_t
+    !! Derivatives of a scalar with respect to various quantities
+    real(dp), allocatable :: dr(:)
+    real(dp), allocatable :: dr_1
+    real(dp), allocatable :: dvdw
+    real(dp), allocatable :: dgamma
+end type
+
 type, public :: grad_request_t
     !! Used to request derivatives with respect to function arguments
     logical :: dcoords = .false.
@@ -33,6 +57,7 @@ type, public :: grad_request_t
     logical :: dr_vdw = .false.
     logical :: domega = .false.
     logical :: dsigma = .false.
+    logical :: dgamma = .false.
     logical :: dV = .false.
     logical :: dV_free = .false.
     logical :: dX_free = .false.
@@ -40,33 +65,22 @@ type, public :: grad_request_t
     procedure :: any => grad_request_any
 end type
 
-type, public :: grad_matrix_re_t
-    !! Derivatives of a real dipole matrix with respect to various quantities
-    real(dp), allocatable :: dr(:, :, :)
-    real(dp), allocatable :: dvdw(:, :)
-    real(dp), allocatable :: dsigma(:, :)
-end type
-
-type, public :: grad_matrix_cplx_t
-    !! Derivatives of a compelx dipole matrix with respect to various quantities
-    complex(dp), allocatable :: dr(:, :, :)
-    complex(dp), allocatable :: dvdw(:, :)
-    complex(dp), allocatable :: dsigma(:, :)
-end type
-
-type, public :: grad_scalar_t
-    !! Derivatives of a scalar with respect to various quantities
-    real(dp), allocatable :: dr(:)  ! explicit derivative
-    real(dp), allocatable :: dvdw
-end type
-
 contains
 
 logical function grad_request_any(this) result(any)
     class(grad_request_t), intent(in) :: this
 
-    any = this%dcoords .or. this%dalpha .or. this%dC6 .or. &
-        this%dr_vdw .or. this%domega
+    any = this%dcoords &
+        .or. this%dalpha &
+        .or. this%dalpha_dyn &
+        .or. this%dC6 &
+        .or. this%dr_vdw &
+        .or. this%domega &
+        .or. this%dsigma &
+        .or. this%dgamma &
+        .or. this%dV &
+        .or. this%dV_free &
+        .or. this%dX_free
 end function
 
 end module

@@ -439,7 +439,7 @@ function T_bare(r, dT, grad) result(T)
     end forall
 end function
 
-real(dp) function B_erfc(r, a) result(B)
+real(dp) function B_erfc(r, gamm, dB, grad) result(B)
     !! $$
     !! \begin{aligned}
     !! B(R,\gamma)
@@ -450,12 +450,22 @@ real(dp) function B_erfc(r, a) result(B)
     !! (R\partial\gamma+\gamma\partial R)
     !! \end{aligned}
     !! $$
-    real(dp), intent(in) :: r, a
+    real(dp), intent(in) :: r
+    real(dp), intent(in) :: gamm
+    type(grad_scalar_t), intent(out), optional :: dB
+    type(grad_request_t), intent(in), optional :: grad
 
-    B = (erfc(a*r)+(2*a*r/sqrt(pi))*exp(-(a*r)**2))/r**3
+    real(dp) :: tmp, gamma_r_sq
+
+    gamma_r_sq = (gamm*r)**2
+    B = (erfc(gamm*r)+(2*gamm*r/sqrt(pi))*exp(-gamma_r_sq))
+    if (.not. present(grad)) return
+    tmp = -4d0/sqrt(pi)*gamma_r_sq*exp(-gamma_r_sq)
+    if (grad%dcoords) dB%dr_1 = tmp*gamm
+    if (grad%dgamma) dB%dgamma = tmp*r
 end function
 
-real(dp) elemental function C_erfc(r, a) result(C)
+real(dp) function C_erfc(r, gamm, dC, grad) result(C)
     !! $$
     !! \begin{aligned}
     !! C(r,\gamma)
@@ -466,37 +476,87 @@ real(dp) elemental function C_erfc(r, a) result(C)
     !! (R\partial\gamma+\gamma\partial R)
     !! \end{aligned}
     !! $$
-    real(dp), intent(in) :: r, a
+    real(dp), intent(in) :: r
+    real(dp), intent(in) :: gamm
+    type(grad_scalar_t), intent(out), optional :: dC
+    type(grad_request_t), intent(in), optional :: grad
 
-    C = (3*erfc(a*r)+(2*a*r/sqrt(pi))*(3d0+2*(a*r)**2)*exp(-(a*r)**2))/r**5
+    real(dp) :: tmp, gamma_r_sq
+
+    gamma_r_sq = (gamm*r)**2
+    C = (3*erfc(gamm*r)+(2*gamm*r/sqrt(pi))*(3d0+2*gamma_r_sq)*exp(-gamma_r_sq))
+    if (.not. present(grad)) return
+    tmp = -8d0/sqrt(pi)*gamma_r_sq**2*exp(-gamma_r_sq)
+    if (grad%dcoords) dC%dr_1 = tmp*gamm
+    if (grad%dgamma) dC%dgamma = tmp*r
 end function
 
-function T_erfc(rxyz, alpha) result(T)
+function T_erfc(r, gamm, dT, grad) result(T)
+    !! $$
+    !! T_{ab}^\text{erfc}(\mathbf r,\gamma)
+    !! =-3\frac{r_ar_b}{r^5}C(r,\gamma)+\frac{\delta_{ab}}{r^3}B(r,\gamma)
+    !! $$
+    !!
     !! $$
     !! \begin{aligned}
-    !! T_{ab}^\text{erfc}(\mathbf r,\gamma)
-    !! &=\frac{-3r_ar_bC(r,\gamma)+r^2\delta_{ab}B(r,\gamma)}{r^5}
-    !! \\ \mathbf\partial T_{ab}^\text{erfc}(\mathbf r,\gamma)
-    !! &=\partial T_{ab}(\mathbf r)+\frac{-3r_ar_b\partial C(r,\gamma )
-    !! +r^2\delta_{ab}\partial B(r,\gamma)}{r^5}
+    !! \frac{\partial T_{ab}^\text{erfc}(\mathbf r,\gamma)}{\partial r_c}
+    !! &=-\left(
+    !! \frac{r_a\delta_{bc}+r_b\delta_{ca}}{r^5}-
+    !! 5\frac{r_ar_br_c}{r^7}
+    !! \right)C(r,\gamma)-3\frac{r_c\delta_{ab}}{r^5}B(r,\gamma)
+    !! \\ &-\frac{r_ar_br_c}{r^6}\frac{\partial C(r,\gamma)}{\partial
+    !! r}+\frac{r_c\delta_{ab}}{r^4}\frac{\partial B(r,\gamma)}{\partial r}
     !! \end{aligned}
     !! $$
-    real(dp), intent(in) :: rxyz(3), alpha
+    real(dp), intent(in) :: r(3)
+    real(dp), intent(in) :: gamm
+    type(grad_matrix_re_t), intent(out), optional :: dT
+    type(grad_request_t), intent(in), optional :: grad
     real(dp) :: T(3, 3)
 
-    integer :: i, j
-    real(dp) :: r, B, C
+    integer :: a, b, c
+    real(dp) :: r_1, r_2, r_3, r_4, r_5, r_6, r_7, B_ew, C_ew
+    type(grad_scalar_t) :: dB, dC
 
-    r = sqrt(sum(rxyz(:)**2))
-    B = B_erfc(r, alpha)
-    C = C_erfc(r, alpha)
-    do i = 1, 3
-        do j = i, 3
-            T(i, j) = -C*rxyz(i)*rxyz(j)
-            if (i /= j) T(j, i) = T(i, j)
-        end do
-        T(i, i) = T(i, i)+B
-    end do
+    r_2 = sum(r**2)
+    r_1 = sqrt(r_2)
+    r_3 = r_1*r_2
+    r_5 = r_3*r_2
+    B_ew = B_erfc(r_1, gamm, dB, grad)
+    C_ew = C_erfc(r_1, gamm, dC, grad)
+    forall (a = 1:3)
+        T(a, a) = -C_ew*r(a)**2/r_5+B_ew/r_3
+        forall (b = a+1:3)
+            T(a, b) = -C_ew*r(a)*r(b)/r_5
+            T(b, a) = T(a, b)
+        end forall
+    end forall
+    if (.not. present(grad)) return
+    if (grad%dcoords) then
+        allocate (dT%dr(3, 3, 3))
+        r_7 = r_1**7
+        r_4 = r_2**2
+        r_6 = r_4*r_2
+        forall (c = 1:3)
+            dT%dr(c, c, c) = &
+                -(2*r(c)/r_5-5*r(c)**3/r_7)*C_ew - 3*r(c)/r_5*B_ew &
+                - r(c)**3/r_6*dC%dr_1 + r(c)/r_4*dB%dr_1
+            forall (a = 1:3, a /= c)
+                dT%dr(a, c, c) = &
+                    -(r(a)/r_5-5*r(a)*r(c)**2/r_7)*C_ew &
+                    - r(a)*r(c)**2/r_6*dC%dr_1
+                dT%dr(c, a, c) = dT%dr(a, c, c)
+                dT%dr(a, a, c) = &
+                    5*r(a)**2*r(c)/r_7*C_ew - 3*r(c)/r_5*B_ew &
+                    - r(a)**2*r(c)/r_6*dC%dr_1 + r(c)/r_4*dB%dr_1
+                forall (b = a+1:3, b /= c)
+                    dT%dr(a, b, c) = &
+                        5*r(a)*r(b)*r(c)/r_7*C_ew - r(a)*r(b)*r(c)/r_6*dC%dr_1
+                    dT%dr(b, a, c) = dT%dr(a, b, c)
+                end forall
+            end forall
+        end forall
+    end if
 end function
 
 function T_erf_coulomb(r, sigma, dT, grad) result(T)

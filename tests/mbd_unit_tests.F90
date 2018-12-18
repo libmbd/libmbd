@@ -6,7 +6,7 @@ program mbd_unit_tests
 use mbd_constants
 use mbd_calc, only: calc_t
 use mbd_damping, only: damping_t, damping_fermi
-use mbd_dipole, only: dipole_matrix, T_bare, T_erf_coulomb, damping_grad
+use mbd_dipole, only: dipole_matrix, T_bare, T_erf_coulomb, damping_grad, T_erfc
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_request_t, grad_scalar_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
@@ -37,6 +37,7 @@ n_all = 0
 call exec_test('T_bare derivative')
 call exec_test('T_GG derivative explicit')
 call exec_test('T_GG derivative implicit')
+call exec_test('T_erfc derivative explicit')
 call exec_test('T_fermi derivative implicit')
 call exec_test('MBD derivative explicit')
 call exec_test('SCS derivative explicit')
@@ -68,6 +69,7 @@ subroutine exec_test(test_name)
     case ('T_bare derivative'); call test_T_bare_deriv()
     case ('T_GG derivative explicit'); call test_T_GG_deriv_expl()
     case ('T_GG derivative implicit'); call test_T_GG_deriv_impl()
+    case ('T_erfc derivative explicit'); call test_T_erfc_deriv_expl()
     case ('T_fermi derivative implicit'); call test_T_fermi_deriv_impl()
     case ('MBD derivative explicit'); call test_mbd_deriv_expl()
     case ('SCS derivative explicit'); call test_scs_deriv_expl()
@@ -198,6 +200,32 @@ subroutine test_T_fermi_deriv_impl()
     diff = (T_diff_num(:, :, 0)-dT%dvdw)/T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTfermi', diff)
+    end if
+end subroutine
+
+subroutine test_T_erfc_deriv_expl()
+    real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta, gamm
+    type(grad_matrix_re_t) :: dT
+    integer :: a, b, c, i_step
+
+    delta = 1d-2
+    r = [1.02d0, -2.22d0, 0.15d0]
+    gamm = 1.2d0
+    T = T_erfc(r, gamm, dT, grad_request_t(dcoords=.true.))
+    diff = 0d0
+    do c = 1, 3
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            r_diff = r
+            r_diff(c) = r_diff(c)+i_step*delta
+            T_diff_num(:, :, i_step) = T_erfc(r_diff, gamm)
+        end do
+        forall (a = 1:3, b = 1:3)
+            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+        end forall
+        diff = max(diff, abs(T_diff_num(:, :, 0)-dT%dr(:, :, c))/T_diff_num(:, :, 0))
+    end do
+    if (failed(maxval(abs(diff)), 1d-9)) then
     end if
 end subroutine
 

@@ -114,9 +114,9 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     type(grad_scalar_t) :: df
     type(grad_request_t) :: grad_
 #if MBD_TYPE == 0
-    real(dp) :: Tpp_final(3, 3)
+    real(dp) :: Tpp_ij(3, 3)
 #elif MBD_TYPE == 1
-    complex(dp) :: Tpp_final(3, 3)
+    complex(dp) :: Tpp_ij(3, 3)
 #endif
 
     do_ewald = .false.
@@ -150,16 +150,14 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
             real_space_cutoff = geom%calc%param%dipole_cutoff
         end if
         range_cell = geom%supercell_circum(geom%lattice, real_space_cutoff)
-    else
-        range_cell(:) = 0
-    end if
-    if (is_periodic) then
         call geom%calc%print( &
             'Ewald: summing real part in cell vector range of ' &
             // trim(tostr(1+2*range_cell(1))) // 'x' &
             // trim(tostr(1+2*range_cell(2))) // 'x' &
             // trim(tostr(1+2*range_cell(3))) &
         )
+    else
+        range_cell(:) = 0
     end if
     associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
         allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
@@ -169,16 +167,16 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     end associate
     call geom%clock(11)
     idx_cell = [0, 0, -1]
-    do i_cell = 1, product(1+2*range_cell)
+    each_cell: do i_cell = 1, product(1+2*range_cell)
         call shift_idx(idx_cell, -range_cell, range_cell)
         if (is_periodic) then
             R_cell = matmul(geom%lattice, idx_cell)
         else
             R_cell(:) = 0d0
         end if
-        do my_i_atom = 1, size(dipmat%idx%i_atom)
+        each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
-            do my_j_atom = 1, size(dipmat%idx%j_atom)
+            each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
@@ -225,21 +223,17 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                             T_erf_coulomb(r, sigma_ij)
                         do_ewald = .false.
                 end select
-                if (grad_%dr_vdw) then
-                    dTpp%dvdw = damp%beta*dTpp%dvdw
-                end if
-                if (do_ewald) then
-                    Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
-                end if
+                if (grad_%dr_vdw) dTpp%dvdw = damp%beta*dTpp%dvdw
+                if (do_ewald) Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
 #if MBD_TYPE == 0
-                Tpp_final = Tpp
+                Tpp_ij = Tpp
 #elif MBD_TYPE == 1
-                Tpp_final = Tpp*exp(-cmplx(0d0, 1d0, 8)*(dot_product(k_point, r)))
+                Tpp_ij = Tpp*exp(-cmplx(0d0, 1d0, 8)*(dot_product(k_point, r)))
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
                 associate (T => dipmat%val(i+1:i+3, j+1:j+3))
-                    T = T + Tpp_final
+                    T = T + Tpp_ij
                 end associate
                 if (.not. present(grad)) cycle
 #if MBD_TYPE == 0
@@ -259,9 +253,9 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                     end associate
                 end if
 #endif
-            end do ! j_atom
-        end do ! i_atom
-    end do ! i_cell
+            end do each_atom_pair
+        end do each_atom
+    end do each_cell
     call geom%clock(-11)
     if (do_ewald) then
 #if MBD_TYPE == 0
@@ -295,7 +289,6 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
     real(dp) :: Tpp(3, 3)
 #elif MBD_TYPE == 1
     complex(dp) :: Tpp(3, 3)
-    real(dp) :: elem
 #endif
 
     rec_unit_cell = 2*pi*inverse(transpose(geom%lattice))
@@ -313,9 +306,8 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
     )
     call geom%clock(12)
     idx_G_vector = [0, 0, -1]
-    do i_G_vector = 1, product(1+2*range_G_vector)
+    each_recip_cell: do i_G_vector = 1, product(1+2*range_G_vector)
         call shift_idx(idx_G_vector, -range_G_vector, range_G_vector)
-        if (i_G_vector == 1) cycle
         G_vector = matmul(rec_unit_cell, idx_G_vector)
 #if MBD_TYPE == 1
         k_total = G_vector + k_point
@@ -323,19 +315,18 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
         k_total = G_vector
 #endif
         k_sq = sum(k_total**2)
-        if (sqrt(k_sq) > rec_space_cutoff) cycle
+        if (sqrt(k_sq) > rec_space_cutoff .or. sqrt(k_sq) < 1d-15) cycle
         k_prefactor = 4*pi/volume*exp(-k_sq/(4*alpha**2))
         forall (i_xyz = 1:3, j_xyz = 1:3) &
                 k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
                 *k_total(i_xyz)*k_total(j_xyz)/k_sq
-        do my_i_atom = 1, size(dipmat%idx%i_atom)
+        each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
-            do my_j_atom = 1, size(dipmat%idx%j_atom)
+            each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
                 r = geom%coords(:, i_atom)-geom%coords(:, j_atom)
 #if MBD_TYPE == 1
-                Tpp = k_prefactor*exp(cmplx(0d0, 1d0, 8) &
-                    *dot_product(G_vector, r))
+                Tpp = k_prefactor*exp(cmplx(0d0, 1d0, 8)*dot_product(G_vector, r))
 #elif MBD_TYPE == 0
                 Tpp = k_prefactor*cos(dot_product(G_vector, r))
 #endif
@@ -344,40 +335,27 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
                 associate (T => dipmat%val(i+1:i+3, j+1:j+3))
                     T = T + Tpp
                 end associate
-            end do ! j_atom
-        end do ! i_atom
-    end do ! i_G_vector
-    call dipmat%add_diag_scalar(-4*alpha**3/(3*sqrt(pi))) ! self energy
-    do_surface = .true.
+            end do each_atom_pair
+        end do each_atom
+    end do each_recip_cell
+    ! self energy
+    call dipmat%add_diag_scalar(-4*alpha**3/(3*sqrt(pi)))
+    ! surface term
 #if MBD_TYPE == 1
-    k_sq = sum(k_point**2)
-    if (sqrt(k_sq) > 1.d-15) then
-        do_surface = .false.
-        do my_i_atom = 1, size(dipmat%idx%i_atom)
-        do my_j_atom = 1, size(dipmat%idx%j_atom)
-            do i_xyz = 1, 3
-            do j_xyz = 1, 3
-                i = 3*(my_i_atom-1)+i_xyz
-                j = 3*(my_j_atom-1)+j_xyz
-                elem = 4*pi/volume*k_point(i_xyz)*k_point(j_xyz)/k_sq &
-                    *exp(-k_sq/(4*alpha**2))
-                dipmat%val(i, j) = dipmat%val(i, j) + elem
-            end do ! j_xyz
-            end do ! i_xyz
-        end do ! j_atom
-        end do ! i_atom
-    end if ! k_sq >
+    do_surface = sqrt(sum(k_point**2)) < 1d-15
+#else
+    do_surface = .true.
 #endif
-    if (do_surface) then ! surface energy
+    if (do_surface) then
         do my_i_atom = 1, size(dipmat%idx%i_atom)
-        do my_j_atom = 1, size(dipmat%idx%j_atom)
-            do i_xyz = 1, 3
-                i = 3*(my_i_atom-1)+i_xyz
-                j = 3*(my_j_atom-1)+i_xyz
-                dipmat%val(i, j) = dipmat%val(i, j) + 4*pi/(3*volume)
-            end do ! i_xyz
-        end do ! j_atom
-        end do ! i_atom
+            do my_j_atom = 1, size(dipmat%idx%j_atom)
+                do i_xyz = 1, 3
+                    i = 3*(my_i_atom-1)+i_xyz
+                    j = 3*(my_j_atom-1)+i_xyz
+                    dipmat%val(i, j) = dipmat%val(i, j) + 4*pi/(3*volume)
+                end do
+            end do
+        end do
     end if
     call geom%clock(-12)
 end subroutine

@@ -140,7 +140,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
             real_space_cutoff = &
                 6d0/gamm*geom%calc%param%ewald_real_cutoff_scaling
             call geom%calc%print( &
-                'Ewald: using alpha = ' // trim(tostr(gamm)) &
+                'Ewald: using gamma = ' // trim(tostr(gamm)) &
                 // ', real cutoff = ' // trim(tostr(real_space_cutoff)) &
             )
         else
@@ -281,41 +281,44 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     call geom%clock(-11)
     if (do_ewald) then
 #if MBD_TYPE == 0
-        call add_ewald_dipole_parts_real(geom, gamm, dipmat)
+        call add_ewald_dipole_parts_real(geom, gamm, dipmat, ddipmat, grad_)
 #elif MBD_TYPE == 1
-        call add_ewald_dipole_parts_complex(geom, gamm, dipmat, k_point)
+        call add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad_, k_point)
 #endif
     end if
 end function
 
 #if MBD_TYPE == 0
-subroutine add_ewald_dipole_parts_real(geom, alpha, dipmat)
+subroutine add_ewald_dipole_parts_real(geom, gamm, dipmat, ddipmat, grad)
     type(matrix_re_t), intent(inout) :: dipmat
+    type(grad_matrix_re_t), intent(inout) :: ddipmat
 #elif MBD_TYPE == 1
-subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
+subroutine add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad, k_point)
     type(matrix_cplx_t), intent(inout) :: dipmat
+    type(grad_matrix_cplx_t), intent(inout) :: ddipmat
 #endif
     type(geom_t), intent(inout) :: geom
-    real(dp), intent(in) :: alpha
+    real(dp), intent(in) :: gamm
+    type(grad_request_t), intent(in) :: grad
 #if MBD_TYPE == 1
     real(dp), intent(in) :: k_point(3)
 #endif
 
     logical :: do_surface
     real(dp) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
-        k_sq, rec_space_cutoff, k_prefactor(3, 3)
+        k_sq, rec_space_cutoff, k_prefactor(3, 3), G_r
     integer :: &
         i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
         range_G_vector(3), my_i_atom, my_j_atom
 #if MBD_TYPE == 0
-    real(dp) :: Tpp(3, 3)
+    real(dp) :: T(3, 3)
 #elif MBD_TYPE == 1
-    complex(dp) :: Tpp(3, 3)
+    complex(dp) :: T(3, 3)
 #endif
 
     rec_unit_cell = 2*pi*inverse(transpose(geom%lattice))
     volume = abs(dble(product(eigvals(geom%lattice))))
-    rec_space_cutoff = 10d0*alpha*geom%calc%param%ewald_rec_cutoff_scaling
+    rec_space_cutoff = 10d0*gamm*geom%calc%param%ewald_rec_cutoff_scaling
     range_G_vector = geom%supercell_circum(rec_unit_cell, rec_space_cutoff)
     call geom%calc%print( &
         'Ewald: using reciprocal cutoff = ' // trim(tostr(rec_space_cutoff)) &
@@ -338,30 +341,44 @@ subroutine add_ewald_dipole_parts_complex(geom, alpha, dipmat, k_point)
 #endif
         k_sq = sum(k_total**2)
         if (sqrt(k_sq) > rec_space_cutoff .or. sqrt(k_sq) < 1d-15) cycle
-        k_prefactor = 4*pi/volume*exp(-k_sq/(4*alpha**2))
-        forall (i_xyz = 1:3, j_xyz = 1:3) &
-                k_prefactor(i_xyz, j_xyz) = k_prefactor(i_xyz, j_xyz) &
-                *k_total(i_xyz)*k_total(j_xyz)/k_sq
+        k_prefactor = 4*pi/volume*exp(-k_sq/(4*gamm**2))
+        forall (i_xyz = 1:3, j_xyz = 1:3)
+            k_prefactor(i_xyz, j_xyz) = &
+                k_prefactor(i_xyz, j_xyz)*k_total(i_xyz)*k_total(j_xyz)/k_sq
+        end forall
         each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
             each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
                 r = geom%coords(:, i_atom)-geom%coords(:, j_atom)
+                G_r = dot_product(G_vector, r)
 #if MBD_TYPE == 1
-                Tpp = k_prefactor*exp(cmplx(0d0, 1d0, 8)*dot_product(G_vector, r))
+                T = k_prefactor*exp(IMI*G_r)
 #elif MBD_TYPE == 0
-                Tpp = k_prefactor*cos(dot_product(G_vector, r))
+                T = k_prefactor*cos(G_r)
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
-                associate (T => dipmat%val(i+1:i+3, j+1:j+3))
-                    T = T + Tpp
+                associate (T_sub => dipmat%val(i+1:i+3, j+1:j+3))
+                    T_sub = T_sub + T
                 end associate
+                if (grad%dcoords .and. i_atom /= j_atom) then
+                    associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
+                        forall (i_xyz = 1:3)
+                            dTdR_sub(:, :, i_xyz) = dTdR_sub(:, :, i_xyz) &
+#if MBD_TYPE == 1
+                                + conjg(IMI*G_vector(i_xyz)*T)
+#elif MBD_TYPE == 0
+                                - k_prefactor*sin(G_r)*G_vector(i_xyz)
+#endif
+                        end forall
+                    end associate
+                end if
             end do each_atom_pair
         end do each_atom
     end do each_recip_cell
     ! self energy
-    call dipmat%add_diag_scalar(-4*alpha**3/(3*sqrt(pi)))
+    call dipmat%add_diag_scalar(-4*gamm**3/(3*sqrt(pi)))
     ! surface term
 #if MBD_TYPE == 1
     do_surface = sqrt(sum(k_point**2)) < 1d-15

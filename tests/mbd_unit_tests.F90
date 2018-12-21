@@ -309,8 +309,6 @@ subroutine test_mbd_ewald_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     omega = [.7d0, .65d0, .75d0]
-    calc%param%ewald_rec_cutoff_scaling = 0d0
-    calc%param%ewald_real_cutoff_scaling = 3d0
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
         dene, grad_request_t(dcoords=.true.), k_point)
     gradients_anl = dene%dcoords
@@ -326,11 +324,9 @@ subroutine test_mbd_ewald_deriv_expl()
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
-    calc%param%ewald_rec_cutoff_scaling = 1d0
-    calc%param%ewald_real_cutoff_scaling = 1d0
     call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
-    if (failed(maxval(abs(diff)), 1d-10)) then
+    if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
         call print_matrix('anl', gradients_anl)
         call print_matrix('num', gradients)

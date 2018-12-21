@@ -41,9 +41,7 @@ call exec_test('T_GG derivative implicit')
 call exec_test('T_erfc derivative explicit')
 call exec_test('T_fermi derivative implicit')
 call exec_test('MBD derivative explicit')
-#ifndef WITH_SCALAPACK
 call exec_test('MBD Ewald derivative explicit')
-#endif
 call exec_test('SCS derivative explicit')
 call exec_test('SCS derivative implicit alpha')
 call exec_test('SCS derivative implicit Rvdw')

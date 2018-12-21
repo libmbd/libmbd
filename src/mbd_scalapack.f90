@@ -167,9 +167,8 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     logical, intent(in), optional :: vals_only
 
     complex(dp), allocatable :: work_arr(:), vectors(:, :)
-    complex(dp) :: n_work_arr
+    integer :: n_work_arr, n_rwork_arr
     real(dp), allocatable :: rwork_arr(:)
-    real(dp) :: n_rwork_arr
     integer :: error_flag, n
 
     n = 3*blacs%n_atoms
@@ -179,15 +178,24 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     else
         allocate (vectors(1, 1))
     end if
+    allocate (work_arr(1), rwork_arr(1))
     call PZHEEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
-        1, 1, blacs%desc, n_work_arr, -1, n_rwork_arr, -1, error_flag &
+        1, 1, blacs%desc, work_arr , -1, rwork_arr, -1, error_flag &
     )
-    allocate (work_arr(nint(dble(n_work_arr))), source=(0d0, 0d0))
-    allocate (rwork_arr(nint(n_rwork_arr)), source=0d0)
+    n_work_arr = nint(dble(work_arr(1)))
+    n_rwork_arr = nint(rwork_arr(1))
+    deallocate (work_arr, rwork_arr)
+    if (mode(vals_only) == 'N') then
+        n_rwork_arr = max(2*n, n_rwork_arr)
+    else
+        n_rwork_arr = max(4*n - 2, n_rwork_arr)
+    end if
+    allocate (work_arr(n_work_arr), source=(0d0, 0d0))
+    allocate (rwork_arr(n_rwork_arr), source=0d0)
     call PZHEEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
-        1, 1, blacs%desc, work_arr, size(work_arr), rwork_arr, size(rwork_arr), &
+        1, 1, blacs%desc, work_arr, n_work_arr, rwork_arr, n_rwork_arr, &
         error_flag &
     )
     if (error_flag /= 0) then

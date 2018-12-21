@@ -158,9 +158,18 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     end if
     associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
         allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
-        if (grad_%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
-        if (grad_%dr_vdw) allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
-        if (grad_%dsigma) allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
+        if (grad_%dcoords) then
+            allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
+            allocate (dTij%dr(3, 3, 3))
+        end if
+        if (grad_%dr_vdw) then
+            allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
+            allocate (dTij%dvdw(3, 3))
+        end if
+        if (grad_%dsigma) then
+            allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
+            allocate (dTij%dsigma(3, 3))
+        end if
     end associate
     call geom%clock(11)
     idx_cell = [0, 0, -1]

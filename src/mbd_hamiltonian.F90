@@ -31,7 +31,8 @@ interface get_mbd_hamiltonian_energy
     !! \mathbf Q_{ij}(\mathbf q)=\omega_i^2\delta_{ij}\mathbf I+
     !! \omega_i\omega_j\sqrt{\alpha_{0,i}\alpha_{0,j}}\mathbf T_{ij}(\mathbf q)
     !! \\ \mathbf Q(\mathbf q)\equiv
-    !! \mathbf C(\mathbf q)\boldsymbol\Lambda(\mathbf q)\mathbf C(\mathbf q)^\text T,\qquad
+    !! \mathbf C(\mathbf q)\boldsymbol\Lambda(\mathbf q)\mathbf C(\mathbf
+    !! q)^\dagger,\qquad
     !! \boldsymbol\Lambda(\mathbf q)
     !! \equiv\operatorname{diag}(\{\tilde\omega_i(\mathbf q)^2\}),\qquad
     !! \operatorname{Tr}\big(\sqrt{\mathbf Q(\mathbf q)}\big)
@@ -42,13 +43,13 @@ interface get_mbd_hamiltonian_energy
     !! $$
     !! \begin{aligned}
     !! \partial E_\text{MBD}&=\frac14\operatorname{Tr}\big(
-    !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\text T
+    !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\dagger
     !! \partial\mathbf Q
     !! \big)-
     !! 3\sum_i\frac{\partial\omega_i}2
     !! \\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
-    !! \frac12\sum_{p\zeta}(
-    !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\mathrm T
+    !! \operatorname{Re}\frac12\sum_{p\zeta}(
+    !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\dagger
     !! )_{p,i\zeta}
     !! \frac{\partial Q_{p,i\zeta}}{\partial X_i}-
     !! \frac32\frac{\partial\omega_i}{\partial X_i}
@@ -98,13 +99,12 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
 #if MBD_TYPE == 0
     type(matrix_re_t) :: relay, dQ, T, modes, c_lambda12i_c
     type(grad_matrix_re_t) :: dT
-    integer :: i_xyz
 #elif MBD_TYPE == 1
-    type(matrix_cplx_t) :: relay, T, modes
+    type(matrix_cplx_t) :: relay, dQ, T, modes, c_lambda12i_c
     type(grad_matrix_cplx_t) :: dT
 #endif
     real(dp), allocatable :: eigs(:)
-    integer :: n_negative_eigs, n_atoms
+    integer :: n_negative_eigs, n_atoms, i_xyz
     character(120) :: msg
 
     n_atoms = geom%siz()
@@ -153,12 +153,10 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         end if
     end if
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
-    ! TODO finish implementation for complex
-#if MBD_TYPE == 0
     if (.not. grad%any()) return
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
-    c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB=.true.)
+    c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
     call dQ%init_from(T)
     if (grad%dcoords) then
         allocate (dene%dcoords(n_atoms, 3))
@@ -166,7 +164,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
             dQ%val = dT%dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
             dQ%val = c_lambda12i_c%val*dQ%val
-            dene%dcoords(:, i_xyz) = 1d0/2*dQ%contract_n33_rows()
+            dene%dcoords(:, i_xyz) = 1d0/2*dble(dQ%contract_n33_rows())
         end do
     end if
     if (grad%dalpha) then
@@ -174,7 +172,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(1d0/(2*alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%dalpha = 1d0/2*dQ%contract_n33_rows()
+        dene%dalpha = 1d0/2*dble(dQ%contract_n33_rows())
     end if
     if (grad%domega) then
         dQ%val = T%val
@@ -182,15 +180,14 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         call dQ%mult_rows(1d0/omega)
         call dQ%add_diag(omega)
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%domega = 1d0/2*dQ%contract_n33_rows()-3d0/2
+        dene%domega = 1d0/2*dble(dQ%contract_n33_rows())-3d0/2
     end if
     if (grad%dr_vdw) then
         dQ%val = dT%dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%dr_vdw = 1d0/2*dQ%contract_n33_rows()
+        dene%dr_vdw = 1d0/2*dble(dQ%contract_n33_rows())
     end if
-#endif
 end function
 
 #if MBD_TYPE == 0

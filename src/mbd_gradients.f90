@@ -58,6 +58,8 @@ type, public :: grad_request_t
     logical :: domega = .false.
     logical :: dsigma = .false.
     logical :: dgamma = .false.
+    logical :: dk_point = .false.
+    logical :: dlattice = .false.
     logical :: dV = .false.
     logical :: dV_free = .false.
     logical :: dX_free = .false.
@@ -78,6 +80,8 @@ logical function grad_request_any(this) result(any)
         .or. this%domega &
         .or. this%dsigma &
         .or. this%dgamma &
+        .or. this%dk_point &
+        .or. this%dlattice &
         .or. this%dV &
         .or. this%dV_free &
         .or. this%dX_free

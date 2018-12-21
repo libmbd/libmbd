@@ -82,7 +82,7 @@ end subroutine
 function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     real(dp), intent(in) :: A(:, :), B(:, :)
     type(blacs_desc_t), intent(in) :: blacsA, blacsB, blacsC
-    logical, intent(in), optional :: transA, transB
+    character, intent(in), optional :: transA, transB
     real(dp) :: C(size(A, 1), size(B, 2))
 
     character :: transA_, transB_
@@ -90,12 +90,8 @@ function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
 
     transA_= 'N'
     transB_ = 'N'
-    if (present(transA)) then
-        if (transA) transA_ = 'T'
-    end if
-    if (present(transB)) then
-        if (transB) transB_ = 'T'
-    end if
+    if (present(transA)) transA_ = transA
+    if (present(transB)) transB_ = transB
     n = 3*blacsA%n_atoms
     call PDGEMM( &
         transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
@@ -106,7 +102,7 @@ end function
 function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     complex(dp), intent(in) :: A(:, :), B(:, :)
     type(blacs_desc_t), intent(in) :: blacsA, blacsB, blacsC
-    logical, intent(in), optional :: transA, transB
+    character, intent(in), optional :: transA, transB
     complex(dp) :: C(size(A, 1), size(B, 2))
 
     character :: transA_, transB_
@@ -114,12 +110,8 @@ function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
 
     transA_= 'N'
     transB_ = 'N'
-    if (present(transA)) then
-        if (transA) transA_ = 'T'
-    end if
-    if (present(transB)) then
-        if (transB) transB_ = 'T'
-    end if
+    if (present(transA)) transA_ = transA
+    if (present(transB)) transB_ = transB
     n = 3*blacsA%n_atoms
     call PZGEMM( &
         transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
@@ -182,7 +174,7 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
 
     n = 3*blacs%n_atoms
     if (present(src)) A = src
-    if (.not. vals_only) then
+    if (mode(vals_only) == 'V') then
         allocate (vectors(size(A, 1), size(A, 2)))
     else
         allocate (vectors(1, 1))

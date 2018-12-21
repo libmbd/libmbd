@@ -25,5 +25,6 @@ integer, parameter :: MBD_EXC_DAMPING = 5
 
 real(dp), parameter :: ZERO_REAL = 0d0
 complex(dp), parameter :: ZERO_COMPLEX = (0d0, 0d0)
+complex(dp), parameter :: IMI = (0d0, 1d0)
 
 end module

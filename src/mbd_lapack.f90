@@ -47,7 +47,7 @@ interface eigvalsh
 end interface
 
 external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-    ZGEEV, DSYTRI, DSYTRF, DGEMM
+    ZGEEV, DSYTRI, DSYTRF, DGEMM, ZGEMM
 
 contains
 
@@ -149,7 +149,7 @@ end function
 
 function mmul_real(A, B, transA, transB) result(C)
     real(dp), intent(in) :: A(:, :), B(:, :)
-    logical, intent(in), optional :: transA, transB
+    character, intent(in), optional :: transA, transB
     real(dp) :: C(size(A, 1), size(B, 2))
 
     character :: transA_, transB_
@@ -157,19 +157,15 @@ function mmul_real(A, B, transA, transB) result(C)
 
     transA_= 'N'
     transB_ = 'N'
-    if (present(transA)) then
-        if (transA) transA_ = 'T'
-    end if
-    if (present(transB)) then
-        if (transB) transB_ = 'T'
-    end if
+    if (present(transA)) transA_ = transA
+    if (present(transB)) transB_ = transB
     n = size(A, 1)
     call DGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
 end function
 
 function mmul_complex(A, B, transA, transB) result(C)
     complex(dp), intent(in) :: A(:, :), B(:, :)
-    logical, intent(in), optional :: transA, transB
+    character, intent(in), optional :: transA, transB
     complex(dp) :: C(size(A, 1), size(B, 2))
 
     character :: transA_, transB_
@@ -177,14 +173,10 @@ function mmul_complex(A, B, transA, transB) result(C)
 
     transA_= 'N'
     transB_ = 'N'
-    if (present(transA)) then
-        if (transA) transA_ = 'T'
-    end if
-    if (present(transB)) then
-        if (transB) transB_ = 'T'
-    end if
+    if (present(transA)) transA_ = transA
+    if (present(transB)) transB_ = transB
     n = size(A, 1)
-    call DGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
+    call ZGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
 end function
 
 subroutine inv_real(A, exc, src)

@@ -560,7 +560,7 @@ type(matrix_cplx_t) function matrix_cplx_mmul( &
     class(matrix_cplx_t), intent(in) :: A
     type(matrix_cplx_t), intent(in) :: B
 #endif
-    logical, intent(in), optional :: transA, transB
+    character, intent(in), optional :: transA, transB
 
     C%idx = A%idx
 #ifdef WITH_SCALAPACK

@@ -105,18 +105,20 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     real(dp), intent(in) :: k_point(3)
 #endif
 
-    real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, Tpp(3, 3), f_damp, &
-        sigma_ij, volume, ewald_alpha, real_space_cutoff, T0pp(3, 3)
+    real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, T(3, 3), f_damp, &
+        sigma_ij, volume, gamm, real_space_cutoff, T0(3, 3)
     integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
         n_atoms, my_i_atom, my_j_atom
     logical :: do_ewald, is_periodic
-    type(grad_matrix_re_t) :: dTpp, dT0pp
+    type(grad_matrix_re_t) :: dT, dT0, dTew
     type(grad_scalar_t) :: df
     type(grad_request_t) :: grad_
 #if MBD_TYPE == 0
-    real(dp) :: Tpp_ij(3, 3)
+    real(dp) :: Tij(3, 3)
+    type(grad_matrix_re_t) :: dTij
 #elif MBD_TYPE == 1
-    complex(dp) :: Tpp_ij(3, 3)
+    complex(dp) :: Tij(3, 3), k_factor
+    type(grad_matrix_cplx_t) :: dTij
 #endif
 
     do_ewald = .false.
@@ -132,18 +134,13 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
         if (any(geom%vacuum_axis)) then
             real_space_cutoff = geom%calc%param%dipole_low_dim_cutoff
         else if (geom%calc%param%ewald_on) then
-            if (grad%dcoords .or. grad%dr_vdw .or. grad%dsigma) then
-                geom%calc%exc%code = MBD_EXC_UNIMPL
-                geom%calc%exc%msg = 'Forces not implemented for periodic systems'
-                return
-            end if
             do_ewald = .true.
             volume = max(abs(dble(product(eigvals(geom%lattice)))), 0.2d0)
-            ewald_alpha = 2.5d0/(volume)**(1d0/3)
+            gamm = 2.5d0/(volume)**(1d0/3)
             real_space_cutoff = &
-                6d0/ewald_alpha*geom%calc%param%ewald_real_cutoff_scaling
+                6d0/gamm*geom%calc%param%ewald_real_cutoff_scaling
             call geom%calc%print( &
-                'Ewald: using alpha = ' // trim(tostr(ewald_alpha)) &
+                'Ewald: using alpha = ' // trim(tostr(gamm)) &
                 // ', real cutoff = ' // trim(tostr(real_space_cutoff)) &
             )
         else
@@ -193,75 +190,91 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 end if
                 select case (damp%version)
                     case ("bare")
-                        Tpp = T_bare(r, dTpp, grad_%dcoords)
+                        T = T_bare(r, dT, grad_%dcoords)
                     case ("dip,1mexp")
-                        Tpp = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
+                        T = T_1mexp_coulomb(r, damp%beta*R_vdw_ij, damp%a)
                     case ("fermi,dip")
                         f_damp = damping_fermi(r, damp%beta*R_vdw_ij, damp%a, df, grad_)
-                        T0pp = T_bare(r, dT0pp, grad_%dcoords)
-                        Tpp = damping_grad(f_damp, df, T0pp, dT0pp, dTpp, grad_)
+                        T0 = T_bare(r, dT0, grad_%dcoords)
+                        T = damping_grad(f_damp, df, T0, dT0, dT, grad_)
                     case ("sqrtfermi,dip")
-                        Tpp = damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
+                        T = damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a)*T_bare(r)
                     case ("custom,dip")
-                        Tpp = damp%damping_custom(i_atom, j_atom)*T_bare(r)
+                        T = damp%damping_custom(i_atom, j_atom)*T_bare(r)
                     case ("dip,custom")
-                        Tpp = damp%potential_custom(:, :, i_atom, j_atom)
+                        T = damp%potential_custom(:, :, i_atom, j_atom)
                     case ("dip,gg")
-                        Tpp = T_erf_coulomb(r, sigma_ij, dTpp, grad_)
+                        T = T_erf_coulomb(r, sigma_ij, dT, grad_)
                     case ("fermi,dip,gg")
                         f_damp = damping_fermi(r, damp%beta*R_vdw_ij, damp%a, df, grad_)
                         call op1minus_grad(f_damp, df)
-                        T0pp = T_erf_coulomb(r, sigma_ij, dT0pp, grad_)
-                        Tpp = damping_grad(f_damp, df, T0pp, dT0pp, dTpp, grad_)
+                        T0 = T_erf_coulomb(r, sigma_ij, dT0, grad_)
+                        T = damping_grad(f_damp, df, T0, dT0, dT, grad_)
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
-                        Tpp = (1d0-damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a)) * &
+                        T = (1d0-damping_sqrtfermi(r, damp%beta*R_vdw_ij, damp%a)) * &
                             T_erf_coulomb(r, sigma_ij)
                         do_ewald = .false.
                     case ("custom,dip,gg")
-                        Tpp = (1d0-damp%damping_custom(i_atom, j_atom)) * &
+                        T = (1d0-damp%damping_custom(i_atom, j_atom)) * &
                             T_erf_coulomb(r, sigma_ij)
                         do_ewald = .false.
                 end select
-                if (grad_%dr_vdw) dTpp%dvdw = damp%beta*dTpp%dvdw
-                if (do_ewald) Tpp = Tpp+T_erfc(r, ewald_alpha)-T_bare(r)
-#if MBD_TYPE == 0
-                Tpp_ij = Tpp
-#elif MBD_TYPE == 1
-                Tpp_ij = Tpp*exp(-cmplx(0d0, 1d0, 8)*(dot_product(k_point, r)))
+                if (grad_%dr_vdw) dT%dvdw = damp%beta*dT%dvdw
+                if (do_ewald) then
+                    T = T &
+                        + T_erfc(r, gamm, dTew, grad_request_t( &
+                            dcoords=grad_%dcoords, &
+                            dgamma=grad_%dlattice) &
+                        ) &
+                        - T_bare(r, dT0, grad_%dcoords)
+                    if (grad_%dcoords) dT%dr = dT%dr + dTew%dr - dT0%dr
+                end if
+                Tij = T
+                if (grad_%dcoords) dTij%dr = dT%dr
+                if (grad_%dr_vdw) dTij%dvdw = dT%dvdw
+                if (grad_%dsigma) dTij%dsigma = dT%dsigma
+#if MBD_TYPE == 1
+                k_factor = exp(-IMI*(dot_product(k_point, r)))
+                Tij = T*k_factor
+                if (grad_%dcoords) then
+                    forall (i = 1:3)
+                        dTij%dr(:, :, i) = conjg( &
+                            dT%dr(:, :, i)*k_factor - IMI*k_point(i)*Tij &
+                        )
+                    end forall
+                end if
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
-                associate (T => dipmat%val(i+1:i+3, j+1:j+3))
-                    T = T + Tpp_ij
+                associate (T_sub => dipmat%val(i+1:i+3, j+1:j+3))
+                    T_sub = T_sub + Tij
                 end associate
                 if (.not. present(grad)) cycle
-#if MBD_TYPE == 0
-                if (grad%dcoords) then
-                    associate (T => ddipmat%dr(i+1:i+3, j+1:j+3, :))
-                        T = T + dTpp%dr
+                if (grad%dcoords .and. i_atom /= j_atom) then
+                    associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
+                        dTdR_sub = dTdR_sub + dTij%dr
                     end associate
                 end if
                 if (grad%dr_vdw) then
-                    associate (dTdRvdw => ddipmat%dvdw(i+1:i+3, j+1:j+3))
-                        dTdRvdw = dTdRvdw + dTpp%dvdw
+                    associate (dTdRvdw_sub => ddipmat%dvdw(i+1:i+3, j+1:j+3))
+                        dTdRvdw_sub = dTdRvdw_sub + dTij%dvdw
                     end associate
                 end if
                 if (grad%dsigma) then
-                    associate (dTdsigma => ddipmat%dsigma(i+1:i+3, j+1:j+3))
-                        dTdsigma = dTdsigma + dTpp%dsigma
+                    associate (dTdsigma_sub => ddipmat%dsigma(i+1:i+3, j+1:j+3))
+                        dTdsigma_sub = dTdsigma_sub + dTij%dsigma
                     end associate
                 end if
-#endif
             end do each_atom_pair
         end do each_atom
     end do each_cell
     call geom%clock(-11)
     if (do_ewald) then
 #if MBD_TYPE == 0
-        call add_ewald_dipole_parts_real(geom, ewald_alpha, dipmat)
+        call add_ewald_dipole_parts_real(geom, gamm, dipmat)
 #elif MBD_TYPE == 1
-        call add_ewald_dipole_parts_complex(geom, ewald_alpha, dipmat, k_point)
+        call add_ewald_dipole_parts_complex(geom, gamm, dipmat, k_point)
 #endif
     end if
 end function

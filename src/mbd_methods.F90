@@ -58,10 +58,10 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     if (geom%calc%do_rpa) then
         alpha = alpha_dyn_qho(geom%calc, alpha_0, omega, dalpha, grad_request_t())
     end if
+    grad_ham = grad
+    if (grad%dC6 .or. grad%dalpha) grad_ham%domega = .true.
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%calc%do_rpa) then
-            grad_ham = grad
-            if (grad%dC6) grad_ham%domega = .true.
             res = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, dene, grad_ham)
             if (grad%dC6) dene%dC6 = dene%domega*domega%dC6
             if (grad%dalpha) dene%dalpha = dene%dalpha + dene%domega*domega%dalpha
@@ -81,31 +81,44 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
         if (geom%calc%get_rpa_orders) allocate ( &
             res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
         )
+        if (grad%dcoords) allocate (dene%dcoords(geom%siz(), 3), source=0d0)
+        if (grad%dalpha) allocate (dene%dalpha(geom%siz()), source=0d0)
+        if (grad%dC6) allocate (dene%dC6(geom%siz()), source=0d0)
+        if (grad%dR_vdw) allocate (dene%dR_vdw(geom%siz()), source=0d0)
         do i_kpt = 1, n_kpts
             associate (k_pt => geom%k_pts(:, i_kpt))
                 if (.not. geom%calc%do_rpa) then
                     res_k = get_mbd_hamiltonian_energy( &
-                        geom, alpha_0, omega, damp, dene_k, grad, k_pt &
+                        geom, alpha_0, omega, damp, dene_k, grad_ham, k_pt &
                     )
-                    if (geom%calc%get_eigs) res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
-                    if (geom%calc%get_modes) res%modes_k(:, :, i_kpt) = res_k%modes_k_single
                 else
                     res_k = get_mbd_rpa_energy(geom, alpha, damp, k_pt)
-                    if (geom%calc%get_rpa_orders) then
-                        res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
-                    end if
                 end if
             end associate
             if (geom%has_exc()) return
-            res%energy = res%energy + res_k%energy
+            if (geom%calc%get_eigs) then
+                res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
+            end if
+            if (geom%calc%get_modes) then
+                res%modes_k(:, :, i_kpt) = res_k%modes_k_single
+            end if
+            if (geom%calc%get_rpa_orders) then
+                res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
+            end if
+            res%energy = res%energy + res_k%energy/n_kpts
+            if (grad%dcoords) dene%dcoords = dene%dcoords + dene_k%dcoords/n_kpts
+            if (grad%dalpha) then
+                dene%dalpha = dene%dalpha &
+                    + (dene_k%dalpha + dene_k%domega*domega%dalpha)/n_kpts
+            end if
+            if (grad%dC6) dene%dC6 = dene%dC6 + dene_k%domega*domega%dC6/n_kpts
+            if (grad%dR_vdw) dene%dR_vdw = dene%dR_vdw + dene_k%dR_vdw/n_kpts
             if (i_kpt == 1) then
                 muted_before = geom%calc%muted
                 geom%calc%muted = .true.
             end if
         end do
         geom%calc%muted = muted_before
-        res%energy = res%energy/size(geom%k_pts, 2)
-        if (geom%calc%get_rpa_orders) res%rpa_orders = res%rpa_orders/n_kpts
     end if
 end function
 

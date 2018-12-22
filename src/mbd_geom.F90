@@ -26,7 +26,7 @@ type, public :: geom_t
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
     logical :: vacuum_axis(3) = [.false., .false., .false.]
     real(dp), allocatable :: lattice(:, :)  ! vectors in columns
-    integer :: k_grid(3)
+    integer :: k_grid(3)  ! TODO make allocatable
     real(dp), allocatable :: k_pts(:, :)
 
     integer :: supercell(3)

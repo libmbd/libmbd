@@ -252,6 +252,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                     end forall
                 end if
                 if (grad_%dsigma) dTij%dsigma = dT%dsigma*k_factor
+                if (grad_%dr_vdw) dTij%dvdw = dT%dvdw*k_factor
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)

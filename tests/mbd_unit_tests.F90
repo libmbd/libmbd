@@ -50,8 +50,10 @@ call exec_test('SCS derivative implicit Rvdw')
 call exec_test('SCS Ewald derivative implicit Rvdw')
 call exec_test('MBD derivative implicit alpha')
 call exec_test('MBD Ewald derivative implicit alpha')
-call exec_test('MBD derivative implicit C6')
+call exec_test('MBD derivative implicit omega')
+call exec_test('MBD Ewald derivative implicit omega')
 call exec_test('MBD derivative implicit Rvdw')
+call exec_test('MBD Ewald derivative implicit Rvdw')
 call exec_test('MBD@rsscs derivative explicit')
 call exec_test('MBD@rsscs derivative implicit alpha')
 call exec_test('MBD@rsscs derivative implicit C6')
@@ -87,8 +89,10 @@ subroutine exec_test(test_name)
     case ('SCS Ewald derivative implicit Rvdw'); call test_scs_ewald_deriv_impl_vdw()
     case ('MBD derivative implicit alpha'); call test_mbd_deriv_impl_alpha()
     case ('MBD Ewald derivative implicit alpha'); call test_mbd_ewald_deriv_impl_alpha()
-    case ('MBD derivative implicit C6'); call test_mbd_deriv_impl_omega()
+    case ('MBD derivative implicit omega'); call test_mbd_deriv_impl_omega()
+    case ('MBD Ewald derivative implicit omega'); call test_mbd_ewald_deriv_impl_omega()
     case ('MBD derivative implicit Rvdw'); call test_mbd_deriv_impl_vdw()
+    case ('MBD Ewald derivative implicit Rvdw'); call test_mbd_ewald_deriv_impl_vdw()
     case ('MBD@rsscs derivative explicit'); call test_mbd_rsscs_deriv_expl()
     case ('MBD@rsscs derivative implicit alpha'); call test_mbd_rsscs_deriv_impl_alpha()
     case ('MBD@rsscs derivative implicit C6'); call test_mbd_rsscs_deriv_impl_C6()
@@ -832,6 +836,52 @@ subroutine test_mbd_deriv_impl_omega()
     end if
 end subroutine
 
+subroutine test_mbd_ewald_deriv_impl_omega()
+    real(dp) :: delta, k_point(3)
+    type(geom_t) :: geom
+    type(damping_t) :: damp
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), omega_diff(:), omega(:)
+    type(result_t) :: res(-3:3)
+    type(grad_t) :: dene
+    integer :: i_atom, n_atoms, i_step
+
+    delta = 0.03d0
+    n_atoms = 2
+    allocate (coords(3, n_atoms), source=0d0)
+    allocate (gradients(n_atoms))
+    coords(3, 1) = 1d0
+    coords(1, 2) = 1d0
+    coords(2, 2) = 4d0
+    geom%coords = coords
+    geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
+    k_point = [0.4d0, 0d0, 0d0]
+    call geom%init(calc)
+    damp%version = 'fermi,dip'
+    damp%r_vdw = [3.55d0, 3.5d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0]
+    omega = [.7d0, .65d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+        dene, grad_request_t(domega=.true.), k_point)
+    gradients_anl = dene%domega
+    do i_atom = 1, n_atoms
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            omega_diff = omega
+            omega_diff(i_atom) = omega_diff(i_atom) + i_step*delta
+            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega_diff, damp, &
+                dene, grad_request_t(), k_point)
+        end do
+        gradients(i_atom) = diff7(res%energy, delta)
+    end do
+    call geom%destroy()
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 2d-8)) then
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
+    end if
+end subroutine
+
 subroutine test_mbd_deriv_impl_vdw()
     real(dp) :: delta
     type(geom_t) :: geom
@@ -873,6 +923,55 @@ subroutine test_mbd_deriv_impl_vdw()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
+    end if
+end subroutine
+
+subroutine test_mbd_ewald_deriv_impl_vdw()
+    real(dp) :: delta, k_point(3)
+    type(geom_t) :: geom
+    type(damping_t) :: damp
+    real(dp), allocatable :: coords(:, :), gradients(:), &
+        gradients_anl(:), diff(:), alpha_0(:), omega(:), r_vdw(:)
+    type(result_t) :: res(-3:3)
+    type(grad_t) :: dene
+    integer :: i_atom, n_atoms, i_step
+
+    delta = 1d-3
+    n_atoms = 2
+    allocate (coords(3, n_atoms), source=0d0)
+    allocate (gradients(n_atoms))
+    coords(3, 1) = 1d0
+    coords(1, 2) = 1d0
+    coords(2, 2) = 4d0
+    geom%coords = coords
+    geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
+    k_point = [0.4d0, 0d0, 0d0]
+    call geom%init(calc)
+    damp%version = 'fermi,dip'
+    r_vdw = [3.55d0, 3.5d0]
+    damp%r_vdw = r_vdw
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0]
+    omega = [.7d0, .65d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+        dene, grad_request_t(dr_vdw=.true.), k_point)
+    gradients_anl = dene%dr_vdw
+    do i_atom = 1, n_atoms
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            damp%r_vdw = r_vdw
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+                dene, grad_request_t(), k_point)
+        end do
+        gradients(i_atom) = diff7(res%energy, delta)
+    end do
+    call geom%destroy()
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-8)) then
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
+        call print_matrix('gradients anl', reshape(gradients_anl, [n_atoms, 1]))
+        call print_matrix('gradients num', reshape(gradients, [n_atoms, 1]))
     end if
 end subroutine
 

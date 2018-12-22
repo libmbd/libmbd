@@ -3,6 +3,8 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_unit_tests
 
+use ieee_arithmetic, only: ieee_is_finite
+
 use mbd_constants
 use mbd_calc, only: calc_t
 use mbd_damping, only: damping_t, damping_fermi
@@ -113,7 +115,7 @@ end subroutine
 logical function failed(diff, thre)
     real(dp), intent(in) :: diff, thre
 
-    failed = abs(diff) > thre
+    failed = .not. ieee_is_finite(diff) .or. abs(diff) > thre
     if (rank == 0) write (6, '(A,G10.3,A,G10.3,A)', advance='no') &
         'diff:', diff, ', threshold:', thre, ': '
     if (failed) n_failed = n_failed + 1

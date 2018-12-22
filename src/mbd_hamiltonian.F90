@@ -157,7 +157,9 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
-    c_lambda12i_c%val = transpose(c_lambda12i_c%val)
+#if MBD_TYPE == 1
+    c_lambda12i_c%val = conjg(c_lambda12i_c%val)
+#endif
     call dQ%init_from(T)
     if (grad%dcoords) then
         allocate (dene%dcoords(n_atoms, 3))

@@ -26,7 +26,8 @@ public :: cmbd_calc, cmbd_geom
 public :: cmbd_init_calc, cmbd_destroy_calc, cmbd_init_geom, &
     cmbd_destroy_geom, cmbd_init_damping, cmbd_destroy_damping, cmbd_get_exception
 public :: cmbd_ts_energy, cmbd_mbd_energy, cmbd_rpa_energy, cmbd_mbd_rsscs_energy, &
-    cmbd_mbd_scs_energy, cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy
+    cmbd_mbd_scs_energy, cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy, &
+    cmbd_toggle_muted
 
 #ifdef WITH_MPI
 logical(c_bool), bind(c) :: cmbd_with_mpi = .true.
@@ -44,7 +45,6 @@ type, bind(c) :: cmbd_calc
     type(c_ptr) :: omega_grid = c_null_ptr
     type(c_ptr) :: omega_grid_w = c_null_ptr
     type(c_ptr) :: mbd_calc_f = c_null_ptr
-    type(c_ptr) :: muted = c_null_ptr
 end type
 
 type, bind(c) :: cmbd_geom
@@ -67,7 +67,6 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     calc_c%omega_grid = c_loc(calc%omega_grid)
     calc_c%omega_grid_w = c_loc(calc%omega_grid_w)
     calc_c%mbd_calc_f = c_loc(calc)
-    calc_c%muted = c_loc(calc%muted)
     cmbd_init_calc = c_loc(calc_c)
 end function
 
@@ -97,6 +96,15 @@ subroutine cmbd_get_exception(calc_cp, code, origin, msg) bind(c)
     calc%exc%code = 0
     calc%exc%origin = ''
     calc%exc%msg = ''
+end subroutine
+
+subroutine cmbd_toggle_muted(calc_cp) bind(c)
+    type(c_ptr), value :: calc_cp
+
+    type(calc_t), pointer :: calc
+
+    calc => get_mbd_calc(calc_cp)
+    calc%muted = .not. calc%muted
 end subroutine
 
 type(c_ptr) function cmbd_init_geom( &

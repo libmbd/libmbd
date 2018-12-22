@@ -74,6 +74,14 @@ ethylcarbamate = [(
      0.824, 0.974, 0.896]
 )]
 
+argon_crystal = (
+    np.array([(0.3, 0.1, 0.2), (4.1, -0.2, -0.1)])*ang,
+    np.array([(8.1, 0.1, -0.2), (0.3, 3.9, -0.1), (-0.1, 0.2, 4.2)])*ang,
+    (4, 4, 4),
+    ['Ar', 'Ar'],
+    [1., 1.]
+)
+
 peptide_meoh = [(
     np.array([
         (2.137, 0.252, 0.453), (2.857, 0.879, 0.544),
@@ -259,6 +267,22 @@ def test_ethylcarbamate(calc):
     ]
     ene_int = enes[0]-2*enes[1]
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
+
+
+@no_complex_scalapack_macos_py27
+def test_argon_crystal_gradients(calc):
+    coords, lattice, k_grid, species, vols = argon_crystal
+    ene, gradients = calc.mbd_energy_species(
+        coords, species, vols, 0.83,
+        lattice=lattice, k_grid=k_grid, force=True
+    )
+    with calc.muted():
+        num_gradients = numerical_gradients(
+            calc.mbd_energy_species, coords, species, vols, 0.83,
+            lattice=lattice, k_grid=k_grid
+        )
+    for i in range(len(coords)):
+        assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
 
 
 @no_complex_scalapack_macos_py27

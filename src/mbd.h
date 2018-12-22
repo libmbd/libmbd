@@ -7,7 +7,6 @@ struct cmbd_calc {
     int n_freq;
     double* omega_grid;
     double* omega_grid_w;
-    _Bool* muted;
 };
 
 struct cmbd_calc* cmbd_init_calc(int n_freq);
@@ -18,6 +17,10 @@ void cmbd_get_exception(
     int* code,
     char origin[50],
     char msg[150]
+);
+
+void cmbd_toggle_muted(
+    struct cmbd_calc* calc
 );
 
 struct cmbd_geom* cmbd_init_geom(

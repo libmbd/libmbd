@@ -9,7 +9,7 @@ import numpy as np
 from .pymbd import _array, from_volumes
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
-except ImportError as e:
+except ImportError:
     raise Exception('Pymbd C extension unimportable, cannot use Fortran')
 
 with_mpi = _lib.cmbd_with_mpi
@@ -64,11 +64,11 @@ class MBDCalc(object):
 
     @contextmanager
     def muted(self):
-        self._calc.muted, muted_before = True, self._calc.muted
+        _lib.cmbd_toggle_muted(self._calc)
         try:
             yield
         finally:
-            self._calc.muted = muted_before
+            _lib.cmbd_toggle_muted(self._calc)
 
     def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
                   lattice=None, d=20., damping='fermi'):

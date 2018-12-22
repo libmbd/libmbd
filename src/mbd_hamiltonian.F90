@@ -50,7 +50,7 @@ interface get_mbd_hamiltonian_energy
     !! \\ \frac{\partial E_\text{MBD}}{\partial X_i}&=
     !! \operatorname{Re}\frac12\sum_{p\zeta}(
     !! \mathbf C\boldsymbol\Lambda^{-\frac12}\mathbf C^\dagger
-    !! )_{p,i\zeta}
+    !! )_{i\zeta,p}
     !! \frac{\partial Q_{p,i\zeta}}{\partial X_i}-
     !! \frac32\frac{\partial\omega_i}{\partial X_i}
     !! \end{aligned}
@@ -157,6 +157,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
+    c_lambda12i_c%val = transpose(c_lambda12i_c%val)
     call dQ%init_from(T)
     if (grad%dcoords) then
         allocate (dene%dcoords(n_atoms, 3))

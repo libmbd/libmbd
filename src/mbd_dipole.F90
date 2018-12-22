@@ -248,11 +248,10 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 Tij = T*k_factor
                 if (grad_%dcoords) then
                     forall (i = 1:3)
-                        dTij%dr(:, :, i) = conjg( &
-                            dT%dr(:, :, i)*k_factor - IMI*k_point(i)*Tij &
-                        )
+                        dTij%dr(:, :, i) = dT%dr(:, :, i)*k_factor - IMI*k_point(i)*Tij
                     end forall
                 end if
+                if (grad_%dsigma) dTij%dsigma = dT%dsigma*k_factor
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
@@ -367,7 +366,7 @@ subroutine add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad, k_p
                         forall (i_xyz = 1:3)
                             dTdR_sub(:, :, i_xyz) = dTdR_sub(:, :, i_xyz) &
 #if MBD_TYPE == 1
-                                + conjg(IMI*G_vector(i_xyz)*T)
+                                + IMI*G_vector(i_xyz)*T
 #elif MBD_TYPE == 0
                                 - k_prefactor*sin(G_r)*G_vector(i_xyz)
 #endif

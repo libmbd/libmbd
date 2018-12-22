@@ -38,10 +38,10 @@ if(ENABLE_SCALAPACK_MPI)
     else()
         target_link_libraries(mbd PRIVATE scalapack)
     endif()
-    set_target_properties(mbd PROPERTIES COMPILE_DEFINITIONS "WITH_MPI;WITH_SCALAPACK")
+    set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
 endif()
 
-set_target_properties(mbd PROPERTIES PUBLIC_HEADER "mbd.h;${CMAKE_CURRENT_BINARY_DIR}/mbd.mod")
+set_property(TARGET mbd PROPERTY PUBLIC_HEADER mbd.h "${CMAKE_CURRENT_BINARY_DIR}/mbd.mod")
 install(TARGETS mbd
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

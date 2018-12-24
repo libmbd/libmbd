@@ -41,6 +41,15 @@ if(ENABLE_SCALAPACK_MPI)
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
 endif()
 
+if(ENABLE_ELSI)
+    if(ELSI_LIBRARIES)
+        target_link_libraries(mbd PRIVATE ${ELSI_LIBRARIES})
+    else()
+        target_link_libraries(mbd PRIVATE elsi::elsi)
+    endif()
+    set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_ELSI)
+endif()
+
 set_property(TARGET mbd PROPERTY PUBLIC_HEADER mbd.h "${CMAKE_CURRENT_BINARY_DIR}/mbd.mod")
 install(TARGETS mbd
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

@@ -3,9 +3,14 @@ cmake_policy(SET CMP0042 NEW)
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
+include(GNUInstallDirs)
+include(CMakeDependentOption)
+
 project(libmbd LANGUAGES Fortran)
 
 option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
+CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_MPI OFF)
+
 option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)
 
 set(DEFAULT_BUILD_TYPE "Release")
@@ -16,8 +21,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to ${DEFAULT_BUILD_TYPE} as none was set")
     set(CMAKE_BUILD_TYPE ${DEFAULT_BUILD_TYPE})
 endif()
-
-include(GNUInstallDirs)
 
 if(NOT LAPACK_LIBRARIES)
     find_package(LAPACK)
@@ -48,6 +51,17 @@ if(ENABLE_SCALAPACK_MPI)
             message(STATUS "ScaLAPACK CMake package found in ${Scalapack_DIR}")
         else()
             message(SEND_ERROR "ScaLAPACK CMake package not found, specify custom installation with SCALAPACK_LIBRARIES variable")
+        endif()
+    endif()
+endif()
+
+if(ENABLE_ELSI)
+    if(NOT ELSI_LIBRARIES)
+        find_package(ELSI 2.0 QUIET)
+        if(ELSI_FOUND)
+            message(STATUS "ELSI CMake package found in ${ELSI_DIR}")
+        else()
+            message(SEND_ERROR "ELSI CMake package not found, specify custom installation with ELSI_LIBRARIES variable")
         endif()
     endif()
 endif()

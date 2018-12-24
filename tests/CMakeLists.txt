@@ -17,6 +17,10 @@ if(CMAKE_TESTING_ENABLED)
         set_property(TARGET mbd_unit_tests mbd_api_tests APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
     endif()
 
+    if(ENABLE_ELSI)
+        set_property(TARGET mbd_unit_tests mbd_api_tests APPEND PROPERTY COMPILE_DEFINITIONS WITH_ELSI)
+    endif()
+
     add_dependencies(check mbd_unit_tests mbd_api_tests)
 endif()
 

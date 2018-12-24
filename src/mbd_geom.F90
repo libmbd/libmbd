@@ -70,11 +70,11 @@ subroutine geom_init(this, calc)
 #ifdef WITH_SCALAPACK
     this%idx%parallel = this%parallel_mode == 'atoms'
     if (this%idx%parallel) then
-#ifdef WITH_MPI
+#   ifdef WITH_MPI
         call this%blacs_grid%init(this%comm)
-#else
+#   else
         call this%blacs_grid%init()
-#endif
+#   endif
         call this%blacs%init(this%siz(), this%blacs_grid)
         this%idx%i_atom = this%blacs%i_atom
         this%idx%j_atom = this%blacs%j_atom
@@ -91,8 +91,8 @@ end subroutine
 
 subroutine geom_destroy(this)
     class(geom_t), intent(inout) :: this
-#ifdef WITH_SCALAPACK
 
+#ifdef WITH_SCALAPACK
     if (this%idx%parallel) call this%blacs_grid%destroy()
 #endif
 end subroutine

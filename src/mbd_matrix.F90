@@ -6,10 +6,13 @@ module mbd_matrix
 
 use mbd_constants
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
-use mbd_utils, only: findval, exception_t, atom_index_t
+use mbd_utils, only: findval, exception_t, atom_index_t, is_true
 #   ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
+#   endif
+#   ifdef WITH_ELSI
+use mbd_elsi, only: elsi_eigh, elsi_eigvalsh
 #   endif
 
 implicit none
@@ -149,11 +152,9 @@ subroutine matrix_cplx_copy_from(this, other)
     class(matrix_cplx_t), intent(out) :: this
     type(matrix_cplx_t), intent(in) :: other
 #endif
+
+    call this%init_from(other)
     this%val = other%val
-    this%idx = other%idx
-#ifdef WITH_SCALAPACK
-    this%blacs = other%blacs
-#endif
 end subroutine
 
 #if MBD_TYPE == 0
@@ -166,11 +167,8 @@ subroutine matrix_cplx_move_from(this, other)
     type(matrix_cplx_t), intent(inout) :: other
 #endif
 
+    call this%init_from(other)
     call move_alloc(other%val, this%val)
-    this%idx = other%idx
-#ifdef WITH_SCALAPACK
-    this%blacs = other%blacs
-#endif
 end subroutine
 
 #if MBD_TYPE == 0
@@ -185,13 +183,10 @@ subroutine matrix_cplx_alloc_from(this, other)
 
     integer :: n1, n2
 
+    call this%init_from(other)
     n1 = other%siz(1)
     n2 = other%siz(2)
     allocate (this%val(n1, n2))
-    this%idx = other%idx
-#ifdef WITH_SCALAPACK
-    this%blacs = other%blacs
-#endif
 end subroutine
 
 #if MBD_TYPE == 0
@@ -359,36 +354,40 @@ subroutine matrix_cplx_eigh(A, eigs, exc, src, vals_only)
     logical, intent(in), optional :: vals_only
 
 #ifdef WITH_SCALAPACK
-    if (.not. A%idx%parallel) then
-        call eigh(A%val, eigs, exc, src%val, vals_only)
-    else
+    if (A%idx%parallel) then
+#   ifdef WITH_ELSI
+        call elsi_eigh(A%val, A%blacs, eigs, exc, src%val, vals_only)
+#   else
         call peigh(A%val, A%blacs, eigs, exc, src%val, vals_only)
-    endif
-#else
-    call eigh(A%val, eigs, exc, src%val, vals_only)
+#   endif
+        return
+    end if
 #endif
+    call eigh(A%val, eigs, exc, src%val, vals_only)
 end subroutine
 
 #if MBD_TYPE == 0
 function matrix_re_eigvalsh(A, exc, destroy) result(eigs)
-    class(matrix_re_t), target, intent(in) :: A
+    class(matrix_re_t), intent(inout) :: A
 #elif MBD_TYPE == 1
 function matrix_cplx_eigvalsh(A, exc, destroy) result(eigs)
-    class(matrix_cplx_t), target, intent(in) :: A
+    class(matrix_cplx_t), intent(inout) :: A
 #endif
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3*A%idx%n_atoms)
 
 #ifdef WITH_SCALAPACK
-    if (.not. A%idx%parallel) then
-        eigs = eigvalsh(A%val, exc, destroy)
-    else
+    if (A%idx%parallel) then
+#   ifdef WITH_ELSI
+        eigs = elsi_eigvalsh(A%val, A%blacs, exc, destroy)
+#   else
         eigs = peigvalsh(A%val, A%blacs, exc, destroy)
+#   endif
+        return
     end if
-#else
-    eigs = eigvalsh(A%val, exc, destroy)
 #endif
+    eigs = eigvalsh(A%val, exc, destroy)
 end function
 
 #if MBD_TYPE == 0

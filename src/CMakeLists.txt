@@ -26,6 +26,10 @@ if(ENABLE_SCALAPACK_MPI)
     list(APPEND SRCS mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
 endif()
 
+if(ENABLE_ELSI)
+    list(APPEND SRCS mbd_elsi.F90)
+endif()
+
 add_library(mbd ${SRCS})
 
 target_link_libraries(mbd PRIVATE ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})

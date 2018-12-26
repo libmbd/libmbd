@@ -12,6 +12,7 @@ public :: all_reduce
 
 type, public :: blacs_grid_t
     integer :: ctx
+    integer :: comm
     integer :: nprows
     integer :: npcols
     integer :: my_prow
@@ -27,6 +28,7 @@ type, public :: blacs_desc_t
     integer :: n_atoms
     integer :: desc(9)
     integer :: ctx
+    integer :: comm = -1
 contains
     procedure :: init => blacs_desc_init
 end type
@@ -58,6 +60,7 @@ subroutine blacs_grid_init(this, comm)
     this%npcols = n_tasks/this%nprows
     if (present(comm)) then
         this%ctx = comm
+        this%comm = comm
     else
         call BLACS_GET(0, 0, this%ctx)
     end if
@@ -81,6 +84,7 @@ subroutine blacs_desc_init(this, n_atoms, grid)
 
     integer :: blocksize, my_nratoms, my_ncatoms, ierr
 
+    this%comm = grid%comm
     this%ctx = grid%ctx
     this%n_atoms = n_atoms
     blocksize = 3

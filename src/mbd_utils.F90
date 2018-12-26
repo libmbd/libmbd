@@ -14,7 +14,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, &
-    abstract_printer, null_printer, stdout_printer, shift_idx
+    abstract_printer, null_printer, stdout_printer, shift_idx, is_true
 
 interface tostr
     module procedure tostr_int
@@ -235,5 +235,12 @@ subroutine clock_clock(this, id)
         this%counts(absid) = this%counts(absid)+1
     end if
 end subroutine
+
+logical function is_true(val) result(res)
+    logical, intent(in), optional :: val
+
+    res = .false.
+    if (present(val)) res = val
+end function
 
 end module

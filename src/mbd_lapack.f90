@@ -176,7 +176,7 @@ function mmul_complex(A, B, transA, transB) result(C)
     if (present(transA)) transA_ = transA
     if (present(transB)) transB_ = transB
     n = size(A, 1)
-    call ZGEMM(transA_, transB_, n, n, n, 1d0, A, n, B, n, 0d0, C, n)
+    call ZGEMM(transA_, transB_, n, n, n, (1d0, 0d0), A, n, B, n, (0d0, 0d0), C, n)
 end function
 
 subroutine inv_real(A, exc, src)

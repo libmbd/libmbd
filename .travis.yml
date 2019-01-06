@@ -16,7 +16,7 @@ jobs:
     - language: python
       python: 3.6
       stage: deploy
-      env: TOXENV=doc MAKEENV=doc
+      env: TOXENV=doc MAKEENV=
     - language: generic
       stage: anaconda
       script: .travis/anaconda.sh

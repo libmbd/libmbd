@@ -12,9 +12,6 @@ mpi-%: serial-%
 	mpirun -n 2 $*/tests/mbd_unit_tests
 	mpirun -n 2 $*/tests/mbd_api_tests
 
-doc:
-	ford docs/libmbd.md
-
 setup: $(addprefix setup_,$(MAKEENV))
 
 setup_serial-build: | build

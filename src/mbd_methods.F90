@@ -82,6 +82,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
         )
         if (grad%dcoords) allocate (dene%dcoords(geom%siz(), 3), source=0d0)
+        if (grad%dlattice) allocate (dene%dlattice(3, 3), source=0d0)
         if (grad%dalpha) allocate (dene%dalpha(geom%siz()), source=0d0)
         if (grad%dC6) allocate (dene%dC6(geom%siz()), source=0d0)
         if (grad%dR_vdw) allocate (dene%dR_vdw(geom%siz()), source=0d0)
@@ -107,6 +108,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             end if
             res%energy = res%energy + res_k%energy/n_kpts
             if (grad%dcoords) dene%dcoords = dene%dcoords + dene_k%dcoords/n_kpts
+            if (grad%dlattice) dene%dlattice = dene%dlattice + dene_k%dlattice/n_kpts
             if (grad%dalpha) then
                 dene%dalpha = dene%dalpha &
                     + (dene_k%dalpha + dene_k%domega*domega%dalpha)/n_kpts
@@ -162,7 +164,9 @@ type(result_t) function get_mbd_scs_energy( &
         grad_request_t(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
     )
     grad_scs = grad_request_t( &
-        dcoords=grad%dcoords, dalpha=grad%dalpha .or. grad%dC6, &
+        dcoords=grad%dcoords, &
+        dlattice=grad%dlattice, &
+        dalpha=grad%dalpha .or. grad%dC6, &
         dr_vdw=grad%dr_vdw &
     )
     damp_scs = damp
@@ -189,7 +193,7 @@ type(result_t) function get_mbd_scs_energy( &
     damp_mbd%version = damping_types(2)
     res = get_mbd_energy(geom, alpha_dyn_scs(:, 0), C6_scs, damp_mbd, dene_mbd, &
         grad_request_t( &
-            dcoords=grad%dcoords, &
+            dcoords=grad%dcoords, dlattice=grad%dlattice, &
             dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
         ) &
     )
@@ -207,16 +211,32 @@ type(result_t) function get_mbd_scs_energy( &
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                dene%dcoords(geom%idx%j_atom, :) = &
-                    dene%dcoords(geom%idx%j_atom, :) + &
-                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
-                    dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
+                dene%dcoords(geom%idx%j_atom, :) &
+                    = dene%dcoords(geom%idx%j_atom, :) &
+                    + freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) &
+                    * dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
             end do
         end do
 #ifdef WITH_SCALAPACK
         if (geom%idx%parallel) call all_reduce(dene%dcoords, geom%blacs)
 #endif
         dene%dcoords = dene%dcoords + dene_mbd%dcoords
+    end if
+    if (grad%dlattice) then
+        allocate (dene%dlattice(3, 3), source=0d0)
+        do my_i_atom = 1, size(dalpha_dyn_scs, 1)
+            i_atom = geom%idx%i_atom(my_i_atom)
+            if (.not. any(i_atom == geom%idx%j_atom)) cycle
+            do i_freq = 0, n_freq
+                dene%dlattice = dene%dlattice &
+                    + freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) &
+                    * dalpha_dyn_scs(my_i_atom, i_freq)%dlattice
+            end do
+        end do
+#ifdef WITH_SCALAPACK
+        if (geom%idx%parallel) call all_reduce(dene%dlattice, geom%blacs)
+#endif
+        dene%dlattice = dene%dlattice + dene_mbd%dlattice
     end if
     if (grad%dalpha) then
         allocate (dene%dalpha(n_atoms), source=0d0)

@@ -58,6 +58,7 @@ call exec_test('MBD Ewald derivative implicit omega')
 call exec_test('MBD Ewald derivative implicit Rvdw')
 call exec_test('MBD@rsscs derivative explicit')
 call exec_test('MBD@rsscs Ewald derivative explicit')
+call exec_test('MBD@rsscs Ewald derivative stress')
 call exec_test('MBD@rsscs derivative implicit alpha')
 call exec_test('MBD@rsscs derivative implicit C6')
 call exec_test('MBD@rsscs derivative implicit Rvdw')
@@ -103,6 +104,7 @@ subroutine exec_test(test_name)
     case ('MBD Ewald derivative implicit Rvdw'); call test_mbd_ewald_deriv_impl_vdw()
     case ('MBD@rsscs derivative explicit'); call test_mbd_rsscs_deriv_expl()
     case ('MBD@rsscs Ewald derivative explicit'); call test_mbd_rsscs_ewald_deriv_expl()
+    case ('MBD@rsscs Ewald derivative stress'); call test_mbd_rsscs_ewald_deriv_stress()
     case ('MBD@rsscs derivative implicit alpha'); call test_mbd_rsscs_deriv_impl_alpha()
     case ('MBD@rsscs derivative implicit C6'); call test_mbd_rsscs_deriv_impl_C6()
     case ('MBD@rsscs derivative implicit Rvdw'); call test_mbd_rsscs_deriv_impl_vdw()
@@ -1194,6 +1196,54 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
     call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
+        call print_matrix('delta gradients', diff)
+    end if
+end subroutine
+
+subroutine test_mbd_rsscs_ewald_deriv_stress()
+    real(dp) :: delta
+    type(geom_t) :: geom
+    type(damping_t) :: damp
+    real(dp), allocatable :: gradients(:, :), gradients_anl(:, :), &
+        diff(:, :), alpha_0(:), C6(:), lattice(:, :)
+    type(result_t) :: res(-3:3)
+    type(grad_t) :: dene
+    integer :: n_atoms, i_xyz, i_step, i_latt
+
+    delta = 0.01d0
+    n_atoms = 2
+    allocate (geom%coords(3, n_atoms), source=0d0)
+    allocate (gradients(3, 3))
+    geom%coords(3, 1) = 1d0
+    geom%coords(1, 2) = 1d0
+    geom%coords(2, 2) = 4d0
+    lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
+    geom%lattice = lattice
+    geom%k_grid = [2, 2, 2]
+    call geom%init(calc)
+    damp%version = 'fermi,dip'
+    damp%r_vdw = [3.55d0, 3.5d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0]
+    C6 = [65d0, 60d0]
+    res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+        dene, grad_request_t(dlattice=.true.))
+    gradients_anl = dene%dlattice
+    do i_latt = 1, 3
+        do i_xyz = 1, 3
+            do i_step = -3, 3
+                if (i_step == 0) cycle
+                geom%lattice = lattice
+                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
+                res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
+                    dene, grad_request_t())
+            end do
+            gradients(i_latt, i_xyz) = diff7(res%energy, delta)
+        end do
+    end do
+    call geom%destroy()
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 3d-6)) then
         call print_matrix('delta gradients', diff)
     end if
 end subroutine

@@ -138,9 +138,9 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
         else if (geom%calc%param%ewald_on) then
             do_ewald = .true.
             volume = max(abs(dble(product(eigvals(geom%lattice)))), 0.2d0)
-            gamm = 2.5d0/(volume)**(1d0/3)
-            real_space_cutoff = &
-                6d0/gamm*geom%calc%param%ewald_real_cutoff_scaling
+            if (.not. allocated(geom%gamma_ew)) geom%gamma_ew = 2.5d0/(volume)**(1d0/3)
+            gamm = geom%gamma_ew
+            real_space_cutoff = 6d0/gamm*geom%calc%param%ewald_real_cutoff_scaling
             call geom%calc%print( &
                 'Ewald: using gamma = ' // trim(tostr(gamm)) &
                 // ', real cutoff = ' // trim(tostr(real_space_cutoff)) &

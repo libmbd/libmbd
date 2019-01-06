@@ -28,6 +28,8 @@ type, public :: geom_t
     real(dp), allocatable :: lattice(:, :)  ! vectors in columns
     integer :: k_grid(3)  ! TODO make allocatable
     real(dp), allocatable :: k_pts(:, :)
+    real(dp), allocatable :: gamma_ew
+        ! TODO create ewald_t type
 
     integer :: supercell(3)
     character(len=10) :: parallel_mode = 'auto'

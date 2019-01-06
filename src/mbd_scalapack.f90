@@ -114,8 +114,8 @@ function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     if (present(transB)) transB_ = transB
     n = 3*blacsA%n_atoms
     call PZGEMM( &
-        transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
-        B, 1, 1, blacsB%desc, 0d0, C, 1, 1, blacsC%desc &
+        transA_, transB_, n, n, n, (1d0, 0d0), A, 1, 1, blacsA%desc, &
+        B, 1, 1, blacsB%desc, (0d0, 0d0), C, 1, 1, blacsC%desc &
     )
 end function
 

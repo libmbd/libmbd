@@ -49,8 +49,7 @@ double cmbd_ts_energy(
     int n_atoms,
     double* alpha_0,
     double* C6,
-    struct cmbd_damping* damping,
-    double* gradients
+    struct cmbd_damping* damping
 );
 
 double cmbd_mbd_energy(
@@ -59,7 +58,8 @@ double cmbd_mbd_energy(
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    double* gradients
+    double* gradients,
+    double* latt_gradients
 );
 
 double cmbd_rpa_energy(
@@ -68,7 +68,8 @@ double cmbd_rpa_energy(
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    double* gradients
+    double* gradients,
+    double* latt_gradients
 );
 
 double cmbd_mbd_rsscs_energy(
@@ -78,6 +79,7 @@ double cmbd_mbd_rsscs_energy(
     double* C6,
     struct cmbd_damping* damping,
     double* gradients,
+    double* latt_gradients,
     double* eigvals,
     double* eigvecs
 );
@@ -88,7 +90,8 @@ double cmbd_mbd_scs_energy(
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    double* gradients
+    double* gradients,
+    double* latt_gradients
 );
 
 double cmbd_dipole_matrix(

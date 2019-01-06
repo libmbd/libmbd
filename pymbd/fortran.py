@@ -91,7 +91,6 @@ class MBDCalc(object):
             _cast('double*', alpha_0),
             _cast('double*', C6),
             damping,
-            _ffi.NULL,
         )
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_geom(geom)
@@ -117,6 +116,7 @@ class MBDCalc(object):
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
         )
         gradients = np.zeros((n_atoms, 3)) if force else None
+        latt_gradients = np.zeros((3, 3)) if force and lattice is not None else None
         eigs, modes = None, None
         args = (
             geom,
@@ -125,6 +125,7 @@ class MBDCalc(object):
             _cast('double*', C6),
             damping,
             _cast('double*', gradients),
+            _cast('double*', latt_gradients),
         )
         if func == 'mbd_rsscs_energy':
             if spectrum:
@@ -138,7 +139,10 @@ class MBDCalc(object):
         if spectrum:
             ene = ene, eigs, modes
         if force:
-            return ene, gradients
+            gradients = (gradients,)
+            if lattice is not None:
+                gradients += (latt_gradients,)
+            ene = (ene,) + gradients
         return ene
 
     def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,

@@ -247,18 +247,22 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
     real(dp), intent(out) :: energy
         !! (a.u.) VdW energy.
 
+    type(grad_request_t) :: grad
+
+    if (this%calculate_gradients) then
+        grad%dcoords = .true.
+        if (allocated(this%geom%lattice)) grad%dlattice = .true.
+    end if
     select case (this%method)
     case ('mbd', 'mbd-nl')
         this%damp%version = 'fermi,dip'
         this%results = get_mbd_energy( &
-            this%geom, this%alpha_0, this%C6, this%damp, &
-            this%denergy, grad_request_t(dcoords=this%calculate_gradients) &
+            this%geom, this%alpha_0, this%C6, this%damp, this%denergy, grad &
         )
         energy = this%results%energy
     case ('mbd-rsscs')
         this%results = get_mbd_scs_energy( &
-            this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, &
-            this%denergy, grad_request_t(dcoords=this%calculate_gradients) &
+            this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, this%denergy, grad &
         )
         energy = this%results%energy
     case ('ts')
@@ -297,7 +301,7 @@ subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
         !! (\(3\times 3\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
         !! a_i\), index \(i\) runs over columns.
 
-    ! TODO
+    latt_derivs = transpose(this%denergy%dlattice)
 end subroutine
 
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)

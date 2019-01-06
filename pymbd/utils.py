@@ -21,5 +21,20 @@ def numerical_gradients(f, coords, *args, **kwargs):
     return gradients
 
 
+def numerical_latt_gradients(f, *args, **kwargs):
+    lattice = kwargs.pop('lattice')  # support python 2
+    delta = kwargs.pop('delta', 1e-3)
+    gradients = np.zeros((3, 3))
+    for i_vec in range(3):
+        for i_xyz in range(3):
+            ene = {}
+            for step in [-2, -1, 1, 2]:
+                lattice_diff = lattice.copy()
+                lattice_diff[i_vec, i_xyz] += step*delta
+                ene[step] = f(*args, lattice=lattice_diff, **kwargs)
+            gradients[i_vec, i_xyz] = _diff5(ene, delta)
+    return gradients
+
+
 def _diff5(x, delta):
     return (1./12*x[-2]-2./3*x[-1]+2./3*x[1]-1./12*x[2])/delta

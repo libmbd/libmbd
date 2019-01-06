@@ -10,7 +10,7 @@ from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
 from .fortran import MBDCalc, with_scalapack, MBDFortranException
-from .utils import numerical_gradients
+from .utils import numerical_gradients, numerical_latt_gradients
 
 no_scalapack = pytest.mark.skipif(
     with_scalapack,
@@ -272,7 +272,7 @@ def test_ethylcarbamate(calc):
 @no_complex_scalapack_macos_py27
 def test_argon_crystal_gradients(calc):
     coords, lattice, k_grid, species, vols = argon_crystal
-    ene, gradients = calc.mbd_energy_species(
+    ene, gradients, latt_gradients = calc.mbd_energy_species(
         coords, species, vols, 0.83,
         lattice=lattice, k_grid=k_grid, force=True
     )
@@ -281,8 +281,14 @@ def test_argon_crystal_gradients(calc):
             calc.mbd_energy_species, coords, species, vols, 0.83,
             lattice=lattice, k_grid=k_grid
         )
+        # num_latt_gradients = numerical_latt_gradients(
+        #     calc.mbd_energy_species, coords, species, vols, 0.83,
+        #     lattice=lattice, k_grid=k_grid
+        # )
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
+    # for i in range(3):
+    #     assert latt_gradients[i] == approx(num_latt_gradients[i], rel=1e-10, abs=1e-10)
 
 
 @no_complex_scalapack_macos_py27

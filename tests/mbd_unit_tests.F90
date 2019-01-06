@@ -47,6 +47,7 @@ call exec_test('SCS derivative explicit')
 call exec_test('SCS derivative implicit alpha')
 call exec_test('SCS derivative implicit Rvdw')
 call exec_test('SCS Ewald derivative explicit')
+call exec_test('SCS Ewald derivative stress')
 call exec_test('SCS Ewald derivative implicit alpha')
 call exec_test('SCS Ewald derivative implicit Rvdw')
 call exec_test('MBD derivative implicit alpha')
@@ -89,6 +90,7 @@ subroutine exec_test(test_name)
     case ('MBD Ewald derivative stress'); call test_mbd_ewald_deriv_stress()
     case ('SCS derivative explicit'); call test_scs_deriv_expl()
     case ('SCS Ewald derivative explicit'); call test_scs_ewald_deriv_expl()
+    case ('SCS Ewald derivative stress'); call test_scs_ewald_deriv_stress()
     case ('SCS derivative implicit alpha'); call test_scs_deriv_impl_alpha()
     case ('SCS Ewald derivative implicit alpha'); call test_scs_ewald_deriv_impl_alpha()
     case ('SCS derivative implicit Rvdw'); call test_scs_deriv_impl_vdw()
@@ -530,6 +532,64 @@ subroutine test_scs_ewald_deriv_expl()
     call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
+        call print_matrix('diff x', diff(:, :, 1))
+        call print_matrix('diff y', diff(:, :, 2))
+        call print_matrix('diff z', diff(:, :, 3))
+    end if
+end subroutine
+
+subroutine test_scs_ewald_deriv_stress()
+    real(dp) :: delta
+    type(geom_t) :: geom
+    type(damping_t) :: damp
+    real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :), &
+        diff(:, :, :), alpha_0(:), lattice(:, :)
+    integer :: i_atom, n_atoms, i_xyz, i_step, my_i_atom, my_nratoms, &
+        my_ncatoms, i_latt
+    real(dp), allocatable :: alpha_scs(:, :)
+    type(grad_t), allocatable :: dalpha_scs(:)
+
+    delta = 0.05d0
+    n_atoms = 2
+    allocate (geom%coords(3, n_atoms), source=0d0)
+    geom%coords(3, 1) = 1d0
+    geom%coords(1, 2) = 1d0
+    geom%coords(2, 2) = 4d0
+    lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
+    geom%lattice = lattice
+    call geom%init(calc)
+    my_nratoms = size(geom%idx%i_atom)
+    my_ncatoms = size(geom%idx%j_atom)
+    allocate (gradients(my_nratoms, 3, 3))
+    allocate (gradients_anl(my_nratoms, 3, 3))
+    allocate (alpha_scs(n_atoms, -3:3), dalpha_scs(my_nratoms))
+    damp%version = 'fermi,dip,gg'
+    damp%r_vdw = [3.55d0, 3.5d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0]
+    alpha_scs(:, 0) = &
+        run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t(dlattice=.true.))
+    do my_i_atom = 1, my_nratoms
+        gradients_anl(my_i_atom, :, :) = dalpha_scs(my_i_atom)%dlattice
+    end do
+    do i_latt = 1, 3
+        do i_xyz = 1, 3
+            do i_step = -3, 3
+                if (i_step == 0) cycle
+                geom%lattice = lattice
+                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
+                alpha_scs(:, i_step) = &
+                    run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t())
+            end do
+            do my_i_atom = 1, my_nratoms
+                i_atom = geom%idx%i_atom(my_i_atom)
+                gradients(my_i_atom, i_latt, i_xyz) = diff7(alpha_scs(i_atom, :), delta)
+            end do
+        end do
+    end do
+    call geom%destroy()
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-4)) then
         call print_matrix('diff x', diff(:, :, 1))
         call print_matrix('diff y', diff(:, :, 2))
         call print_matrix('diff z', diff(:, :, 3))

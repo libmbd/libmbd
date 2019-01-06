@@ -53,17 +53,22 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     real(dp) :: alpha_scs(size(alpha))
 
     type(matrix_re_t) :: alpha_full, dQ, T
-    integer :: n_atoms, i_xyz, i_atom, my_i_atom
+    integer :: n_atoms, i_xyz, i_atom, my_i_atom, i_latt
     type(damping_t) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
-        alpha_prime(:, :), B_prime(:, :), grads_i(:)
+        alpha_prime(:, :), B_prime(:, :), grads_i(:), dalphadA(:)
     type(grad_matrix_re_t) :: dT
     type(grad_request_t) :: grad_req
 
     n_atoms = geom%siz()
     damp_local = damp
     damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
-    grad_req = grad_request_t(dcoords=grad%dcoords, dsigma=grad%dalpha, dr_vdw=grad%dr_vdw)
+    grad_req = grad_request_t( &
+        dcoords=grad%dcoords, &
+        dlattice=grad%dlattice, &
+        dsigma=grad%dalpha, &
+        dr_vdw=grad%dr_vdw &
+    )
     T = dipole_matrix(geom, damp_local, dT, grad_req)
     if (geom%has_exc()) return
     if (grad%any()) then
@@ -105,6 +110,23 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
                     dalpha_scs(my_i_atom)%dcoords(:, i_xyz) = &
                         grads_i(geom%idx%j_atom)
                 end if
+            end do
+        end do
+    end if
+    if (grad%dlattice) then
+        do my_i_atom = 1, size(geom%idx%i_atom)
+            allocate (dalpha_scs(my_i_atom)%dlattice(3, 3))
+        end do
+        do i_latt = 1, 3
+            do i_xyz = 1, 3
+                dQ%val = -dT%dlattice(:, :, i_latt, i_xyz)
+                dQ = alpha_full%mmul(dQ)
+                dQ = dQ%mmul(alpha_full)
+                dalphadA = dQ%contract_n33diag_cols()
+                forall (my_i_atom = 1:size(geom%idx%i_atom))
+                    dalpha_scs(my_i_atom)%dlattice(i_latt, i_xyz) &
+                        = dalphadA(geom%idx%i_atom(my_i_atom))
+                end forall
             end do
         end do
     end if

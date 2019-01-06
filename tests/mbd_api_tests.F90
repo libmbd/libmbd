@@ -3,7 +3,7 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_api_tests
 
-use mbd, only: mbd_input, mbd_calc
+use mbd, only: mbd_input_t, mbd_calc_t
 
 #ifdef WITH_MPI
 use mbd_mpi
@@ -36,8 +36,8 @@ contains
 subroutine test()
     real(dp), parameter :: ang = 1.8897259886d0
 
-    type(mbd_input) :: inp
-    type(mbd_calc) :: calc
+    type(mbd_input_t) :: inp
+    type(mbd_calc_t) :: calc
     real(dp) :: energy
     real(dp), allocatable :: gradients(:, :)
     integer :: code

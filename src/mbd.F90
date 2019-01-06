@@ -7,7 +7,7 @@ module mbd
 !! High-level Fortran API.
 
 use mbd_constants
-use mbd_calc, only: calc_t, get_freq_grid
+use mbd_calc, only: calc_t
 use mbd_damping, only: damping_t
 use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
@@ -21,7 +21,7 @@ implicit none
 
 private
 
-type, public :: mbd_input
+type, public :: mbd_input_t
     !! Contains user input to an MBD calculation.
     character(len=30) :: method = 'mbd-rsscs'
         !! VdW method to use to calculate energy and gradients.
@@ -92,7 +92,7 @@ type, public :: mbd_input
         !! - `atoms`: Parallelize over atom pairs.
 end type
 
-type, public :: mbd_calc
+type, public :: mbd_calc_t
     !! Represents an MBD calculation.
     private
     type(geom_t) :: geom
@@ -124,8 +124,8 @@ contains
 
 subroutine mbd_calc_init(this, input)
     !! Initialize an MBD calculation from an MBD input.
-    class(mbd_calc), target, intent(inout) :: this
-    type(mbd_input), intent(in) :: input
+    class(mbd_calc_t), target, intent(inout) :: this
+    type(mbd_input_t), intent(in) :: input
         !! MBD input.
 
 #ifdef WITH_MPI
@@ -172,7 +172,7 @@ end subroutine
 
 subroutine mbd_calc_destroy(this)
     !! Finalize an MBD calculation.
-    class(mbd_calc), target, intent(inout) :: this
+    class(mbd_calc_t), target, intent(inout) :: this
 
     call this%geom%destroy()
     call this%calc%destroy()
@@ -180,7 +180,7 @@ end subroutine
 
 subroutine mbd_calc_update_coords(this, coords)
     !! Update atomic coordinates.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(in) :: coords(:, :)
         !! (\(3\times N\), a.u.) New atomic coordinates.
 
@@ -189,7 +189,7 @@ end subroutine
 
 subroutine mbd_calc_update_lattice_vectors(this, latt_vecs)
     !! Update unit-cell lattice vectors.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(in) :: latt_vecs(:, :)
         !! (\(3\times 3\), a.u.) New lattice vectors in columns.
 
@@ -198,7 +198,7 @@ end subroutine
 
 subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     !! Update vdW parameters in a custom way.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(in) :: alpha_0(:)
         !! (a.u.) New atomic static polarizabilities.
     real(dp), intent(in) :: C6(:)
@@ -213,7 +213,7 @@ end subroutine
 
 subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     !! Update vdW parameters based on scaling of free-atom values.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(in) :: ratios(:)
         !! Ratios of atomic volumes in the system and in vacuum.
 
@@ -227,7 +227,7 @@ end subroutine
 
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     !! Update vdW parameters for the MBD-NL method.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(in) :: alpha_0_ratios(:)
         !! Ratios of free-atom exact static polarizabilities and those from the
         !! VV functional.
@@ -243,7 +243,7 @@ end subroutine
 subroutine mbd_calc_evaluate_vdw_method(this, energy)
     !! Evaluate a given vdW method for a given system and vdW parameters,
     !! retrieve energy.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(out) :: energy
         !! (a.u.) VdW energy.
 
@@ -279,7 +279,7 @@ subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     !! [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the
     !! gradients must be requested prior to this called via
     !! [[mbd_input(type):calculate_forces]].
-    class(mbd_calc), intent(in) :: this
+    class(mbd_calc_t), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
         !! (\(3\times N\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
         !! R_i\), index \(i\) runs over columns.
@@ -296,7 +296,7 @@ subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
     !! [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the
     !! gradients must be requested prior to this called via
     !! [[mbd_input(type):calculate_forces]].
-    class(mbd_calc), intent(in) :: this
+    class(mbd_calc_t), intent(in) :: this
     real(dp), intent(out) :: latt_derivs(:, :)
         !! (\(3\times 3\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
         !! a_i\), index \(i\) runs over columns.
@@ -312,7 +312,7 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     !! [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the
     !! spectrum must be requested prior to this called via
     !! [[mbd_input(type):calculate_spectrum]].
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(out) :: spectrum(:)
         !! (\(3N\), a.u.) Energies (frequencies) of coupled MBD modues,
         !! \(\omega_i\).
@@ -333,7 +333,7 @@ end subroutine
 
 subroutine mbd_calc_get_exception(this, code, origin, msg)
     !! Retrieve an exception in the MBD calculation if it occured.
-    class(mbd_calc), intent(inout) :: this
+    class(mbd_calc_t), intent(inout) :: this
     integer, intent(out) :: code
         !! Exception code, values defined in [[mbd_constants]].
     character(*), intent(out) :: origin

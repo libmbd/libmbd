@@ -34,6 +34,8 @@ contains
 end type
 
 interface all_reduce
+    module procedure all_reduce_real_scalar
+    module procedure all_reduce_complex_scalar
     module procedure all_reduce_real_1d
     module procedure all_reduce_real_2d
     module procedure all_reduce_complex_1d
@@ -123,6 +125,20 @@ function idx_map(my_task, n_tasks, n, blocksize, nidx)
         end if
     end do
 end function
+
+subroutine all_reduce_real_scalar(x, blacs)
+    real(dp), intent(inout) :: x
+    type(blacs_desc_t), intent(in) :: blacs
+
+    call DGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x, 1, -1, -1)
+end subroutine
+
+subroutine all_reduce_complex_scalar(x, blacs)
+    complex(dp), intent(inout) :: x
+    type(blacs_desc_t), intent(in) :: blacs
+
+    call ZGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x, 1, -1, -1)
+end subroutine
 
 subroutine all_reduce_real_1d(A, blacs)
     real(dp), intent(inout) :: A(:)

@@ -15,7 +15,7 @@ use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_linalg, only: outer
-use mbd_utils, only: tostr, shift_idx
+use mbd_utils, only: tostr, shift_idx, print_matrix
 
 implicit none
 
@@ -28,53 +28,55 @@ interface dipole_matrix
     !! The real-typed version is equivalent to \(\mathbf q=0\).
     !!
     !! $$
+    !! \boldsymbol{\mathcal A}:=[\mathbf a_1\mathbf a_2\mathbf
+    !! a_3],\qquad\boldsymbol{\mathcal B}:=[\mathbf b_1\mathbf b_2\mathbf b_3]
+    !! \\ \boldsymbol{\mathcal B}=2\pi(\boldsymbol{\mathcal A}^{-1})^\mathrm
+    !! T,\qquad \partial\boldsymbol{\mathcal B}=-\big((\partial\boldsymbol{\mathcal
+    !! A})\boldsymbol{\mathcal A}^{-1}\big)^\mathrm T\boldsymbol{\mathcal B}
+    !! \\ \mathbf R_\mathbf n=\boldsymbol{\mathcal A}\mathbf
+    !! n,\qquad\partial\mathbf R_\mathbf n=(\partial\boldsymbol{\mathcal
+    !! A})\mathbf n,
+    !! \\ \mathbf G_\mathbf m=\boldsymbol{\mathcal B}\mathbf m,\qquad
+    !! \partial\mathbf G_\mathbf m=-\big((\partial\boldsymbol{\mathcal
+    !! A})\boldsymbol{\mathcal A}^{-1}\big)^\mathrm T\mathbf G_\mathbf m,
+    !! \\ \frac{\partial G_{\mathbf ma}}{\partial A_{bc}}=-\mathcal A^{-1}_{ca}G_{\mathbf mb}
+    !! $$
+    !!
+    !! $$
     !! \begin{gathered}
-    !! \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf m}\mathbf T(\mathbf R_{\mathbf
-    !! mij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf mij}},\quad\mathbf
-    !! R_{\mathbf mij}=\mathbf R_j+\mathbf R_\mathbf m-\mathbf R_i
-    !! \\ \frac{\mathrm d\mathbf R_{\mathbf mij}}{\mathrm d\mathbf R_k}=(\delta_{jk}-\delta_{ik})\mathbf I
+    !! \mathbf T_{ij}(\mathbf q)=\sum_{\mathbf n}\mathbf T(\mathbf R_{\mathbf
+    !! nij})\mathrm e^{-\mathrm i\mathbf q\cdot\mathbf R_{\mathbf nij}},\quad\mathbf
+    !! R_{\mathbf nij}=\mathbf R_j+\mathbf R_\mathbf n-\mathbf R_i
+    !! \\ \frac{\mathrm d\mathbf R_{\mathbf nij}}{\mathrm d\mathbf
+    !! R_k}=(\delta_{jk}-\delta_{ik})\mathbf I
     !! \\ \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
-    !! =\sum_\mathbf m^{|\mathbf R_{\mathbf mij}|<R_\text c}\mathbf
-    !! T^\text{erfc}(\mathbf R_{\mathbf mij},\gamma)\mathrm e^{-\mathrm i\mathbf
-    !! q\cdot\mathbf R_{\mathbf mij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
-    !! n}^{0<|\mathbf k_\mathbf n|<k_\text c}\mathbf{\hat k}_\mathbf
-    !! n\otimes\mathbf{\hat k}_\mathbf n\,\mathrm e^{-\frac{k_\mathbf
-    !! n^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf n\cdot\mathbf R_{ij}}
+    !! =\sum_\mathbf n^{|\mathbf R_{\mathbf nij}|<R_\text c}\mathbf
+    !! T^\text{erfc}(\mathbf R_{\mathbf nij};\gamma)\mathrm e^{-\mathrm i\mathbf
+    !! q\cdot\mathbf R_{\mathbf nij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
+    !! m}^{0<|\mathbf k_\mathbf m|<k_\text c}\mathbf{\hat k}_\mathbf
+    !! m\otimes\mathbf{\hat k}_\mathbf m\,\mathrm e^{-\frac{k_\mathbf
+    !! m^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf m\cdot\mathbf R_{ij}}
     !! \\ -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
-    !! \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf n=\mathbf G_\mathbf
-    !! n+\mathbf q
+    !! \pi}{3 V_\text{uc}}\mathbf I,\qquad \mathbf k_\mathbf m=\mathbf G_\mathbf
+    !! m+\mathbf q
     !! \end{gathered}
     !! $$
     !!
+    !!
     !! $$
-    !! \mathbf a:=(\mathbf a_1,\mathbf a_2,\mathbf a_3),\quad\mathbf b:=(\mathbf
-    !! b_1,\mathbf b_2,\mathbf b_3)
-    !! \\ \mathbf b=2\pi(\mathbf a^{-1})^\mathrm T,\qquad \partial\mathbf
-    !! b=\big((\partial\mathbf a)\mathbf a^{-1}\big)^\mathrm T\mathbf b
-    !! \\ \mathbf R_\mathbf m=\mathbf a\mathbf m,\qquad\partial\mathbf R_\mathbf
-    !! m=(\partial\mathbf a)\mathbf m,
-    !! \\ \mathbf G_\mathbf n=\mathbf b\mathbf n,\qquad \partial\mathbf
-    !! G_\mathbf n=\big((\partial\mathbf a)\mathbf a^{-1}\big)^\mathrm T\mathbf
-    !! G_\mathbf n
+    !! \partial\left(\frac{4\pi}{V_\text{uc}}\right)=-\frac{4\pi}{V_\text{uc}}\frac{\partial
+    !! V_\text{uc}}{V_\text{uc}},\qquad\frac{\partial
+    !! V_\text{uc}}{\partial\boldsymbol{\mathcal
+    !! A}}=V_\text{uc}(\boldsymbol{\mathcal A}^{-1})^\mathrm T
+    !! \\ \partial(k^2)=2\mathbf k\cdot\partial\mathbf k
+    !! \\ \mathbf{\hat k}\otimes\partial\mathbf{\hat k}=\frac{\mathbf
+    !! k\otimes\partial\mathbf k}{k^2}-\frac{\mathbf k\otimes\mathbf
+    !! k}{2k^4}\partial(k^2)
     !! $$
     !!
     !! $$
-    !! \partial\left(\frac{4\pi}{V_\text{uc}}\right)=-\frac{4\pi}{V_\text{uc}^2}\partial
-    !! V_\text{uc},
-    !! \\ \partial\mathbf{\hat k}_\mathbf n=\frac1{k_\mathbf
-    !! n}\left(\partial\mathbf k_\mathbf n-\frac{\mathbf k_\mathbf n}{k_\mathbf
-    !! n^2}\mathbf k_\mathbf n\cdot\partial\mathbf k_\mathbf n\right)
-    !! \\ \partial\left(-\frac{k_\mathbf n^2}{4\gamma^2}\right)=-\frac{\mathbf
-    !! k_\mathbf n\cdot\partial\mathbf k_\mathbf n}{2\gamma^2}+\frac{k_\mathbf
-    !! n^2}{2\gamma^3}\partial\gamma
-    !! \\ \partial\left(\frac{4\gamma^3}{3\sqrt\pi}\right)=\frac{4\gamma^2}{9\sqrt\pi}
-    !! $$
-    !!
-    !! $$
-    !! \gamma:=\frac{2.5}{\sqrt[3]{V_\text{uc}}},
-    !! \qquad\partial\gamma=-\frac{2.5}3(V_\text{uc})^{-\frac43}\partial
-    !! V_\text{uc}
-    !! \\ R_\text c:=\frac6\gamma,\quad k_\text c:=10\gamma
+    !! \gamma:=\frac{2.5}{\sqrt[3]{V_\text{uc}}},\quad R_\text
+    !! c:=\frac6\gamma,\quad k_\text c:=10\gamma
     !! $$
     module procedure dipole_matrix_real
     module procedure dipole_matrix_complex
@@ -91,7 +93,7 @@ type(matrix_re_t) function dipole_matrix_real( &
     use mbd_constants, only: ZERO => ZERO_REAL
 #elif MBD_TYPE == 1
 type(matrix_cplx_t) function dipole_matrix_complex( &
-        geom, damp, ddipmat, grad, k_point) result(dipmat)
+        geom, damp, ddipmat, grad, q) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
 #endif
 
@@ -102,13 +104,13 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     type(grad_matrix_re_t), intent(out), optional :: ddipmat
 #elif MBD_TYPE == 1
     type(grad_matrix_cplx_t), intent(out), optional :: ddipmat
-    real(dp), intent(in) :: k_point(3)
+    real(dp), intent(in) :: q(3)
 #endif
 
-    real(dp) :: R_cell(3), r(3), r_norm, R_vdw_ij, T(3, 3), f_damp, &
+    real(dp) :: Rn(3), Rnij(3), Rnij_norm, T(3, 3), f_damp, &
         sigma_ij, volume, gamm, real_space_cutoff, T0(3, 3), beta_R_vdw
-    integer :: i_atom, j_atom, i_cell, idx_cell(3), range_cell(3), i, j, &
-        n_atoms, my_i_atom, my_j_atom
+    integer :: i_atom, j_atom, i_cell, n(3), range_n(3), i, j, &
+        n_atoms, my_i_atom, my_j_atom, i_latt
     logical :: do_ewald, is_periodic
     type(grad_matrix_re_t) :: dT, dT0, dTew
     type(grad_scalar_t) :: df
@@ -117,7 +119,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     real(dp) :: Tij(3, 3)
     type(grad_matrix_re_t) :: dTij
 #elif MBD_TYPE == 1
-    complex(dp) :: Tij(3, 3), k_factor
+    complex(dp) :: Tij(3, 3), exp_qR
     type(grad_matrix_cplx_t) :: dTij
 #endif
 
@@ -126,6 +128,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     n_atoms = geom%siz()
     if (present(grad)) then
         grad_ij = grad
+        grad_ij%dcoords = grad%dcoords .or. grad%dlattice
     end if
 #ifdef WITH_SCALAPACK
     call dipmat%init(geom%idx, geom%blacs)
@@ -148,21 +151,24 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
         else
             real_space_cutoff = geom%calc%param%dipole_cutoff
         end if
-        range_cell = geom%supercell_circum(geom%lattice, real_space_cutoff)
+        range_n = geom%supercell_circum(geom%lattice, real_space_cutoff)
         call geom%calc%print( &
             'Ewald: summing real part in cell vector range of ' &
-            // trim(tostr(1+2*range_cell(1))) // 'x' &
-            // trim(tostr(1+2*range_cell(2))) // 'x' &
-            // trim(tostr(1+2*range_cell(3))) &
+            // trim(tostr(1+2*range_n(1))) // 'x' &
+            // trim(tostr(1+2*range_n(2))) // 'x' &
+            // trim(tostr(1+2*range_n(3))) &
         )
     else
-        range_cell(:) = 0
+        range_n(:) = 0
     end if
     if (grad_ij%dcoords) allocate (dTij%dr(3, 3, 3))
     associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
         allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
         if (present(grad)) then
             if (grad%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
+            if (grad%dlattice) then
+                allocate (ddipmat%dlattice(3*my_nr, 3*my_nc, 3, 3), source=ZERO)
+            end if
             if (grad%dr_vdw) then
                 allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
                 allocate (dTij%dvdw(3, 3))
@@ -174,13 +180,13 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
         end if
     end associate
     call geom%clock(11)
-    idx_cell = [0, 0, -1]
-    each_cell: do i_cell = 1, product(1+2*range_cell)
-        call shift_idx(idx_cell, -range_cell, range_cell)
+    n = [0, 0, -1]
+    each_cell: do i_cell = 1, product(1+2*range_n)
+        call shift_idx(n, -range_n, range_n)
         if (is_periodic) then
-            R_cell = matmul(geom%lattice, idx_cell)
+            Rn = matmul(geom%lattice, n)
         else
-            R_cell(:) = 0d0
+            Rn(:) = 0d0
         end if
         each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
@@ -189,53 +195,53 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                r = geom%coords(:, i_atom)-geom%coords(:, j_atom)-R_cell
-                r_norm = sqrt(sum(r**2))
-                if (is_periodic .and. r_norm > real_space_cutoff) cycle
+                Rnij = geom%coords(:, i_atom)-geom%coords(:, j_atom)-Rn
+                Rnij_norm = sqrt(sum(Rnij**2))
+                if (is_periodic .and. Rnij_norm > real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
                     beta_R_vdw = damp%beta*sum(damp%R_vdw([i_atom, j_atom]))
                 end if
                 if (allocated(damp%sigma)) then
-                    sigma_ij = damp%mayer_scaling * &
-                        sqrt(sum(damp%sigma([i_atom, j_atom])**2))
+                    sigma_ij = damp%mayer_scaling &
+                        * sqrt(sum(damp%sigma([i_atom, j_atom])**2))
                 end if
                 select case (damp%version)
                     case ("bare")
-                        T = T_bare(r, dT, grad_ij%dcoords)
+                        T = T_bare(Rnij, dT, grad_ij%dcoords)
                     case ("dip,1mexp")
-                        T = T_1mexp_coulomb(r, beta_R_vdw, damp%a)
+                        T = T_1mexp_coulomb(Rnij, beta_R_vdw, damp%a)
                     case ("fermi,dip")
-                        f_damp = damping_fermi(r, beta_R_vdw, damp%a, df, grad_ij)
-                        T0 = T_bare(r, dT0, grad_ij%dcoords)
+                        f_damp = damping_fermi(Rnij, beta_R_vdw, damp%a, df, grad_ij)
+                        T0 = T_bare(Rnij, dT0, grad_ij%dcoords)
                         T = damping_grad(f_damp, df, T0, dT0, dT, grad_ij)
                     case ("sqrtfermi,dip")
-                        T = damping_sqrtfermi(r, beta_R_vdw, damp%a)*T_bare(r)
+                        T = damping_sqrtfermi(Rnij, beta_R_vdw, damp%a)*T_bare(Rnij)
                     case ("custom,dip")
-                        T = damp%damping_custom(i_atom, j_atom)*T_bare(r)
+                        T = damp%damping_custom(i_atom, j_atom)*T_bare(Rnij)
                     case ("dip,custom")
                         T = damp%potential_custom(:, :, i_atom, j_atom)
                     case ("dip,gg")
-                        T = T_erf_coulomb(r, sigma_ij, dT, grad_ij)
+                        T = T_erf_coulomb(Rnij, sigma_ij, dT, grad_ij)
                     case ("fermi,dip,gg")
-                        f_damp = damping_fermi(r, beta_R_vdw, damp%a, df, grad_ij)
+                        f_damp = damping_fermi(Rnij, beta_R_vdw, damp%a, df, grad_ij)
                         call op1minus_grad(f_damp, df)
-                        T0 = T_erf_coulomb(r, sigma_ij, dT0, grad_ij)
+                        T0 = T_erf_coulomb(Rnij, sigma_ij, dT0, grad_ij)
                         T = damping_grad(f_damp, df, T0, dT0, dT, grad_ij)
                         do_ewald = .false.
                     case ("sqrtfermi,dip,gg")
-                        T = (1d0-damping_sqrtfermi(r, beta_R_vdw, damp%a)) * &
-                            T_erf_coulomb(r, sigma_ij)
+                        T = (1d0-damping_sqrtfermi(Rnij, beta_R_vdw, damp%a)) * &
+                            T_erf_coulomb(Rnij, sigma_ij)
                         do_ewald = .false.
                     case ("custom,dip,gg")
                         T = (1d0-damp%damping_custom(i_atom, j_atom)) * &
-                            T_erf_coulomb(r, sigma_ij)
+                            T_erf_coulomb(Rnij, sigma_ij)
                         do_ewald = .false.
                 end select
                 if (grad_ij%dr_vdw) dT%dvdw = damp%beta*dT%dvdw
                 if (do_ewald) then
                     T = T &
-                        + T_erfc(r, gamm, dTew, grad_ij) &
-                        - T_bare(r, dT0, grad_ij%dcoords)
+                        + T_erfc(Rnij, gamm, dTew, grad_ij) &
+                        - T_bare(Rnij, dT0, grad_ij%dcoords)
                     if (grad_ij%dcoords) dT%dr = dT%dr + dTew%dr - dT0%dr
                 end if
                 Tij = T
@@ -243,15 +249,15 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 if (grad_ij%dr_vdw) dTij%dvdw = dT%dvdw
                 if (grad_ij%dsigma) dTij%dsigma = dT%dsigma
 #if MBD_TYPE == 1
-                k_factor = exp(-IMI*(dot_product(k_point, r)))
-                Tij = T*k_factor
+                exp_qR = exp(-IMI*(dot_product(q, Rnij)))
+                Tij = T*exp_qR
                 if (grad_ij%dcoords) then
                     forall (i = 1:3)
-                        dTij%dr(:, :, i) = dT%dr(:, :, i)*k_factor - IMI*k_point(i)*Tij
+                        dTij%dr(:, :, i) = dT%dr(:, :, i)*exp_qR - IMI*q(i)*Tij
                     end forall
                 end if
-                if (grad_ij%dsigma) dTij%dsigma = dT%dsigma*k_factor
-                if (grad_ij%dr_vdw) dTij%dvdw = dT%dvdw*k_factor
+                if (grad_ij%dsigma) dTij%dsigma = dT%dsigma*exp_qR
+                if (grad_ij%dr_vdw) dTij%dvdw = dT%dvdw*exp_qR
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
@@ -263,6 +269,15 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                     associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
                         dTdR_sub = dTdR_sub + dTij%dr
                     end associate
+                end if
+                if (grad%dlattice) then
+                     do i_latt = 1, 3
+                        associate ( &
+                            dTda_sub => ddipmat%dlattice(i+1:i+3, j+1:j+3, i_latt, :) &
+                        )
+                            dTda_sub = dTda_sub - dTij%dr*(n(i_latt))
+                        end associate
+                    end do
                 end if
                 if (grad%dr_vdw) then
                     associate (dTdRvdw_sub => ddipmat%dvdw(i+1:i+3, j+1:j+3))
@@ -280,86 +295,89 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     call geom%clock(-11)
     if (do_ewald) then
 #if MBD_TYPE == 0
-        call add_ewald_dipole_parts_real(geom, gamm, dipmat, ddipmat, grad)
+        call add_ewald_dipole_parts_real(geom, dipmat, ddipmat, grad)
 #elif MBD_TYPE == 1
-        call add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad, k_point)
+        call add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
 #endif
     end if
 end function
 
 #if MBD_TYPE == 0
-subroutine add_ewald_dipole_parts_real(geom, gamm, dipmat, ddipmat, grad)
+subroutine add_ewald_dipole_parts_real(geom, dipmat, ddipmat, grad)
     type(matrix_re_t), intent(inout) :: dipmat
     type(grad_matrix_re_t), intent(inout) :: ddipmat
 #elif MBD_TYPE == 1
-subroutine add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad, k_point)
+subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     type(matrix_cplx_t), intent(inout) :: dipmat
     type(grad_matrix_cplx_t), intent(inout) :: ddipmat
 #endif
     type(geom_t), intent(inout) :: geom
-    real(dp), intent(in) :: gamm
     type(grad_request_t), intent(in), optional :: grad
 #if MBD_TYPE == 1
-    real(dp), intent(in) :: k_point(3)
+    real(dp), intent(in) :: q(3)
 #endif
 
     logical :: do_surface
-    real(dp) :: rec_unit_cell(3, 3), volume, G_vector(3), r(3), k_total(3), &
-        k_sq, rec_space_cutoff, k_prefactor(3, 3), G_r
+    real(dp) :: rec_latt(3, 3), volume, G(3), Rij(3), k(3), &
+        k_sq, rec_space_cutoff, G_Rij, gamm, latt_inv(3, 3), &
+        dGdA(3), dk_sqdA, dkk_dA(3, 3), vol_prefactor, &
+        k_otimes_k(3, 3), exp_k_sq_gamma, vol_kk_exp_ksq(3, 3)
     integer :: &
-        i_atom, j_atom, i, j, i_xyz, j_xyz, idx_G_vector(3), i_G_vector, &
-        range_G_vector(3), my_i_atom, my_j_atom
+        i_atom, j_atom, i, j, i_xyz, m(3), i_m, &
+        range_m(3), my_i_atom, my_j_atom, i_latt, a, b
 #if MBD_TYPE == 0
-    real(dp) :: T(3, 3)
+    real(dp) :: Tij(3, 3), exp_GR, vol_exp
 #elif MBD_TYPE == 1
-    complex(dp) :: T(3, 3)
+    complex(dp) :: Tij(3, 3), exp_GR, vol_exp
 #endif
 
-    rec_unit_cell = 2*pi*inverse(transpose(geom%lattice))
+    gamm = geom%gamma_ew
+    latt_inv = inverse(geom%lattice)
+    rec_latt = 2*pi*transpose(latt_inv)
     volume = abs(dble(product(eigvals(geom%lattice))))
+    vol_prefactor = 4*pi/volume
     rec_space_cutoff = 10d0*gamm*geom%calc%param%ewald_rec_cutoff_scaling
-    range_G_vector = geom%supercell_circum(rec_unit_cell, rec_space_cutoff)
+    range_m = geom%supercell_circum(rec_latt, rec_space_cutoff)
     call geom%calc%print( &
         'Ewald: using reciprocal cutoff = ' // trim(tostr(rec_space_cutoff)) &
     )
     call geom%calc%print( &
-        'Ewald: summing reciprocal part in G vector range of ' &
-        // trim(tostr(1+2*range_G_vector(1))) // 'x' &
-        // trim(tostr(1+2*range_G_vector(2))) // 'x' &
-        // trim(tostr(1+2*range_G_vector(3))) &
+        'Ewald: summing reciprocal part in m vector range of ' &
+        // trim(tostr(1+2*range_m(1))) // 'x' &
+        // trim(tostr(1+2*range_m(2))) // 'x' &
+        // trim(tostr(1+2*range_m(3))) &
     )
     call geom%clock(12)
-    idx_G_vector = [0, 0, -1]
-    each_recip_cell: do i_G_vector = 1, product(1+2*range_G_vector)
-        call shift_idx(idx_G_vector, -range_G_vector, range_G_vector)
-        G_vector = matmul(rec_unit_cell, idx_G_vector)
+    m = [0, 0, -1]
+    each_recip_vec: do i_m = 1, product(1+2*range_m)
+        call shift_idx(m, -range_m, range_m)
+        G = matmul(rec_latt, m)
 #if MBD_TYPE == 1
-        k_total = G_vector + k_point
+        k = G + q
 #elif MBD_TYPE == 0
-        k_total = G_vector
+        k = G
 #endif
-        k_sq = sum(k_total**2)
+        k_sq = sum(k**2)
         if (sqrt(k_sq) > rec_space_cutoff .or. sqrt(k_sq) < 1d-15) cycle
-        k_prefactor = 4*pi/volume*exp(-k_sq/(4*gamm**2))
-        forall (i_xyz = 1:3, j_xyz = 1:3)
-            k_prefactor(i_xyz, j_xyz) = &
-                k_prefactor(i_xyz, j_xyz)*k_total(i_xyz)*k_total(j_xyz)/k_sq
-        end forall
+        exp_k_sq_gamma = exp(-k_sq/(4*gamm**2))
+        forall (a = 1:3, b = 1:3) k_otimes_k(a, b) = k(a)*k(b)/k_sq
         each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
             each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
-                r = geom%coords(:, i_atom)-geom%coords(:, j_atom)
-                G_r = dot_product(G_vector, r)
+                Rij = geom%coords(:, i_atom)-geom%coords(:, j_atom)
+                G_Rij = dot_product(G, Rij)
 #if MBD_TYPE == 1
-                T = k_prefactor*exp(IMI*G_r)
+                exp_GR = exp(IMI*G_Rij)
 #elif MBD_TYPE == 0
-                T = k_prefactor*cos(G_r)
+                exp_GR = cos(G_Rij)
 #endif
+                vol_kk_exp_ksq = vol_prefactor*k_otimes_k*exp_k_sq_gamma
+                Tij = vol_kk_exp_ksq*exp_GR
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
                 associate (T_sub => dipmat%val(i+1:i+3, j+1:j+3))
-                    T_sub = T_sub + T
+                    T_sub = T_sub + Tij
                 end associate
                 if (.not. present(grad)) cycle
                 if (grad%dcoords .and. i_atom /= j_atom) then
@@ -367,21 +385,48 @@ subroutine add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad, k_p
                         forall (i_xyz = 1:3)
                             dTdR_sub(:, :, i_xyz) = dTdR_sub(:, :, i_xyz) &
 #if MBD_TYPE == 1
-                                + IMI*G_vector(i_xyz)*T
+                                + Tij*IMI*G(i_xyz)
 #elif MBD_TYPE == 0
-                                - k_prefactor*sin(G_r)*G_vector(i_xyz)
+                                - vol_kk_exp_ksq*sin(G_Rij)*G(i_xyz)
 #endif
                         end forall
                     end associate
                 end if
+                if (grad%dlattice) then
+                    vol_exp = vol_prefactor*exp_k_sq_gamma*exp_GR
+                    do i_latt = 1, 3
+                        do i_xyz = 1, 3
+                            dGdA = -latt_inv(i_latt, :)*G(i_xyz)
+                            dk_sqdA = 2*dot_product(k, dGdA)
+                            forall (a = 1:3, b = 1:3)
+                                dkk_dA(a, b) = k(a)*dGdA(b)/k_sq &
+                                    - k(a)*k(b)*dk_sqdA/(2*k_sq**2)
+                            end forall
+                            dkk_dA = dkk_dA + transpose(dkk_dA)
+                            associate ( &
+                                dTda_sub => ddipmat%dlattice(i+1:i+3, j+1:j+3, i_latt, i_xyz) &
+                            )
+                                dTda_sub = dTda_sub &
+                                    - Tij*latt_inv(i_latt, i_xyz) &
+                                    + vol_exp*dkk_dA &
+                                    - Tij*dk_sqdA/(4*gamm**2) &
+#if MBD_TYPE == 1
+                                    + Tij*IMI*dot_product(dGdA, Rij)
+#elif MBD_TYPE == 0
+                                    - vol_kk_exp_ksq*sin(G_Rij)*dot_product(dGdA, Rij)
+#endif
+                            end associate
+                        end do
+                    end do
+                end if
             end do each_atom_pair
         end do each_atom
-    end do each_recip_cell
+    end do each_recip_vec
     ! self energy
     call dipmat%add_diag_scalar(-4*gamm**3/(3*sqrt(pi)))
     ! surface term
 #if MBD_TYPE == 1
-    do_surface = sqrt(sum(k_point**2)) < 1d-15
+    do_surface = sqrt(sum(q**2)) < 1d-15
 #else
     do_surface = .true.
 #endif
@@ -391,7 +436,12 @@ subroutine add_ewald_dipole_parts_complex(geom, gamm, dipmat, ddipmat, grad, k_p
                 do i_xyz = 1, 3
                     i = 3*(my_i_atom-1)+i_xyz
                     j = 3*(my_j_atom-1)+i_xyz
-                    dipmat%val(i, j) = dipmat%val(i, j) + 4*pi/(3*volume)
+                    dipmat%val(i, j) = dipmat%val(i, j) + vol_prefactor/3
+                    if (.not. present(grad)) cycle
+                    if (grad%dlattice) then
+                        ddipmat%dlattice(i, j, :, :) = ddipmat%dlattice(i, j, :, :) &
+                            - vol_prefactor/3*latt_inv
+                    end if
                 end do
             end do
         end do
@@ -571,6 +621,16 @@ function T_erfc(r, gamm, dT, grad) result(T)
                         5*r(a)*r(b)*r(c)/r_7*C_ew - r(a)*r(b)*r(c)/r_6*dC%dr_1
                     dT%dr(b, a, c) = dT%dr(a, b, c)
                 end forall
+            end forall
+        end forall
+    end if
+    if (grad%dgamma) then
+        allocate (dT%dgamma(3, 3))
+        forall (a = 1:3)
+            dT%dgamma(a, a) = -dC%dgamma*r(a)**2/r_5+dB%dgamma/r_3
+            forall (b = a+1:3)
+                dT%dgamma(a, b) = -dC%dgamma*r(a)*r(b)/r_5
+                dT%dgamma(b, a) = dT%dgamma(a, b)
             end forall
         end forall
     end if

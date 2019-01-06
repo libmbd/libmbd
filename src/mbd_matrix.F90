@@ -41,6 +41,7 @@ type, public :: matrix_re_t
     procedure :: eigh => matrix_re_eigh
     procedure :: eigvals => matrix_re_eigvals
     procedure :: eigvalsh => matrix_re_eigvalsh
+    procedure :: sum_all => matrix_re_sum_all
     procedure :: contract_n_transp => matrix_re_contract_n_transp
     procedure :: contract_n33diag_cols => matrix_re_contract_n33diag_cols
     procedure :: contract_n33_rows => matrix_re_contract_n33_rows
@@ -70,6 +71,7 @@ type, public :: matrix_cplx_t
     procedure :: eigh => matrix_cplx_eigh
     procedure :: eigvals => matrix_cplx_eigvals
     procedure :: eigvalsh => matrix_cplx_eigvalsh
+    procedure :: sum_all => matrix_cplx_sum_all
     procedure :: contract_n_transp => matrix_cplx_contract_n_transp
     procedure :: contract_n33diag_cols => matrix_cplx_contract_n33diag_cols
     procedure :: contract_n33_rows => matrix_cplx_contract_n33_rows
@@ -410,6 +412,20 @@ function matrix_cplx_eigvals(A, exc, destroy) result(eigs)
     end if
 #else
     eigs = eigvals(A%val, exc, destroy)
+#endif
+end function
+
+#if MBD_TYPE == 0
+real(dp) function matrix_re_sum_all(this) result(res)
+    class(matrix_re_t), intent(in) :: this
+#elif MBD_TYPE == 1
+complex(dp) function matrix_cplx_sum_all(this) result(res)
+    class(matrix_cplx_t), intent(in) :: this
+#endif
+
+    res = sum(this%val)
+#ifdef WITH_SCALAPACK
+    if (this%idx%parallel) call all_reduce(res, this%blacs)
 #endif
 end function
 

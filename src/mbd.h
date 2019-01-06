@@ -94,7 +94,7 @@ double cmbd_mbd_scs_energy(
 double cmbd_dipole_matrix(
     struct cmbd_geom* geom,
     struct cmbd_damping* damping,
-    double* k_point,
+    double* q_point,
     double* dipmat
 );
 

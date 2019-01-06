@@ -14,6 +14,7 @@ private
 type, public :: grad_t
     !! Derivatives with respect to various quantities
     real(dp), allocatable :: dcoords(:, :)  ! n_atoms by 3
+    real(dp), allocatable :: dlattice(:, :)  ! n_vectors by 3
     real(dp), allocatable :: dalpha(:)
     real(dp), allocatable :: dalpha_dyn(:, :)  ! n_atoms by 0:n_freq
     real(dp), allocatable :: dC6(:)
@@ -27,6 +28,7 @@ end type
 type, public :: grad_matrix_re_t
     !! Derivatives of a real dipole matrix with respect to various quantities
     real(dp), allocatable :: dr(:, :, :)
+    real(dp), allocatable :: dlattice(:, :, :, :)
     real(dp), allocatable :: dvdw(:, :)
     real(dp), allocatable :: dsigma(:, :)
     real(dp), allocatable :: dgamma(:, :)
@@ -35,6 +37,7 @@ end type
 type, public :: grad_matrix_cplx_t
     !! Derivatives of a compelx dipole matrix with respect to various quantities
     complex(dp), allocatable :: dr(:, :, :)
+    complex(dp), allocatable :: dlattice(:, :, :, :)
     complex(dp), allocatable :: dvdw(:, :)
     complex(dp), allocatable :: dsigma(:, :)
     complex(dp), allocatable :: dgamma(:, :)
@@ -58,7 +61,7 @@ type, public :: grad_request_t
     logical :: domega = .false.
     logical :: dsigma = .false.
     logical :: dgamma = .false.
-    logical :: dk_point = .false.
+    logical :: dq = .false.
     logical :: dlattice = .false.
     logical :: dV = .false.
     logical :: dV_free = .false.
@@ -80,7 +83,7 @@ logical function grad_request_any(this) result(any)
         .or. this%domega &
         .or. this%dsigma &
         .or. this%dgamma &
-        .or. this%dk_point &
+        .or. this%dq &
         .or. this%dlattice &
         .or. this%dV &
         .or. this%dV_free &

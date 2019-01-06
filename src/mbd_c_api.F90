@@ -307,10 +307,10 @@ real(c_double) function cmbd_mbd_scs_energy(geom_cp, n_atoms, alpha_0, C6, dampi
     cmbd_mbd_scs_energy = res%energy
 end function
 
-subroutine cmbd_dipole_matrix(geom_cp, damping_p, k_point, dipmat_p) bind(c)
+subroutine cmbd_dipole_matrix(geom_cp, damping_p, q_point, dipmat_p) bind(c)
     type(c_ptr), intent(in), value :: geom_cp
     type(c_ptr), intent(in), value :: damping_p
-    real(c_double), intent(in), optional :: k_point(3)
+    real(c_double), intent(in), optional :: q_point(3)
     type(c_ptr), intent(in), value :: dipmat_p
 
     type(geom_t), pointer :: geom
@@ -324,8 +324,8 @@ subroutine cmbd_dipole_matrix(geom_cp, damping_p, k_point, dipmat_p) bind(c)
     geom => get_mbd_geom(geom_cp)
     n_atoms = size(geom%coords, 2)
     call c_f_pointer(damping_p, damp)
-    if (present(k_point)) then
-        dipmat_c = dipole_matrix(geom, damp, k_point=k_point)
+    if (present(q_point)) then
+        dipmat_c = dipole_matrix(geom, damp, q=q_point)
         call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
         dipmat_cplx = transpose(dipmat_c%val)
     else

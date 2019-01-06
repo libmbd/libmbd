@@ -84,7 +84,7 @@ type(result_t) function get_mbd_hamiltonian_energy_real( &
         geom, alpha_0, omega, damp, dene, grad) result(res)
 #elif MBD_TYPE == 1
 type(result_t) function get_mbd_hamiltonian_energy_complex( &
-        geom, alpha_0, omega, damp, dene, grad, k_point) result(res)
+        geom, alpha_0, omega, damp, dene, grad, q) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
@@ -93,7 +93,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     type(grad_t), intent(out) :: dene
     type(grad_request_t), intent(in) :: grad
 #if MBD_TYPE == 1
-    real(dp), intent(in) :: k_point(3)
+    real(dp), intent(in) :: q(3)
 #endif
 
 #if MBD_TYPE == 0
@@ -104,14 +104,14 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     type(grad_matrix_cplx_t) :: dT
 #endif
     real(dp), allocatable :: eigs(:)
-    integer :: n_negative_eigs, n_atoms, i_xyz
+    integer :: n_negative_eigs, n_atoms, i_xyz, i_latt
     character(120) :: msg
 
     n_atoms = geom%siz()
 #if MBD_TYPE == 0
     T = dipole_matrix(geom, damp, dT, grad)
 #elif MBD_TYPE == 1
-    T = dipole_matrix(geom, damp, dT, grad, k_point)
+    T = dipole_matrix(geom, damp, dT, grad, q)
 #endif
     if (geom%has_exc()) return
     if (grad%any()) then
@@ -168,6 +168,17 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
             call dQ%mult_cross(omega*sqrt(alpha_0))
             dQ%val = c_lambda12i_c%val*dQ%val
             dene%dcoords(:, i_xyz) = 1d0/2*dble(dQ%contract_n33_rows())
+        end do
+    end if
+    if (grad%dlattice) then
+        allocate (dene%dlattice(3, 3))
+        do i_latt = 1, 3
+            do i_xyz = 1, 3
+                dQ%val = dT%dlattice(:, :, i_latt, i_xyz)
+                call dQ%mult_cross(omega*sqrt(alpha_0))
+                dQ%val = c_lambda12i_c%val*dQ%val
+                dene%dlattice(i_latt, i_xyz) = 1d0/4*dble(dQ%sum_all())
+            end do
         end do
     end if
     if (grad%dalpha) then

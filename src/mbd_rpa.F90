@@ -32,13 +32,13 @@ type(result_t) function get_mbd_rpa_energy_real( &
         geom, alpha, damp) result(res)
 #elif MBD_TYPE == 1
 type(result_t) function get_mbd_rpa_energy_complex( &
-        geom, alpha, damp, k_point) result(res)
+        geom, alpha, damp, q) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:, 0:)
     type(damping_t), intent(in) :: damp
 #if MBD_TYPE == 1
-    real(dp), intent(in) :: k_point(3)
+    real(dp), intent(in) :: q(3)
 #endif
 
 #if MBD_TYPE == 0
@@ -59,7 +59,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
 #if MBD_TYPE == 0
         relay = dipole_matrix(geom, damp_alpha)
 #elif MBD_TYPE == 1
-        relay = dipole_matrix(geom, damp_alpha, k_point=k_point)
+        relay = dipole_matrix(geom, damp_alpha, q=q)
 #endif
         do my_i_atom = 1, size(relay%idx%i_atom)
             associate ( &

@@ -44,6 +44,7 @@ call exec_test('T_erfc derivative explicit')
 call exec_test('T_fermi derivative implicit')
 call exec_test('MBD derivative explicit')
 call exec_test('MBD Ewald derivative explicit')
+call exec_test('MBD Ewald derivative stress')
 call exec_test('SCS derivative explicit')
 call exec_test('SCS derivative implicit alpha')
 call exec_test('SCS derivative implicit Rvdw')
@@ -87,6 +88,7 @@ subroutine exec_test(test_name)
     case ('T_fermi derivative implicit'); call test_T_fermi_deriv_impl()
     case ('MBD derivative explicit'); call test_mbd_deriv_expl()
     case ('MBD Ewald derivative explicit'); call test_mbd_ewald_deriv_expl()
+    case ('MBD Ewald derivative stress'); call test_mbd_ewald_deriv_stress()
     case ('SCS derivative explicit'); call test_scs_deriv_expl()
     case ('SCS Ewald derivative explicit'); call test_scs_ewald_deriv_expl()
     case ('SCS derivative implicit alpha'); call test_scs_deriv_impl_alpha()
@@ -350,6 +352,57 @@ subroutine test_mbd_ewald_deriv_expl()
     call geom%destroy()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
+        call print_matrix('delta gradients', diff)
+        call print_matrix('anl', gradients_anl)
+        call print_matrix('num', gradients)
+    end if
+end subroutine
+
+subroutine test_mbd_ewald_deriv_stress()
+    real(dp) :: delta, k_point(3)
+    type(geom_t) :: geom
+    type(damping_t) :: damp
+    real(dp), allocatable :: &
+        lattice(:, :), gradients(:, :), diff(:, :), alpha_0(:), omega(:), &
+        gradients_anl(:, :)
+    type(result_t) :: res(-3:3)
+    type(grad_t) :: dene
+    integer :: i_latt, n_atoms, i_xyz, i_step
+
+    delta = 0.01d0
+    n_atoms = 2
+    allocate (geom%coords(3, n_atoms), source=0d0)
+    allocate (gradients(3, 3))
+    geom%coords(3, 1) = 1d0
+    geom%coords(1, 2) = 1d0
+    geom%coords(2, 2) = 4d0
+    lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
+    geom%lattice = lattice
+    k_point = [0.4d0, 0d0, 0d0]
+    call geom%init(calc)
+    damp%version = 'fermi,dip'
+    damp%r_vdw = [3.55d0, 3.5d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0]
+    omega = [.7d0, .65d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+        dene, grad_request_t(dlattice=.true.), k_point)
+    gradients_anl = dene%dlattice
+    do i_latt = 1, 3
+        do i_xyz = 1, 3
+            do i_step = -3, 3
+                if (i_step == 0) cycle
+                geom%lattice = lattice
+                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
+                res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+                    dene, grad_request_t(), k_point)
+            end do
+            gradients(i_latt, i_xyz) = diff7(res%energy, delta)
+        end do
+    end do
+    call geom%destroy()
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('delta gradients', diff)
         call print_matrix('anl', gradients_anl)
         call print_matrix('num', gradients)

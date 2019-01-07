@@ -40,7 +40,7 @@ type, public :: calc_t
     real(dp), allocatable :: omega_grid_w(:)
     type(exception_t) :: exc
     logical :: muted = .false.
-    procedure(abstract_printer), pointer, nopass :: printer => stdout_printer
+    procedure(abstract_printer), pointer, nopass :: printer
     logical :: do_rpa = .false.
     logical :: get_eigs = .false.
     logical :: get_modes = .false.
@@ -58,6 +58,7 @@ subroutine calc_init(this)
 
     integer :: n
 
+    this%printer => stdout_printer
     call this%clock%init(100)
     n = this%param%n_frequency_grid
     allocate (this%omega_grid(0:n))

@@ -22,6 +22,8 @@ integer, parameter :: MBD_EXC_UNIMPL = 4
     !! Functionality is not implemented
 integer, parameter :: MBD_EXC_DAMPING = 5
     !! Damping-function exception
+integer, parameter :: MBD_EXC_INPUT = 6
+    !! Invalid input
 
 real(dp), parameter :: ZERO_REAL = 0d0
 complex(dp), parameter :: ZERO_COMPLEX = (0d0, 0d0)

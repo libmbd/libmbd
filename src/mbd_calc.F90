@@ -21,7 +21,6 @@ type, public :: param_t
     !! Calculation-wide paramters.
     real(dp) :: ts_energy_accuracy = TS_ENERGY_ACCURACY
     real(dp) :: ts_cutoff_radius = 50d0*ang
-    real(dp) :: dipole_low_dim_cutoff = 100d0*ang
     real(dp) :: dipole_cutoff = 400d0*ang  ! used only when Ewald is off
     real(dp) :: ewald_real_cutoff_scaling = 1d0
     real(dp) :: ewald_rec_cutoff_scaling = 1d0

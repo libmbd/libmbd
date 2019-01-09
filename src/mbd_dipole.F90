@@ -136,9 +136,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     call dipmat%init(geom%idx)
 #endif
     if (is_periodic) then
-        if (any(geom%vacuum_axis)) then
-            real_space_cutoff = geom%calc%param%dipole_low_dim_cutoff
-        else if (geom%calc%param%ewald_on) then
+        if (geom%calc%param%ewald_on) then
             do_ewald = .true.
             volume = max(abs(dble(product(eigvals(geom%lattice)))), 0.2d0)
             if (.not. allocated(geom%gamma_ew)) geom%gamma_ew = 2.5d0/(volume)**(1d0/3)

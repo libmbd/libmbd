@@ -24,9 +24,8 @@ type, public :: geom_t
     !! Represents a molecule or a crystal unit cell.
     type(calc_t), pointer :: calc
     real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
-    logical :: vacuum_axis(3) = [.false., .false., .false.]
     real(dp), allocatable :: lattice(:, :)  ! vectors in columns
-    integer :: k_grid(3)  ! TODO make allocatable
+    integer, allocatable :: k_grid(:)
     real(dp), allocatable :: k_pts(:, :)
     real(dp), allocatable :: gamma_ew
         ! TODO create ewald_t type
@@ -53,7 +52,7 @@ type, public :: geom_t
     procedure :: destroy => geom_destroy
     procedure :: siz => geom_siz
     procedure :: has_exc => geom_has_exc
-    procedure :: supercell_circum => geom_supercell_circum
+    procedure, nopass :: supercell_circum => geom_supercell_circum
     procedure :: ensure_k_pts => geom_ensure_k_pts
     procedure :: clock => geom_clock
 end type
@@ -115,8 +114,7 @@ logical function geom_has_exc(this) result(has_exc)
     has_exc = this%calc%exc%code /= 0
 end function
 
-function geom_supercell_circum(this, uc, radius) result(sc)
-    class(geom_t), intent(in) :: this
+function geom_supercell_circum(uc, radius) result(sc)
     real(dp), intent(in) :: uc(3, 3), radius
     integer :: sc(3)
 
@@ -127,7 +125,6 @@ function geom_supercell_circum(this, uc, radius) result(sc)
     forall (i = 1:3) &
         layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
-    where (this%vacuum_axis) sc = 0
 end function
 
 subroutine geom_ensure_k_pts(this)

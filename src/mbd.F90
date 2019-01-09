@@ -14,7 +14,7 @@ use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: ts_energy
-use mbd_utils, only: result_t
+use mbd_utils, only: result_t, exception_t
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 
 implicit none
@@ -32,6 +32,9 @@ type, public :: mbd_input_t
         !! - `mbd`: Generic MBD method (without any screening).
     integer :: comm = -1
         !! MPI communicator.
+        !!
+        !! Only used when compiled with MPI. Leave as is to use the
+        !! MPI_COMM_WORLD communicator.
     logical :: calculate_forces = .true.
         !! Whether to calculate forces.
     logical :: calculate_spectrum = .false.
@@ -79,15 +82,12 @@ type, public :: mbd_input_t
     real(dp), allocatable :: lattice_vectors(:, :)
         !! (\(3\times 3\), a.u.) Lattice vectors in columns, unallocated if not
         !! periodic.
-    integer :: k_grid(3)
+    integer :: k_grid(3) = [-1, -1, -1]
         !! Number of \(k\)-points along reciprocal axes.
-    logical :: vacuum_axis(3) = [.false., .false., .false.]
-        !! Is there vacuum along some axes in a periodic calculation?
     character(len=10) :: parallel_mode = 'auto'
         !! Parallelization scheme.
         !!
-        !! - `auto`: Pick based on system system size and number of
-        !! \(k\)-points.
+        !! - `auto`: Pick based on system system size and number of \(k\)-points.
         !! - `kpoints`: Parallelize over \(k\)-points.
         !! - `atoms`: Parallelize over atom pairs.
 end type
@@ -142,10 +142,19 @@ subroutine mbd_calc_init(this, input)
     this%calc%param%n_frequency_grid = input%n_omega_grid
     this%calc%param%k_grid_shift = input%k_grid_shift
     this%calc%param%zero_negative_eigs = input%zero_negative_eigvals
-    this%geom%k_grid = input%k_grid
-    this%geom%vacuum_axis = input%vacuum_axis
+    if (.not. all(input%k_grid == -1)) this%geom%k_grid = input%k_grid
     this%geom%coords = input%coords
-    if (allocated(input%lattice_vectors)) this%geom%lattice = input%lattice_vectors
+    if (allocated(input%lattice_vectors)) then
+        if (.not. allocated(this%geom%k_grid)) then
+            this%calc%exc = exception_t( &
+                MBD_EXC_INPUT, &
+                'calc%init()', &
+                'Lattice vectors present but no k-grid specified' &
+            )
+            return
+        end if
+        this%geom%lattice = input%lattice_vectors
+    end if
     this%geom%parallel_mode = input%parallel_mode
     call this%calc%init()
     call this%geom%init(this%calc)

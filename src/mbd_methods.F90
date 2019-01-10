@@ -52,7 +52,6 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     type(result_t) :: res_k
     type(grad_t) :: domega, dene_k
     type(grad_request_t) :: grad_ham
-    logical :: muted_before
 
     omega = omega_qho(C6, alpha_0, domega, grad)
     if (geom%calc%do_rpa) then
@@ -71,7 +70,6 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             ! TODO gradients
         end if
     else
-        call geom%ensure_k_pts()
         n_kpts = size(geom%k_pts, 2)
         res%energy = 0d0
         if (geom%calc%get_eigs) &
@@ -115,12 +113,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             end if
             if (grad%dC6) dene%dC6 = dene%dC6 + dene_k%domega*domega%dC6/n_kpts
             if (grad%dR_vdw) dene%dR_vdw = dene%dR_vdw + dene_k%dR_vdw/n_kpts
-            if (i_kpt == 1) then
-                muted_before = geom%calc%muted
-                geom%calc%muted = .true.
-            end if
         end do
-        geom%calc%muted = muted_before
     end if
 end function
 
@@ -144,7 +137,6 @@ type(result_t) function get_mbd_scs_energy( &
     type(damping_t) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
-    logical :: muted_before
 
     select case (variant)
     case ('scs')
@@ -176,12 +168,7 @@ type(result_t) function get_mbd_scs_energy( &
             geom, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
         )
         if (geom%has_exc()) return
-        if (i_freq == 0) then
-            muted_before = geom%calc%muted
-            geom%calc%muted = .true.
-        end if
     end do
-    geom%calc%muted = muted_before
     C6_scs = C6_from_alpha( &
         geom%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
     )

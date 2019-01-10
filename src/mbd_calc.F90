@@ -72,7 +72,7 @@ subroutine calc_init(this)
 end subroutine
 
 subroutine calc_print(this, msg)
-    class(calc_t), intent(inout) :: this
+    class(calc_t), intent(in) :: this
     character(len=*), intent(in) :: msg
 
     if (this%muted) return

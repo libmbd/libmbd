@@ -7,8 +7,8 @@ module mbd_geom
 
 use mbd_constants
 use mbd_calc, only: calc_t
-use mbd_lapack, only: inverse
-use mbd_utils, only: shift_idx, atom_index_t
+use mbd_lapack, only: eigvals, inverse
+use mbd_utils, only: shift_idx, atom_index_t, tostr
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
@@ -20,17 +20,23 @@ implicit none
 
 private
 
+type, public :: ewald_t
+    real(dp) :: gamm
+    real(dp) :: real_space_cutoff
+    real(dp) :: rec_space_cutoff
+end type
+
 type, public :: geom_t
     !! Represents a molecule or a crystal unit cell.
-    type(calc_t), pointer :: calc
-    real(dp), allocatable :: coords(:, :)  ! 3 by n_atoms
-    real(dp), allocatable :: lattice(:, :)  ! vectors in columns
+    !!
+    !! The documented variables should be set before calling the initializer.
+    real(dp), allocatable :: coords(:, :)
+        !! (\(3\times N\), a.u.) Atomic coordinates.
+    real(dp), allocatable :: lattice(:, :)
+        !! (\(3\times 3\), a.u.) Lattice vectors in columns, unallocated if not
+        !! periodic.
     integer, allocatable :: k_grid(:)
-    real(dp), allocatable :: k_pts(:, :)
-    real(dp), allocatable :: gamma_ew
-        ! TODO create ewald_t type
-
-    integer :: supercell(3)
+        !! Number of \(k\)-points along reciprocal axes.
     character(len=10) :: parallel_mode = 'auto'
         !! Type of parallelization:
         !!
@@ -38,6 +44,11 @@ type, public :: geom_t
         !! solve eigenproblems sequentialy.
         !! - `k_points`: parallelize over k-points (each MPI task solves entire
         !! eigenproblems for its k-points)
+    ! The following components are set by the initializer and should be
+    ! considered read-only
+    type(calc_t), pointer :: calc
+    real(dp), allocatable :: k_pts(:, :)
+    type(ewald_t), allocatable :: ewald
     type(atom_index_t) :: idx
 #ifdef WITH_SCALAPACK
     ! TODO makes these two private (see use in mbd_methods, mbd_dipole)
@@ -53,7 +64,6 @@ type, public :: geom_t
     procedure :: siz => geom_siz
     procedure :: has_exc => geom_has_exc
     procedure, nopass :: supercell_circum => geom_supercell_circum
-    procedure :: ensure_k_pts => geom_ensure_k_pts
     procedure :: clock => geom_clock
 end type
 
@@ -64,10 +74,39 @@ subroutine geom_init(this, calc)
     type(calc_t), target, intent(in) :: calc
 
     integer :: i_atom
+    real(dp) :: volume
 
     this%calc => calc
-    if (this%parallel_mode == 'auto') this%parallel_mode = 'atoms'
-        ! TODO put some logic here
+    if (allocated(this%lattice)) then
+        volume = abs(dble(product(eigvals(this%lattice))))
+        if (.not. allocated(this%k_pts) .and. allocated(this%k_grid)) then
+            this%k_pts = make_k_pts(this%k_grid, this%lattice, this%calc%param%k_grid_shift)
+        end if
+        if (calc%param%ewald_on) then
+            allocate (this%ewald)
+            this%ewald%gamm = 2.5d0/volume**(1d0/3)
+            this%ewald%real_space_cutoff = &
+                6d0/this%ewald%gamm*calc%param%ewald_real_cutoff_scaling
+            this%ewald%rec_space_cutoff = &
+                10d0*this%ewald%gamm*calc%param%ewald_rec_cutoff_scaling
+            call calc%print( &
+                'Ewald: using gamma = ' // trim(tostr(this%ewald%gamm)) &
+                // ', real cutoff = ' // trim(tostr(this%ewald%real_space_cutoff)) &
+                // ', reciprocal cutoff = ' // trim(tostr(this%ewald%rec_space_cutoff)) &
+            )
+        end if
+    end if
+    if (this%parallel_mode == 'auto') then
+        if (allocated(this%k_pts)) then
+            if (this%siz()**2 > size(this%k_pts, 2)) then
+                this%parallel_mode = 'atoms'
+            else
+                this%parallel_mode = 'k_points'
+            end if
+        else
+            this%parallel_mode = 'atoms'
+        end if
+    end if
 #ifdef WITH_SCALAPACK
     this%idx%parallel = this%parallel_mode == 'atoms'
     if (this%idx%parallel) then
@@ -126,14 +165,6 @@ function geom_supercell_circum(uc, radius) result(sc)
         layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
 end function
-
-subroutine geom_ensure_k_pts(this)
-    class(geom_t), intent(inout) :: this
-
-    if (allocated(this%k_pts)) return
-    if (.not. allocated(this%lattice)) return
-    this%k_pts = make_k_pts(this%k_grid, this%lattice, this%calc%param%k_grid_shift)
-end subroutine
 
 function make_k_pts(k_grid, lattice, shift) result(k_pts)
     integer, intent(in) :: k_grid(3)

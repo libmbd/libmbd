@@ -108,7 +108,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
 #endif
 
     real(dp) :: Rn(3), Rnij(3), Rnij_norm, T(3, 3), f_damp, &
-        sigma_ij, volume, gamm, real_space_cutoff, T0(3, 3), beta_R_vdw
+        sigma_ij, real_space_cutoff, T0(3, 3), beta_R_vdw
     integer :: i_atom, j_atom, i_cell, n(3), range_n(3), i, j, &
         n_atoms, my_i_atom, my_j_atom, i_latt
     logical :: do_ewald, is_periodic
@@ -136,26 +136,13 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     call dipmat%init(geom%idx)
 #endif
     if (is_periodic) then
-        if (geom%calc%param%ewald_on) then
+        if (allocated(geom%ewald)) then
             do_ewald = .true.
-            volume = max(abs(dble(product(eigvals(geom%lattice)))), 0.2d0)
-            if (.not. allocated(geom%gamma_ew)) geom%gamma_ew = 2.5d0/(volume)**(1d0/3)
-            gamm = geom%gamma_ew
-            real_space_cutoff = 6d0/gamm*geom%calc%param%ewald_real_cutoff_scaling
-            call geom%calc%print( &
-                'Ewald: using gamma = ' // trim(tostr(gamm)) &
-                // ', real cutoff = ' // trim(tostr(real_space_cutoff)) &
-            )
+            real_space_cutoff = geom%ewald%real_space_cutoff
         else
             real_space_cutoff = geom%calc%param%dipole_cutoff
         end if
         range_n = geom%supercell_circum(geom%lattice, real_space_cutoff)
-        call geom%calc%print( &
-            'Ewald: summing real part in cell vector range of ' &
-            // trim(tostr(1+2*range_n(1))) // 'x' &
-            // trim(tostr(1+2*range_n(2))) // 'x' &
-            // trim(tostr(1+2*range_n(3))) &
-        )
     else
         range_n(:) = 0
     end if
@@ -238,7 +225,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 if (grad_ij%dr_vdw) dT%dvdw = damp%beta*dT%dvdw
                 if (do_ewald) then
                     T = T &
-                        + T_erfc(Rnij, gamm, dTew, grad_ij) &
+                        + T_erfc(Rnij, geom%ewald%gamm, dTew, grad_ij) &
                         - T_bare(Rnij, dT0, grad_ij%dcoords)
                     if (grad_ij%dcoords) dT%dr = dT%dr + dTew%dr - dT0%dr
                 end if
@@ -329,22 +316,13 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     complex(dp) :: Tij(3, 3), exp_GR, vol_exp
 #endif
 
-    gamm = geom%gamma_ew
+    gamm = geom%ewald%gamm
     latt_inv = inverse(geom%lattice)
     rec_latt = 2*pi*transpose(latt_inv)
     volume = abs(dble(product(eigvals(geom%lattice))))
     vol_prefactor = 4*pi/volume
-    rec_space_cutoff = 10d0*gamm*geom%calc%param%ewald_rec_cutoff_scaling
+    rec_space_cutoff = geom%ewald%rec_space_cutoff
     range_m = geom%supercell_circum(rec_latt, rec_space_cutoff)
-    call geom%calc%print( &
-        'Ewald: using reciprocal cutoff = ' // trim(tostr(rec_space_cutoff)) &
-    )
-    call geom%calc%print( &
-        'Ewald: summing reciprocal part in m vector range of ' &
-        // trim(tostr(1+2*range_m(1))) // 'x' &
-        // trim(tostr(1+2*range_m(2))) // 'x' &
-        // trim(tostr(1+2*range_m(3))) &
-    )
     call geom%clock(12)
     m = [0, 0, -1]
     each_recip_vec: do i_m = 1, product(1+2*range_m)

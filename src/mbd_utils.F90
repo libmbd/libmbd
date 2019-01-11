@@ -13,8 +13,7 @@ use mbd_mpi
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, &
-    abstract_printer, null_printer, stdout_printer, shift_idx, is_true
+public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, shift_idx, is_true
 
 interface tostr
     module procedure tostr_int
@@ -69,30 +68,7 @@ type, public :: quad_pt_t
     real(dp) :: weight
 end type
 
-abstract interface
-    !! Logging subroutine.
-    subroutine abstract_printer(msg)
-        character(len=*), intent(in) :: msg
-    end subroutine
-end interface
-
 contains
-
-subroutine null_printer(msg)
-    character(len=*), intent(in) :: msg
-end subroutine
-
-subroutine stdout_printer(msg)
-    !! Print to standard output on zero-rank process only.
-    character(len=*), intent(in) :: msg
-#ifdef WITH_MPI
-    integer :: rank, err
-
-    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
-    if (rank /= 0) return
-#endif
-    print *, msg
-end subroutine
 
 character(len=50) elemental function tostr_int(k, format) result(s)
     integer, intent(in) :: k

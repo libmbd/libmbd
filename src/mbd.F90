@@ -7,7 +7,6 @@ module mbd
 !! High-level Fortran API.
 
 use mbd_constants
-use mbd_calc, only: calc_t
 use mbd_damping, only: damping_t
 use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
@@ -100,7 +99,6 @@ type, public :: mbd_calc_t
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
     character(len=30) :: method
-    type(calc_t) :: calc
     type(result_t) :: results
     type(grad_t) :: denergy
     logical :: calculate_gradients
@@ -146,7 +144,7 @@ subroutine mbd_calc_init(this, input)
     this%geom%coords = input%coords
     if (allocated(input%lattice_vectors)) then
         if (.not. allocated(this%geom%k_grid)) then
-            this%calc%exc = exception_t( &
+            this%geom%exc = exception_t( &
                 MBD_EXC_INPUT, &
                 'calc%init()', &
                 'Lattice vectors present but no k-grid specified' &
@@ -156,8 +154,7 @@ subroutine mbd_calc_init(this, input)
         this%geom%lattice = input%lattice_vectors
     end if
     this%geom%parallel_mode = input%parallel_mode
-    call this%calc%init()
-    call this%geom%init(this%calc)
+    call this%geom%init()
     if (allocated(input%free_values)) then
         this%free_values = input%free_values
     else
@@ -174,7 +171,7 @@ subroutine mbd_calc_init(this, input)
         this%damp%ts_d = input%ts_d
         this%damp%ts_sr = input%ts_sr
     else
-        this%calc%exc = this%damp%set_params_from_xc(input%xc, input%method)
+        this%geom%exc = this%damp%set_params_from_xc(input%xc, input%method)
         if (this%geom%has_exc()) return
     end if
 end subroutine
@@ -184,7 +181,6 @@ subroutine mbd_calc_destroy(this)
     class(mbd_calc_t), target, intent(inout) :: this
 
     call this%geom%destroy()
-    call this%calc%destroy()
 end subroutine
 
 subroutine mbd_calc_update_coords(this, coords)
@@ -350,13 +346,13 @@ subroutine mbd_calc_get_exception(this, code, origin, msg)
     character(*), intent(out) :: msg
         !! Exception message.
 
-    code = this%calc%exc%code
+    code = this%geom%exc%code
     if (code == 0) return
-    origin = this%calc%exc%origin
-    msg = this%calc%exc%msg
-    this%calc%exc%code = 0
-    this%calc%exc%origin = ''
-    this%calc%exc%msg = ''
+    origin = this%geom%exc%origin
+    msg = this%geom%exc%msg
+    this%geom%exc%code = 0
+    this%geom%exc%origin = ''
+    this%geom%exc%msg = ''
 end subroutine
 
 end module

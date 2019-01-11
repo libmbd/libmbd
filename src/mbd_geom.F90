@@ -10,9 +10,8 @@ module mbd_geom
 !! Representing a molecule or a crystal unit cell.
 
 use mbd_constants
-use mbd_calc, only: calc_t
 use mbd_lapack, only: eigvals, inverse
-use mbd_utils, only: shift_idx, atom_index_t, quad_pt_t, exception_t, tostr
+use mbd_utils, only: shift_idx, atom_index_t, quad_pt_t, exception_t, tostr, clock_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
@@ -66,8 +65,9 @@ type, public :: geom_t
         !! Whether to calculate RPA orders
     ! The following components are set by the initializer and should be
     ! considered read-only
-    type(calc_t), pointer, private :: calc
-    type(exception_t), pointer :: exc
+    type(clock_t) :: clock_
+    type(exception_t) :: exc
+    logical :: muted = .false.
     type(quad_pt_t), allocatable :: freq(:)
     real(dp), allocatable :: k_pts(:, :)
     real(dp) :: gamm = 0d0
@@ -94,22 +94,18 @@ end type
 
 contains
 
-subroutine geom_init(this, calc, param)
+subroutine geom_init(this)
     class(geom_t), intent(inout) :: this
-    type(calc_t), target, intent(in) :: calc
-    type(param_t), intent(in), optional :: param
 
     integer :: i_atom, n
     real(dp) :: volume
 
-    if (present(param)) this%param = param
-    this%calc => calc
-    this%exc => calc%exc
     n = this%param%n_freq
     allocate (this%freq(0:n))
     this%freq(0)%val = 0d0
     this%freq(0)%weight = 0d0
     call get_freq_grid(n, this%freq(1:n)%val, this%freq(1:n)%weight)
+    call this%clock_%init(100)
     if (allocated(this%lattice)) then
         volume = abs(dble(product(eigvals(this%lattice))))
         if (.not. allocated(this%k_pts) .and. allocated(this%k_grid)) then
@@ -119,11 +115,6 @@ subroutine geom_init(this, calc, param)
             this%gamm = 2.5d0/volume**(1d0/3)
             this%real_space_cutoff = 6d0/this%gamm*this%param%ewald_real_cutoff_scaling
             this%rec_space_cutoff = 10d0*this%gamm*this%param%ewald_rec_cutoff_scaling
-            call calc%print( &
-                'Ewald: using gamma = ' // trim(tostr(this%gamm)) &
-                // ', real cutoff = ' // trim(tostr(this%real_space_cutoff)) &
-                // ', reciprocal cutoff = ' // trim(tostr(this%rec_space_cutoff)) &
-            )
         else
             this%real_space_cutoff = this%param%dipole_cutoff
         end if
@@ -168,6 +159,8 @@ subroutine geom_destroy(this)
     if (this%idx%parallel) call this%blacs_grid%destroy()
 #endif
     deallocate (this%freq)
+    deallocate (this%clock_%timestamps)
+    deallocate (this%clock_%counts)
 end subroutine
 
 integer function geom_siz(this) result(siz)
@@ -183,7 +176,7 @@ end function
 logical function geom_has_exc(this) result(has_exc)
     class(geom_t), intent(in) :: this
 
-    has_exc = this%calc%exc%code /= 0
+    has_exc = this%exc%code /= 0
 end function
 
 function geom_supercell_circum(uc, radius) result(sc)
@@ -223,7 +216,7 @@ subroutine geom_clock(this, id)
     class(geom_t), intent(inout) :: this
     integer, intent(in) :: id
 
-    call this%calc%clock%clock(id)
+    call this%clock_%clock(id)
 end subroutine
 
 subroutine get_freq_grid(n, x, w, L)

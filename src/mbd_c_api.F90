@@ -7,7 +7,6 @@ module mbd_c_api
 
 use iso_c_binding
 use mbd_constants
-use mbd_calc, only: calc_t
 use mbd_coulomb, only: dipole_energy, coulomb_energy
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
@@ -22,12 +21,10 @@ implicit none
 
 private
 public :: cmbd_with_scalapack, cmbd_with_mpi
-public :: cmbd_calc
-public :: cmbd_init_calc, cmbd_destroy_calc, cmbd_init_geom, &
-    cmbd_destroy_geom, cmbd_init_damping, cmbd_destroy_damping, cmbd_get_exception
+public :: cmbd_init_geom, cmbd_destroy_geom, cmbd_init_damping, &
+    cmbd_destroy_damping, cmbd_get_exception
 public :: cmbd_ts_energy, cmbd_mbd_energy, cmbd_rpa_energy, cmbd_mbd_rsscs_energy, &
-    cmbd_mbd_scs_energy, cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy, &
-    cmbd_toggle_muted
+    cmbd_mbd_scs_energy, cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy
 
 #ifdef WITH_MPI
 logical(c_bool), bind(c) :: cmbd_with_mpi = .true.
@@ -40,81 +37,23 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .true.
 logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 #endif
 
-type, bind(c) :: cmbd_calc
-    type(c_ptr) :: mbd_calc_f = c_null_ptr
-end type
-
 contains
 
-type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
-    integer(c_int), intent(in), value :: n_freq
-
-    type(calc_t), pointer :: calc
-    type(cmbd_calc), pointer :: calc_c
-
-    allocate (calc)
-    call calc%init()
-    allocate (calc_c)
-    calc_c%mbd_calc_f = c_loc(calc)
-    cmbd_init_calc = c_loc(calc_c)
-end function
-
-subroutine cmbd_destroy_calc(calc_cp) bind(c)
-    type(c_ptr), value :: calc_cp
-
-    type(calc_t), pointer :: calc
-    type(cmbd_calc), pointer :: calc_c
-
-    call c_f_pointer(calc_cp, calc_c)
-    call c_f_pointer(calc_c%mbd_calc_f, calc)
-    deallocate (calc)
-    deallocate (calc_c)
-end subroutine
-
-subroutine cmbd_get_exception(calc_cp, code, origin, msg) bind(c)
-    type(c_ptr), value :: calc_cp
-    integer(c_int), intent(out) :: code
-    character(kind=c_char), intent(out) :: origin(50), msg(150)
-
-    type(calc_t), pointer :: calc
-
-    calc => get_mbd_calc(calc_cp)
-    code = calc%exc%code
-    call f_c_string(calc%exc%origin, origin)
-    call f_c_string(calc%exc%msg, msg)
-    calc%exc%code = 0
-    calc%exc%origin = ''
-    calc%exc%msg = ''
-end subroutine
-
-subroutine cmbd_toggle_muted(calc_cp) bind(c)
-    type(c_ptr), value :: calc_cp
-
-    type(calc_t), pointer :: calc
-
-    calc => get_mbd_calc(calc_cp)
-    calc%muted = .not. calc%muted
-end subroutine
-
-type(c_ptr) function cmbd_init_geom( &
-        calc_cp, n_atoms, coords, lattice, k_grid, n_freq) bind(c)
-    type(c_ptr), value :: calc_cp
+type(c_ptr) function cmbd_init_geom(n_atoms, coords, lattice, k_grid, n_freq) bind(c)
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: coords(3, n_atoms)
     real(c_double), intent(in), optional :: lattice(3, 3)
     integer(c_int), intent(in), optional :: k_grid(3)
     integer(c_int), intent(in), value :: n_freq
 
-    type(calc_t), pointer :: calc
     type(geom_t), pointer :: geom
 
-    calc => get_mbd_calc(calc_cp)
     allocate (geom)
     if (n_freq > 0) geom%param%n_freq = n_freq
     geom%coords = coords
     if (present(lattice)) geom%lattice = lattice
     if (present(k_grid)) geom%k_grid = k_grid
-    call geom%init(calc)
+    call geom%init()
     cmbd_init_geom = c_loc(geom)
 end function
 
@@ -126,6 +65,22 @@ subroutine cmbd_destroy_geom(geom_c) bind(c)
     call c_f_pointer(geom_c, geom)
     call geom%destroy()
     deallocate (geom)
+end subroutine
+
+subroutine cmbd_get_exception(geom_c, code, origin, msg) bind(c)
+    type(c_ptr), value :: geom_c
+    integer(c_int), intent(out) :: code
+    character(kind=c_char), intent(out) :: origin(50), msg(150)
+
+    type(geom_t), pointer :: geom
+
+    call c_f_pointer(geom_c, geom)
+    code = geom%exc%code
+    call f_c_string(geom%exc%origin, origin)
+    call f_c_string(geom%exc%msg, msg)
+    geom%exc%code = 0
+    geom%exc%origin = ''
+    geom%exc%msg = ''
 end subroutine
 
 type(c_ptr) function cmbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a) bind(c)
@@ -159,16 +114,6 @@ subroutine cmbd_destroy_damping(damping_c) bind(c)
     if (allocated(damping%sigma)) deallocate (damping%sigma)
     deallocate (damping)
 end subroutine
-
-function get_mbd_calc(calc_cp)
-    type(c_ptr), intent(in), value :: calc_cp
-    type(calc_t), pointer :: get_mbd_calc
-
-    type(cmbd_calc), pointer :: calc_c
-
-    call c_f_pointer(calc_cp, calc_c)
-    call c_f_pointer(calc_c%mbd_calc_f, get_mbd_calc)
-end function
 
 real(c_double) function cmbd_ts_energy(geom_c, n_atoms, alpha_0, C6, damping_c) bind(c)
     type(c_ptr), intent(in), value :: geom_c

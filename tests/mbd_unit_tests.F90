@@ -4,7 +4,6 @@
 program mbd_unit_tests
 
 use mbd_constants
-use mbd_calc, only: calc_t
 use mbd_damping, only: damping_t, damping_fermi
 use mbd_dipole, only: dipole_matrix, T_bare, T_erf_coulomb, damping_grad, T_erfc
 use mbd_geom, only: geom_t
@@ -20,7 +19,7 @@ use mbd_mpi
 implicit none
 
 integer :: n_failed, n_all, rank
-type(calc_t), target :: calc
+type(geom_t), allocatable :: geom
 
 #ifdef WITH_MPI
 integer :: err
@@ -31,8 +30,6 @@ call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
     rank = 0
 #endif
 
-calc%muted = .true.
-call calc%init()
 n_failed = 0
 n_all = 0
 call exec_test('T_bare derivative')
@@ -80,6 +77,8 @@ subroutine exec_test(test_name)
 
     if (rank == 0) write (6, '(A,A,A)', advance='no') &
         'Executing test "', test_name, '"... '
+    allocate (geom)
+    geom%muted = .true.
     select case (test_name)
     case ('T_bare derivative'); call test_T_bare_deriv()
     case ('T_GG derivative explicit'); call test_T_GG_deriv_expl()
@@ -112,7 +111,8 @@ subroutine exec_test(test_name)
     case ('MBD@rsscs Ewald derivative implicit C6'); call test_mbd_rsscs_ewald_deriv_impl_C6()
     case ('MBD@rsscs Ewald derivative implicit Rvdw'); call test_mbd_rsscs_ewald_deriv_impl_vdw()
     end select
-    if (calc%exc%code /= 0) print *, 'Exception!'
+    if (geom%exc%code /= 0) print *, 'Exception!'
+    deallocate (geom)
     n_all = n_all + 1
 end subroutine
 
@@ -261,7 +261,6 @@ end subroutine
 
 subroutine test_mbd_deriv_expl()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :)
@@ -281,7 +280,7 @@ subroutine test_mbd_deriv_expl()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
@@ -311,7 +310,6 @@ end subroutine
 
 subroutine test_mbd_ewald_deriv_expl()
     real(dp) :: delta, k_point(3)
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: &
         coords(:, :), gradients(:, :), diff(:, :), alpha_0(:), omega(:), &
@@ -330,7 +328,7 @@ subroutine test_mbd_ewald_deriv_expl()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     k_point = [0.4d0, 0d0, 0d0]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -362,7 +360,6 @@ end subroutine
 
 subroutine test_mbd_ewald_deriv_stress()
     real(dp) :: delta, k_point(3)
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: &
         lattice(:, :), gradients(:, :), diff(:, :), alpha_0(:), omega(:), &
@@ -381,7 +378,7 @@ subroutine test_mbd_ewald_deriv_stress()
     lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%lattice = lattice
     k_point = [0.4d0, 0d0, 0d0]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -413,7 +410,6 @@ end subroutine
 
 subroutine test_scs_deriv_expl()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :)
@@ -431,7 +427,7 @@ subroutine test_scs_deriv_expl()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms, 3))
@@ -477,7 +473,6 @@ end subroutine
 
 subroutine test_scs_ewald_deriv_expl()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :)
@@ -496,7 +491,7 @@ subroutine test_scs_ewald_deriv_expl()
     coords(2, 2) = 4d0
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms, 3))
@@ -542,7 +537,6 @@ end subroutine
 
 subroutine test_scs_ewald_deriv_stress()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: gradients(:, :, :), gradients_anl(:, :, :), &
         diff(:, :, :), alpha_0(:), lattice(:, :)
@@ -559,7 +553,7 @@ subroutine test_scs_ewald_deriv_stress()
     geom%coords(2, 2) = 4d0
     lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%lattice = lattice
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, 3, 3))
@@ -600,7 +594,6 @@ end subroutine
 
 subroutine test_scs_deriv_impl_alpha
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_0_diff(:), &
@@ -616,7 +609,7 @@ subroutine test_scs_deriv_impl_alpha
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
@@ -656,7 +649,6 @@ end subroutine
 
 subroutine test_scs_ewald_deriv_impl_alpha
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_0_diff(:), &
@@ -673,7 +665,7 @@ subroutine test_scs_ewald_deriv_impl_alpha
     coords(2, 2) = 4d0
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
@@ -713,7 +705,6 @@ end subroutine
 
 subroutine test_scs_deriv_impl_vdw
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_scs(:, :), rvdw(:)
@@ -728,7 +719,7 @@ subroutine test_scs_deriv_impl_vdw
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
@@ -769,7 +760,6 @@ end subroutine
 
 subroutine test_scs_ewald_deriv_impl_vdw
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:, :), &
         gradients_anl(:, :), diff(:, :), alpha_0(:), alpha_scs(:, :), rvdw(:)
@@ -785,7 +775,7 @@ subroutine test_scs_ewald_deriv_impl_vdw
     coords(2, 2) = 4d0
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
-    call geom%init(calc)
+    call geom%init()
     my_nratoms = size(geom%idx%i_atom)
     my_ncatoms = size(geom%idx%j_atom)
     allocate (gradients(my_nratoms, my_ncatoms))
@@ -826,7 +816,6 @@ end subroutine
 
 subroutine test_mbd_deriv_impl_alpha()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), omega(:)
@@ -842,7 +831,7 @@ subroutine test_mbd_deriv_impl_alpha()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
@@ -870,7 +859,6 @@ end subroutine
 
 subroutine test_mbd_ewald_deriv_impl_alpha()
     real(dp) :: delta, k_point(3)
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), omega(:)
@@ -888,7 +876,7 @@ subroutine test_mbd_ewald_deriv_impl_alpha()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     k_point = [0.4d0, 0d0, 0d0]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -918,7 +906,6 @@ end subroutine
 
 subroutine test_mbd_deriv_impl_omega()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega_diff(:), omega(:)
@@ -934,7 +921,7 @@ subroutine test_mbd_deriv_impl_omega()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
@@ -962,7 +949,6 @@ end subroutine
 
 subroutine test_mbd_ewald_deriv_impl_omega()
     real(dp) :: delta, k_point(3)
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega_diff(:), omega(:)
@@ -980,7 +966,7 @@ subroutine test_mbd_ewald_deriv_impl_omega()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     k_point = [0.4d0, 0d0, 0d0]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -1008,7 +994,6 @@ end subroutine
 
 subroutine test_mbd_deriv_impl_vdw()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega(:), r_vdw(:)
@@ -1023,7 +1008,7 @@ subroutine test_mbd_deriv_impl_vdw()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%r_vdw = r_vdw
@@ -1052,7 +1037,6 @@ end subroutine
 
 subroutine test_mbd_ewald_deriv_impl_vdw()
     real(dp) :: delta, k_point(3)
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega(:), r_vdw(:)
@@ -1070,7 +1054,7 @@ subroutine test_mbd_ewald_deriv_impl_vdw()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     k_point = [0.4d0, 0d0, 0d0]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     r_vdw = [3.55d0, 3.5d0]
     damp%r_vdw = r_vdw
@@ -1101,7 +1085,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_deriv_expl()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :), gradients_anl(:, :)
@@ -1120,7 +1103,7 @@ subroutine test_mbd_rsscs_deriv_expl()
     coords(3, 2) = 4d0
     coords(1, 3) = 1d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
@@ -1150,7 +1133,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_ewald_deriv_expl()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :)
     real(dp), allocatable :: gradients(:, :), gradients_anl(:, :)
@@ -1171,7 +1153,7 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%k_grid = [2, 2, 2]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -1202,7 +1184,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_ewald_deriv_stress()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: gradients(:, :), gradients_anl(:, :), &
         diff(:, :), alpha_0(:), C6(:), lattice(:, :)
@@ -1220,7 +1201,7 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
     lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%lattice = lattice
     geom%k_grid = [2, 2, 2]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -1250,7 +1231,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_deriv_impl_alpha()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
@@ -1266,7 +1246,7 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
@@ -1294,7 +1274,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_deriv_impl_C6()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
@@ -1310,7 +1289,7 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%beta = 0.83d0
@@ -1338,7 +1317,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_deriv_impl_vdw()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
@@ -1353,7 +1331,7 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     coords(2, 1) = 4d0
     coords(3, 2) = 4d0
     geom%coords = coords
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     r_vdw = [3.55d0, 3.5d0, 3.56d0]
     damp%r_vdw = r_vdw
@@ -1382,7 +1360,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_ewald_deriv_impl_alpha()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
@@ -1400,7 +1377,7 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_alpha()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%k_grid = [2, 2, 2]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -1428,7 +1405,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_ewald_deriv_impl_C6()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
@@ -1446,7 +1422,7 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_C6()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%k_grid = [2, 2, 2]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     damp%r_vdw = [3.55d0, 3.5d0]
     damp%beta = 0.83d0
@@ -1474,7 +1450,6 @@ end subroutine
 
 subroutine test_mbd_rsscs_ewald_deriv_impl_vdw()
     real(dp) :: delta
-    type(geom_t) :: geom
     type(damping_t) :: damp
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
@@ -1492,7 +1467,7 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_vdw()
     geom%coords = coords
     geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
     geom%k_grid = [2, 2, 2]
-    call geom%init(calc)
+    call geom%init()
     damp%version = 'fermi,dip'
     r_vdw = [3.55d0, 3.5d0]
     damp%r_vdw = r_vdw

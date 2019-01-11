@@ -6,7 +6,6 @@ module mbd_methods
 !! Obtaining MBD energies.
 
 use mbd_constants
-use mbd_calc, only: calc_t
 use mbd_formulas, only: omega_qho, alpha_dyn_qho, scale_with_ratio, C6_from_alpha
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t

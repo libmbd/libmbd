@@ -32,18 +32,17 @@ class MBDCalc(object):
         self.n_freq = n_freq
 
     def __enter__(self):
-        self._calc_obj = _lib.cmbd_init_calc()
+        self._calc_obj = True
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        _lib.cmbd_destroy_calc(self._calc)
         self._calc_obj = None
 
-    def _check_exc(self):
+    def _check_exc(self, geom):
         code = _array(0, dtype=int)
         origin = _ffi.new('char[50]')
         msg = _ffi.new('char[150]')
-        _lib.cmbd_get_exception(self._calc, _cast('int*', code), origin, msg)
+        _lib.cmbd_get_exception(geom, _cast('int*', code), origin, msg)
         if code != 0:
             raise MBDFortranException(
                 int(code), _ffi.string(origin).decode(), _ffi.string(msg).decode()
@@ -55,21 +54,12 @@ class MBDCalc(object):
             raise RuntimeError('MBDCalc must be used as a context manager')
         return self._calc_obj
 
-    @contextmanager
-    def muted(self):
-        _lib.cmbd_toggle_muted(self._calc)
-        try:
-            yield
-        finally:
-            _lib.cmbd_toggle_muted(self._calc)
-
     def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
                   lattice=None, d=20., damping='fermi'):
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         n_atoms = len(coords)
         geom = _lib.cmbd_init_geom(
-            self._calc,
             n_atoms,
             _cast('double*', coords),
             _cast('double*', lattice),
@@ -88,7 +78,7 @@ class MBDCalc(object):
         )
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_geom(geom)
-        self._check_exc()
+        self._check_exc(geom)
         return ene
 
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
@@ -100,7 +90,6 @@ class MBDCalc(object):
         k_grid = _array(k_grid, dtype='i4')
         n_atoms = len(coords)
         geom = _lib.cmbd_init_geom(
-            self._calc,
             n_atoms,
             _cast('double*', coords),
             _cast('double*', lattice),
@@ -130,7 +119,7 @@ class MBDCalc(object):
         ene = getattr(_lib, 'cmbd_' + func)(*args)
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_geom(geom)
-        self._check_exc()
+        self._check_exc(geom)
         if spectrum:
             ene = ene, eigs, modes
         if force:
@@ -146,7 +135,6 @@ class MBDCalc(object):
             map(_array, (coords, R_vdw, sigma, lattice, k_point))
         n_atoms = len(coords)
         geom = _lib.cmbd_init_geom(
-            self._calc,
             n_atoms,
             _cast('double*', coords),
             _cast('double*', lattice),
@@ -171,7 +159,7 @@ class MBDCalc(object):
         )
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_geom(geom)
-        self._check_exc()
+        self._check_exc(geom)
         return dipmat
 
     def mbd_energy_species(self, coords, species, vols, beta, **kwargs):
@@ -185,7 +173,6 @@ class MBDCalc(object):
     def dipole_energy(self, coords, a0, w, w_t, version, r_vdw, beta, a, C):
         n_atoms = len(coords)
         geom = _lib.cmbd_init_geom(
-            self._calc,
             n_atoms,
             _cast('double*', coords),
             _ffi.NULL,
@@ -204,13 +191,12 @@ class MBDCalc(object):
             a,
             _cast('double*', C),
         )
-        self._check_exc()
+        self._check_exc(geom)
         return res
 
     def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, a, C):
         n_atoms = len(coords)
         geom = _lib.cmbd_init_geom(
-            self._calc,
             n_atoms,
             _cast('double*', coords),
             _ffi.NULL,
@@ -229,7 +215,7 @@ class MBDCalc(object):
             a,
             _cast('double*', C),
         )
-        self._check_exc()
+        self._check_exc(geom)
         return res
 
 

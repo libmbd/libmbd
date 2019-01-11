@@ -276,15 +276,14 @@ def test_argon_crystal_gradients(calc):
         coords, species, vols, 0.83,
         lattice=lattice, k_grid=k_grid, force=True
     )
-    with calc.muted():
-        num_gradients = numerical_gradients(
-            calc.mbd_energy_species, coords, species, vols, 0.83,
-            lattice=lattice, k_grid=k_grid
-        )
-        # num_latt_gradients = numerical_latt_gradients(
-        #     calc.mbd_energy_species, coords, species, vols, 0.83,
-        #     lattice=lattice, k_grid=k_grid
-        # )
+    num_gradients = numerical_gradients(
+        calc.mbd_energy_species, coords, species, vols, 0.83,
+        lattice=lattice, k_grid=k_grid
+    )
+    # num_latt_gradients = numerical_latt_gradients(
+    #     calc.mbd_energy_species, coords, species, vols, 0.83,
+    #     lattice=lattice, k_grid=k_grid
+    # )
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
     # for i in range(3):

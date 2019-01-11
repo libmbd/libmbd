@@ -3,24 +3,7 @@
 extern const _Bool cmbd_with_mpi;
 extern const _Bool cmbd_with_scalapack;
 
-struct cmbd_calc {};
-
-struct cmbd_calc* cmbd_init_calc();
-void cmbd_destroy_calc(struct cmbd_calc* calc);
-
-void cmbd_get_exception(
-    struct cmbd_calc* calc,
-    int* code,
-    char origin[50],
-    char msg[150]
-);
-
-void cmbd_toggle_muted(
-    struct cmbd_calc* calc
-);
-
 struct geom_t* cmbd_init_geom(
-    struct cmbd_calc* calc,
     int n_atoms,
     double* coords,
     double* lattice,
@@ -29,6 +12,13 @@ struct geom_t* cmbd_init_geom(
 );
 
 void cmbd_destroy_geom(struct geom_t* geom);
+
+void cmbd_get_exception(
+    struct geom_t* geom,
+    int* code,
+    char origin[50],
+    char msg[150]
+);
 
 struct cmbd_damping* cmbd_init_damping(
     int n_atoms,

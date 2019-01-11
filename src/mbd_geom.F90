@@ -22,6 +22,7 @@ use mbd_mpi
 implicit none
 
 private
+public :: supercell_circum
 
 type, public :: param_t
     !! Calculation-wide paramters.
@@ -88,7 +89,6 @@ type, public :: geom_t
     procedure :: destroy => geom_destroy
     procedure :: siz => geom_siz
     procedure :: has_exc => geom_has_exc
-    procedure, nopass :: supercell_circum => geom_supercell_circum
     procedure :: clock => geom_clock
 end type
 
@@ -179,16 +179,17 @@ logical function geom_has_exc(this) result(has_exc)
     has_exc = this%exc%code /= 0
 end function
 
-function geom_supercell_circum(uc, radius) result(sc)
-    real(dp), intent(in) :: uc(3, 3), radius
+function supercell_circum(lattice, radius) result(sc)
+    real(dp), intent(in) :: lattice(3, 3)
+    real(dp), intent(in) :: radius
     integer :: sc(3)
 
     real(dp) :: ruc(3, 3), layer_sep(3)
     integer :: i
 
-    ruc = 2*pi*inverse(transpose(uc))
+    ruc = 2*pi*inverse(transpose(lattice))
     forall (i = 1:3) &
-        layer_sep(i) = sum(uc(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
+        layer_sep(i) = sum(lattice(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
 end function
 

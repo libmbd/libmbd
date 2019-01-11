@@ -8,7 +8,7 @@ module mbd_ts
 use mbd_constants
 use mbd_utils, only: shift_idx, tostr
 use mbd_damping, only: damping_t, damping_fermi
-use mbd_geom, only: geom_t
+use mbd_geom, only: geom_t, supercell_circum
 
 implicit none
 
@@ -38,7 +38,7 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
         i_shell = i_shell+1
         ene_shell = 0d0
         if (is_periodic) then
-            range_cell = geom%supercell_circum(geom%lattice, i_shell*shell_thickness)
+            range_cell = supercell_circum(geom%lattice, i_shell*shell_thickness)
         else
             range_cell = [0, 0, 0]
         end if

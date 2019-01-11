@@ -8,7 +8,7 @@ module mbd_dipole
 
 use mbd_constants
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
-use mbd_geom, only: geom_t
+use mbd_geom, only: geom_t, supercell_circum
 use mbd_damping, only: damping_t, damping_fermi, damping_sqrtfermi, &
     op1minus_grad
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
@@ -137,7 +137,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
 #endif
     if (is_periodic) then
         do_ewald = geom%gamm > 0d0
-        range_n = geom%supercell_circum(geom%lattice, geom%real_space_cutoff)
+        range_n = supercell_circum(geom%lattice, geom%real_space_cutoff)
     else
         range_n(:) = 0
     end if
@@ -315,7 +315,7 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     rec_latt = 2*pi*transpose(latt_inv)
     volume = abs(dble(product(eigvals(geom%lattice))))
     vol_prefactor = 4*pi/volume
-    range_m = geom%supercell_circum(rec_latt, geom%rec_space_cutoff)
+    range_m = supercell_circum(rec_latt, geom%rec_space_cutoff)
     call geom%clock(12)
     m = [0, 0, -1]
     each_recip_vec: do i_m = 1, product(1+2*range_m)

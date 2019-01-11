@@ -57,7 +57,7 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
                     end if
                     r = geom%coords(:, i_atom)-geom%coords(:, j_atom)-R_cell
                     r_norm = sqrt(sum(r**2))
-                    if (r_norm > geom%calc%param%ts_cutoff_radius) cycle
+                    if (r_norm > geom%param%ts_cutoff_radius) cycle
                     if (is_periodic) then
                         if (r_norm >= i_shell*shell_thickness &
                             .or. r_norm < (i_shell-1)*shell_thickness) then
@@ -89,15 +89,7 @@ function ts_energy(geom, alpha_0, C6, damp) result(ene)
         end do ! i_cell
         ene = ene+ene_shell
         if (.not. is_periodic) exit
-        if (i_shell > 1 .and. &
-                abs(ene_shell) < geom%calc%param%ts_energy_accuracy) then
-            call geom%calc%print( &
-                "Periodic TS converged in " // trim(tostr(i_shell)) &
-                // " shells, " // trim(tostr(i_shell*shell_thickness/ang)) &
-                // " angstroms" &
-            )
-            exit
-        endif
+        if (i_shell > 1 .and. abs(ene_shell) < geom%param%ts_energy_accuracy) exit
     end do ! i_shell
 end function
 

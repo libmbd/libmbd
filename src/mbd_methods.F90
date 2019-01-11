@@ -14,7 +14,7 @@ use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
 use mbd_damping, only: damping_t
 use mbd_rpa, only: get_mbd_rpa_energy
 use mbd_scs, only: run_scs
-use mbd_utils, only: result_t, tostr
+use mbd_utils, only: result_t, tostr, quad_pt_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: all_reduce
 #endif
@@ -54,13 +54,13 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     type(grad_request_t) :: grad_ham
 
     omega = omega_qho(C6, alpha_0, domega, grad)
-    if (geom%calc%do_rpa) then
-        alpha = alpha_dyn_qho(geom%calc, alpha_0, omega, dalpha, grad_request_t())
+    if (geom%do_rpa) then
+        alpha = alpha_dyn_qho(alpha_0, omega, geom%freq, dalpha, grad_request_t())
     end if
     grad_ham = grad
     if (grad%dC6 .or. grad%dalpha) grad_ham%domega = .true.
     if (.not. allocated(geom%lattice)) then
-        if (.not. geom%calc%do_rpa) then
+        if (.not. geom%do_rpa) then
             res = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, dene, grad_ham)
             if (grad%dC6) dene%dC6 = dene%domega*domega%dC6
             if (grad%dalpha) dene%dalpha = dene%dalpha + dene%domega*domega%dalpha
@@ -72,12 +72,12 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     else
         n_kpts = size(geom%k_pts, 2)
         res%energy = 0d0
-        if (geom%calc%get_eigs) &
+        if (geom%get_eigs) &
             allocate (res%mode_eigs_k(3*geom%siz(), n_kpts), source=0d0)
-        if (geom%calc%get_modes) &
+        if (geom%get_modes) &
             allocate (res%modes_k(3*geom%siz(), 3*geom%siz(), n_kpts), source=(0d0, 0d0))
-        if (geom%calc%get_rpa_orders) allocate ( &
-            res%rpa_orders_k(geom%calc%param%rpa_order_max, n_kpts), source=0d0 &
+        if (geom%get_rpa_orders) allocate ( &
+            res%rpa_orders_k(geom%param%rpa_order_max, n_kpts), source=0d0 &
         )
         if (grad%dcoords) allocate (dene%dcoords(geom%siz(), 3), source=0d0)
         if (grad%dlattice) allocate (dene%dlattice(3, 3), source=0d0)
@@ -86,7 +86,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
         if (grad%dR_vdw) allocate (dene%dR_vdw(geom%siz()), source=0d0)
         do i_kpt = 1, n_kpts
             associate (k_pt => geom%k_pts(:, i_kpt))
-                if (.not. geom%calc%do_rpa) then
+                if (.not. geom%do_rpa) then
                     res_k = get_mbd_hamiltonian_energy( &
                         geom, alpha_0, omega, damp, dene_k, grad_ham, k_pt &
                     )
@@ -95,13 +95,13 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
                 end if
             end associate
             if (geom%has_exc()) return
-            if (geom%calc%get_eigs) then
+            if (geom%get_eigs) then
                 res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
             end if
-            if (geom%calc%get_modes) then
+            if (geom%get_modes) then
                 res%modes_k(:, :, i_kpt) = res_k%modes_k_single
             end if
-            if (geom%calc%get_rpa_orders) then
+            if (geom%get_rpa_orders) then
                 res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
             end if
             res%energy = res%energy + res_k%energy/n_kpts
@@ -144,7 +144,7 @@ type(result_t) function get_mbd_scs_energy( &
     case ('rsscs')
         damping_types = [character(len=15) :: 'fermi,dip,gg', 'fermi,dip']
     end select
-    n_freq = ubound(geom%calc%omega_grid, 1)
+    n_freq = ubound(geom%freq, 1)
     n_atoms = geom%siz()
     allocate (alpha_dyn(n_atoms, 0:n_freq))
     allocate (alpha_dyn_scs(n_atoms, 0:n_freq))
@@ -152,7 +152,7 @@ type(result_t) function get_mbd_scs_energy( &
     if (grad%any()) allocate (dene_dalpha_scs_dyn(n_atoms, 0:n_freq))
     omega = omega_qho(C6, alpha_0, domega, grad)
     alpha_dyn = alpha_dyn_qho( &
-        geom%calc, alpha_0, omega, dalpha_dyn, &
+        alpha_0, omega, geom%freq, dalpha_dyn, &
         grad_request_t(dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6) &
     )
     grad_scs = grad_request_t( &
@@ -169,9 +169,7 @@ type(result_t) function get_mbd_scs_energy( &
         )
         if (geom%has_exc()) return
     end do
-    C6_scs = C6_from_alpha( &
-        geom%calc, alpha_dyn_scs, dC6_scs_dalpha_dyn_scs, grad%any() &
-    )
+    C6_scs = C6_from_alpha(alpha_dyn_scs, geom%freq, dC6_scs_dalpha_dyn_scs, grad%any())
     damp_mbd = damp
     damp_mbd%r_vdw = scale_with_ratio( &
         damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
@@ -186,7 +184,8 @@ type(result_t) function get_mbd_scs_energy( &
     )
     if (geom%has_exc()) return
     if (.not. grad%any()) return
-    freq_w = geom%calc%omega_grid_w
+    allocate (freq_w(0:ubound(geom%freq, 1)))
+    freq_w = geom%freq%weight
     freq_w(0) = 1d0
     dene_dalpha_scs_dyn(:, 0) = dene_mbd%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV
     do i_freq = 1, n_freq
@@ -277,19 +276,17 @@ type(result_t) function get_mbd_scs_energy( &
     end if
 end function
 
-subroutine test_frequency_grid(calc)
-    type(calc_t), intent(inout) :: calc
+real(dp) function test_frequency_grid(freq)
+    !! Calculate eelative quadrature error in C6 of a carbon atom
+    type(quad_pt_t), intent(in) :: freq(:)
 
-    real(dp) :: alpha(1, 0:ubound(calc%omega_grid, 1)), C6(1), error
+    real(dp) :: alpha(1, 0:ubound(freq, 1)), C6(1), error
     type(grad_t), allocatable :: dalpha(:)
     type(grad_request_t) :: grad
 
-    alpha = alpha_dyn_qho(calc, [21d0], [99.5d0], dalpha, grad)
-    C6 = C6_from_alpha(calc, alpha)
+    alpha = alpha_dyn_qho([21d0], [99.5d0], freq, dalpha, grad)
+    C6 = C6_from_alpha(alpha, freq)
     error = abs(C6(1)/99.5d0-1d0)
-    call calc%print( &
-        "Relative quadrature error in C6 of carbon atom: " // trim(tostr(error)) &
-    )
-end subroutine
+end function
 
 end module

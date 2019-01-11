@@ -122,11 +122,11 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     call relay%mult_cross(omega*sqrt(alpha_0))
     call relay%add_diag(omega**2)
     call geom%clock(21)
-    if (geom%calc%get_modes .or. grad%any()) then
+    if (geom%get_modes .or. grad%any()) then
         call modes%alloc_from(relay)
         allocate (eigs(3*n_atoms))
-        call modes%eigh(eigs, geom%calc%exc, src=relay)
-        if (geom%calc%get_modes) then
+        call modes%eigh(eigs, geom%exc, src=relay)
+        if (geom%get_modes) then
 #if MBD_TYPE == 0
             call move_alloc(modes%val, res%modes)
 #elif MBD_TYPE == 1
@@ -134,21 +134,22 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
 #endif
         end if
     else
-        eigs = relay%eigvalsh(geom%calc%exc, destroy=.true.)
+        eigs = relay%eigvalsh(geom%exc, destroy=.true.)
     end if
     if (geom%has_exc()) return
     call geom%clock(-21)
-    if (geom%calc%get_eigs) res%mode_eigs = eigs
+    if (geom%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
         msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
             " negative eigenvalues"
-        if (geom%calc%param%zero_negative_eigs) then
+        if (geom%param%zero_negative_eigvals) then
             where (eigs < 0) eigs = 0d0
-            call geom%calc%print(msg)
+            ! call geom%calc%print(msg)
+            ! TODO add warning mechanism
         else
-            geom%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            geom%calc%exc%msg = msg
+            geom%exc%code = MBD_EXC_NEG_EIGVALS
+            geom%exc%msg = msg
             return
         end if
     end if

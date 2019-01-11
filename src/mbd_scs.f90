@@ -78,13 +78,13 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     end if
     call alpha_full%add_diag(1d0/alpha)
     call geom%clock(32)
-    call alpha_full%invh(geom%calc%exc)
+    call alpha_full%invh(geom%exc)
     if (geom%has_exc()) return
     call geom%clock(-32)
     alpha_scs = alpha_full%contract_n33diag_cols()
     if (any(alpha_scs < 0)) then
-        geom%calc%exc%code = MBD_EXC_NEG_POL
-        geom%calc%exc%msg = 'Screening leads to negative polarizability'
+        geom%exc%code = MBD_EXC_NEG_POL
+        geom%exc%msg = 'Screening leads to negative polarizability'
         return
     end if
     if (.not. grad%any()) return

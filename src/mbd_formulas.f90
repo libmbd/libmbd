@@ -6,9 +6,8 @@ module mbd_formulas
 !! Common formulas used at multiple places.
 
 use mbd_constants
-use mbd_calc, only: calc_t
 use mbd_gradients, only: grad_t, grad_request_t
-use mbd_utils, only: tostr
+use mbd_utils, only: quad_pt_t, tostr
 
 implicit none
 
@@ -36,7 +35,7 @@ function omega_qho(C6, alpha, domega, grad) result(omega)
     if (grad%dalpha) domega%dalpha = -2*omega/alpha
 end function
 
-function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
+function alpha_dyn_qho(alpha_0, omega, freq, dalpha, grad) result(alpha)
     !! $$
     !! \alpha(\mathrm iu)=\frac{\alpha_0}{1+u^2/\omega^2},\qquad
     !! \partial\alpha(\mathrm iu)=\alpha(\mathrm iu)\left(
@@ -44,19 +43,19 @@ function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
     !! \frac2\omega\frac{\partial\omega}{1+\omega^2/u^2}
     !! \right)
     !! $$
-    type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
+    type(quad_pt_t), intent(in) :: freq(0:)
     type(grad_t), allocatable, intent(out) :: dalpha(:)
     type(grad_request_t), intent(in) :: grad
-    real(dp) :: alpha(size(alpha_0), 0:ubound(calc%omega_grid, 1))
+    real(dp) :: alpha(size(alpha_0), 0:ubound(freq, 1))
 
     integer :: i_freq, n_atoms
 
     n_atoms = size(alpha_0)
     allocate (dalpha(0:ubound(alpha, 2)))
     do i_freq = 0, ubound(alpha, 2)
-        associate (alpha => alpha(:, i_freq), u => calc%omega_grid(i_freq))
+        associate (alpha => alpha(:, i_freq), u => freq(i_freq)%val)
             alpha = alpha_0/(1+(u/omega)**2)
             if (grad%dalpha) dalpha(i_freq)%dalpha = alpha/alpha_0
             if (grad%domega) dalpha(i_freq)%domega = alpha*2d0/omega/(1d0+(omega/u)**2)
@@ -64,14 +63,14 @@ function alpha_dyn_qho(calc, alpha_0, omega, dalpha, grad) result(alpha)
     end do
 end function
 
-function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
+function C6_from_alpha(alpha, freq, dC6_dalpha, grad) result(C6)
     !! $$
     !! \bar C_6=\frac3\pi\int_0^\infty\mathrm du\,\bar\alpha(u)^2,\qquad
     !! \partial\bar C_6=\frac6\pi\int_0^\infty\mathrm du
     !! \bar\alpha(u)\partial\bar\alpha(u)
     !! $$
-    type(calc_t), intent(in) :: calc
     real(dp), intent(in) :: alpha(:, 0:)
+    type(quad_pt_t), intent(in) :: freq(0:)
     real(dp), allocatable, intent(out), optional :: dC6_dalpha(:, :)
     logical, intent(in), optional :: grad
     real(dp) :: C6(size(alpha, 1))
@@ -81,7 +80,7 @@ function C6_from_alpha(calc, alpha, dC6_dalpha, grad) result(C6)
     n_atoms = size(alpha, 1)
     C6 = 0d0
     do i_freq = 0, ubound(alpha, 2)
-        C6 = C6 + 3d0/pi*alpha(:, i_freq)**2*calc%omega_grid_w(i_freq)
+        C6 = C6 + 3d0/pi*alpha(:, i_freq)**2*freq(i_freq)%weight
     end do
     if (.not. present(grad)) return
     if (.not. grad) return

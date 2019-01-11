@@ -53,7 +53,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     res%energy = 0d0
     damp_alpha = damp
     allocate (eigs(3*geom%siz()))
-    do i_freq = 0, ubound(geom%calc%omega_grid, 1)
+    do i_freq = 0, ubound(geom%freq, 1)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
         ! relay = T
 #if MBD_TYPE == 0
@@ -70,11 +70,11 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             end associate
         end do
         ! relay = alpha*T
-        if (geom%calc%get_rpa_orders) AT = relay
+        if (geom%get_rpa_orders) AT = relay
         ! relay = 1+alpha*T
         call relay%add_diag_scalar(1d0)
         call geom%clock(23)
-        eigs = relay%eigvals(geom%calc%exc, destroy=.true.)
+        eigs = relay%eigvals(geom%exc, destroy=.true.)
         call geom%clock(-23)
         if (geom%has_exc()) return
         ! The count construct won't work here due to a bug in Cray compiler
@@ -84,24 +84,24 @@ type(result_t) function get_mbd_rpa_energy_complex( &
            if (dble(eigs(i)) < 0) n_negative_eigs = n_negative_eigs + 1
         end do
         if (n_negative_eigs > 0) then
-            geom%calc%exc%code = MBD_EXC_NEG_EIGVALS
-            geom%calc%exc%msg = "1+AT matrix has " // &
+            geom%exc%code = MBD_EXC_NEG_EIGVALS
+            geom%exc%msg = "1+AT matrix has " // &
                 trim(tostr(n_negative_eigs)) // " negative eigenvalues"
             return
         end if
         res%energy = res%energy + &
-            1d0/(2*pi)*sum(log(dble(eigs)))*geom%calc%omega_grid_w(i_freq)
-        if (geom%calc%get_rpa_orders) then
+            1d0/(2*pi)*sum(log(dble(eigs)))*geom%freq(i_freq)%weight
+        if (geom%get_rpa_orders) then
             call geom%clock(24)
-            eigs = AT%eigvals(geom%calc%exc, destroy=.true.)
+            eigs = AT%eigvals(geom%exc, destroy=.true.)
             call geom%clock(-24)
             if (geom%has_exc()) return
-            allocate (res%rpa_orders(geom%calc%param%rpa_order_max))
-            do n_order = 2, geom%calc%param%rpa_order_max
+            allocate (res%rpa_orders(geom%param%rpa_order_max))
+            do n_order = 2, geom%param%rpa_order_max
                 res%rpa_orders(n_order) = res%rpa_orders(n_order) &
                     +(-1d0/(2*pi)*(-1)**n_order &
                     *sum(dble(eigs)**n_order)/n_order) &
-                    *geom%calc%omega_grid_w(i_freq)
+                    *geom%freq(i_freq)%weight
             end do
         end if
     end do

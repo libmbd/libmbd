@@ -22,7 +22,7 @@ implicit none
 
 private
 public :: cmbd_with_scalapack, cmbd_with_mpi
-public :: cmbd_calc, cmbd_geom
+public :: cmbd_calc
 public :: cmbd_init_calc, cmbd_destroy_calc, cmbd_init_geom, &
     cmbd_destroy_geom, cmbd_init_damping, cmbd_destroy_damping, cmbd_get_exception
 public :: cmbd_ts_energy, cmbd_mbd_energy, cmbd_rpa_energy, cmbd_mbd_rsscs_energy, &
@@ -41,14 +41,7 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 #endif
 
 type, bind(c) :: cmbd_calc
-    integer(c_int) :: n_freq = 0
-    type(c_ptr) :: omega_grid = c_null_ptr
-    type(c_ptr) :: omega_grid_w = c_null_ptr
     type(c_ptr) :: mbd_calc_f = c_null_ptr
-end type
-
-type, bind(c) :: cmbd_geom
-    type(c_ptr) :: mbd_geom_f = c_null_ptr
 end type
 
 contains
@@ -60,12 +53,8 @@ type(c_ptr) function cmbd_init_calc(n_freq) bind(c)
     type(cmbd_calc), pointer :: calc_c
 
     allocate (calc)
-    calc%param%n_frequency_grid = n_freq
     call calc%init()
     allocate (calc_c)
-    calc_c%n_freq = ubound(calc%omega_grid, 1)
-    calc_c%omega_grid = c_loc(calc%omega_grid)
-    calc_c%omega_grid_w = c_loc(calc%omega_grid_w)
     calc_c%mbd_calc_f = c_loc(calc)
     cmbd_init_calc = c_loc(calc_c)
 end function
@@ -108,39 +97,35 @@ subroutine cmbd_toggle_muted(calc_cp) bind(c)
 end subroutine
 
 type(c_ptr) function cmbd_init_geom( &
-        calc_cp, n_atoms, coords, lattice, k_grid) bind(c)
+        calc_cp, n_atoms, coords, lattice, k_grid, n_freq) bind(c)
     type(c_ptr), value :: calc_cp
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: coords(3, n_atoms)
     real(c_double), intent(in), optional :: lattice(3, 3)
     integer(c_int), intent(in), optional :: k_grid(3)
+    integer(c_int), intent(in), value :: n_freq
 
     type(calc_t), pointer :: calc
     type(geom_t), pointer :: geom
-    type(cmbd_geom), pointer :: geom_c
 
     calc => get_mbd_calc(calc_cp)
     allocate (geom)
+    if (n_freq > 0) geom%param%n_freq = n_freq
     geom%coords = coords
     if (present(lattice)) geom%lattice = lattice
     if (present(k_grid)) geom%k_grid = k_grid
     call geom%init(calc)
-    allocate (geom_c)
-    geom_c%mbd_geom_f = c_loc(geom)
-    cmbd_init_geom = c_loc(geom_c)
+    cmbd_init_geom = c_loc(geom)
 end function
 
-subroutine cmbd_destroy_geom(geom_cp) bind(c)
-    type(c_ptr), value :: geom_cp
+subroutine cmbd_destroy_geom(geom_c) bind(c)
+    type(c_ptr), value :: geom_c
 
-    type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
 
-    call c_f_pointer(geom_cp, geom_c)
-    call c_f_pointer(geom_c%mbd_geom_f, geom)
+    call c_f_pointer(geom_c, geom)
     call geom%destroy()
     deallocate (geom)
-    deallocate (geom_c)
 end subroutine
 
 type(c_ptr) function cmbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a) bind(c)
@@ -164,26 +149,16 @@ type(c_ptr) function cmbd_init_damping(n_atoms, version_c, r_vdw, sigma, beta, a
     cmbd_init_damping = c_loc(damping)
 end function
 
-subroutine cmbd_destroy_damping(damping_p) bind(c)
-    type(c_ptr), value :: damping_p
+subroutine cmbd_destroy_damping(damping_c) bind(c)
+    type(c_ptr), value :: damping_c
 
     type(damping_t), pointer :: damping
 
-    call c_f_pointer(damping_p, damping)
+    call c_f_pointer(damping_c, damping)
     if (allocated(damping%r_vdw)) deallocate (damping%r_vdw)
     if (allocated(damping%sigma)) deallocate (damping%sigma)
     deallocate (damping)
 end subroutine
-
-function get_mbd_geom(geom_cp)
-    type(c_ptr), intent(in), value :: geom_cp
-    type(geom_t), pointer :: get_mbd_geom
-
-    type(cmbd_geom), pointer :: geom_c
-
-    call c_f_pointer(geom_cp, geom_c)
-    call c_f_pointer(geom_c%mbd_geom_f, get_mbd_geom)
-end function
 
 function get_mbd_calc(calc_cp)
     type(c_ptr), intent(in), value :: calc_cp
@@ -195,43 +170,39 @@ function get_mbd_calc(calc_cp)
     call c_f_pointer(calc_c%mbd_calc_f, get_mbd_calc)
 end function
 
-real(c_double) function cmbd_ts_energy(geom_cp, n_atoms, alpha_0, C6, damping_p) bind(c)
-    type(c_ptr), intent(in), value :: geom_cp
+real(c_double) function cmbd_ts_energy(geom_c, n_atoms, alpha_0, C6, damping_c) bind(c)
+    type(c_ptr), intent(in), value :: geom_c
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
-    type(c_ptr), intent(in), value :: damping_p
+    type(c_ptr), intent(in), value :: damping_c
 
-    type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
 
-    call c_f_pointer(geom_cp, geom_c)
-    call c_f_pointer(geom_c%mbd_geom_f, geom)
-    call c_f_pointer(damping_p, damping)
+    call c_f_pointer(geom_c, geom)
+    call c_f_pointer(damping_c, damping)
     cmbd_ts_energy = ts_energy(geom, alpha_0, C6, damping)
 end function
 
 real(c_double) function cmbd_mbd_energy( &
-    geom_cp, n_atoms, alpha_0, C6, damping_p, gradients, latt_gradients &
+    geom_c, n_atoms, alpha_0, C6, damping_c, gradients, latt_gradients &
 ) bind(c)
-    type(c_ptr), intent(in), value :: geom_cp
+    type(c_ptr), intent(in), value :: geom_c
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
-    type(c_ptr), intent(in), value :: damping_p
+    type(c_ptr), intent(in), value :: damping_c
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
     real(c_double), intent(out), optional :: latt_gradients(3, 3)
 
-    type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
     type(result_t) :: res
     type(grad_t) :: dene
 
-    call c_f_pointer(geom_cp, geom_c)
-    call c_f_pointer(geom_c%mbd_geom_f, geom)
-    call c_f_pointer(damping_p, damping)
+    call c_f_pointer(geom_c, geom)
+    call c_f_pointer(damping_c, damping)
     res = get_mbd_energy( &
         geom, alpha_0, C6, damping, dene, grad_request_t( &
             dcoords=present(gradients), &
@@ -244,13 +215,13 @@ real(c_double) function cmbd_mbd_energy( &
 end function
 
 real(c_double) function cmbd_rpa_energy( &
-    geom_cp, n_atoms, alpha_0, C6, damping_p, gradients, latt_gradients &
+    geom_c, n_atoms, alpha_0, C6, damping_c, gradients, latt_gradients &
 ) bind(c)
-    type(c_ptr), intent(in), value :: geom_cp
+    type(c_ptr), intent(in), value :: geom_c
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
-    type(c_ptr), intent(in), value :: damping_p
+    type(c_ptr), intent(in), value :: damping_c
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
     real(c_double), intent(out), optional :: latt_gradients(3, 3)
 
@@ -259,45 +230,45 @@ real(c_double) function cmbd_rpa_energy( &
     type(result_t) :: res
     type(grad_t) :: dene
 
-    geom => get_mbd_geom(geom_cp)
-    call c_f_pointer(damping_p, damping)
-    geom%calc%do_rpa = .true.
+    call c_f_pointer(geom_c, geom)
+    call c_f_pointer(damping_c, damping)
+    geom%do_rpa = .true.
     res = get_mbd_energy(geom, alpha_0, C6, damping, dene, grad_request_t())
-    geom%calc%do_rpa = .false.
+    geom%do_rpa = .false.
     cmbd_rpa_energy = res%energy
 end function
 
 real(c_double) function cmbd_mbd_rsscs_energy( &
-    geom_cp, n_atoms, alpha_0, C6, damping_p, &
+    geom_c, n_atoms, alpha_0, C6, damping_c, &
     gradients, latt_gradients, eigvals, eigvecs &
 ) bind(c)
-    type(c_ptr), intent(in), value :: geom_cp
+    type(c_ptr), intent(in), value :: geom_c
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
-    type(c_ptr), intent(in), value :: damping_p
+    type(c_ptr), intent(in), value :: damping_c
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
     real(c_double), intent(out), optional :: latt_gradients(3, 3)
     real(c_double), intent(out), optional :: eigvals(3*n_atoms)
     real(c_double), intent(out), optional :: eigvecs(3*n_atoms, 3*n_atoms)
 
-    type(cmbd_geom), pointer :: geom_c
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
     type(result_t) :: res
     type(grad_t) :: dene
 
-    call c_f_pointer(geom_cp, geom_c)
-    call c_f_pointer(geom_c%mbd_geom_f, geom)
-    call c_f_pointer(damping_p, damping)
-    geom%calc%get_eigs = present(eigvals)
-    geom%calc%get_modes = present(eigvecs)
+    call c_f_pointer(geom_c, geom)
+    call c_f_pointer(damping_c, damping)
+    geom%get_eigs = present(eigvals)
+    geom%get_modes = present(eigvecs)
     res = get_mbd_scs_energy( &
         geom, 'rsscs', alpha_0, C6, damping, dene, grad_request_t( &
             dcoords=present(gradients), &
             dlattice=present(latt_gradients) &
         ) &
     )
+    geom%get_eigs = .false.
+    geom%get_modes = .false.
     if (geom%has_exc()) return
     cmbd_mbd_rsscs_energy = res%energy
     if (present(gradients)) gradients = transpose(dene%dcoords)
@@ -307,13 +278,13 @@ real(c_double) function cmbd_mbd_rsscs_energy( &
 end function
 
 real(c_double) function cmbd_mbd_scs_energy( &
-    geom_cp, n_atoms, alpha_0, C6, damping_p, gradients, latt_gradients &
+    geom_c, n_atoms, alpha_0, C6, damping_c, gradients, latt_gradients &
 ) bind(c)
-    type(c_ptr), intent(in), value :: geom_cp
+    type(c_ptr), intent(in), value :: geom_c
     integer(c_int), intent(in), value :: n_atoms
     real(c_double), intent(in) :: alpha_0(n_atoms)
     real(c_double), intent(in) :: C6(n_atoms)
-    type(c_ptr), intent(in), value :: damping_p
+    type(c_ptr), intent(in), value :: damping_c
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
     real(c_double), intent(out), optional :: latt_gradients(3, 3)
 
@@ -322,8 +293,8 @@ real(c_double) function cmbd_mbd_scs_energy( &
     type(result_t) :: res
     type(grad_t) :: dene
 
-    geom => get_mbd_geom(geom_cp)
-    call c_f_pointer(damping_p, damping)
+    call c_f_pointer(geom_c, geom)
+    call c_f_pointer(damping_c, damping)
     res = get_mbd_scs_energy( &
         geom, 'scs', alpha_0, C6, damping, dene, grad_request_t( &
             dcoords=present(gradients), &
@@ -335,37 +306,37 @@ real(c_double) function cmbd_mbd_scs_energy( &
     if (present(latt_gradients)) latt_gradients = transpose(dene%dlattice)
 end function
 
-subroutine cmbd_dipole_matrix(geom_cp, damping_p, q_point, dipmat_p) bind(c)
-    type(c_ptr), intent(in), value :: geom_cp
-    type(c_ptr), intent(in), value :: damping_p
+subroutine cmbd_dipole_matrix(geom_c, damping_c, q_point, dipmat_c) bind(c)
+    type(c_ptr), intent(in), value :: geom_c
+    type(c_ptr), intent(in), value :: damping_c
     real(c_double), intent(in), optional :: q_point(3)
-    type(c_ptr), intent(in), value :: dipmat_p
+    type(c_ptr), intent(in), value :: dipmat_c
 
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damp
-    type(matrix_re_t) :: dipmat
-    type(matrix_cplx_t) :: dipmat_c
-    real(dp), pointer :: dipmat_re(:, :)
-    complex(dp), pointer :: dipmat_cplx(:, :)
+    type(matrix_re_t) :: dipmat_re
+    type(matrix_cplx_t) :: dipmat_cplx
+    real(dp), pointer :: dipmat_re_p(:, :)
+    complex(dp), pointer :: dipmat_cplx_p(:, :)
     integer :: n_atoms
 
-    geom => get_mbd_geom(geom_cp)
+    call c_f_pointer(geom_c, geom)
     n_atoms = size(geom%coords, 2)
-    call c_f_pointer(damping_p, damp)
+    call c_f_pointer(damping_c, damp)
     if (present(q_point)) then
-        dipmat_c = dipole_matrix(geom, damp, q=q_point)
-        call c_f_pointer(dipmat_p, dipmat_cplx, [3*n_atoms, 3*n_atoms])
-        dipmat_cplx = transpose(dipmat_c%val)
+        dipmat_cplx = dipole_matrix(geom, damp, q=q_point)
+        call c_f_pointer(dipmat_c, dipmat_cplx_p, [3*n_atoms, 3*n_atoms])
+        dipmat_cplx_p = transpose(dipmat_cplx%val)
     else
-        dipmat = dipole_matrix(geom, damp)
-        call c_f_pointer(dipmat_p, dipmat_re, [3*n_atoms, 3*n_atoms])
-        dipmat_re = transpose(dipmat%val)
+        dipmat_re = dipole_matrix(geom, damp)
+        call c_f_pointer(dipmat_c, dipmat_re_p, [3*n_atoms, 3*n_atoms])
+        dipmat_re_p = transpose(dipmat_re%val)
     end if
 end subroutine
 
 real(c_double) function cmbd_coulomb_energy( &
-        geom_cp, n_atoms, q, m, w_t, version, r_vdw, beta, a, C) bind(c)
-    type(c_ptr), value :: geom_cp
+        geom_c, n_atoms, q, m, w_t, version, r_vdw, beta, a, C) bind(c)
+    type(c_ptr), value :: geom_c
     integer(c_int), value, intent(in) :: n_atoms
     real(c_double), value, intent(in) :: a, beta
     real(c_double), intent(in) ::  C(3*n_atoms, 3*n_atoms), &
@@ -379,13 +350,13 @@ real(c_double) function cmbd_coulomb_energy( &
     damp%r_vdw = r_vdw
     damp%ts_d = a
     damp%ts_sr = beta
-    geom => get_mbd_geom(geom_cp)
+    call c_f_pointer(geom_c, geom)
     cmbd_coulomb_energy = coulomb_energy(geom, q, m, w_t, C, damp)
 end function
 
 real(c_double) function cmbd_dipole_energy( &
-        geom_cp, n_atoms, a0, w, w_t, version, r_vdw, beta, a, C) bind(c)
-    type(c_ptr), value :: geom_cp
+        geom_c, n_atoms, a0, w, w_t, version, r_vdw, beta, a, C) bind(c)
+    type(c_ptr), value :: geom_c
     integer(c_int), value, intent(in) :: n_atoms
     real(c_double), intent(in) :: C(3*n_atoms, 3*n_atoms), &
         w_t(3*n_atoms), w(n_atoms), a0(n_atoms), r_vdw(n_atoms)
@@ -399,7 +370,7 @@ real(c_double) function cmbd_dipole_energy( &
     damp%r_vdw = r_vdw
     damp%beta = beta
     damp%a = a
-    geom => get_mbd_geom(geom_cp)
+    call c_f_pointer(geom_c, geom)
     cmbd_dipole_energy = dipole_energy(geom, a0, w, w_t, C, damp)
 end function
 

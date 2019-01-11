@@ -3,13 +3,9 @@
 extern const _Bool cmbd_with_mpi;
 extern const _Bool cmbd_with_scalapack;
 
-struct cmbd_calc {
-    int n_freq;
-    double* omega_grid;
-    double* omega_grid_w;
-};
+struct cmbd_calc {};
 
-struct cmbd_calc* cmbd_init_calc(int n_freq);
+struct cmbd_calc* cmbd_init_calc();
 void cmbd_destroy_calc(struct cmbd_calc* calc);
 
 void cmbd_get_exception(
@@ -23,15 +19,16 @@ void cmbd_toggle_muted(
     struct cmbd_calc* calc
 );
 
-struct cmbd_geom* cmbd_init_geom(
+struct geom_t* cmbd_init_geom(
     struct cmbd_calc* calc,
     int n_atoms,
     double* coords,
     double* lattice,
-    int* k_grid
+    int* k_grid,
+    int n_freq
 );
 
-void cmbd_destroy_geom(struct cmbd_geom* geom);
+void cmbd_destroy_geom(struct geom_t* geom);
 
 struct cmbd_damping* cmbd_init_damping(
     int n_atoms,
@@ -45,7 +42,7 @@ struct cmbd_damping* cmbd_init_damping(
 void cmbd_destroy_damping(struct cmbd_damping* damping);
 
 double cmbd_ts_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* alpha_0,
     double* C6,
@@ -53,7 +50,7 @@ double cmbd_ts_energy(
 );
 
 double cmbd_mbd_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* alpha_0,
     double* C6,
@@ -63,7 +60,7 @@ double cmbd_mbd_energy(
 );
 
 double cmbd_rpa_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* alpha_0,
     double* C6,
@@ -73,7 +70,7 @@ double cmbd_rpa_energy(
 );
 
 double cmbd_mbd_rsscs_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* alpha_0,
     double* C6,
@@ -85,7 +82,7 @@ double cmbd_mbd_rsscs_energy(
 );
 
 double cmbd_mbd_scs_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* alpha_0,
     double* C6,
@@ -95,14 +92,14 @@ double cmbd_mbd_scs_energy(
 );
 
 double cmbd_dipole_matrix(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     struct cmbd_damping* damping,
     double* q_point,
     double* dipmat
 );
 
 double cmbd_coulomb_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* q,
     double* m,
@@ -115,7 +112,7 @@ double cmbd_coulomb_energy(
 );
 
 double cmbd_dipole_energy(
-    struct cmbd_geom* geom,
+    struct geom_t* geom,
     int n_atoms,
     double* a0,
     double* w,

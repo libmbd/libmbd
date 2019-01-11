@@ -108,7 +108,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
 #endif
 
     real(dp) :: Rn(3), Rnij(3), Rnij_norm, T(3, 3), f_damp, &
-        sigma_ij, real_space_cutoff, T0(3, 3), beta_R_vdw
+        sigma_ij, T0(3, 3), beta_R_vdw
     integer :: i_atom, j_atom, i_cell, n(3), range_n(3), i, j, &
         n_atoms, my_i_atom, my_j_atom, i_latt
     logical :: do_ewald, is_periodic
@@ -136,13 +136,8 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     call dipmat%init(geom%idx)
 #endif
     if (is_periodic) then
-        if (allocated(geom%ewald)) then
-            do_ewald = .true.
-            real_space_cutoff = geom%ewald%real_space_cutoff
-        else
-            real_space_cutoff = geom%calc%param%dipole_cutoff
-        end if
-        range_n = geom%supercell_circum(geom%lattice, real_space_cutoff)
+        do_ewald = geom%gamm > 0d0
+        range_n = geom%supercell_circum(geom%lattice, geom%real_space_cutoff)
     else
         range_n(:) = 0
     end if
@@ -182,7 +177,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 end if
                 Rnij = geom%coords(:, i_atom)-geom%coords(:, j_atom)-Rn
                 Rnij_norm = sqrt(sum(Rnij**2))
-                if (is_periodic .and. Rnij_norm > real_space_cutoff) cycle
+                if (is_periodic .and. Rnij_norm > geom%real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
                     beta_R_vdw = damp%beta*sum(damp%R_vdw([i_atom, j_atom]))
                 end if
@@ -225,7 +220,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 if (grad_ij%dr_vdw) dT%dvdw = damp%beta*dT%dvdw
                 if (do_ewald) then
                     T = T &
-                        + T_erfc(Rnij, geom%ewald%gamm, dTew, grad_ij) &
+                        + T_erfc(Rnij, geom%gamm, dTew, grad_ij) &
                         - T_bare(Rnij, dT0, grad_ij%dcoords)
                     if (grad_ij%dcoords) dT%dr = dT%dr + dTew%dr - dT0%dr
                 end if
@@ -304,7 +299,7 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
 
     logical :: do_surface
     real(dp) :: rec_latt(3, 3), volume, G(3), Rij(3), k(3), &
-        k_sq, rec_space_cutoff, G_Rij, gamm, latt_inv(3, 3), &
+        k_sq, G_Rij, latt_inv(3, 3), &
         dGdA(3), dk_sqdA, dkk_dA(3, 3), vol_prefactor, &
         k_otimes_k(3, 3), exp_k_sq_gamma, vol_kk_exp_ksq(3, 3)
     integer :: &
@@ -316,13 +311,11 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     complex(dp) :: Tij(3, 3), exp_GR, vol_exp
 #endif
 
-    gamm = geom%ewald%gamm
     latt_inv = inverse(geom%lattice)
     rec_latt = 2*pi*transpose(latt_inv)
     volume = abs(dble(product(eigvals(geom%lattice))))
     vol_prefactor = 4*pi/volume
-    rec_space_cutoff = geom%ewald%rec_space_cutoff
-    range_m = geom%supercell_circum(rec_latt, rec_space_cutoff)
+    range_m = geom%supercell_circum(rec_latt, geom%rec_space_cutoff)
     call geom%clock(12)
     m = [0, 0, -1]
     each_recip_vec: do i_m = 1, product(1+2*range_m)
@@ -334,8 +327,8 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
         k = G
 #endif
         k_sq = sum(k**2)
-        if (sqrt(k_sq) > rec_space_cutoff .or. sqrt(k_sq) < 1d-15) cycle
-        exp_k_sq_gamma = exp(-k_sq/(4*gamm**2))
+        if (sqrt(k_sq) > geom%rec_space_cutoff .or. sqrt(k_sq) < 1d-15) cycle
+        exp_k_sq_gamma = exp(-k_sq/(4*geom%gamm**2))
         forall (a = 1:3, b = 1:3) k_otimes_k(a, b) = k(a)*k(b)/k_sq
         each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
@@ -385,7 +378,7 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                                 dTda_sub = dTda_sub &
                                     - Tij*latt_inv(i_latt, i_xyz) &
                                     + vol_exp*dkk_dA &
-                                    - Tij*dk_sqdA/(4*gamm**2) &
+                                    - Tij*dk_sqdA/(4*geom%gamm**2) &
 #if MBD_TYPE == 1
                                     + Tij*IMI*dot_product(dGdA, Rij)
 #elif MBD_TYPE == 0
@@ -399,7 +392,7 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
         end do each_atom
     end do each_recip_vec
     ! self energy
-    call dipmat%add_diag_scalar(-4*gamm**3/(3*sqrt(pi)))
+    call dipmat%add_diag_scalar(-4*geom%gamm**3/(3*sqrt(pi)))
     ! surface term
 #if MBD_TYPE == 1
     do_surface = sqrt(sum(q**2)) < 1d-15

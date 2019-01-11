@@ -63,6 +63,12 @@ type, public :: clock_t
     procedure :: clock => clock_clock
 end type
 
+type, public :: quad_pt_t
+    !! Represents a 1D quadrature point
+    real(dp) :: val
+    real(dp) :: weight
+end type
+
 abstract interface
     !! Logging subroutine.
     subroutine abstract_printer(msg)

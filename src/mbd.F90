@@ -134,14 +134,14 @@ subroutine mbd_calc_init(this, input)
     this%method = input%method
     this%calculate_gradients = input%calculate_forces
     if (input%calculate_spectrum) then
-        this%geom%calc%get_eigs = .true.
-        this%geom%calc%get_modes = .true.
+        this%geom%get_eigs = .true.
+        this%geom%get_modes = .true.
     end if
-    this%calc%param%ts_energy_accuracy = input%ts_ene_acc
+    this%geom%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
-    this%calc%param%n_frequency_grid = input%n_omega_grid
-    this%calc%param%k_grid_shift = input%k_grid_shift
-    this%calc%param%zero_negative_eigs = input%zero_negative_eigvals
+    this%geom%param%n_freq = input%n_omega_grid
+    this%geom%param%k_grid_shift = input%k_grid_shift
+    this%geom%param%zero_negative_eigvals = input%zero_negative_eigvals
     if (.not. all(input%k_grid == -1)) this%geom%k_grid = input%k_grid
     this%geom%coords = input%coords
     if (allocated(input%lattice_vectors)) then

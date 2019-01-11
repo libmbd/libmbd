@@ -32,7 +32,7 @@ class MBDCalc(object):
         self.n_freq = n_freq
 
     def __enter__(self):
-        self._calc_obj = _lib.cmbd_init_calc(self.n_freq)
+        self._calc_obj = _lib.cmbd_init_calc()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -55,13 +55,6 @@ class MBDCalc(object):
             raise RuntimeError('MBDCalc must be used as a context manager')
         return self._calc_obj
 
-    @property
-    def omega_grid(self):
-        return (
-            _ndarray(self._calc.omega_grid, (self.n_freq+1,)).copy(),
-            _ndarray(self._calc.omega_grid_w, (self.n_freq+1,)).copy(),
-        )
-
     @contextmanager
     def muted(self):
         _lib.cmbd_toggle_muted(self._calc)
@@ -81,6 +74,7 @@ class MBDCalc(object):
             _cast('double*', coords),
             _cast('double*', lattice),
             _ffi.NULL,
+            self.n_freq,
         )
         damping = _lib.cmbd_init_damping(
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
@@ -111,6 +105,7 @@ class MBDCalc(object):
             _cast('double*', coords),
             _cast('double*', lattice),
             _cast('int*', k_grid),
+            self.n_freq,
         )
         damping = _lib.cmbd_init_damping(
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
@@ -156,6 +151,7 @@ class MBDCalc(object):
             _cast('double*', coords),
             _cast('double*', lattice),
             _ffi.NULL,
+            self.n_freq,
         )
         damping = _lib.cmbd_init_damping(
             n_atoms, damping.encode(),
@@ -194,6 +190,7 @@ class MBDCalc(object):
             _cast('double*', coords),
             _ffi.NULL,
             _ffi.NULL,
+            self.n_freq,
         )
         res = _lib.cmbd_dipole_energy(
             geom,
@@ -218,6 +215,7 @@ class MBDCalc(object):
             _cast('double*', coords),
             _ffi.NULL,
             _ffi.NULL,
+            self.n_freq,
         )
         res = _lib.cmbd_coulomb_energy(
             geom,

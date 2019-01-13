@@ -125,7 +125,7 @@ subroutine geom_init(this)
         end if
     end if
 #ifdef WITH_SCALAPACK
-    this%idx%parallel = this%parallel_mode == 'atoms'
+    this%idx%parallel = this%parallel_mode == 'atoms' .and. this%siz() > 1
     if (this%idx%parallel) then
 #   ifdef WITH_MPI
         call this%blacs_grid%init(this%comm)

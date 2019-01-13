@@ -22,7 +22,7 @@ use mbd_mpi
 implicit none
 
 private
-public :: supercell_circum
+public :: supercell_circum, get_freq_grid
 
 type, public :: param_t
     !! Calculation-wide paramters.

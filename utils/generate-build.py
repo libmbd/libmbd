@@ -93,7 +93,7 @@ if __name__ == '__main__':
         srcs = [src for src in sources if src.name not in filtered]
         ordered, deps = dep_tree(srcs, macros)
         template = Template((root/'utils/Makefile.in').read_text())
-        objs = {path: re.sub('\.[fF]90$', '.o', path.name) for path in srcs}
+        objs = {path: re.sub(r'\.[fF]90$', '.o', path.name) for path in srcs}
         (root/'src'/f'{label}.make').write_text(template.substitute(
             objs=' '.join(objs[path] for path in srcs),
             deps='\n'.join(

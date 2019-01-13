@@ -118,6 +118,11 @@ call calc%get_gradients(gradients)
 call calc%destroy()
 ```
 
+## Links
+
+- Libmbd documentation: https://azag0.github.io/libmbd
+- Pymbd documentation: https://azag0.github.io/libmbd/pymbd
+
 ## Developing
 
 For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in the build directory. Use [Tox](https://tox.readthedocs.io/) for comfortable running of Python tests.

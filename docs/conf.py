@@ -1,6 +1,29 @@
 import os
+import sys
 import datetime
+from unittest.mock import MagicMock
 from configparser import ConfigParser
+
+sys.path.insert(0, os.path.abspath('..'))
+
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+        return MagicMock()
+
+
+MOCK_MODULES = [
+    'numpy',
+    'numpy.linalg',
+    'numpy.polynomial',
+    'numpy.polynomial.legendre',
+    'scipy',
+    'scipy.special',
+    'pymbd._libmbd',
+    'mpi4py',
+]
+sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 conf = ConfigParser()
 conf.read('../setup.cfg')

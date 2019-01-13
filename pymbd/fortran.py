@@ -2,7 +2,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import division, print_function
-from contextlib import contextmanager
 
 import numpy as np
 
@@ -12,8 +11,13 @@ try:
 except ImportError:
     raise Exception('Pymbd C extension unimportable, cannot use Fortran')
 
+__all__ = ['MBDCalc', 'MBDFortranException', 'with_mpi', 'with_scalapack']
+
 with_mpi = _lib.cmbd_with_mpi
+"""Whether Libmbd was compiled with MPI"""
+
 with_scalapack = _lib.cmbd_with_scalapack
+"""Whether Libmbd was compiled with Scalapack"""
 
 if with_mpi:
     from mpi4py import MPI  # noqa
@@ -27,6 +31,9 @@ class MBDFortranException(Exception):
 
 
 class MBDCalc(object):
+    """
+    Represents an initialized Libmbd Fortran library.
+    """
     def __init__(self, n_freq=15):
         self._calc_obj = None
         self.n_freq = n_freq
@@ -56,6 +63,9 @@ class MBDCalc(object):
 
     def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
                   lattice=None, d=20., damping='fermi'):
+        """
+        Calculate a TS energy.
+        """
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         n_atoms = len(coords)
@@ -85,6 +95,9 @@ class MBDCalc(object):
                    lattice=None, k_grid=None,
                    a=6., func='mbd_rsscs_energy', force=False,
                    damping='fermi,dip', spectrum=False):
+        """
+        Calculate an MBD energy.
+        """
         coords, alpha_0, C6, R_vdw, lattice = \
             map(_array, (coords, alpha_0, C6, R_vdw, lattice))
         k_grid = _array(k_grid, dtype='i4')
@@ -163,10 +176,16 @@ class MBDCalc(object):
         return dipmat
 
     def mbd_energy_species(self, coords, species, vols, beta, **kwargs):
+        """
+        Calculate an MBD energy from atom types and Hirshfed-volume ratios.
+        """
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.mbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
     def ts_energy_species(self, coords, species, vols, beta, **kwargs):
+        """
+        Calculate a TS energy from atom types and Hirshfed-volume ratios.
+        """
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.ts_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 

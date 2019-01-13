@@ -103,8 +103,8 @@ def T_bare(R):
     R_2 = tf.reduce_sum(R**2, -1)
     R_5 = tf.sqrt(_set_diag(R_2, inf))**5
     return (
-        -3*R[:, :, :, None]*R[:, :, None, :] +
-        R_2[:, :, None, None]*np.eye(3)[None, None, :, :]
+        -3*R[:, :, :, None]*R[:, :, None, :]
+        + R_2[:, :, None, None]*np.eye(3)[None, None, :, :]
     )/R_5[:, :, None, None]
 
 

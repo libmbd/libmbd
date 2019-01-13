@@ -13,10 +13,20 @@ from pkg_resources import resource_string
 
 from scipy.special import erf, erfc
 
+__all__ = ['mbd_energy', 'mbd_energy_species', 'screening', 'ang']
+
 ang = 1/0.529177249
+"""
+Value of an angstrom in atomic units.
+"""
 
 
 def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
+    r"""Screen atomic polarizabilities.
+
+    Returns static polarizabilities, :math:`C_6` coefficients, and
+    :math:`R_\mathrm{vdw}` coefficients.
+    """
     freq, freq_w = freq_grid(nfreq)
     omega = 4/3*C6/alpha_0**2
     alpha_dyn = [alpha_0/(1+(u/omega)**2) for u in freq]
@@ -38,6 +48,9 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
                nfreq=15):
+    """
+    Calculate an MBD energy.
+    """
     coords, alpha_0, C6, R_vdw, lattice = \
         map(_array, (coords, alpha_0, C6, R_vdw, lattice))
     alpha_0_rsscs, C6_rsscs, R_vdw_rsscs = screening(
@@ -53,8 +66,8 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
     ene = 0.
     for k_point in k_points:
         eigs = np.linalg.eigvalsh(
-            np.diag(np.repeat(omega_rsscs**2, 3)) +
-            np.outer(pre, pre)*dipole_matrix(
+            np.diag(np.repeat(omega_rsscs**2, 3))
+            + np.outer(pre, pre)*dipole_matrix(
                 coords, 'fermi,dip', R_vdw=R_vdw_rsscs, beta=beta,
                 lattice=lattice, k_point=k_point
             )
@@ -65,6 +78,9 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None,
 
 
 def mbd_energy_species(coords, species, vols, beta, **kwargs):
+    """
+    Calculate an MBD energy from atom types and Hirshfed-volume ratios.
+    """
     alpha_0, C6, R_vdw = from_volumes(species, vols)
     return mbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
@@ -156,8 +172,8 @@ def T_bare(R):
     R_2 = np.sum(R**2, -1)
     R_5 = np.where(R_2 > 0, np.sqrt(R_2)**5, np.inf)
     return (
-        -3*R[:, :, :, None]*R[:, :, None, :] +
-        R_2[:, :, None, None]*np.eye(3)[None, None, :, :]
+        -3*R[:, :, :, None]*R[:, :, None, :]
+        + R_2[:, :, None, None]*np.eye(3)[None, None, :, :]
     )/R_5[:, :, None, None]
 
 
@@ -180,8 +196,8 @@ def T_erfc(R, a):
     R_5 = np.where(R_1 > 0, R_1**5, np.inf)
     B = (erfc(a*R_1)+(2*a*R_1/np.sqrt(np.pi))*np.exp(-(a*R_1)**2))/R_3
     C = (
-        3*erfc(a*R_1) +
-        (2*a*R_1/np.sqrt(np.pi))*(3+2*(a*R_1)**2)*np.exp(-(a*R_1)**2)
+        3*erfc(a*R_1)
+        + (2*a*R_1/np.sqrt(np.pi))*(3+2*(a*R_1)**2)*np.exp(-(a*R_1)**2)
     )/R_5
     return -C[:, :, None, None]*R[:, :, :, None]*R[:, :, None, :] + \
         B[:, :, None, None]*np.eye(3)

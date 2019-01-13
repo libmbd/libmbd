@@ -70,7 +70,6 @@ type, public :: geom_t
     type(exception_t) :: exc
     logical :: muted = .false.
     type(quad_pt_t), allocatable :: freq(:)
-    real(dp), allocatable :: k_pts(:, :)
     real(dp) :: gamm = 0d0
     real(dp) :: real_space_cutoff
     real(dp) :: rec_space_cutoff
@@ -97,20 +96,18 @@ contains
 subroutine geom_init(this)
     class(geom_t), intent(inout) :: this
 
-    integer :: i_atom, n
+    integer :: i_atom
     real(dp) :: volume
 
-    n = this%param%n_freq
-    allocate (this%freq(0:n))
+    associate (n => this%param%n_freq)
+        allocate (this%freq(0:n))
+        call get_freq_grid(n, this%freq(1:n)%val, this%freq(1:n)%weight)
+    end associate
     this%freq(0)%val = 0d0
     this%freq(0)%weight = 0d0
-    call get_freq_grid(n, this%freq(1:n)%val, this%freq(1:n)%weight)
     call this%clock_%init(100)
     if (allocated(this%lattice)) then
         volume = abs(dble(product(eigvals(this%lattice))))
-        if (.not. allocated(this%k_pts) .and. allocated(this%k_grid)) then
-            this%k_pts = make_k_pts(this%k_grid, this%lattice, this%param%k_grid_shift)
-        end if
         if (this%param%ewald_on) then
             this%gamm = 2.5d0/volume**(1d0/3)
             this%real_space_cutoff = 6d0/this%gamm*this%param%ewald_real_cutoff_scaling
@@ -120,14 +117,11 @@ subroutine geom_init(this)
         end if
     end if
     if (this%parallel_mode == 'auto') then
-        if (allocated(this%k_pts)) then
-            if (this%siz()**2 > size(this%k_pts, 2)) then
+        this%parallel_mode = 'atoms'
+        if (allocated(this%lattice) .and. allocated(this%k_grid)) then
+            if (this%siz()**2 < product(this%k_grid)) then
                 this%parallel_mode = 'atoms'
-            else
-                this%parallel_mode = 'k_points'
             end if
-        else
-            this%parallel_mode = 'atoms'
         end if
     end if
 #ifdef WITH_SCALAPACK
@@ -191,26 +185,6 @@ function supercell_circum(lattice, radius) result(sc)
     forall (i = 1:3) &
         layer_sep(i) = sum(lattice(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
     sc = ceiling(radius/layer_sep+0.5d0)
-end function
-
-function make_k_pts(k_grid, lattice, shift) result(k_pts)
-    integer, intent(in) :: k_grid(3)
-    real(dp), intent(in) :: lattice(3, 3)
-    real(dp), intent(in), optional :: shift
-    real(dp) :: k_pts(3, product(k_grid))
-
-    integer :: n_kpt(3), i_kpt
-    real(dp) :: n_kpt_shifted(3)
-
-    n_kpt = [0, 0, -1]
-    do i_kpt = 1, product(k_grid)
-        call shift_idx(n_kpt, [0, 0, 0], k_grid-1)
-        n_kpt_shifted = dble(n_kpt)
-        if (present(shift)) n_kpt_shifted = n_kpt_shifted+shift
-        where (2*n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted-dble(k_grid)
-        k_pts(:, i_kpt) = n_kpt_shifted/k_grid
-    end do
-    k_pts = matmul(2*pi*inverse(transpose(lattice)), k_pts)
 end function
 
 subroutine geom_clock(this, id)

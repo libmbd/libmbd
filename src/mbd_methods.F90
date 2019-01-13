@@ -6,14 +6,15 @@ module mbd_methods
 !! Obtaining MBD energies.
 
 use mbd_constants
+use mbd_damping, only: damping_t
 use mbd_formulas, only: omega_qho, alpha_dyn_qho, scale_with_ratio, C6_from_alpha
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
-use mbd_damping, only: damping_t
+use mbd_lapack, only: eigvals, inverse
 use mbd_rpa, only: get_mbd_rpa_energy
 use mbd_scs, only: run_scs
-use mbd_utils, only: result_t, tostr, quad_pt_t
+use mbd_utils, only: result_t, tostr, quad_pt_t, shift_idx
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: all_reduce
 #endif
@@ -34,9 +35,11 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     !! integrates the energy over the frist Brillouin zone.
     !!
     !! $$
-    !! E=\int_\text{FBZ}\mathrm d\mathbf q\,E(\mathbf q)\approx\frac1N\sum_i^NE(\mathbf q_i)
-    !! \\ \mathbf q_i=\mathbf b\mathbf n_i,\qquad\partial\mathbf
-    !! q_i=\big((\partial\mathbf a)\mathbf a\big)^\mathrm T\mathbf q_i
+    !! E=\int_\text{FBZ}\mathrm d\mathbf q\,E(\mathbf
+    !! q)\approx\frac1{N_k}\sum_i^{N_k}E(\mathbf q_i)
+    !! \\ \mathbf q_i=\boldsymbol{\mathcal B}\mathbf n_i,\qquad\partial\mathbf
+    !! q_i=-\big((\partial\boldsymbol{\mathcal
+    !! A})\boldsymbol{\mathcal A}^{-1}\big)^\mathrm T\mathbf q_i
     !! $$
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
@@ -45,9 +48,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     type(grad_t), intent(out) :: dene
     type(grad_request_t), intent(in) :: grad
 
-    real(dp), allocatable :: alpha(:, :), omega(:)
+    real(dp), allocatable :: alpha(:, :), omega(:), k_pts(:, :), dkdlattice(:, :, :, :)
     type(grad_t), allocatable :: dalpha(:)
-    integer :: n_kpts, i_kpt
+    integer :: n_kpts, i_kpt, a
     type(result_t) :: res_k
     type(grad_t) :: domega, dene_k
     type(grad_request_t) :: grad_ham
@@ -58,6 +61,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
     end if
     grad_ham = grad
     if (grad%dC6 .or. grad%dalpha) grad_ham%domega = .true.
+    if (grad%dlattice) grad_ham%dq = .true.
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%do_rpa) then
             res = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, dene, grad_ham)
@@ -69,7 +73,10 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             ! TODO gradients
         end if
     else
-        n_kpts = size(geom%k_pts, 2)
+        k_pts = make_k_pts( &
+            geom%k_grid, geom%lattice, geom%param%k_grid_shift, dkdlattice, grad%dlattice &
+        )
+        n_kpts = size(k_pts, 2)
         res%energy = 0d0
         if (geom%get_eigs) &
             allocate (res%mode_eigs_k(3*geom%siz(), n_kpts), source=0d0)
@@ -84,7 +91,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
         if (grad%dC6) allocate (dene%dC6(geom%siz()), source=0d0)
         if (grad%dR_vdw) allocate (dene%dR_vdw(geom%siz()), source=0d0)
         do i_kpt = 1, n_kpts
-            associate (k_pt => geom%k_pts(:, i_kpt))
+            associate (k_pt => k_pts(:, i_kpt))
                 if (.not. geom%do_rpa) then
                     res_k = get_mbd_hamiltonian_energy( &
                         geom, alpha_0, omega, damp, dene_k, grad_ham, k_pt &
@@ -105,7 +112,13 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             end if
             res%energy = res%energy + res_k%energy/n_kpts
             if (grad%dcoords) dene%dcoords = dene%dcoords + dene_k%dcoords/n_kpts
-            if (grad%dlattice) dene%dlattice = dene%dlattice + dene_k%dlattice/n_kpts
+            if (grad%dlattice) then
+                dene%dlattice = dene%dlattice + dene_k%dlattice/n_kpts
+                do a = 1, 3
+                    dene%dlattice = dene%dlattice &
+                        + dene_k%dq(a)*dkdlattice(a, i_kpt, :, :)/n_kpts
+                end do
+            end if
             if (grad%dalpha) then
                 dene%dalpha = dene%dalpha &
                     + (dene_k%dalpha + dene_k%domega*domega%dalpha)/n_kpts
@@ -286,6 +299,35 @@ real(dp) function test_frequency_grid(freq)
     alpha = alpha_dyn_qho([21d0], [99.5d0], freq, dalpha, grad)
     C6 = C6_from_alpha(alpha, freq)
     error = abs(C6(1)/99.5d0-1d0)
+end function
+
+function make_k_pts(k_grid, lattice, shift, dkdlattice, grad) result(k_pts)
+    integer, intent(in) :: k_grid(3)
+    real(dp), intent(in) :: lattice(3, 3)
+    real(dp), intent(in) :: shift
+    real(dp), allocatable, intent(out) :: dkdlattice(:, :, :, :)
+    logical, intent(in) :: grad
+    real(dp) :: k_pts(3, product(k_grid))
+
+    integer :: n_kpt(3), i_kpt, i_latt, a
+    real(dp) :: n_kpt_shifted(3), latt_inv(3, 3)
+
+    n_kpt = [0, 0, -1]
+    do i_kpt = 1, product(k_grid)
+        call shift_idx(n_kpt, [0, 0, 0], k_grid-1)
+        n_kpt_shifted = dble(n_kpt)+shift
+        where (2*n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted-dble(k_grid)
+        k_pts(:, i_kpt) = n_kpt_shifted/k_grid
+    end do
+    latt_inv = inverse(lattice)
+    k_pts = matmul(2*pi*transpose(latt_inv), k_pts)
+    if (grad) then
+        allocate (dkdlattice(3, product(k_grid), 3, 3))
+        forall (i_kpt = 1:product(k_grid), i_latt = 1:3, a = 1:3)
+            dkdlattice(:, i_kpt, i_latt, a) = &
+                -latt_inv(i_latt, :)*k_pts(a, i_kpt)
+        end forall
+    end if
 end function
 
 end module

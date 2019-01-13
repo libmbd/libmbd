@@ -18,6 +18,7 @@ type, public :: grad_t
     real(dp), allocatable :: dalpha(:)
     real(dp), allocatable :: dalpha_dyn(:, :)  ! n_atoms by 0:n_freq
     real(dp), allocatable :: dC6(:)
+    real(dp), allocatable :: dq(:)
     real(dp), allocatable :: dr_vdw(:)
     real(dp), allocatable :: domega(:)
     real(dp), allocatable :: dV(:)
@@ -38,6 +39,7 @@ type, public :: grad_matrix_cplx_t
     !! Derivatives of a compelx dipole matrix with respect to various quantities
     complex(dp), allocatable :: dr(:, :, :)
     complex(dp), allocatable :: dlattice(:, :, :, :)
+    complex(dp), allocatable :: dq(:, :, :)
     complex(dp), allocatable :: dvdw(:, :)
     complex(dp), allocatable :: dsigma(:, :)
     complex(dp), allocatable :: dgamma(:, :)

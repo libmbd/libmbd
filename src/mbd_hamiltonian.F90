@@ -203,6 +203,17 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         dQ%val = c_lambda12i_c%val*dQ%val
         dene%dr_vdw = 1d0/2*dble(dQ%contract_n33_rows())
     end if
+#if MBD_TYPE == 1
+    if (grad%dq) then
+        allocate (dene%dq(3))
+        do i_latt = 1, 3
+            dQ%val = dT%dq(:, :, i_latt)
+            call dQ%mult_cross(omega*sqrt(alpha_0))
+            dQ%val = c_lambda12i_c%val*dQ%val
+            dene%dq(i_latt) = 1d0/4*dble(dQ%sum_all())
+        end do
+    end if
+#endif
 end function
 
 #if MBD_TYPE == 0

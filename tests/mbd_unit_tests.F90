@@ -53,6 +53,7 @@ call exec_test('MBD derivative implicit Rvdw')
 call exec_test('MBD Ewald derivative implicit alpha')
 call exec_test('MBD Ewald derivative implicit omega')
 call exec_test('MBD Ewald derivative implicit Rvdw')
+call exec_test('MBD Ewald derivative implicit q')
 call exec_test('MBD@rsscs derivative explicit')
 call exec_test('MBD@rsscs Ewald derivative explicit')
 call exec_test('MBD@rsscs Ewald derivative stress')
@@ -101,6 +102,7 @@ subroutine exec_test(test_name)
     case ('MBD Ewald derivative implicit omega'); call test_mbd_ewald_deriv_impl_omega()
     case ('MBD derivative implicit Rvdw'); call test_mbd_deriv_impl_vdw()
     case ('MBD Ewald derivative implicit Rvdw'); call test_mbd_ewald_deriv_impl_vdw()
+    case ('MBD Ewald derivative implicit q'); call test_mbd_ewald_deriv_impl_q()
     case ('MBD@rsscs derivative explicit'); call test_mbd_rsscs_deriv_expl()
     case ('MBD@rsscs Ewald derivative explicit'); call test_mbd_rsscs_ewald_deriv_expl()
     case ('MBD@rsscs Ewald derivative stress'); call test_mbd_rsscs_ewald_deriv_stress()
@@ -355,6 +357,52 @@ subroutine test_mbd_ewald_deriv_expl()
         call print_matrix('delta gradients', diff)
         call print_matrix('anl', gradients_anl)
         call print_matrix('num', gradients)
+    end if
+end subroutine
+
+subroutine test_mbd_ewald_deriv_impl_q()
+    real(dp) :: delta, k_point(3), k_point_diff(3)
+    type(damping_t) :: damp
+    real(dp), allocatable :: &
+        gradients(:), diff(:), alpha_0(:), omega(:), gradients_anl(:)
+    type(result_t) :: res(-3:3)
+    type(grad_t) :: dene
+    integer :: n_atoms, i_xyz, i_step
+
+    delta = 0.01d0
+    n_atoms = 2
+    allocate (geom%coords(3, n_atoms), source=0d0)
+    allocate (gradients(3))
+    geom%coords(3, 1) = 1d0
+    geom%coords(1, 2) = 1d0
+    geom%coords(2, 2) = 4d0
+    geom%lattice = reshape([6d0, 1d0, 0d0, -1d0, 9d0, 1d0, 0d0, 1d0, 7d0], [3, 3])
+    k_point = [0.4d0, 0d0, 0d0]
+    call geom%init()
+    damp%version = 'fermi,dip'
+    damp%r_vdw = [3.55d0, 3.5d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0]
+    omega = [.7d0, .65d0]
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+        dene, grad_request_t(dq=.true.), k_point)
+    gradients_anl = dene%dq
+    do i_xyz = 1, 3
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            k_point_diff = k_point
+            k_point_diff(i_xyz) = k_point_diff(i_xyz)+i_step*delta
+            res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
+                dene, grad_request_t(), k_point_diff)
+        end do
+        gradients(i_xyz) = diff7(res%energy, delta)
+    end do
+    call geom%destroy()
+    diff = (gradients-gradients_anl)/gradients_anl
+    if (failed(maxval(abs(diff)), 1d-6)) then
+        print *, 'delta gradients', diff
+        print *, 'anl', gradients_anl
+        print *, 'num', gradients
     end if
 end subroutine
 
@@ -1226,6 +1274,8 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
     diff = (gradients-gradients_anl)/gradients_anl
     if (failed(maxval(abs(diff)), 3d-6)) then
         call print_matrix('delta gradients', diff)
+        call print_matrix('gradients anl', gradients_anl)
+        call print_matrix('gradients num', gradients)
     end if
 end subroutine
 

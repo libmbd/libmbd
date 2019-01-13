@@ -281,9 +281,9 @@ subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
     !!
     !! The gradients are calculated together with the energy, so a call to this
     !! method must be preceeded by a call to
-    !! [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the
+    !! [[mbd_calc_t:evaluate_vdw_method]].  For the same reason, the
     !! gradients must be requested prior to this called via
-    !! [[mbd_input(type):calculate_forces]].
+    !! [[mbd_input_t:calculate_forces]].
     class(mbd_calc_t), intent(in) :: this
     real(dp), intent(out) :: gradients(:, :)
         !! (\(3\times N\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
@@ -298,9 +298,9 @@ subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
     !!
     !! The gradients are actually calculated together with the energy, so a call
     !! to this method must be preceeded by a call to
-    !! [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the
+    !! [[mbd_calc_t:evaluate_vdw_method]].  For the same reason, the
     !! gradients must be requested prior to this called via
-    !! [[mbd_input(type):calculate_forces]].
+    !! [[mbd_input_t:calculate_forces]].
     class(mbd_calc_t), intent(in) :: this
     real(dp), intent(out) :: latt_derivs(:, :)
         !! (\(3\times 3\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
@@ -314,9 +314,9 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     !!
     !! The spectrum is actually calculated together with the energy, so a call
     !! to this method must be preceeded by a call to
-    !! [[mbd_calc(type):evaluate_vdw_method]].  For the same reason, the
+    !! [[mbd_calc_t:evaluate_vdw_method]].  For the same reason, the
     !! spectrum must be requested prior to this called via
-    !! [[mbd_input(type):calculate_spectrum]].
+    !! [[mbd_input_t:calculate_spectrum]].
     class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(out) :: spectrum(:)
         !! (\(3N\), a.u.) Energies (frequencies) of coupled MBD modues,

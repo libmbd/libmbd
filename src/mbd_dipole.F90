@@ -15,7 +15,7 @@ use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_scalar_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_linalg, only: outer
-use mbd_utils, only: tostr, shift_idx, print_matrix
+use mbd_utils, only: tostr, shift_idx
 
 implicit none
 
@@ -157,6 +157,12 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
                 allocate (dTij%dsigma(3, 3))
             end if
+#if MBD_TYPE == 1
+            if (grad%dq) then
+                allocate (ddipmat%dq(3*my_nr, 3*my_nc, 3), source=ZERO)
+                allocate (dTij%dq(3, 3, 3))
+            end if
+#endif
         end if
     end associate
     call geom%clock(11)
@@ -238,6 +244,11 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 end if
                 if (grad_ij%dsigma) dTij%dsigma = dT%dsigma*exp_qR
                 if (grad_ij%dr_vdw) dTij%dvdw = dT%dvdw*exp_qR
+                if (grad_ij%dq) then
+                    forall (i = 1:3)
+                        dTij%dq(:, :, i) = -IMI*Rnij(i)*Tij
+                    end forall
+                end if
 #endif
                 i = 3*(my_i_atom-1)
                 j = 3*(my_j_atom-1)
@@ -269,6 +280,13 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                         dTdsigma_sub = dTdsigma_sub + dTij%dsigma
                     end associate
                 end if
+#if MBD_TYPE == 1
+                if (grad%dq) then
+                    associate (dTdq_sub => ddipmat%dq(i+1:i+3, j+1:j+3, :))
+                        dTdq_sub = dTdq_sub + dTij%dq
+                    end associate
+                end if
+#endif
             end do each_atom_pair
         end do each_atom
     end do each_cell
@@ -309,6 +327,8 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     real(dp) :: Tij(3, 3), exp_GR, vol_exp
 #elif MBD_TYPE == 1
     complex(dp) :: Tij(3, 3), exp_GR, vol_exp
+    integer :: c
+    real(dp) :: dkk_dq(3, 3, 3)
 #endif
 
     latt_inv = inverse(geom%lattice)
@@ -349,6 +369,7 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                     T_sub = T_sub + Tij
                 end associate
                 if (.not. present(grad)) cycle
+                vol_exp = vol_prefactor*exp_k_sq_gamma*exp_GR
                 if (grad%dcoords .and. i_atom /= j_atom) then
                     associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
                         forall (i_xyz = 1:3)
@@ -362,7 +383,6 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                     end associate
                 end if
                 if (grad%dlattice) then
-                    vol_exp = vol_prefactor*exp_k_sq_gamma*exp_GR
                     do i_latt = 1, 3
                         do i_xyz = 1, 3
                             dGdA = -latt_inv(i_latt, :)*G(i_xyz)
@@ -388,6 +408,22 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                         end do
                     end do
                 end if
+#if MBD_TYPE == 1
+                if (grad%dq) then
+                    forall (b = 1:3, a = 1:3)
+                        forall (c = 1:3) dkk_dq(b, c, a) = -2*k(a)*k(b)*k(c)/k_sq**2
+                        dkk_dq(b, a, a) = dkk_dq(b, a, a) + k(b)/k_sq
+                        dkk_dq(a, b, a) = dkk_dq(a, b, a) + k(b)/k_sq
+                    end forall
+                    associate (dTdq_sub => ddipmat%dq(i+1:i+3, j+1:j+3, :))
+                        dTdq_sub = dTdq_sub + vol_exp*dkk_dq
+                        forall (a = 1:3)
+                            dTdq_sub(:, :, a) = dTdq_sub(:, :, a) &
+                                - Tij*k(a)/(2*geom%gamm**2)
+                        end forall
+                    end associate
+                end if
+#endif
             end do each_atom_pair
         end do each_atom
     end do each_recip_vec

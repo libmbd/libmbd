@@ -307,7 +307,7 @@ function make_k_pts(k_grid, lattice, shift, dkdlattice, grad) result(k_pts)
     real(dp), intent(in) :: shift
     real(dp), allocatable, intent(out) :: dkdlattice(:, :, :, :)
     logical, intent(in) :: grad
-    real(dp) :: k_pts(3, product(k_grid))
+    real(dp) :: k_pts(3, k_grid(1)*k_grid(2)*k_grid(3))
 
     integer :: n_kpt(3), i_kpt, i_latt, a
     real(dp) :: n_kpt_shifted(3), latt_inv(3, 3)

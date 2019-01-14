@@ -85,8 +85,16 @@ if __name__ == '__main__':
         if 'tests' not in path.name and path.name != 'mbd_density.f90'
     )
     configs = [
-        ({'mbd_mpi.F90', 'mbd_blacs.f90', 'mbd_scalapack.f90'}, [], 'serial'),
-        ([], ['WITH_SCALAPACK', 'WITH_MPI'], 'scalapack-mpi'),
+        (
+            {'mbd_mpi.F90', 'mbd_blacs.f90', 'mbd_scalapack.f90', 'mbd_elsi.F90'},
+            [],
+            'serial'
+        ),
+        (
+            {'mbd_elsi.F90'},
+            ['WITH_SCALAPACK', 'WITH_MPI'],
+            'scalapack-mpi'
+        ),
     ]
     config_file = root/'setup.cfg'
     for filtered, macros, label in configs:

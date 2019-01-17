@@ -1,14 +1,14 @@
 # Libmbd
 
-[![build](https://img.shields.io/travis/azag0/libmbd/master.svg)](https://travis-ci.org/azag0/libmbd)
-[![coverage](https://img.shields.io/codecov/c/github/azag0/libmbd.svg)](https://codecov.io/gh/azag0/libmbd)
+[![build](https://img.shields.io/travis/jhrmnn/libmbd/master.svg)](https://travis-ci.org/jhrmnn/libmbd)
+[![coverage](https://img.shields.io/codecov/c/github/jhrmnn/libmbd.svg)](https://codecov.io/gh/jhrmnn/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
-[![release](https://img.shields.io/github/release/azag0/libmbd.svg)](https://github.com/azag0/libmbd/releases)
-[![conda](https://img.shields.io/conda/v/azag0/pymbd.svg)](https://anaconda.org/azag0/pymbd)
+[![release](https://img.shields.io/github/release/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/releases)
+[![conda](https://img.shields.io/conda/v/libmbd/pymbd.svg)](https://anaconda.org/libmbd/pymbd)
 [![pypi](https://img.shields.io/pypi/v/pymbd.svg)](https://pypi.org/project/pymbd/)
-[![commits since](https://img.shields.io/github/commits-since/azag0/libmbd/latest.svg)](https://github.com/azag0/libmbd/releases)
-[![last commit](https://img.shields.io/github/last-commit/azag0/libmbd.svg)](https://github.com/azag0/libmbd/commits/master)
-[![license](https://img.shields.io/github/license/azag0/libmbd.svg)](https://github.com/azag0/libmbd/blob/master/LICENSE)
+[![commits since](https://img.shields.io/github/commits-since/jhrmnn/libmbd/latest.svg)](https://github.com/jhrmnn/libmbd/releases)
+[![last commit](https://img.shields.io/github/last-commit/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/commits/master)
+[![license](https://img.shields.io/github/license/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/blob/master/LICENSE)
 
 Libmbd contains implementations of the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
 
@@ -23,7 +23,7 @@ The Python-based implementations as well as Python bindings to the Libmbd C API 
 The easiest way to get Pymbd is to install the Pymbd [Conda](https://conda.io/docs/) package, which ships with pre-built Libmbd.
 
 ```
-conda install -c azag0 pymbd
+conda install -c libmbd pymbd
 ```
 
 Alternatively, if you have Libmbd installed on your system (see below), you can install Pymbd via Pip, in which case it links against the installed Libmbd. To support Libmbd built with ScaLAPACK/MPI, the `MPI` extras is required.
@@ -63,7 +63,7 @@ brew install gcc [open-mpi scalapack]
 The building and installation can then proceed with
 
 ```
-git clone https://github.com/azag0/libmbd.git && cd libmbd
+git clone https://github.com/jhrmnn/libmbd.git && cd libmbd
 mkdir build && cd build
 cmake .. [-DENABLE_SCALAPACK_MPI=ON]
 make
@@ -120,8 +120,8 @@ call calc%destroy()
 
 ## Links
 
-- Libmbd documentation: https://azag0.github.io/libmbd
-- Pymbd documentation: https://azag0.github.io/libmbd/pymbd
+- Libmbd documentation: https://jhrmnn.github.io/libmbd
+- Pymbd documentation: https://jhrmnn.github.io/libmbd/pymbd
 
 ## Developing
 
@@ -129,7 +129,7 @@ For development, Libmbd doesn't have to be installed on the system, and Pymbd ca
 
 ```
 pip install tox tox-venv  # or just make sure you have tox and tox-venv installed
-git clone https://github.com/azag0/libmbd.git && cd libmbd
+git clone https://github.com/jhrmnn/libmbd.git && cd libmbd
 make setup  # creates ./build and runs cmake
 # do some development
 make test && tox

@@ -34,11 +34,11 @@ test:
     - pytest -vs --durations=3 --pyargs pymbd
 
 about:
-  home: https://github.com/azag0/libmbd
+  home: https://github.com/jhrmnn/libmbd
   license: MPL-2.0
   license_file: LICENSE
   summary: Many-body dispersion library
 
 extra:
   recipe-maintainers:
-    - azag0
+    - jhrmnn

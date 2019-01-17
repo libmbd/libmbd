@@ -16,4 +16,4 @@ conda config --set always_yes yes
 conda update -q conda
 conda install conda-build anaconda-client
 conda build .conda
-anaconda -t $ANACONDA_TOKEN upload -u azag0 $(conda build --output .)
+anaconda -t $ANACONDA_TOKEN upload -u libmbd $(conda build --output .)

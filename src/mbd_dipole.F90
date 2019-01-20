@@ -392,19 +392,23 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                                     - k(a)*k(b)*dk_sqdA/(2*k_sq**2)
                             end forall
                             dkk_dA = dkk_dA + transpose(dkk_dA)
-                            associate ( &
-                                dTda_sub => ddipmat%dlattice(i+1:i+3, j+1:j+3, i_latt, i_xyz) &
-                            )
-                                dTda_sub = dTda_sub &
-                                    - Tij*latt_inv(i_latt, i_xyz) &
-                                    + vol_exp*dkk_dA &
-                                    - Tij*dk_sqdA/(4*geom%gamm**2) &
+                            ! Using associate here was causing weird seg faults
+                            ! with some Intel compilers, reporting i_xyz being
+                            ! zero in the index, even though it printed as 1
+                            ! associate ( &
+                            !     dTda_sub => ddipmat%dlattice(i+1:i+3, j+1:j+3, i_latt, i_xyz) &
+                            ! )
+                            ddipmat%dlattice(i+1:i+3, j+1:j+3, i_latt, i_xyz) = &
+                                ddipmat%dlattice(i+1:i+3, j+1:j+3, i_latt, i_xyz) &
+                                - Tij*latt_inv(i_latt, i_xyz) &
+                                + vol_exp*dkk_dA &
+                                - Tij*dk_sqdA/(4*geom%gamm**2) &
 #if MBD_TYPE == 1
-                                    + Tij*IMI*dot_product(dGdA, Rij)
+                                + Tij*IMI*dot_product(dGdA, Rij)
 #elif MBD_TYPE == 0
-                                    - vol_kk_exp_ksq*sin(G_Rij)*dot_product(dGdA, Rij)
+                                - vol_kk_exp_ksq*sin(G_Rij)*dot_product(dGdA, Rij)
 #endif
-                            end associate
+                            ! end associate
                         end do
                     end do
                 end if

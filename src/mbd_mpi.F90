@@ -3,17 +3,18 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 module mbd_mpi
 
-use mbd_constants
-#ifdef WITH_MPIFH
-include 'mpif.h'
-#else
+use mbd_constants, only: dp
+#ifndef WITH_MPIFH
 use mpi
 #endif
 
 implicit none
 
-private
-public :: mpi_all_reduce, MPI_COMM_WORLD, MPI_COMM_RANK, MPI_COMM_SIZE
+#ifdef WITH_MPIFH
+include 'mpif.h'
+#endif
+
+private :: dp
 
 interface mpi_all_reduce
     module procedure mpi_all_reduce_real_0d

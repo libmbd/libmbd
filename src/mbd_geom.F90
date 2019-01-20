@@ -16,7 +16,7 @@ use mbd_utils, only: shift_idx, atom_index_t, quad_pt_t, exception_t, tostr, clo
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
 #ifdef WITH_MPI
-use mbd_mpi, only: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_WORLD
+use mbd_mpi
 #endif
 
 implicit none

@@ -16,7 +16,7 @@ use mbd_utils, only: shift_idx, atom_index_t, quad_pt_t, exception_t, tostr, clo
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
 #ifdef WITH_MPI
-use mbd_mpi
+use mbd_mpi, only: MPI_COMM_SIZE, MPI_COMM_RANK, MPI_COMM_WORLD
 #endif
 
 implicit none
@@ -64,6 +64,10 @@ type, public :: geom_t
         !! Whether to calculate MBD energy by frequency integration
     logical :: get_rpa_orders = .false.
         !! Whether to calculate RPA orders
+#ifdef WITH_MPI
+    integer :: mpi_comm = MPI_COMM_WORLD
+        !! MPI communicator
+#endif
     ! The following components are set by the initializer and should be
     ! considered read-only
     type(clock_t) :: clock_
@@ -81,7 +85,8 @@ type, public :: geom_t
     type(blacs_grid_t) :: blacs_grid
 #endif
 #ifdef WITH_MPI
-    integer :: comm = MPI_COMM_WORLD
+    integer :: mpi_size = -1
+    integer :: mpi_rank = -1
 #endif
     contains
     procedure :: init => geom_init
@@ -98,6 +103,9 @@ subroutine geom_init(this)
 
     integer :: i_atom
     real(dp) :: volume
+#ifdef WITH_MPI
+    integer :: ierr
+#endif
 
     associate (n => this%param%n_freq)
         allocate (this%freq(0:n))
@@ -120,15 +128,19 @@ subroutine geom_init(this)
         this%parallel_mode = 'atoms'
         if (allocated(this%lattice) .and. allocated(this%k_grid)) then
             if (this%siz()**2 < product(this%k_grid)) then
-                this%parallel_mode = 'atoms'
+                this%parallel_mode = 'k_points'
             end if
         end if
     end if
+#ifdef WITH_MPI
+    call MPI_COMM_SIZE(this%mpi_comm, this%mpi_size, ierr)
+    call MPI_COMM_RANK(this%mpi_comm, this%mpi_rank, ierr)
+#endif
 #ifdef WITH_SCALAPACK
     this%idx%parallel = this%parallel_mode == 'atoms' .and. this%siz() > 1
     if (this%idx%parallel) then
 #   ifdef WITH_MPI
-        call this%blacs_grid%init(this%comm)
+        call this%blacs_grid%init(this%mpi_comm)
 #   else
         call this%blacs_grid%init()
 #   endif

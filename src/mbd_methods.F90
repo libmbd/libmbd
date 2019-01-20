@@ -16,7 +16,10 @@ use mbd_rpa, only: get_mbd_rpa_energy
 use mbd_scs, only: run_scs
 use mbd_utils, only: result_t, tostr, quad_pt_t, shift_idx
 #ifdef WITH_SCALAPACK
-use mbd_blacs, only: all_reduce
+use mbd_blacs, only: blacs_all_reduce
+#endif
+#ifdef WITH_MPI
+use mbd_mpi, only: mpi_all_reduce
 #endif
 
 implicit none
@@ -73,8 +76,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             ! TODO gradients
         end if
     else
-        k_pts = make_k_pts( &
-            geom%k_grid, geom%lattice, geom%param%k_grid_shift, dkdlattice, grad%dlattice &
+        call make_k_pts( &
+            k_pts, geom%k_grid, geom%lattice, geom%param%k_grid_shift, &
+            dkdlattice, grad%dlattice &
         )
         n_kpts = size(k_pts, 2)
         res%energy = 0d0
@@ -91,6 +95,11 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
         if (grad%dC6) allocate (dene%dC6(geom%siz()), source=0d0)
         if (grad%dR_vdw) allocate (dene%dR_vdw(geom%siz()), source=0d0)
         do i_kpt = 1, n_kpts
+#ifdef WITH_MPI
+            if (geom%parallel_mode == 'k_points') then
+                if (modulo(i_kpt, geom%mpi_size) /= geom%mpi_rank) cycle
+            end if
+#endif
             associate (k_pt => k_pts(:, i_kpt))
                 if (.not. geom%do_rpa) then
                     res_k = get_mbd_hamiltonian_energy( &
@@ -126,6 +135,16 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
             if (grad%dC6) dene%dC6 = dene%dC6 + dene_k%domega*domega%dC6/n_kpts
             if (grad%dR_vdw) dene%dR_vdw = dene%dR_vdw + dene_k%dR_vdw/n_kpts
         end do
+#ifdef WITH_MPI
+        if (geom%parallel_mode == 'k_points') then
+            call mpi_all_reduce(res%energy, geom%mpi_comm)
+            if (grad%dcoords) call mpi_all_reduce(dene%dcoords, geom%mpi_comm)
+            if (grad%dlattice) call mpi_all_reduce(dene%dlattice, geom%mpi_comm)
+            if (grad%dalpha) call mpi_all_reduce(dene%dalpha, geom%mpi_comm)
+            if (grad%dC6) call mpi_all_reduce(dene%dC6, geom%mpi_comm)
+            if (grad%dR_vdw) call mpi_all_reduce(dene%dR_vdw, geom%mpi_comm)
+        end if
+#endif
     end if
 end function
 
@@ -216,7 +235,7 @@ type(result_t) function get_mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call all_reduce(dene%dcoords, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dene%dcoords, geom%blacs)
 #endif
         dene%dcoords = dene%dcoords + dene_mbd%dcoords
     end if
@@ -232,7 +251,7 @@ type(result_t) function get_mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call all_reduce(dene%dlattice, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dene%dlattice, geom%blacs)
 #endif
         dene%dlattice = dene%dlattice + dene_mbd%dlattice
     end if
@@ -251,7 +270,7 @@ type(result_t) function get_mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call all_reduce(dene%dalpha, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dene%dalpha, geom%blacs)
 #endif
         dene%dalpha = dene%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
     end if
@@ -268,7 +287,7 @@ type(result_t) function get_mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call all_reduce(dene%dC6, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dene%dC6, geom%blacs)
 #endif
     end if
     if (grad%dr_vdw) then
@@ -282,7 +301,7 @@ type(result_t) function get_mbd_scs_energy( &
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call all_reduce(dene%dr_vdw, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dene%dr_vdw, geom%blacs)
 #endif
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
@@ -301,19 +320,24 @@ real(dp) function test_frequency_grid(freq) result(error)
     error = abs(C6(1)/99.5d0-1d0)
 end function
 
-function make_k_pts(k_grid, lattice, shift, dkdlattice, grad) result(k_pts)
+! This used to be a function returning the k_pts array, but that was causing
+! segfaults with some compilers. I suspect some combination of the product()
+! in the dimension specification and assignemnt to allocatable array.
+subroutine make_k_pts(k_pts, k_grid, lattice, shift, dkdlattice, grad)
+    real(dp), allocatable, intent(out) :: k_pts(:, :)
     integer, intent(in) :: k_grid(3)
     real(dp), intent(in) :: lattice(3, 3)
     real(dp), intent(in) :: shift
     real(dp), allocatable, intent(out) :: dkdlattice(:, :, :, :)
     logical, intent(in) :: grad
-    real(dp) :: k_pts(3, k_grid(1)*k_grid(2)*k_grid(3))
 
-    integer :: n_kpt(3), i_kpt, i_latt, a
+    integer :: n_kpt(3), i_kpt, i_latt, a, n_kpts
     real(dp) :: n_kpt_shifted(3), latt_inv(3, 3)
 
+    n_kpts = product(k_grid)
+    allocate (k_pts(3, n_kpts))
     n_kpt = [0, 0, -1]
-    do i_kpt = 1, product(k_grid)
+    do i_kpt = 1, n_kpts
         call shift_idx(n_kpt, [0, 0, 0], k_grid-1)
         n_kpt_shifted = dble(n_kpt)+shift
         where (2*n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted-dble(k_grid)
@@ -322,12 +346,12 @@ function make_k_pts(k_grid, lattice, shift, dkdlattice, grad) result(k_pts)
     latt_inv = inverse(lattice)
     k_pts = matmul(2*pi*transpose(latt_inv), k_pts)
     if (grad) then
-        allocate (dkdlattice(3, product(k_grid), 3, 3))
-        forall (i_kpt = 1:product(k_grid), i_latt = 1:3, a = 1:3)
+        allocate (dkdlattice(3, n_kpts, 3, 3))
+        forall (i_kpt = 1:n_kpts, i_latt = 1:3, a = 1:3)
             dkdlattice(:, i_kpt, i_latt, a) = &
                 -latt_inv(i_latt, :)*k_pts(a, i_kpt)
         end forall
     end if
-end function
+end subroutine
 
 end module

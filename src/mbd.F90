@@ -127,7 +127,7 @@ subroutine mbd_calc_init(this, input)
         !! MBD input.
 
 #ifdef WITH_MPI
-    if (input%comm /= -1) this%geom%comm = input%comm
+    if (input%comm /= -1) this%geom%mpi_comm = input%comm
 #endif
     this%method = input%method
     this%calculate_gradients = input%calculate_forces

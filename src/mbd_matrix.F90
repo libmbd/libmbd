@@ -8,7 +8,7 @@ use mbd_constants
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
 use mbd_utils, only: findval, exception_t, atom_index_t, is_true
 #   ifdef WITH_SCALAPACK
-use mbd_blacs, only: blacs_desc_t, all_reduce
+use mbd_blacs, only: blacs_desc_t, blacs_all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
 #   endif
 #   ifdef WITH_ELSI
@@ -425,7 +425,7 @@ complex(dp) function matrix_cplx_sum_all(this) result(res)
 
     res = sum(this%val)
 #ifdef WITH_SCALAPACK
-    if (this%idx%parallel) call all_reduce(res, this%blacs)
+    if (this%idx%parallel) call blacs_all_reduce(res, this%blacs)
 #endif
 end function
 
@@ -464,7 +464,7 @@ subroutine matrix_cplx_contract_n_transp(this, dir, res)
         end do
     end do
 #ifdef WITH_SCALAPACK
-    if (this%idx%parallel) call all_reduce(res, this%blacs)
+    if (this%idx%parallel) call blacs_all_reduce(res, this%blacs)
 #endif
 end subroutine
 
@@ -510,7 +510,7 @@ function contract_cross_33_complex(k_atom, A, A_prime, B, B_prime) result(res)
         end do
     end if
 #ifdef WITH_SCALAPACK
-    if (A%idx%parallel) call all_reduce(res, A%blacs)
+    if (A%idx%parallel) call blacs_all_reduce(res, A%blacs)
 #endif
 end function
 
@@ -536,7 +536,7 @@ function matrix_cplx_contract_n33diag_cols(A) result(res)
     end do
     res = res/3
 #ifdef WITH_SCALAPACK
-    if (A%idx%parallel) call all_reduce(res, A%blacs)
+    if (A%idx%parallel) call blacs_all_reduce(res, A%blacs)
 #endif
 end function
 
@@ -560,7 +560,7 @@ function matrix_cplx_contract_n33_rows(A) result(res)
         end associate
     end do
 #ifdef WITH_SCALAPACK
-    if (A%idx%parallel) call all_reduce(res, A%blacs)
+    if (A%idx%parallel) call blacs_all_reduce(res, A%blacs)
 #endif
 end function
 

@@ -270,6 +270,15 @@ def test_ethylcarbamate(calc):
 
 
 @no_complex_scalapack_macos_py27
+def test_argon_crystal(calc):
+    coords, lattice, k_grid, species, vols = argon_crystal
+    ene = calc.mbd_energy_species(
+        coords, species, vols, 0.83, lattice=lattice, k_grid=k_grid
+    )
+    assert ene == approx(-0.0021037562496878173, rel=1e-10)
+
+
+@no_complex_scalapack_macos_py27
 def test_argon_crystal_gradients(calc):
     coords, lattice, k_grid, species, vols = argon_crystal
     ene, gradients, latt_gradients = calc.mbd_energy_species(

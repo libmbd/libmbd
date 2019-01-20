@@ -8,7 +8,7 @@ use mbd_constants
 implicit none
 
 private
-public :: all_reduce
+public :: blacs_all_reduce
 
 type, public :: blacs_grid_t
     integer :: ctx
@@ -33,7 +33,7 @@ contains
     procedure :: init => blacs_desc_init
 end type
 
-interface all_reduce
+interface blacs_all_reduce
     module procedure all_reduce_real_scalar
     module procedure all_reduce_complex_scalar
     module procedure all_reduce_real_1d

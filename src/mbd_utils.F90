@@ -13,7 +13,8 @@ use mbd_mpi
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, shift_idx, is_true
+public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, shift_idx, &
+    is_true, printer
 
 interface tostr
     module procedure tostr_int
@@ -254,6 +255,15 @@ subroutine clock_print(this)
         end select
         print '(A20,I10,F10.3)', label, this%counts(i), dble(this%timestamps(i))/rate
     end do
+end subroutine
+
+subroutine printer(str)
+    character(len=*) :: str
+
+#ifdef WITH_MPI
+    if (mpi_get_rank() /= 0) return
+#endif
+    print *, str
 end subroutine
 
 logical function is_true(val) result(res)

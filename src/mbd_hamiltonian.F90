@@ -155,6 +155,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     end if
     res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
     if (.not. grad%any()) return
+    call geom%clock(25)
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
@@ -214,6 +215,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         end do
     end if
 #endif
+    call geom%clock(-25)
 end function
 
 #if MBD_TYPE == 0

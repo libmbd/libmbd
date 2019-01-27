@@ -191,6 +191,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                     sigma_ij = damp%mayer_scaling &
                         * sqrt(sum(damp%sigma([i_atom, j_atom])**2))
                 end if
+                call geom%clock(13)
                 select case (damp%version)
                     case ("bare")
                         T = T_bare(Rnij, dT, grad_ij%dcoords)
@@ -223,6 +224,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                             T_erf_coulomb(Rnij, sigma_ij)
                         do_ewald = .false.
                 end select
+                call geom%clock(-13)
                 if (grad_ij%dr_vdw) dT%dvdw = damp%beta*dT%dvdw
                 if (do_ewald) then
                     T = T &

@@ -56,10 +56,11 @@ end type
 type, public :: clock_t
     !! Used for measuring performance.
     logical :: active = .true.
-    integer, allocatable :: timestamps(:), counts(:)
+    integer(kind=8), allocatable :: timestamps(:), counts(:)
     contains
     procedure :: init => clock_init
     procedure :: clock => clock_clock
+    procedure :: print => clock_print
 end type
 
 type, public :: quad_pt_t
@@ -198,14 +199,16 @@ subroutine clock_init(this, n)
     class(clock_t), intent(inout) :: this
     integer, intent(in) :: n
 
-    allocate (this%timestamps(n), this%counts(n))
+    allocate (this%timestamps(n), source=0_8)
+    allocate (this%counts(n), source=0_8)
 end subroutine
 
 subroutine clock_clock(this, id)
     class(clock_t), intent(inout) :: this
     integer, intent(in) :: id
 
-    integer :: absid, cnt, rate, cnt_max
+    integer(kind=8) :: cnt, rate, cnt_max
+    integer :: absid
 
     if (.not. this%active) return
     call system_clock(cnt, rate, cnt_max)
@@ -216,6 +219,41 @@ subroutine clock_clock(this, id)
         this%timestamps(absid) = this%timestamps(absid) + cnt
         this%counts(absid) = this%counts(absid)+1
     end if
+end subroutine
+
+subroutine clock_print(this)
+    class(clock_t), intent(inout) :: this
+
+    integer(kind=8) :: cnt, rate, cnt_max
+    integer :: i
+    character(len=20) :: label
+
+#ifdef WITH_MPI
+    if (mpi_get_rank() /= 0) return
+#endif
+    call system_clock(cnt, rate, cnt_max)
+
+    print '(A20,A10,A10)', 'id', 'count', 'time (s)'
+    do i = 1, size(this%counts)
+        if (this%counts(i) == 0) cycle
+        select case (i)
+        case (11); label = 'dipole real space'
+        case (12); label = 'dipole rec space'
+        case (13); label = 'dipole real 3x3'
+        case (21); label = 'eig MBD'
+        case (23); label = 'eig RPA'
+        case (24); label = 'eig RPA orders'
+        case (25); label = 'MBD forces'
+        case (32); label = 'inv SCS'
+        case (50); label = 'SCS'
+        case (51); label = 'single k-point'
+        case (90); label = 'MBD@rsSCS'
+        case (91); label = 'MBD@rsSCS forces'
+        case default
+            label = '(' // trim(tostr(i)) // ')'
+        end select
+        print '(A20,I10,F10.3)', label, this%counts(i), dble(this%timestamps(i))/rate
+    end do
 end subroutine
 
 logical function is_true(val) result(res)

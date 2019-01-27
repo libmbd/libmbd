@@ -100,6 +100,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
                 if (modulo(i_kpt, geom%mpi_size) /= geom%mpi_rank) cycle
             end if
 #endif
+            call geom%clock(51)
             associate (k_pt => k_pts(:, i_kpt))
                 if (.not. geom%do_rpa) then
                     res_k = get_mbd_hamiltonian_energy( &
@@ -109,6 +110,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, dene, grad) resu
                     res_k = get_mbd_rpa_energy(geom, alpha, damp, k_pt)
                 end if
             end associate
+            call geom%clock(-51)
             if (geom%has_exc()) return
             if (geom%get_eigs) then
                 res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
@@ -169,6 +171,7 @@ type(result_t) function get_mbd_scs_energy( &
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
     character(len=15) :: damping_types(2)
 
+    call geom%clock(90)
     select case (variant)
     case ('scs')
         damping_types = [character(len=15) :: 'dip,gg', 'dip,1mexp']
@@ -194,12 +197,14 @@ type(result_t) function get_mbd_scs_energy( &
     )
     damp_scs = damp
     damp_scs%version = damping_types(1)
+    call geom%clock(50)
     do i_freq = 0, n_freq
         alpha_dyn_scs(:, i_freq) = run_scs( &
             geom, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
         )
         if (geom%has_exc()) return
     end do
+    call geom%clock(-50)
     C6_scs = C6_from_alpha(alpha_dyn_scs, geom%freq, dC6_scs_dalpha_dyn_scs, grad%any())
     damp_mbd = damp
     damp_mbd%r_vdw = scale_with_ratio( &
@@ -213,8 +218,10 @@ type(result_t) function get_mbd_scs_energy( &
             dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
         ) &
     )
+    call geom%clock(-90)
     if (geom%has_exc()) return
     if (.not. grad%any()) return
+    call geom%clock(91)
     allocate (freq_w(0:ubound(geom%freq, 1)))
     freq_w = geom%freq%weight
     freq_w(0) = 1d0
@@ -305,6 +312,7 @@ type(result_t) function get_mbd_scs_energy( &
 #endif
         dene%dr_vdw = dene%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
     end if
+    call geom%clock(-91)
 end function
 
 real(dp) function test_frequency_grid(freq) result(error)

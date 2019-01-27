@@ -62,4 +62,10 @@ subroutine mpi_all_reduce_real_2d(x, comm)
     call mpi_all_reduce_real(x, size(x), comm)
 end subroutine
 
+integer function mpi_get_rank() result(rank)
+    integer :: err
+
+    call MPI_COMM_RANK(MPI_COMM_WORLD, rank, err)
+end function
+
 end module

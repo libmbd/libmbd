@@ -277,7 +277,7 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
     case ('ts')
         energy = ts_energy(this%geom, this%alpha_0, this%C6, this%damp)
     end select
-    if (this%debug) call this%geom%clock_%print()
+    if (this%debug) call this%geom%timer%print()
 end subroutine
 
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR

@@ -70,7 +70,7 @@ type, public :: geom_t
 #endif
     ! The following components are set by the initializer and should be
     ! considered read-only
-    type(clock_t) :: clock_
+    type(clock_t) :: timer
     type(exception_t) :: exc
     logical :: muted = .false.
     type(quad_pt_t), allocatable :: freq(:)
@@ -113,7 +113,7 @@ subroutine geom_init(this)
     end associate
     this%freq(0)%val = 0d0
     this%freq(0)%weight = 0d0
-    call this%clock_%init(100)
+    call this%timer%init(100)
     if (allocated(this%lattice)) then
         volume = abs(dble(product(eigvals(this%lattice))))
         if (this%param%ewald_on) then
@@ -165,8 +165,8 @@ subroutine geom_destroy(this)
     if (this%idx%parallel) call this%blacs_grid%destroy()
 #endif
     deallocate (this%freq)
-    deallocate (this%clock_%timestamps)
-    deallocate (this%clock_%counts)
+    deallocate (this%timer%timestamps)
+    deallocate (this%timer%counts)
 end subroutine
 
 integer function geom_siz(this) result(siz)
@@ -203,7 +203,7 @@ subroutine geom_clock(this, id)
     class(geom_t), intent(inout) :: this
     integer, intent(in) :: id
 
-    call this%clock_%clock(id)
+    call this%timer%clock(id)
 end subroutine
 
 subroutine get_freq_grid(n, x, w, L)

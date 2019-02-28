@@ -53,6 +53,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     res%energy = 0d0
     damp_alpha = damp
     allocate (eigs(3*geom%siz()))
+    if (geom%get_rpa_orders) allocate (res%rpa_orders(geom%param%rpa_order_max), source=0d0)
     do i_freq = 0, ubound(geom%freq, 1)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
         ! relay = T
@@ -96,7 +97,6 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             eigs = AT%eigvals(geom%exc, destroy=.true.)
             call geom%clock(-24)
             if (geom%has_exc()) return
-            allocate (res%rpa_orders(geom%param%rpa_order_max))
             do n_order = 2, geom%param%rpa_order_max
                 res%rpa_orders(n_order) = res%rpa_orders(n_order) &
                     +(-1d0/(2*pi)*(-1)**n_order &

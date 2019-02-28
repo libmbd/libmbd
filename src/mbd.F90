@@ -40,6 +40,10 @@ type, public :: mbd_input_t
         !! Whether to calculate forces.
     logical :: calculate_spectrum = .false.
         !! Whether to keep MBD eigenvalues.
+    logical :: do_rpa = .false.
+        !! Whether to evalulate the MBD energy as an RPA integral over frequency.
+    logical :: rpa_orders = .false.
+        !! Whether to calculate individual RPA orders
     real(dp) :: ts_ene_acc = TS_ENERGY_ACCURACY
         !! Required accuracy of the TS energy.
     real(dp) :: ts_f_acc = TS_FORCES_ACCURACY
@@ -118,6 +122,7 @@ contains
     procedure :: get_gradients => mbd_calc_get_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
+    procedure :: get_rpa_orders => mbd_calc_get_rpa_orders
     procedure :: get_exception => mbd_calc_get_exception
 end type
 
@@ -134,10 +139,10 @@ subroutine mbd_calc_init(this, input)
 #endif
     this%method = input%method
     this%calculate_gradients = input%calculate_forces
-    if (input%calculate_spectrum) then
-        this%geom%get_eigs = .true.
-        this%geom%get_modes = .true.
-    end if
+    this%geom%get_eigs = input%calculate_spectrum
+    this%geom%get_modes = input%calculate_spectrum
+    this%geom%do_rpa = input%do_rpa
+    this%geom%get_rpa_orders = input%rpa_orders
     this%geom%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
     this%geom%param%n_freq = input%n_omega_grid
@@ -320,7 +325,7 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
     !! The spectrum is actually calculated together with the energy, so a call
     !! to this method must be preceeded by a call to
     !! [[mbd_calc_t:evaluate_vdw_method]].  For the same reason, the
-    !! spectrum must be requested prior to this called via
+    !! spectrum must be requested prior to this call via
     !! [[mbd_input_t:calculate_spectrum]].
     class(mbd_calc_t), intent(inout) :: this
     real(dp), intent(out) :: spectrum(:)
@@ -339,6 +344,21 @@ subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)
 
     spectrum = this%results%mode_eigs
     if (present(modes)) call move_alloc(this%results%modes, modes)
+end subroutine
+
+subroutine mbd_calc_get_rpa_orders(this, rpa_orders)
+    !! Provide RPA orders if they were requested in the MBD input.
+    !!
+    !! The orders are actually calculated together with the energy, so a call
+    !! to this method must be preceeded by a call to
+    !! [[mbd_calc_t:evaluate_vdw_method]]. For the same reason, the
+    !! spectrum must be requested prior to this call via
+    !! [[mbd_input_t:do_rpa]] and [[mbd_input_t:rpa_orders]].
+    class(mbd_calc_t), intent(inout) :: this
+    real(dp), allocatable, intent(out) :: rpa_orders(:)
+        !! (a.u.) MBD energy decomposed to RPA orders.
+
+    rpa_orders = this%results%rpa_orders
 end subroutine
 
 subroutine mbd_calc_get_exception(this, code, origin, msg)

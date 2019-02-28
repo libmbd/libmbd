@@ -160,7 +160,8 @@ real(c_double) function cmbd_mbd_energy( &
 end function
 
 real(c_double) function cmbd_rpa_energy( &
-    geom_c, n_atoms, alpha_0, C6, damping_c, gradients, latt_gradients &
+    geom_c, n_atoms, alpha_0, C6, damping_c, gradients, latt_gradients, &
+    rpa_orders &
 ) bind(c)
     type(c_ptr), intent(in), value :: geom_c
     integer(c_int), intent(in), value :: n_atoms
@@ -169,6 +170,7 @@ real(c_double) function cmbd_rpa_energy( &
     type(c_ptr), intent(in), value :: damping_c
     real(c_double), intent(out), optional :: gradients(3, n_atoms)
     real(c_double), intent(out), optional :: latt_gradients(3, 3)
+    real(c_double), intent(out), optional :: rpa_orders(10)
 
     type(geom_t), pointer :: geom
     type(damping_t), pointer :: damping
@@ -178,9 +180,12 @@ real(c_double) function cmbd_rpa_energy( &
     call c_f_pointer(geom_c, geom)
     call c_f_pointer(damping_c, damping)
     geom%do_rpa = .true.
+    geom%get_rpa_orders = present(rpa_orders)
     res = get_mbd_energy(geom, alpha_0, C6, damping, dene, grad_request_t())
     geom%do_rpa = .false.
+    geom%get_rpa_orders = .false.
     cmbd_rpa_energy = res%energy
+    if (present(rpa_orders)) rpa_orders = res%rpa_orders
 end function
 
 real(c_double) function cmbd_mbd_rsscs_energy( &

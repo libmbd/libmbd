@@ -94,7 +94,7 @@ class MBDCalc(object):
     def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
                    lattice=None, k_grid=None,
                    a=6., func='mbd_rsscs_energy', force=False,
-                   damping='fermi,dip', spectrum=False):
+                   damping='fermi,dip', spectrum=False, rpa_orders=False):
         """
         Calculate an MBD energy.
         """
@@ -114,7 +114,7 @@ class MBDCalc(object):
         )
         gradients = np.zeros((n_atoms, 3)) if force else None
         latt_gradients = np.zeros((3, 3)) if force and lattice is not None else None
-        eigs, modes = None, None
+        eigs, modes, orders = None, None, None
         args = (
             geom,
             n_atoms,
@@ -129,12 +129,18 @@ class MBDCalc(object):
                 eigs = np.zeros(3*n_atoms)
                 modes = np.zeros((3*n_atoms, 3*n_atoms), order='F')
             args += (_cast('double*', eigs), _cast('double*', modes))
+        elif func == 'rpa_energy':
+            if rpa_orders:
+                orders = np.zeros(10)
+            args += (_cast('double*', orders),)
         ene = getattr(_lib, 'cmbd_' + func)(*args)
         _lib.cmbd_destroy_damping(damping)
         _lib.cmbd_destroy_geom(geom)
         self._check_exc(geom)
         if spectrum:
             ene = ene, eigs, modes
+        elif rpa_orders:
+            ene = ene, orders
         if force:
             gradients = (gradients,)
             if lattice is not None:

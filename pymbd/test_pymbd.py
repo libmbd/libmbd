@@ -149,11 +149,14 @@ def test_argon_dimer_plain(calc):
 
 @no_scalapack
 def test_argon_dimer_rpa(calc):
-    ene = calc.mbd_energy(
+    ene, orders = calc.mbd_energy(
         [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
-        func='rpa_energy'
+        func='rpa_energy', rpa_orders=True,
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
+    assert orders[1] == approx(-0.00024318540282078396, rel=1e-10)
+    assert orders[2] == approx(0)
+    assert orders[3] == approx(-1.0560560758487198e-07, rel=1e-10)
 
 
 def test_argon_dimer_rsscs(calc):

@@ -56,7 +56,8 @@ double cmbd_rpa_energy(
     double* C6,
     struct cmbd_damping* damping,
     double* gradients,
-    double* latt_gradients
+    double* latt_gradients,
+    double* rpa_orders
 );
 
 double cmbd_mbd_rsscs_energy(

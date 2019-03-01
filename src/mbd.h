@@ -8,8 +8,15 @@ struct geom_t* cmbd_init_geom(
     double* coords,
     double* lattice,
     int* k_grid,
-    int n_freq
+    int n_freq,
+    _Bool do_rpa,
+    _Bool get_spectrum,
+    _Bool get_rpa_orders
 );
+
+void cmbd_update_coords(struct geom_t* geom, double* coords);
+
+void cmbd_update_lattice(struct geom_t* geom, double* lattice);
 
 void cmbd_destroy_geom(struct geom_t* geom);
 
@@ -33,54 +40,39 @@ void cmbd_destroy_damping(struct cmbd_damping* damping);
 
 double cmbd_ts_energy(
     struct geom_t* geom,
-    int n_atoms,
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping
 );
 
-double cmbd_mbd_energy(
+struct result_t* cmbd_mbd_energy(
     struct geom_t* geom,
-    int n_atoms,
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    double* gradients,
-    double* latt_gradients
+    _Bool grad
 );
 
-double cmbd_rpa_energy(
+struct result_t* cmbd_mbd_scs_energy(
     struct geom_t* geom,
-    int n_atoms,
+    char* variant,
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
+    _Bool grad
+);
+
+void cmbd_get_results(
+    struct result_t* result,
+    double* energy,
     double* gradients,
-    double* latt_gradients,
+    double* lattice_gradients,
+    double* eigvals,
+    double* eigvecs,
     double* rpa_orders
 );
 
-double cmbd_mbd_rsscs_energy(
-    struct geom_t* geom,
-    int n_atoms,
-    double* alpha_0,
-    double* C6,
-    struct cmbd_damping* damping,
-    double* gradients,
-    double* latt_gradients,
-    double* eigvals,
-    double* eigvecs
-);
-
-double cmbd_mbd_scs_energy(
-    struct geom_t* geom,
-    int n_atoms,
-    double* alpha_0,
-    double* C6,
-    struct cmbd_damping* damping,
-    double* gradients,
-    double* latt_gradients
-);
+void cmbd_destroy_result(struct result_t* result);
 
 double cmbd_dipole_matrix(
     struct geom_t* geom,

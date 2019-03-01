@@ -270,7 +270,6 @@ subroutine test_mbd_deriv_expl()
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: omega(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     real(dp), allocatable :: gradients_anl(:, :)
     integer :: i_atom, n_atoms, i_xyz, i_step
 
@@ -288,17 +287,15 @@ subroutine test_mbd_deriv_expl()
     damp%beta = 0.83d0
     alpha_0 = [11d0, 10d0, 12d0]
     omega = [.7d0, .65d0, .75d0]
-    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dcoords=.true.))
-    gradients_anl = dene%dcoords
+    res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, grad_request_t(dcoords=.true.))
+    gradients_anl = res(0)%dE%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 geom%coords = coords
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom)+i_step*delta
-                res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-                    dene, grad_request_t())
+                res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, grad_request_t())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
@@ -317,7 +314,6 @@ subroutine test_mbd_ewald_deriv_expl()
         coords(:, :), gradients(:, :), diff(:, :), alpha_0(:), omega(:), &
         gradients_anl(:, :)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 0.01d0
@@ -337,8 +333,8 @@ subroutine test_mbd_ewald_deriv_expl()
     alpha_0 = [11d0, 10d0]
     omega = [.7d0, .65d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dcoords=.true.), k_point)
-    gradients_anl = dene%dcoords
+        grad_request_t(dcoords=.true.), k_point)
+    gradients_anl = res(0)%dE%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
@@ -346,7 +342,7 @@ subroutine test_mbd_ewald_deriv_expl()
                 geom%coords = coords
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom)+i_step*delta
                 res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-                    dene, grad_request_t(), k_point)
+                    grad_request_t(), k_point)
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
@@ -366,7 +362,6 @@ subroutine test_mbd_ewald_deriv_impl_q()
     real(dp), allocatable :: &
         gradients(:), diff(:), alpha_0(:), omega(:), gradients_anl(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: n_atoms, i_xyz, i_step
 
     delta = 0.01d0
@@ -385,15 +380,15 @@ subroutine test_mbd_ewald_deriv_impl_q()
     alpha_0 = [11d0, 10d0]
     omega = [.7d0, .65d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dq=.true.), k_point)
-    gradients_anl = dene%dq
+        grad_request_t(dq=.true.), k_point)
+    gradients_anl = res(0)%dE%dq
     do i_xyz = 1, 3
         do i_step = -3, 3
             if (i_step == 0) cycle
             k_point_diff = k_point
             k_point_diff(i_xyz) = k_point_diff(i_xyz)+i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-                dene, grad_request_t(), k_point_diff)
+                grad_request_t(), k_point_diff)
         end do
         gradients(i_xyz) = diff7(res%energy, delta)
     end do
@@ -413,7 +408,6 @@ subroutine test_mbd_ewald_deriv_stress()
         lattice(:, :), gradients(:, :), diff(:, :), alpha_0(:), omega(:), &
         gradients_anl(:, :)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_latt, n_atoms, i_xyz, i_step
 
     delta = 0.01d0
@@ -433,8 +427,8 @@ subroutine test_mbd_ewald_deriv_stress()
     alpha_0 = [11d0, 10d0]
     omega = [.7d0, .65d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dlattice=.true.), k_point)
-    gradients_anl = dene%dlattice
+        grad_request_t(dlattice=.true.), k_point)
+    gradients_anl = res(0)%dE%dlattice
     do i_latt = 1, 3
         do i_xyz = 1, 3
             do i_step = -3, 3
@@ -442,7 +436,7 @@ subroutine test_mbd_ewald_deriv_stress()
                 geom%lattice = lattice
                 geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
                 res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-                    dene, grad_request_t(), k_point)
+                    grad_request_t(), k_point)
             end do
             gradients(i_latt, i_xyz) = diff7(res%energy, delta)
         end do
@@ -868,7 +862,6 @@ subroutine test_mbd_deriv_impl_alpha()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), omega(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 0.1d0
@@ -886,15 +879,15 @@ subroutine test_mbd_deriv_impl_alpha()
     alpha_0 = [11d0, 10d0, 12d0]
     omega = [.7d0, .65d0, .75d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dalpha=.true.))
-    gradients_anl = dene%dalpha
+        grad_request_t(dalpha=.true.))
+    gradients_anl = res(0)%dE%dalpha
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0_diff, omega, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -911,7 +904,6 @@ subroutine test_mbd_ewald_deriv_impl_alpha()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), omega(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 0.1d0
@@ -931,15 +923,15 @@ subroutine test_mbd_ewald_deriv_impl_alpha()
     alpha_0 = [11d0, 10d0]
     omega = [.7d0, .65d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dalpha=.true.), k_point)
-    gradients_anl = dene%dalpha
+        grad_request_t(dalpha=.true.), k_point)
+    gradients_anl = res(0)%dE%dalpha
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0_diff, omega, damp, &
-                dene, grad_request_t(), k_point)
+                grad_request_t(), k_point)
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -958,7 +950,6 @@ subroutine test_mbd_deriv_impl_omega()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega_diff(:), omega(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 0.03d0
@@ -976,15 +967,15 @@ subroutine test_mbd_deriv_impl_omega()
     alpha_0 = [11d0, 10d0, 12d0]
     omega = [.7d0, .65d0, .75d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(domega=.true.))
-    gradients_anl = dene%domega
+        grad_request_t(domega=.true.))
+    gradients_anl = res(0)%dE%domega
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             omega_diff = omega
             omega_diff(i_atom) = omega_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega_diff, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1001,7 +992,6 @@ subroutine test_mbd_ewald_deriv_impl_omega()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega_diff(:), omega(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 0.03d0
@@ -1021,15 +1011,15 @@ subroutine test_mbd_ewald_deriv_impl_omega()
     alpha_0 = [11d0, 10d0]
     omega = [.7d0, .65d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(domega=.true.), k_point)
-    gradients_anl = dene%domega
+        grad_request_t(domega=.true.), k_point)
+    gradients_anl = res(0)%dE%domega
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             omega_diff = omega
             omega_diff(i_atom) = omega_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega_diff, damp, &
-                dene, grad_request_t(), k_point)
+                grad_request_t(), k_point)
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1046,7 +1036,6 @@ subroutine test_mbd_deriv_impl_vdw()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega(:), r_vdw(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 1d-3
@@ -1064,15 +1053,15 @@ subroutine test_mbd_deriv_impl_vdw()
     alpha_0 = [11d0, 10d0, 12d0]
     omega = [.7d0, .65d0, .75d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dr_vdw=.true.))
-    gradients_anl = dene%dr_vdw
+        grad_request_t(dr_vdw=.true.))
+    gradients_anl = res(0)%dE%dr_vdw
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1089,7 +1078,6 @@ subroutine test_mbd_ewald_deriv_impl_vdw()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), omega(:), r_vdw(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 1d-3
@@ -1110,15 +1098,15 @@ subroutine test_mbd_ewald_deriv_impl_vdw()
     alpha_0 = [11d0, 10d0]
     omega = [.7d0, .65d0]
     res(0) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-        dene, grad_request_t(dr_vdw=.true.), k_point)
-    gradients_anl = dene%dr_vdw
+        grad_request_t(dr_vdw=.true.), k_point)
+    gradients_anl = res(0)%dE%dr_vdw
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
-                dene, grad_request_t(), k_point)
+                grad_request_t(), k_point)
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1140,7 +1128,6 @@ subroutine test_mbd_rsscs_deriv_expl()
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 0.01d0
@@ -1157,8 +1144,8 @@ subroutine test_mbd_rsscs_deriv_expl()
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dcoords=.true.))
-    gradients_anl = dene%dcoords
+        grad_request_t(dcoords=.true.))
+    gradients_anl = res(0)%dE%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
@@ -1167,7 +1154,7 @@ subroutine test_mbd_rsscs_deriv_expl()
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + &
                     i_step*delta
                 res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-                    dene, grad_request_t())
+                    grad_request_t())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
@@ -1188,7 +1175,6 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
     real(dp), allocatable :: alpha_0(:)
     real(dp), allocatable :: C6(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_xyz, i_step
 
     delta = 0.01d0
@@ -1208,8 +1194,8 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
     alpha_0 = [11d0, 10d0]
     C6 = [65d0, 60d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dcoords=.true.))
-    gradients_anl = dene%dcoords
+        grad_request_t(dcoords=.true.))
+    gradients_anl = res(0)%dE%dcoords
     do i_atom = 1, n_atoms
         do i_xyz = 1, 3
             do i_step = -3, 3
@@ -1218,7 +1204,7 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + &
                     i_step*delta
                 res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-                    dene, grad_request_t())
+                    grad_request_t())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
@@ -1236,7 +1222,6 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
     real(dp), allocatable :: gradients(:, :), gradients_anl(:, :), &
         diff(:, :), alpha_0(:), C6(:), lattice(:, :)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: n_atoms, i_xyz, i_step, i_latt
 
     delta = 0.01d0
@@ -1256,8 +1241,8 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
     alpha_0 = [11d0, 10d0]
     C6 = [65d0, 60d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dlattice=.true.))
-    gradients_anl = dene%dlattice
+        grad_request_t(dlattice=.true.))
+    gradients_anl = res(0)%dE%dlattice
     do i_latt = 1, 3
         do i_xyz = 1, 3
             do i_step = -3, 3
@@ -1265,7 +1250,7 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
                 geom%lattice = lattice
                 geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
                 res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-                    dene, grad_request_t())
+                    grad_request_t())
             end do
             gradients(i_latt, i_xyz) = diff7(res%energy, delta)
         end do
@@ -1285,7 +1270,6 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 3d-2
@@ -1303,15 +1287,15 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dalpha=.true.))
-    gradients_anl = dene%dalpha
+        grad_request_t(dalpha=.true.))
+    gradients_anl = res(0)%dE%dalpha
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1328,7 +1312,6 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 0.01d0
@@ -1346,15 +1329,15 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dC6=.true.))
-    gradients_anl = dene%dC6
+        grad_request_t(dC6=.true.))
+    gradients_anl = res(0)%dE%dC6
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1371,7 +1354,6 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 1d-2
@@ -1389,15 +1371,15 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
     alpha_0 = [11d0, 10d0, 12d0]
     C6 = [65d0, 60d0, 70d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dr_vdw=.true.))
-    gradients_anl = dene%dr_vdw
+        grad_request_t(dr_vdw=.true.))
+    gradients_anl = res(0)%dE%dr_vdw
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1414,7 +1396,6 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_alpha()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 3d-2
@@ -1434,15 +1415,15 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_alpha()
     alpha_0 = [11d0, 10d0]
     C6 = [65d0, 60d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dalpha=.true.))
-    gradients_anl = dene%dalpha
+        grad_request_t(dalpha=.true.))
+    gradients_anl = res(0)%dE%dalpha
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
             alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1459,7 +1440,6 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_C6()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6_diff(:), C6(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 0.01d0
@@ -1479,15 +1459,15 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_C6()
     alpha_0 = [11d0, 10d0]
     C6 = [65d0, 60d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dC6=.true.))
-    gradients_anl = dene%dC6
+        grad_request_t(dC6=.true.))
+    gradients_anl = res(0)%dE%dC6
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             C6_diff = C6
             C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
@@ -1504,7 +1484,6 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_vdw()
     real(dp), allocatable :: coords(:, :), gradients(:), &
         gradients_anl(:), diff(:), alpha_0(:), C6(:), r_vdw(:)
     type(result_t) :: res(-3:3)
-    type(grad_t) :: dene
     integer :: i_atom, n_atoms, i_step
 
     delta = 1d-2
@@ -1525,15 +1504,15 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_vdw()
     alpha_0 = [11d0, 10d0]
     C6 = [65d0, 60d0]
     res(0) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-        dene, grad_request_t(dr_vdw=.true.))
-    gradients_anl = dene%dr_vdw
+        grad_request_t(dr_vdw=.true.))
+    gradients_anl = res(0)%dE%dr_vdw
     do i_atom = 1, n_atoms
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
             damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
-                dene, grad_request_t())
+                grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do

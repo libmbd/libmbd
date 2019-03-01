@@ -9,7 +9,7 @@ import pytest
 from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDCalc, with_scalapack, MBDFortranException
+from .fortran import MBDGeom, with_scalapack, MBDFortranException
 from .utils import numerical_gradients, numerical_latt_gradients
 
 no_scalapack = pytest.mark.skipif(
@@ -133,25 +133,18 @@ bulk_lithium = [(
 )]
 
 
-@pytest.fixture(scope='module')
-def calc():
-    with MBDCalc() as calc:
-        yield calc
-
-
-def test_argon_dimer_plain(calc):
-    ene = calc.mbd_energy(
-        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
-        func='mbd_energy'
+def test_argon_dimer_plain():
+    ene = MBDGeom([(0, 0, 0), (0, 0, 4*ang)]).mbd_energy(
+        [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83, variant='plain'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
 
 @no_scalapack
-def test_argon_dimer_rpa(calc):
-    ene, orders = calc.mbd_energy(
-        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83,
-        func='rpa_energy', rpa_orders=True,
+def test_argon_dimer_rpa():
+    geom = MBDGeom([(0, 0, 0), (0, 0, 4*ang)], do_rpa=True, get_rpa_orders=True)
+    ene, orders = geom.mbd_energy(
+        [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83, variant='plain'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
     assert orders[1] == approx(-0.00024318540282078396, rel=1e-10)
@@ -159,39 +152,38 @@ def test_argon_dimer_rpa(calc):
     assert orders[3] == approx(-1.0560560758487198e-07, rel=1e-10)
 
 
-def test_argon_dimer_rsscs(calc):
-    ene = calc.mbd_energy_species(
-        [(0, 0, 0), (0, 0, 4*ang)], ['Ar', 'Ar'], [1, 1], 0.83
+def test_argon_dimer_rsscs():
+    ene = MBDGeom([(0, 0, 0), (0, 0, 4*ang)]).mbd_energy_species(
+        ['Ar', 'Ar'], [1, 1], 0.83
     )
     assert ene == approx(-0.0002462647623815428, rel=1e-10)
 
 
-def test_argon_dimer_ts(calc):
-    ene = calc.ts_energy(
-        [(0, 0, 0), (0, 0, 4*ang)], [11, 11], [63.525, 63.525], [3.55, 3.55], 0.94
+def test_argon_dimer_ts():
+    ene = MBDGeom([(0, 0, 0), (0, 0, 4*ang)]).ts_energy(
+        [11, 11], [63.525, 63.525], [3.55, 3.55], 0.94
     )
     assert ene == approx(-0.000318123017869182, rel=1e-10)
 
 
-def test_benzene_dimer(calc):
+def test_benzene_dimer():
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        calc.mbd_energy_species(coords, species, vols, 0.83)
+        MBDGeom(coords).mbd_energy_species(species, vols, 0.83)
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
-def test_benzene_gradients(calc):
+def test_benzene_gradients():
     coords, species, vols = benzene_dimer[0]
-    ene, gradients = calc.mbd_energy_species(
-        coords, species, vols, 0.83, force=True
+    ene, gradients = MBDGeom(coords).mbd_energy_species(
+        species, vols, 0.83, force=True
     )
-    num_gradients = numerical_gradients(
-        calc.mbd_energy_species, coords, species, vols, 0.83,
-    )
+    with MBDGeom(coords) as geom:
+        num_gradients = numerical_gradients(geom, 'mbd_energy_species', species, vols, 0.83)
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
 
@@ -201,71 +193,67 @@ def test_benzene_dimer_python():
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        mbd_energy_species(coords, species, vols, 0.83)
+        MBDGeom(coords).mbd_energy_species(species, vols, 0.83)
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.006312323931302544, rel=1e-10)
 
 
-def test_benzene_gradients_plain(calc):
+def test_benzene_gradients_plain():
     coords, species, vols = benzene_dimer[0]
-    ene, gradients = calc.mbd_energy_species(
-        coords, species, vols, 0.83,
-        func='mbd_energy', force=True
+    ene, gradients = MBDGeom(coords).mbd_energy_species(
+        species, vols, 0.83, variant='plain', force=True
     )
-    num_gradients = numerical_gradients(
-        calc.mbd_energy_species, coords, species, vols, 0.83,
-        func='mbd_energy'
-    )
+    with MBDGeom(coords) as geom:
+        num_gradients = numerical_gradients(
+            geom, 'mbd_energy_species', species, vols, 0.83, variant='plain'
+        )
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
 
 
-def test_benzene_dimer_scs(calc):
+def test_benzene_dimer_scs():
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        calc.mbd_energy_species(coords, species, vols, 1, a=2.56, func='mbd_scs_energy')
+        MBDGeom(coords).mbd_energy_species(species, vols, 1, a=2.56, variant='scs')
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.007462380657774048, rel=1e-10)
 
 
-def test_benzene_dimer_ts(calc):
+def test_benzene_dimer_ts():
     mon1, mon2 = benzene_dimer
     dim = (np.vstack((mon1[0], mon2[0])), mon1[1] + mon2[1], mon1[2] + mon2[2])
     enes = [
-        calc.ts_energy_species(coords, species, vols, 0.94)
+        MBDGeom(coords).ts_energy_species(species, vols, 0.94)
         for coords, species, vols in (mon1, mon2, dim)
     ]
     ene_int = enes[2]-enes[1]-enes[0]
     assert ene_int == approx(-0.008490052683234028, rel=1e-10)
 
 
-def test_benzene(calc):
+def test_benzene():
     coords, species, vols = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vols)
-    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='mbd_energy')
+    ene = MBDGeom(coords).mbd_energy(alpha_0, C6, R_vdw, 0.83, variant='plain')
     assert ene == approx(-0.007002398506090302, rel=1e-10)
 
 
 @no_scalapack
-def test_benzene_rpa(calc):
+def test_benzene_rpa():
     coords, species, vols = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vols)
-    ene = calc.mbd_energy(coords, alpha_0, C6, R_vdw, 0.83, func='rpa_energy')
+    ene = MBDGeom(coords, do_rpa=True).mbd_energy(alpha_0, C6, R_vdw, 0.83, variant='plain')
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
 @no_complex_scalapack_macos_py27
-def test_ethylcarbamate(calc):
+def test_ethylcarbamate():
     enes = [
-        calc.mbd_energy_species(
-            coords, species, vols, 0.83,
-            lattice=lattice, k_grid=k_grid
-        )
+        MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vols, 0.83)
         for coords, lattice, k_grid, species, vols in ethylcarbamate
     ]
     ene_int = enes[0]-2*enes[1]
@@ -273,49 +261,38 @@ def test_ethylcarbamate(calc):
 
 
 @no_complex_scalapack_macos_py27
-def test_argon_crystal(calc):
+def test_argon_crystal():
     coords, lattice, k_grid, species, vols = argon_crystal
-    ene = calc.mbd_energy_species(
-        coords, species, vols, 0.83, lattice=lattice, k_grid=k_grid
-    )
+    ene = MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vols, 0.83)
     assert ene == approx(-0.0021037562496878173, rel=1e-10)
 
 
 @no_complex_scalapack_macos_py27
-def test_argon_crystal_gradients(calc):
+def test_argon_crystal_gradients():
     coords, lattice, k_grid, species, vols = argon_crystal
-    ene, gradients, latt_gradients = calc.mbd_energy_species(
-        coords, species, vols, 0.83,
-        lattice=lattice, k_grid=k_grid, force=True
-    )
-    num_gradients = numerical_gradients(
-        calc.mbd_energy_species, coords, species, vols, 0.83,
-        lattice=lattice, k_grid=k_grid
-    )
-    num_latt_gradients = numerical_latt_gradients(
-        calc.mbd_energy_species, coords, species, vols, 0.83,
-        lattice=lattice, k_grid=k_grid
-    )
+    ene, gradients, latt_gradients = \
+        MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vols, 0.83, force=True)
+    with MBDGeom(coords, lattice, k_grid) as geom:
+        num_gradients = numerical_gradients(geom, 'mbd_energy_species', species, vols, 0.83)
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
+    with MBDGeom(coords, lattice, k_grid) as geom:
+        num_latt_gradients = numerical_latt_gradients(geom, 'mbd_energy_species', species, vols, 0.83)
     for i in range(3):
         assert latt_gradients[i] == approx(num_latt_gradients[i], rel=1e-10, abs=1e-10)
 
 
 @no_complex_scalapack_macos_py27
-def test_lithium(calc):
+def test_lithium():
     with pytest.raises(MBDFortranException):
         [
-            calc.mbd_energy_species(
-                coords, species, vols, 0.83,
-                lattice=lattice, k_grid=k_grid
-            )
+            MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vols, 0.83)
             for coords, lattice, k_grid, species, vols in bulk_lithium
         ]
 
 
 @no_scalapack
-def test_ethylcarbamate_python(calc):
+def test_ethylcarbamate_python():
     enes = [
         mbd_energy_species(
             coords, species, vols, 0.83,
@@ -328,12 +305,10 @@ def test_ethylcarbamate_python(calc):
 
 
 @no_complex_scalapack_macos_py27
-def test_ethylcarbamate_scs(calc):
+def test_ethylcarbamate_scs():
     enes = [
-        calc.mbd_energy_species(
-            coords, species, vols, 1, a=2.56,
-            lattice=lattice, k_grid=k_grid,
-            func='mbd_scs_energy'
+        MBDGeom(coords, lattice, k_grid).mbd_energy_species(
+            species, vols, 1, a=2.56, variant='scs'
         )
         for coords, lattice, k_grid, species, vols in ethylcarbamate
     ]
@@ -341,11 +316,9 @@ def test_ethylcarbamate_scs(calc):
     assert ene_int == approx(-0.03633331132194684, rel=1e-10)
 
 
-def test_ethylcarbamate_ts(calc):
+def test_ethylcarbamate_ts():
     enes = [
-        calc.ts_energy_species(
-            coords, species, vols, 0.83, lattice=lattice
-        )
+        MBDGeom(coords, lattice).ts_energy_species(species, vols, 0.83)
         for coords, lattice, _, species, vols in ethylcarbamate
     ]
     ene_int = enes[0]-2*enes[1]
@@ -353,31 +326,30 @@ def test_ethylcarbamate_ts(calc):
 
 
 @no_scalapack
-def test_mbd_coulomb(calc):
+def test_mbd_coulomb():
     a = 14.4
     beta = 2.0
     enes = []
     for coords, species, vols in peptide_meoh:
-        _, eigs, C = calc.mbd_energy_species(
-            coords, species, vols, beta=0.83, spectrum=True
-        )
+        geom = MBDGeom(coords, get_spectrum=True)
+        _, eigs, C = geom.mbd_energy_species(species, vols, beta=0.83)
         omega_t = np.sqrt(eigs)
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         omega = 4*C6/(3*alpha_0**2)
         charges = np.ones_like(alpha_0)
         masses = 1/(alpha_0*omega**2)
-        ecoul = calc.coulomb_energy(
-            coords, charges, masses, omega_t, 'fermi', R_vdw, beta, a, C
+        ecoul = geom.coulomb_energy(
+            charges, masses, omega_t, 'fermi', R_vdw, beta, a, C
         )
-        edip = calc.dipole_energy(
-            coords, alpha_0, omega, omega_t, 'fermi,dip', R_vdw, beta, a, C)
+        edip = geom.dipole_energy(
+            alpha_0, omega, omega_t, 'fermi,dip', R_vdw, beta, a, C)
         C = np.identity(len(omega_t))
         omega_non = np.repeat(omega, 3)
-        ecoul_non = calc.coulomb_energy(
-            coords, charges, masses, omega_non, 'fermi', R_vdw, beta, a, C
+        ecoul_non = geom.coulomb_energy(
+            charges, masses, omega_non, 'fermi', R_vdw, beta, a, C
         )
-        edip_non = calc.dipole_energy(
-            coords, alpha_0, omega, omega_t, 'fermi,dip', R_vdw, beta, a, C
+        edip_non = geom.dipole_energy(
+            alpha_0, omega, omega_t, 'fermi,dip', R_vdw, beta, a, C
         )
         enes.append(ecoul-edip-(ecoul_non-edip_non))
     ene_int = enes[2]-enes[0]-enes[1]

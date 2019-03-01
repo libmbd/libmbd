@@ -6,6 +6,7 @@ module mbd_utils
 !! Utility types, interfaces, and procedures.
 
 use mbd_constants
+use mbd_gradients, only: grad_t
 #ifdef WITH_MPI
 use mbd_mpi
 #endif
@@ -35,6 +36,7 @@ end type
 type, public :: result_t
     !! Stores results from an MBD calculation
     real(dp) :: energy
+    type(grad_t) :: dE
     real(dp), allocatable :: mode_eigs(:)
     real(dp), allocatable :: modes(:, :)
     real(dp), allocatable :: rpa_orders(:)

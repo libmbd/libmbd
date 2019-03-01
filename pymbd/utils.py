@@ -6,32 +6,34 @@ from __future__ import print_function, division
 import numpy as np
 
 
-def numerical_gradients(f, coords, *args, **kwargs):
+def numerical_gradients(geom, func, *args, **kwargs):
     delta = kwargs.pop('delta', 1e-3)  # support python 2
-    coords = np.array(coords)
-    gradients = np.zeros(coords.shape)
-    for i_atom in range(coords.shape[0]):
+    coords_0 = geom.coords
+    gradients = np.zeros(coords_0.shape)
+    for i_atom in range(coords_0.shape[0]):
         for i_xyz in range(3):
             ene = {}
             for step in [-2, -1, 1, 2]:
-                coords_diff = coords.copy()
-                coords_diff[i_atom, i_xyz] += step*delta
-                ene[step] = f(coords_diff, *args, **kwargs)
+                coords = coords_0.copy()
+                coords[i_atom, i_xyz] += step*delta
+                geom.coords = coords
+                ene[step] = getattr(geom, func)(*args, **kwargs)
             gradients[i_atom, i_xyz] = _diff5(ene, delta)
     return gradients
 
 
-def numerical_latt_gradients(f, *args, **kwargs):
-    lattice = kwargs.pop('lattice')  # support python 2
+def numerical_latt_gradients(geom, func, *args, **kwargs):
     delta = kwargs.pop('delta', 1e-3)
+    lattice_0 = geom.lattice
     gradients = np.zeros((3, 3))
     for i_vec in range(3):
         for i_xyz in range(3):
             ene = {}
             for step in [-2, -1, 1, 2]:
-                lattice_diff = lattice.copy()
-                lattice_diff[i_vec, i_xyz] += step*delta
-                ene[step] = f(*args, lattice=lattice_diff, **kwargs)
+                lattice = lattice_0.copy()
+                lattice[i_vec, i_xyz] += step*delta
+                geom.lattice = lattice
+                ene[step] = getattr(geom, func)(*args, **kwargs)
             gradients[i_vec, i_xyz] = _diff5(ene, delta)
     return gradients
 

@@ -10,7 +10,7 @@ use mbd_constants
 use mbd_damping, only: damping_t
 use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
-use mbd_gradients, only: grad_t, grad_request_t
+use mbd_gradients, only: grad_request_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: ts_energy
 use mbd_utils, only: result_t, exception_t, printer
@@ -106,7 +106,6 @@ type, public :: mbd_calc_t
     real(dp), allocatable :: C6(:)
     character(len=30) :: method
     type(result_t) :: results
-    type(grad_t) :: denergy
     logical :: calculate_gradients
     real(dp), allocatable :: free_values(:, :)
     logical :: debug
@@ -271,12 +270,12 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
     case ('mbd', 'mbd-nl')
         this%damp%version = 'fermi,dip'
         this%results = get_mbd_energy( &
-            this%geom, this%alpha_0, this%C6, this%damp, this%denergy, grad &
+            this%geom, this%alpha_0, this%C6, this%damp, grad &
         )
         energy = this%results%energy
     case ('mbd-rsscs')
         this%results = get_mbd_scs_energy( &
-            this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, this%denergy, grad &
+            this%geom, 'rsscs', this%alpha_0, this%C6, this%damp, grad &
         )
         energy = this%results%energy
     case ('ts')
@@ -299,7 +298,7 @@ subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR
         !! (\(3\times N\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
         !! R_i\), index \(i\) runs over columns.
 
-    gradients = transpose(this%denergy%dcoords)
+    gradients = transpose(this%results%dE%dcoords)
 end subroutine
 
 subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
@@ -316,7 +315,7 @@ subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
         !! (\(3\times 3\), a.u.) Energy gradients, \(\mathrm dE/\mathrm d\mathbf
         !! a_i\), index \(i\) runs over columns.
 
-    latt_derivs = transpose(this%denergy%dlattice)
+    latt_derivs = transpose(this%results%dE%dlattice)
 end subroutine
 
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)

@@ -2,6 +2,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import division, print_function
+from functools import wraps
 
 import numpy as np
 
@@ -30,137 +31,152 @@ class MBDFortranException(Exception):
         self.origin = origin
 
 
-class MBDCalc(object):
+def _auto_context(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if self._geom_f:
+            return method(self, *args, **kwargs)
+        with self:
+            return method(self, *args, **kwargs)
+    return wrapper
+
+
+class MBDGeom(object):
     """
-    Represents an initialized Libmbd Fortran library.
+    Represents an initialized Libmbd geom_t object.
     """
-    def __init__(self, n_freq=15):
-        self._calc_obj = None
-        self.n_freq = n_freq
+    def __init__(
+        self, coords, lattice=None, k_grid=None, n_freq=15,
+        do_rpa=False, get_spectrum=False, get_rpa_orders=False
+    ):
+        self._geom_f = None
+        self._coords, self._lattice = map(_array, (coords, lattice))
+        self._k_grid = _array(k_grid, dtype='i4')
+        self._n_freq = n_freq
+        self._do_rpa = do_rpa
+        self._get_spectrum = get_spectrum
+        self._get_rpa_orders = get_rpa_orders
+
+    def __len__(self):
+        return len(self._coords)
 
     def __enter__(self):
-        self._calc_obj = True
+        self._geom_f = _lib.cmbd_init_geom(
+            len(self),
+            _cast('double*', self._coords),
+            _cast('double*', self._lattice),
+            _cast('int*', self._k_grid),
+            self._n_freq,
+            self._do_rpa,
+            self._get_spectrum,
+            self._get_rpa_orders,
+        )
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._calc_obj = None
+        _lib.cmbd_destroy_geom(self._geom_f)
+        self._geom_f = None
 
-    def _check_exc(self, geom):
+    def _check_exc(self):
         code = _array(0, dtype=int)
         origin = _ffi.new('char[50]')
         msg = _ffi.new('char[150]')
-        _lib.cmbd_get_exception(geom, _cast('int*', code), origin, msg)
+        _lib.cmbd_get_exception(self._geom_f, _cast('int*', code), origin, msg)
         if code != 0:
             raise MBDFortranException(
                 int(code), _ffi.string(origin).decode(), _ffi.string(msg).decode()
             )
 
     @property
-    def _calc(self):
-        if not self._calc_obj:
-            raise RuntimeError('MBDCalc must be used as a context manager')
-        return self._calc_obj
+    def coords(self):
+        return self._coords.copy()
 
-    def ts_energy(self, coords, alpha_0, C6, R_vdw, sR,
-                  lattice=None, d=20., damping='fermi'):
+    @coords.setter
+    def coords(self, coords):
+        _lib.cmbd_update_coords(self._geom_f, _cast('double*', _array(coords)))
+
+    @property
+    def lattice(self):
+        return self._lattice.copy()
+
+    @lattice.setter
+    def lattice(self, lattice):
+        _lib.cmbd_update_lattice(self._geom_f, _cast('double*', _array(lattice)))
+
+    @_auto_context
+    def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20., damping='fermi'):
         """
         Calculate a TS energy.
         """
-        coords, alpha_0, C6, R_vdw, lattice = \
-            map(_array, (coords, alpha_0, C6, R_vdw, lattice))
-        n_atoms = len(coords)
-        geom = _lib.cmbd_init_geom(
-            n_atoms,
-            _cast('double*', coords),
-            _cast('double*', lattice),
-            _ffi.NULL,
-            self.n_freq,
-        )
-        damping = _lib.cmbd_init_damping(
-            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
+        alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
+        damping_f = _lib.cmbd_init_damping(
+            len(self), damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
         )
         ene = _lib.cmbd_ts_energy(
-            geom,
-            n_atoms,
+            self._geom_f,
             _cast('double*', alpha_0),
             _cast('double*', C6),
-            damping,
+            damping_f,
         )
-        _lib.cmbd_destroy_damping(damping)
-        _lib.cmbd_destroy_geom(geom)
-        self._check_exc(geom)
+        _lib.cmbd_destroy_damping(damping_f)
+        self._check_exc()
         return ene
 
-    def mbd_energy(self, coords, alpha_0, C6, R_vdw, beta,
-                   lattice=None, k_grid=None,
-                   a=6., func='mbd_rsscs_energy', force=False,
-                   damping='fermi,dip', spectrum=False, rpa_orders=False):
+    @_auto_context
+    def mbd_energy(self, alpha_0, C6, R_vdw, beta, a=6., damping='fermi,dip', variant='rsscs', force=False):
         """
         Calculate an MBD energy.
         """
-        coords, alpha_0, C6, R_vdw, lattice = \
-            map(_array, (coords, alpha_0, C6, R_vdw, lattice))
-        k_grid = _array(k_grid, dtype='i4')
-        n_atoms = len(coords)
-        geom = _lib.cmbd_init_geom(
-            n_atoms,
-            _cast('double*', coords),
-            _cast('double*', lattice),
-            _cast('int*', k_grid),
-            self.n_freq,
-        )
-        damping = _lib.cmbd_init_damping(
+        alpha_0, C6, R_vdw= map(_array, (alpha_0, C6, R_vdw))
+        n_atoms = len(self)
+        damping_f = _lib.cmbd_init_damping(
             n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
         )
-        gradients = np.zeros((n_atoms, 3)) if force else None
-        latt_gradients = np.zeros((3, 3)) if force and lattice is not None else None
-        eigs, modes, orders = None, None, None
         args = (
-            geom,
-            n_atoms,
+            self._geom_f,
             _cast('double*', alpha_0),
             _cast('double*', C6),
-            damping,
-            _cast('double*', gradients),
-            _cast('double*', latt_gradients),
+            damping_f,
+            force,
         )
-        if func == 'mbd_rsscs_energy':
-            if spectrum:
-                eigs = np.zeros(3*n_atoms)
-                modes = np.zeros((3*n_atoms, 3*n_atoms), order='F')
-            args += (_cast('double*', eigs), _cast('double*', modes))
-        elif func == 'rpa_energy':
-            if rpa_orders:
-                orders = np.zeros(10)
-            args += (_cast('double*', orders),)
-        ene = getattr(_lib, 'cmbd_' + func)(*args)
-        _lib.cmbd_destroy_damping(damping)
-        _lib.cmbd_destroy_geom(geom)
-        self._check_exc(geom)
-        if spectrum:
-            ene = ene, eigs, modes
-        elif rpa_orders:
-            ene = ene, orders
+        if variant == 'plain':
+            res_f = _lib.cmbd_mbd_energy(*args)
+        else:
+            args = args[:1] + (variant.encode(),) + args[1:]
+            res_f = _lib.cmbd_mbd_scs_energy(*args)
+        _lib.cmbd_destroy_damping(damping_f)
+        self._check_exc()
+        ene = np.empty(1)  # for some reason np.array(0) doesn't work
+        gradients, lattice_gradients, eigs, modes, rpa_orders = 5*[None]
         if force:
-            gradients = (gradients,)
-            if lattice is not None:
-                gradients += (latt_gradients,)
-            ene = (ene,) + gradients
+            gradients = np.zeros((n_atoms, 3))
+            if self._lattice is not None:
+                lattice_gradients = np.zeros((3, 3))
+        if self._get_spectrum:
+            eigs = np.zeros(3*n_atoms)
+            modes = np.zeros((3*n_atoms, 3*n_atoms), order='F')
+        elif self._get_rpa_orders:
+            rpa_orders = np.zeros(10)
+        _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in (
+            ene, gradients, lattice_gradients, eigs, modes, rpa_orders
+        )))
+        _lib.cmbd_destroy_result(res_f)
+        ene = ene.item()
+        if self._get_spectrum:
+            ene = ene, eigs, modes
+        elif self._get_rpa_orders:
+            ene = ene, rpa_orders
+        if force:
+            ene = (ene, gradients)
+            if self._lattice is not None:
+                ene += (lattice_gradients,)
         return ene
 
-    def dipole_matrix(self, coords, damping, beta=0., lattice=None, k_point=None,
-                      R_vdw=None, sigma=None, a=6.):
-        coords, R_vdw, sigma, lattice, k_point = \
-            map(_array, (coords, R_vdw, sigma, lattice, k_point))
+    @_auto_context
+    def dipole_matrix(self, damping, beta=0., k_point=None, R_vdw=None, sigma=None, a=6.):
+        R_vdw, sigma, k_point = map(_array, (R_vdw, sigma, k_point))
         n_atoms = len(coords)
-        geom = _lib.cmbd_init_geom(
-            n_atoms,
-            _cast('double*', coords),
-            _cast('double*', lattice),
-            _ffi.NULL,
-            self.n_freq,
-        )
-        damping = _lib.cmbd_init_damping(
+        damping_f = _lib.cmbd_init_damping(
             n_atoms, damping.encode(),
             _cast('double*', R_vdw),
             _cast('double*', sigma),
@@ -171,41 +187,34 @@ class MBDCalc(object):
             dtype=float if k_point is None else complex,
         )
         _lib.cmbd_dipole_matrix(
-            geom,
-            damping,
+            self._geom_f,
+            damping_f,
             _cast('double*', k_point),
             _cast('double*', dipmat),
         )
-        _lib.cmbd_destroy_damping(damping)
-        _lib.cmbd_destroy_geom(geom)
-        self._check_exc(geom)
+        _lib.cmbd_destroy_damping(damping_f)
+        self._check_exc()
         return dipmat
 
-    def mbd_energy_species(self, coords, species, vols, beta, **kwargs):
+    def mbd_energy_species(self, species, vols, beta, **kwargs):
         """
         Calculate an MBD energy from atom types and Hirshfed-volume ratios.
         """
         alpha_0, C6, R_vdw = from_volumes(species, vols)
-        return self.mbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
+        return self.mbd_energy(alpha_0, C6, R_vdw, beta, **kwargs)
 
-    def ts_energy_species(self, coords, species, vols, beta, **kwargs):
+    def ts_energy_species(self, species, vols, beta, **kwargs):
         """
         Calculate a TS energy from atom types and Hirshfed-volume ratios.
         """
         alpha_0, C6, R_vdw = from_volumes(species, vols)
-        return self.ts_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
+        return self.ts_energy(alpha_0, C6, R_vdw, beta, **kwargs)
 
-    def dipole_energy(self, coords, a0, w, w_t, version, r_vdw, beta, a, C):
-        n_atoms = len(coords)
-        geom = _lib.cmbd_init_geom(
-            n_atoms,
-            _cast('double*', coords),
-            _ffi.NULL,
-            _ffi.NULL,
-            self.n_freq,
-        )
+    @_auto_context
+    def dipole_energy(self, a0, w, w_t, version, r_vdw, beta, a, C):
+        n_atoms = len(self)
         res = _lib.cmbd_dipole_energy(
-            geom,
+            self._geom_f,
             n_atoms,
             _cast('double*', a0),
             _cast('double*', w),
@@ -216,20 +225,14 @@ class MBDCalc(object):
             a,
             _cast('double*', C),
         )
-        self._check_exc(geom)
+        self._check_exc()
         return res
 
-    def coulomb_energy(self, coords, q, m, w_t, version, r_vdw, beta, a, C):
-        n_atoms = len(coords)
-        geom = _lib.cmbd_init_geom(
-            n_atoms,
-            _cast('double*', coords),
-            _ffi.NULL,
-            _ffi.NULL,
-            self.n_freq,
-        )
+    @_auto_context
+    def coulomb_energy(self, q, m, w_t, version, r_vdw, beta, a, C):
+        n_atoms = len(self)
         res = _lib.cmbd_coulomb_energy(
-            geom,
+            self._geom_f,
             n_atoms,
             _cast('double*', q),
             _cast('double*', m),
@@ -240,8 +243,9 @@ class MBDCalc(object):
             a,
             _cast('double*', C),
         )
-        self._check_exc(geom)
+        self._check_exc()
         return res
+
 
 
 def _ndarray(ptr, shape=None, dtype='float'):

@@ -81,16 +81,15 @@ contains
 
 #if MBD_TYPE == 0
 type(result_t) function get_mbd_hamiltonian_energy_real( &
-        geom, alpha_0, omega, damp, dene, grad) result(res)
+        geom, alpha_0, omega, damp, grad) result(res)
 #elif MBD_TYPE == 1
 type(result_t) function get_mbd_hamiltonian_energy_complex( &
-        geom, alpha_0, omega, damp, dene, grad, q) result(res)
+        geom, alpha_0, omega, damp, grad, q) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)
     real(dp), intent(in) :: omega(:)
     type(damping_t), intent(in) :: damp
-    type(grad_t), intent(out) :: dene
     type(grad_request_t), intent(in) :: grad
 #if MBD_TYPE == 1
     real(dp), intent(in) :: q(3)
@@ -163,22 +162,22 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
 #endif
     call dQ%init_from(T)
     if (grad%dcoords) then
-        allocate (dene%dcoords(n_atoms, 3))
+        allocate (res%dE%dcoords(n_atoms, 3))
         do i_xyz = 1, 3
             dQ%val = dT%dr(:, :, i_xyz)
             call dQ%mult_cross(omega*sqrt(alpha_0))
             dQ%val = c_lambda12i_c%val*dQ%val
-            dene%dcoords(:, i_xyz) = 1d0/2*dble(dQ%contract_n33_rows())
+            res%dE%dcoords(:, i_xyz) = 1d0/2*dble(dQ%contract_n33_rows())
         end do
     end if
     if (grad%dlattice) then
-        allocate (dene%dlattice(3, 3))
+        allocate (res%dE%dlattice(3, 3))
         do i_latt = 1, 3
             do i_xyz = 1, 3
                 dQ%val = dT%dlattice(:, :, i_latt, i_xyz)
                 call dQ%mult_cross(omega*sqrt(alpha_0))
                 dQ%val = c_lambda12i_c%val*dQ%val
-                dene%dlattice(i_latt, i_xyz) = 1d0/4*dble(dQ%sum_all())
+                res%dE%dlattice(i_latt, i_xyz) = 1d0/4*dble(dQ%sum_all())
             end do
         end do
     end if
@@ -187,7 +186,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         call dQ%mult_cross(omega*sqrt(alpha_0))
         call dQ%mult_rows(1d0/(2*alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%dalpha = 1d0/2*dble(dQ%contract_n33_rows())
+        res%dE%dalpha = 1d0/2*dble(dQ%contract_n33_rows())
     end if
     if (grad%domega) then
         dQ%val = T%val
@@ -195,22 +194,22 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         call dQ%mult_rows(1d0/omega)
         call dQ%add_diag(omega)
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%domega = 1d0/2*dble(dQ%contract_n33_rows())-3d0/2
+        res%dE%domega = 1d0/2*dble(dQ%contract_n33_rows())-3d0/2
     end if
     if (grad%dr_vdw) then
         dQ%val = dT%dvdw
         call dQ%mult_cross(omega*sqrt(alpha_0))
         dQ%val = c_lambda12i_c%val*dQ%val
-        dene%dr_vdw = 1d0/2*dble(dQ%contract_n33_rows())
+        res%dE%dr_vdw = 1d0/2*dble(dQ%contract_n33_rows())
     end if
 #if MBD_TYPE == 1
     if (grad%dq) then
-        allocate (dene%dq(3))
+        allocate (res%dE%dq(3))
         do i_latt = 1, 3
             dQ%val = dT%dq(:, :, i_latt)
             call dQ%mult_cross(omega*sqrt(alpha_0))
             dQ%val = c_lambda12i_c%val*dQ%val
-            dene%dq(i_latt) = 1d0/4*dble(dQ%sum_all())
+            res%dE%dq(i_latt) = 1d0/4*dble(dQ%sum_all())
         end do
     end if
 #endif

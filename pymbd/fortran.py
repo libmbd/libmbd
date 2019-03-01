@@ -12,7 +12,7 @@ try:
 except ImportError:
     raise Exception('Pymbd C extension unimportable, cannot use Fortran')
 
-__all__ = ['MBDCalc', 'MBDFortranException', 'with_mpi', 'with_scalapack']
+__all__ = ['MBDGeom', 'MBDFortranException', 'with_mpi', 'with_scalapack']
 
 with_mpi = _lib.cmbd_with_mpi
 """Whether Libmbd was compiled with MPI"""

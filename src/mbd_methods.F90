@@ -162,7 +162,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
         C6_scs(:), dC6_scs_dalpha_dyn_scs(:, :), &
         dene_dalpha_scs_dyn(:, :), freq_w(:), omega(:)
     type(grad_t), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
-    type(grad_t) :: dene_mbd, dr_vdw_scs, domega
+    type(grad_t) :: dE, dr_vdw_scs, domega
     type(grad_request_t) :: grad_scs
     type(damping_t) :: damp_scs, damp_mbd
     integer :: n_freq, i_freq, n_atoms, i_atom, my_i_atom
@@ -215,8 +215,6 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
         ) &
     )
-    dene_mbd = res%dE
-    res%dE = grad_t()
     call geom%clock(-90)
     if (geom%has_exc()) return
     if (.not. grad%any()) return
@@ -224,49 +222,49 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
     allocate (freq_w(0:ubound(geom%freq, 1)))
     freq_w = geom%freq%weight
     freq_w(0) = 1d0
-    dene_dalpha_scs_dyn(:, 0) = dene_mbd%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV
+    dene_dalpha_scs_dyn(:, 0) = res%dE%dalpha + res%dE%dr_vdw*dr_vdw_scs%dV
     do i_freq = 1, n_freq
         dene_dalpha_scs_dyn(:, i_freq) = &
-            dene_mbd%dC6*dC6_scs_dalpha_dyn_scs(:, i_freq)
+            res%dE%dC6*dC6_scs_dalpha_dyn_scs(:, i_freq)
     end do
     if (grad%dcoords) then
-        allocate (res%dE%dcoords(n_atoms, 3), source=0d0)
+        allocate (dE%dcoords(n_atoms, 3), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                res%dE%dcoords(geom%idx%j_atom, :) &
-                    = res%dE%dcoords(geom%idx%j_atom, :) &
+                dE%dcoords(geom%idx%j_atom, :) &
+                    = dE%dcoords(geom%idx%j_atom, :) &
                     + freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) &
                     * dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call blacs_all_reduce(res%dE%dcoords, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dE%dcoords, geom%blacs)
 #endif
-        res%dE%dcoords = res%dE%dcoords + dene_mbd%dcoords
+        dE%dcoords = dE%dcoords + res%dE%dcoords
     end if
     if (grad%dlattice) then
-        allocate (res%dE%dlattice(3, 3), source=0d0)
+        allocate (dE%dlattice(3, 3), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = geom%idx%i_atom(my_i_atom)
             if (.not. any(i_atom == geom%idx%j_atom)) cycle
             do i_freq = 0, n_freq
-                res%dE%dlattice = res%dE%dlattice &
+                dE%dlattice = dE%dlattice &
                     + freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) &
                     * dalpha_dyn_scs(my_i_atom, i_freq)%dlattice
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call blacs_all_reduce(res%dE%dlattice, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dE%dlattice, geom%blacs)
 #endif
-        res%dE%dlattice = res%dE%dlattice + dene_mbd%dlattice
+        dE%dlattice = dE%dlattice + res%dE%dlattice
     end if
     if (grad%dalpha) then
-        allocate (res%dE%dalpha(n_atoms), source=0d0)
+        allocate (dE%dalpha(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                res%dE%dalpha(geom%idx%j_atom) = res%dE%dalpha(geom%idx%j_atom) + &
+                dE%dalpha(geom%idx%j_atom) = dE%dalpha(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * ( &
                         dalpha_dyn(i_freq)%dalpha(geom%idx%j_atom) &
@@ -276,16 +274,16 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call blacs_all_reduce(res%dE%dalpha, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dE%dalpha, geom%blacs)
 #endif
-        res%dE%dalpha = res%dE%dalpha + dene_mbd%dr_vdw*dr_vdw_scs%dV_free
+        dE%dalpha = dE%dalpha + res%dE%dr_vdw*dr_vdw_scs%dV_free
     end if
     if (grad%dC6) then
-        allocate (res%dE%dC6(n_atoms), source=0d0)
+        allocate (dE%dC6(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                res%dE%dC6(geom%idx%j_atom) = res%dE%dC6(geom%idx%j_atom) + &
+                dE%dC6(geom%idx%j_atom) = dE%dC6(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
                     dalpha_dyn(i_freq)%domega(geom%idx%j_atom) &
@@ -293,24 +291,25 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call blacs_all_reduce(res%dE%dC6, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dE%dC6, geom%blacs)
 #endif
     end if
     if (grad%dr_vdw) then
-        allocate (res%dE%dr_vdw(n_atoms), source=0d0)
+        allocate (dE%dr_vdw(n_atoms), source=0d0)
         do my_i_atom = 1, size(dalpha_dyn_scs, 1)
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
-                res%dE%dr_vdw(geom%idx%j_atom) = res%dE%dr_vdw(geom%idx%j_atom) + &
+                dE%dr_vdw(geom%idx%j_atom) = dE%dr_vdw(geom%idx%j_atom) + &
                     freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dr_vdw
             end do
         end do
 #ifdef WITH_SCALAPACK
-        if (geom%idx%parallel) call blacs_all_reduce(res%dE%dr_vdw, geom%blacs)
+        if (geom%idx%parallel) call blacs_all_reduce(dE%dr_vdw, geom%blacs)
 #endif
-        res%dE%dr_vdw = res%dE%dr_vdw + dene_mbd%dr_vdw*dr_vdw_scs%dX_free
+        dE%dr_vdw = dE%dr_vdw + res%dE%dr_vdw*dr_vdw_scs%dX_free
     end if
+    res%dE = dE
     call geom%clock(-91)
 end function
 

@@ -140,23 +140,21 @@ def test_argon_dimer_plain():
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
 
 
-@no_scalapack
-def test_argon_dimer_rpa():
-    geom = MBDGeom([(0, 0, 0), (0, 0, 4*ang)], do_rpa=True, get_rpa_orders=True)
-    ene, orders = geom.mbd_energy(
-        [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83, variant='plain'
-    )
-    assert ene == approx(-0.00024329110270970844, rel=1e-10)
-    assert orders[1] == approx(-0.00024318540282078396, rel=1e-10)
-    assert orders[2] == approx(0)
-    assert orders[3] == approx(-1.0560560758487198e-07, rel=1e-10)
-
-
 def test_argon_dimer_rsscs():
     ene = MBDGeom([(0, 0, 0), (0, 0, 4*ang)]).mbd_energy_species(
         ['Ar', 'Ar'], [1, 1], 0.83
     )
     assert ene == approx(-0.0002462647623815428, rel=1e-10)
+
+
+@no_scalapack
+def test_argon_dimer_rsscs_rpa():
+    geom = MBDGeom([(0, 0, 0), (0, 0, 4*ang)], do_rpa=True, get_rpa_orders=True)
+    ene, orders = geom.mbd_energy_species(['Ar', 'Ar'], [1, 1], 0.83)
+    assert ene == approx(-0.0002462647623815428, rel=1e-10)
+    assert orders[1] == approx(-0.0002461558113413099, rel=1e-10)
+    assert orders[2] == approx(0)
+    assert orders[3] == approx(-1.0885208380438466e-07, rel=1e-10)
 
 
 def test_argon_dimer_ts():

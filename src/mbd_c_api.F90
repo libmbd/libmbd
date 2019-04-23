@@ -41,12 +41,15 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 contains
 
 type(c_ptr) function cmbd_init_geom( &
-    n_atoms, coords, lattice, k_grid, n_freq, do_rpa, get_spectrum, get_rpa_orders &
+    n_atoms, coords, lattice, k_grid, n_kpts, custom_k_pts, &
+    n_freq, do_rpa, get_spectrum, get_rpa_orders &
 ) bind(c)
     integer(c_int), value, intent(in) :: n_atoms
     real(c_double), intent(in) :: coords(3, n_atoms)
     real(c_double), optional, intent(in) :: lattice(3, 3)
     integer(c_int), optional, intent(in) :: k_grid(3)
+    integer(c_int), value, intent(in) :: n_kpts
+    real(c_double), optional, intent(in) :: custom_k_pts(3, n_kpts)
     integer(c_int), value, intent(in) :: n_freq
     logical(c_bool), value, intent(in) :: do_rpa
     logical(c_bool), value, intent(in) :: get_spectrum
@@ -58,6 +61,7 @@ type(c_ptr) function cmbd_init_geom( &
     geom%coords = coords
     if (present(lattice)) geom%lattice = lattice
     if (present(k_grid)) geom%k_grid = k_grid
+    if (present(custom_k_pts)) geom%custom_k_pts = custom_k_pts
     if (n_freq > 0) geom%param%n_freq = n_freq
     geom%do_rpa = do_rpa
     geom%get_eigs = get_spectrum

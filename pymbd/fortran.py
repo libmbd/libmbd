@@ -52,6 +52,7 @@ class MBDGeom(object):
         coords,
         lattice=None,
         k_grid=None,
+        custom_k_pts=None,
         n_freq=15,
         do_rpa=False,
         get_spectrum=False,
@@ -60,6 +61,7 @@ class MBDGeom(object):
         self._geom_f = None
         self._coords, self._lattice = map(_array, (coords, lattice))
         self._k_grid = _array(k_grid, dtype='i4')
+        self._custom_k_pts = _array(custom_k_pts)
         self._n_freq = n_freq
         self._do_rpa = do_rpa
         self._get_spectrum = get_spectrum
@@ -74,6 +76,8 @@ class MBDGeom(object):
             _cast('double*', self._coords),
             _cast('double*', self._lattice),
             _cast('int*', self._k_grid),
+            len(self._custom_k_pts) if self._custom_k_pts is not None else 0,
+            _cast('double*', self._custom_k_pts),
             self._n_freq,
             self._do_rpa,
             self._get_spectrum,
@@ -172,7 +176,11 @@ class MBDGeom(object):
                 lattice_gradients = np.zeros((3, 3))
         if self._get_spectrum:
             if self.has_lattice():
-                n_kpts = self._k_grid.prod()
+                n_kpts = (
+                    len(self._custom_k_pts)
+                    if self._custom_k_pts is not None
+                    else self._k_grid.prod()
+                )
                 eigs_k = np.zeros((3 * n_atoms, n_kpts), order='F')
                 modes_k = np.zeros(
                     (3 * n_atoms, 3 * n_atoms, n_kpts), dtype=complex, order='F'

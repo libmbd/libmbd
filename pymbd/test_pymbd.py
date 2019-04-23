@@ -8,7 +8,7 @@ import pytest
 from pytest import approx
 
 from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDGeom, with_scalapack, MBDFortranException
+from .fortran import MBDFortranException, MBDGeom, with_scalapack
 from .utils import numerical_gradients, numerical_latt_gradients
 
 no_scalapack = pytest.mark.skipif(with_scalapack, reason="doesn't support ScaLAPACK")
@@ -452,6 +452,17 @@ def test_argon_crystal():
     coords, lattice, k_grid, species, vols = argon_crystal
     ene = MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vols, 0.83)
     assert ene == approx(-0.0021037562496878173, rel=1e-10)
+
+
+@no_scalapack
+def test_argon_crystal_modes():
+    coords, lattice, k_grid, species, vols = argon_crystal
+    geom = MBDGeom(
+        coords, lattice, custom_k_pts=[(0, 0, 0), (0.1, 0, 0)], get_spectrum=True
+    )
+    _, eigs, C = geom.mbd_energy_species(species, vols, 0.83)
+    assert abs(C[:, :, 0].imag).sum() == approx(0)
+    assert abs(C[:, :, 1].imag).sum() != approx(0)
 
 
 @no_complex_scalapack_macos_py27

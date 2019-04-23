@@ -8,6 +8,8 @@ struct geom_t* cmbd_init_geom(
     double* coords,
     double* lattice,
     int* k_grid,
+    int n_kpts,
+    double* custom_k_pts,
     int n_freq,
     _Bool do_rpa,
     _Bool get_spectrum,

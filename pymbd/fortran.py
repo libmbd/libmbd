@@ -113,6 +113,10 @@ class MBDGeom(object):
     def lattice(self, lattice):
         _lib.cmbd_update_lattice(self._geom_f, _cast('double*', _array(lattice)))
 
+    def has_lattice(self):
+        """True if a crystal."""
+        return self._lattice is not None
+
     @_auto_context
     def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi'):
         """Calculate a TS energy."""
@@ -163,7 +167,7 @@ class MBDGeom(object):
         gradients, lattice_gradients, eigs, modes, rpa_orders = 5 * [None]
         if force:
             gradients = np.zeros((n_atoms, 3))
-            if self._lattice is not None:
+            if self.has_lattice():
                 lattice_gradients = np.zeros((3, 3))
         if self._get_spectrum:
             eigs = np.zeros(3 * n_atoms)
@@ -180,7 +184,7 @@ class MBDGeom(object):
             ene = ene, rpa_orders
         if force:
             ene = (ene, gradients)
-            if self._lattice is not None:
+            if self.has_lattice():
                 ene += (lattice_gradients,)
         return ene
 

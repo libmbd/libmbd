@@ -49,6 +49,8 @@ type, public :: geom_t
         !! periodic.
     integer, allocatable :: k_grid(:)
         !! Number of \(k\)-points along reciprocal axes.
+    real(dp), allocatable :: custom_k_pts(:, :)
+        !! Custom \(k\)-point grid.
     character(len=10) :: parallel_mode = 'auto'
         !! Type of parallelization:
         !!
@@ -101,7 +103,7 @@ contains
 subroutine geom_init(this)
     class(geom_t), intent(inout) :: this
 
-    integer :: i_atom
+    integer :: i_atom, n_kpts
     real(dp) :: volume
 #ifdef WITH_MPI
     integer :: ierr
@@ -126,8 +128,14 @@ subroutine geom_init(this)
     end if
     if (this%parallel_mode == 'auto') then
         this%parallel_mode = 'atoms'
-        if (allocated(this%lattice) .and. allocated(this%k_grid)) then
-            if (this%siz()**2 < product(this%k_grid)) then
+        n_kpts = -1
+        if (allocated(this%custom_k_pts)) then
+            n_kpts = size(this%custom_k_pts, 2)
+        else if (allocated(this%k_grid)) then
+            n_kpts = product(this%k_grid)
+        end if
+        if (allocated(this%lattice) .and. n_kpts > 0) then
+            if (this%siz()**2 < n_kpts) then
                 this%parallel_mode = 'k_points'
             end if
         end if

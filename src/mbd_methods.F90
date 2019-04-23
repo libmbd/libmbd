@@ -75,10 +75,14 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
             ! TODO gradients
         end if
     else
-        call make_k_pts( &
-            k_pts, geom%k_grid, geom%lattice, geom%param%k_grid_shift, &
-            dkdlattice, grad%dlattice &
-        )
+        if (allocated(geom%custom_k_pts)) then
+            k_pts = geom%custom_k_pts
+        else
+            call make_k_pts( &
+                k_pts, geom%k_grid, geom%lattice, geom%param%k_grid_shift, &
+                dkdlattice, grad%dlattice &
+            )
+        end if
         n_kpts = size(k_pts, 2)
         res%energy = 0d0
         if (geom%get_eigs) &

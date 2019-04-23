@@ -5,6 +5,8 @@ from __future__ import print_function, division
 
 import numpy as np
 
+__all__ = ()
+
 
 def numerical_gradients(geom, func, *args, **kwargs):
     delta = kwargs.pop('delta', 1e-3)  # support python 2
@@ -15,7 +17,7 @@ def numerical_gradients(geom, func, *args, **kwargs):
             ene = {}
             for step in [-2, -1, 1, 2]:
                 coords = coords_0.copy()
-                coords[i_atom, i_xyz] += step*delta
+                coords[i_atom, i_xyz] += step * delta
                 geom.coords = coords
                 ene[step] = getattr(geom, func)(*args, **kwargs)
             gradients[i_atom, i_xyz] = _diff5(ene, delta)
@@ -31,7 +33,7 @@ def numerical_latt_gradients(geom, func, *args, **kwargs):
             ene = {}
             for step in [-2, -1, 1, 2]:
                 lattice = lattice_0.copy()
-                lattice[i_vec, i_xyz] += step*delta
+                lattice[i_vec, i_xyz] += step * delta
                 geom.lattice = lattice
                 ene[step] = getattr(geom, func)(*args, **kwargs)
             gradients[i_vec, i_xyz] = _diff5(ene, delta)
@@ -39,4 +41,6 @@ def numerical_latt_gradients(geom, func, *args, **kwargs):
 
 
 def _diff5(x, delta):
-    return (1./12*x[-2]-2./3*x[-1]+2./3*x[1]-1./12*x[2])/delta
+    return (
+        1.0 / 12 * x[-2] - 2.0 / 3 * x[-1] + 2.0 / 3 * x[1] - 1.0 / 12 * x[2]
+    ) / delta

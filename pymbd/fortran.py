@@ -2,17 +2,19 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import division, print_function
+
 from functools import wraps
 
 import numpy as np
 
 from .pymbd import _array, from_volumes
+
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
 except ImportError:
     raise Exception('Pymbd C extension unimportable, cannot use Fortran')
 
-__all__ = ['MBDGeom', 'MBDFortranException', 'with_mpi', 'with_scalapack']
+__all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 
 with_mpi = _lib.cmbd_with_mpi
 """Whether Libmbd was compiled with MPI"""
@@ -38,16 +40,22 @@ def _auto_context(method):
             return method(self, *args, **kwargs)
         with self:
             return method(self, *args, **kwargs)
+
     return wrapper
 
 
 class MBDGeom(object):
-    """
-    Represents an initialized Libmbd geom_t object.
-    """
+    """Represents an initialized Libmbd geom_t object."""
+
     def __init__(
-        self, coords, lattice=None, k_grid=None, n_freq=15,
-        do_rpa=False, get_spectrum=False, get_rpa_orders=False
+        self,
+        coords,
+        lattice=None,
+        k_grid=None,
+        n_freq=15,
+        do_rpa=False,
+        get_spectrum=False,
+        get_rpa_orders=False,
     ):
         self._geom_f = None
         self._coords, self._lattice = map(_array, (coords, lattice))
@@ -89,6 +97,7 @@ class MBDGeom(object):
 
     @property
     def coords(self):
+        """Atom coordinates as numpy array."""
         return self._coords.copy()
 
     @coords.setter
@@ -97,6 +106,7 @@ class MBDGeom(object):
 
     @property
     def lattice(self):
+        """Lattice vectors as numpy array."""
         return self._lattice.copy()
 
     @lattice.setter
@@ -104,33 +114,36 @@ class MBDGeom(object):
         _lib.cmbd_update_lattice(self._geom_f, _cast('double*', _array(lattice)))
 
     @_auto_context
-    def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20., damping='fermi'):
-        """
-        Calculate a TS energy.
-        """
+    def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi'):
+        """Calculate a TS energy."""
         alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
         damping_f = _lib.cmbd_init_damping(
             len(self), damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
         )
         ene = _lib.cmbd_ts_energy(
-            self._geom_f,
-            _cast('double*', alpha_0),
-            _cast('double*', C6),
-            damping_f,
+            self._geom_f, _cast('double*', alpha_0), _cast('double*', C6), damping_f
         )
         _lib.cmbd_destroy_damping(damping_f)
         self._check_exc()
         return ene
 
     @_auto_context
-    def mbd_energy(self, alpha_0, C6, R_vdw, beta, a=6., damping='fermi,dip', variant='rsscs', force=False):
-        """
-        Calculate an MBD energy.
-        """
-        alpha_0, C6, R_vdw= map(_array, (alpha_0, C6, R_vdw))
+    def mbd_energy(
+        self,
+        alpha_0,
+        C6,
+        R_vdw,
+        beta,
+        a=6.0,
+        damping='fermi,dip',
+        variant='rsscs',
+        force=False,
+    ):
+        """Calculate an MBD energy."""
+        alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
         n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(
-            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a,
+            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a
         )
         args = (
             self._geom_f,
@@ -147,19 +160,18 @@ class MBDGeom(object):
         _lib.cmbd_destroy_damping(damping_f)
         self._check_exc()
         ene = np.empty(1)  # for some reason np.array(0) doesn't work
-        gradients, lattice_gradients, eigs, modes, rpa_orders = 5*[None]
+        gradients, lattice_gradients, eigs, modes, rpa_orders = 5 * [None]
         if force:
             gradients = np.zeros((n_atoms, 3))
             if self._lattice is not None:
                 lattice_gradients = np.zeros((3, 3))
         if self._get_spectrum:
-            eigs = np.zeros(3*n_atoms)
-            modes = np.zeros((3*n_atoms, 3*n_atoms), order='F')
+            eigs = np.zeros(3 * n_atoms)
+            modes = np.zeros((3 * n_atoms, 3 * n_atoms), order='F')
         elif self._get_rpa_orders:
             rpa_orders = np.zeros(10)
-        _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in (
-            ene, gradients, lattice_gradients, eigs, modes, rpa_orders
-        )))
+        results = ene, gradients, lattice_gradients, eigs, modes, rpa_orders
+        _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
         _lib.cmbd_destroy_result(res_f)
         ene = ene.item()
         if self._get_spectrum:
@@ -173,45 +185,41 @@ class MBDGeom(object):
         return ene
 
     @_auto_context
-    def dipole_matrix(self, damping, beta=0., k_point=None, R_vdw=None, sigma=None, a=6.):
+    def dipole_matrix(
+        self, damping, beta=0.0, k_point=None, R_vdw=None, sigma=None, a=6.0
+    ):  # noqa: D102
         R_vdw, sigma, k_point = map(_array, (R_vdw, sigma, k_point))
-        n_atoms = len(coords)
+        n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(
-            n_atoms, damping.encode(),
+            n_atoms,
+            damping.encode(),
             _cast('double*', R_vdw),
             _cast('double*', sigma),
-            beta, a,
+            beta,
+            a,
         )
         dipmat = np.empty(
-            (3*n_atoms, 3*n_atoms),
-            dtype=float if k_point is None else complex,
+            (3 * n_atoms, 3 * n_atoms), dtype=float if k_point is None else complex
         )
         _lib.cmbd_dipole_matrix(
-            self._geom_f,
-            damping_f,
-            _cast('double*', k_point),
-            _cast('double*', dipmat),
+            self._geom_f, damping_f, _cast('double*', k_point), _cast('double*', dipmat)
         )
         _lib.cmbd_destroy_damping(damping_f)
         self._check_exc()
         return dipmat
 
     def mbd_energy_species(self, species, vols, beta, **kwargs):
-        """
-        Calculate an MBD energy from atom types and Hirshfed-volume ratios.
-        """
+        """Calculate an MBD energy from atom types and Hirshfed-volume ratios."""
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.mbd_energy(alpha_0, C6, R_vdw, beta, **kwargs)
 
     def ts_energy_species(self, species, vols, beta, **kwargs):
-        """
-        Calculate a TS energy from atom types and Hirshfed-volume ratios.
-        """
+        """Calculate a TS energy from atom types and Hirshfed-volume ratios."""
         alpha_0, C6, R_vdw = from_volumes(species, vols)
         return self.ts_energy(alpha_0, C6, R_vdw, beta, **kwargs)
 
     @_auto_context
-    def dipole_energy(self, a0, w, w_t, version, r_vdw, beta, a, C):
+    def dipole_energy(self, a0, w, w_t, version, r_vdw, beta, a, C):  # noqa: D102
         n_atoms = len(self)
         res = _lib.cmbd_dipole_energy(
             self._geom_f,
@@ -229,7 +237,7 @@ class MBDGeom(object):
         return res
 
     @_auto_context
-    def coulomb_energy(self, q, m, w_t, version, r_vdw, beta, a, C):
+    def coulomb_energy(self, q, m, w_t, version, r_vdw, beta, a, C):  # noqa: D102
         n_atoms = len(self)
         res = _lib.cmbd_coulomb_energy(
             self._geom_f,
@@ -247,12 +255,9 @@ class MBDGeom(object):
         return res
 
 
-
 def _ndarray(ptr, shape=None, dtype='float'):
-    buffer_size = (np.prod(shape) if shape else 1)*np.dtype(dtype).itemsize
-    return np.ndarray(
-        buffer=_ffi.buffer(ptr, buffer_size), shape=shape, dtype=dtype,
-    )
+    buffer_size = (np.prod(shape) if shape else 1) * np.dtype(dtype).itemsize
+    return np.ndarray(buffer=_ffi.buffer(ptr, buffer_size), shape=shape, dtype=dtype)
 
 
 def _cast(ctype, array):

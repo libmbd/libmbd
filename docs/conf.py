@@ -58,12 +58,7 @@ html_theme_options = {
     'travis_button': True,
 }
 html_sidebars = {
-    '**': [
-        'about.html',
-        'navigation.html',
-        'relations.html',
-        'searchbox.html',
-    ]
+    '**': ['about.html', 'navigation.html', 'relations.html', 'searchbox.html']
 }
 htmlhelp_basename = f'{project}doc'
 

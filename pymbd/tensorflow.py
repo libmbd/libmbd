@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import division, print_function
 
-from math import inf, pi
+from math import pi
 
 import numpy as np
 
@@ -12,7 +12,6 @@ import tensorflow as tf
 from .pymbd import freq_grid
 
 pi = tf.constant(pi, tf.float64)
-inf = tf.constant(inf, tf.float64)
 ang = 1 / 0.529177249
 
 
@@ -99,7 +98,8 @@ def damping_fermi(R, S_vdw, d):
 
 def T_bare(R):
     R_2 = tf.reduce_sum(R ** 2, -1)
-    R_5 = tf.sqrt(_set_diag(R_2, inf)) ** 5
+    # 1e10 rather than inf is necessary to avoid nan gradients
+    R_5 = tf.sqrt(_set_diag(R_2, 1e10)) ** 5
     return (
         -3 * R[:, :, :, None] * R[:, :, None, :]
         + R_2[:, :, None, None] * np.eye(3)[None, None, :, :]
@@ -110,7 +110,8 @@ def T_erf_coulomb(R, sigma):
     bare = T_bare(R)
     # 1e-10 rather than 0 is necessary to avoid nan gradients from sqrt(0)
     R_1 = tf.sqrt(_set_diag(tf.reduce_sum(R ** 2, -1), 1e-10))
-    R_5 = _set_diag(R_1 ** 5, inf)
+    # 1e10 rather than inf is necessary to avoid nan gradients
+    R_5 = _set_diag(R_1 ** 5, 1e10)
     RR_R5 = R[:, :, :, None] * R[:, :, None, :] / R_5[:, :, None, None]
     zeta = R_1 / sigma
     theta = 2 * zeta / tf.sqrt(pi) * tf.exp(-zeta ** 2)

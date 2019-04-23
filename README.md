@@ -9,6 +9,7 @@
 [![commits since](https://img.shields.io/github/commits-since/jhrmnn/libmbd/latest.svg)](https://github.com/jhrmnn/libmbd/releases)
 [![last commit](https://img.shields.io/github/last-commit/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/commits/master)
 [![license](https://img.shields.io/github/license/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/blob/master/LICENSE)
+[![code style](https://img.shields.io/badge/code%20style-black-202020.svg)](https://github.com/ambv/black)
 
 Libmbd contains implementations of the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
 

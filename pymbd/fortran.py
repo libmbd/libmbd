@@ -164,20 +164,39 @@ class MBDGeom(object):
         _lib.cmbd_destroy_damping(damping_f)
         self._check_exc()
         ene = np.empty(1)  # for some reason np.array(0) doesn't work
-        gradients, lattice_gradients, eigs, modes, rpa_orders = 5 * [None]
+        gradients, lattice_gradients = 2 * [None]
+        eigs, modes, rpa_orders, eigs_k, modes_k = 5 * [None]
         if force:
             gradients = np.zeros((n_atoms, 3))
             if self.has_lattice():
                 lattice_gradients = np.zeros((3, 3))
         if self._get_spectrum:
-            eigs = np.zeros(3 * n_atoms)
-            modes = np.zeros((3 * n_atoms, 3 * n_atoms), order='F')
+            if self.has_lattice():
+                n_kpts = self._k_grid.prod()
+                eigs_k = np.zeros((3 * n_atoms, n_kpts), order='F')
+                modes_k = np.zeros(
+                    (3 * n_atoms, 3 * n_atoms, n_kpts), dtype=complex, order='F'
+                )
+            else:
+                eigs = np.zeros(3 * n_atoms)
+                modes = np.zeros((3 * n_atoms, 3 * n_atoms), order='F')
         elif self._get_rpa_orders:
             rpa_orders = np.zeros(10)
-        results = ene, gradients, lattice_gradients, eigs, modes, rpa_orders
+        results = (
+            ene,
+            gradients,
+            lattice_gradients,
+            eigs,
+            modes,
+            rpa_orders,
+            eigs_k,
+            modes_k,
+        )
         _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
         _lib.cmbd_destroy_result(res_f)
         ene = ene.item()
+        if self.has_lattice():
+            eigs, modes = eigs_k, modes_k
         if self._get_spectrum:
             ene = ene, eigs, modes
         elif self._get_rpa_orders:

@@ -220,7 +220,8 @@ type(c_ptr) function cmbd_mbd_scs_energy( &
 end function
 
 subroutine cmbd_get_results( &
-    res_c, energy, gradients_c, lattice_gradients_c, eigvals_c, eigvecs_c, rpa_orders_c &
+    res_c, energy, gradients_c, lattice_gradients_c, eigvals_c, eigvecs_c, rpa_orders_c, &
+    eigvals_k_c, eigvecs_k_c &
 ) bind(c)
     type(c_ptr), value, intent(in) :: res_c
     real(c_double), intent(out) :: energy
@@ -229,6 +230,8 @@ subroutine cmbd_get_results( &
     type(c_ptr), value, intent(in) :: eigvals_c
     type(c_ptr), value, intent(in) :: eigvecs_c
     type(c_ptr), value, intent(in) :: rpa_orders_c
+    type(c_ptr), value, intent(in) :: eigvals_k_c
+    type(c_ptr), value, intent(in) :: eigvecs_k_c
 
     type(result_t), pointer :: res
     real(c_double), pointer :: gradients(:, :)
@@ -236,6 +239,8 @@ subroutine cmbd_get_results( &
     real(c_double), pointer :: eigvals(:)
     real(c_double), pointer :: eigvecs(:, :)
     real(c_double), pointer :: rpa_orders(:)
+    real(c_double), pointer :: eigvals_k(:, :)
+    complex(c_double_complex), pointer :: eigvecs_k(:, :, :)
 
     call c_f_pointer(res_c, res)
     energy = res%energy
@@ -258,6 +263,20 @@ subroutine cmbd_get_results( &
     if (c_associated(rpa_orders_c) .and. allocated(res%rpa_orders)) then
         call c_f_pointer(rpa_orders_c, rpa_orders, [size(res%rpa_orders)])
         rpa_orders = res%rpa_orders
+    end if
+    if (c_associated(eigvals_k_c) .and. allocated(res%mode_eigs_k)) then
+        call c_f_pointer( &
+            eigvals_k_c, eigvals_k, &
+            [size(res%mode_eigs_k, 1), size(res%mode_eigs_k, 2)] &
+        )
+        eigvals_k = res%mode_eigs_k
+    end if
+    if (c_associated(eigvecs_k_c) .and. allocated(res%modes_k)) then
+        call c_f_pointer( &
+            eigvecs_k_c, eigvecs_k, &
+            [size(res%modes_k, 1), size(res%modes_k, 2), size(res%modes_k, 3)] &
+        )
+        eigvecs_k = res%modes_k
     end if
 end subroutine
 

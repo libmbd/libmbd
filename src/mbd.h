@@ -69,7 +69,9 @@ void cmbd_get_results(
     double* lattice_gradients,
     double* eigvals,
     double* eigvecs,
-    double* rpa_orders
+    double* rpa_orders,
+    double* eigvals_k,  // is actually complex double
+    double* eigvecs_k  // is actually complex double
 );
 
 void cmbd_destroy_result(struct result_t* result);

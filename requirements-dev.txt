@@ -1,0 +1,8 @@
+flake8
+flake8-bugbear
+flake8-comprehensions
+flake8-quotes
+black
+pydocstyle
+pep8-naming
+isort

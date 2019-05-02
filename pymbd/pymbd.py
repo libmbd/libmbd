@@ -15,14 +15,22 @@ from scipy.special import erf, erfc
 __all__ = ['mbd_energy', 'mbd_energy_species', 'screening', 'ang']
 
 ang = 1 / 0.529177249
-"""Value of an angstrom in atomic units."""
+"""(a.u.) angstrom"""
 
 
 def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
     r"""Screen atomic polarizabilities.
 
+    :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like alpha_0: (a.u.) atomic polarizabilities
+    :param array-like C6: (a.u.) atomic :math:`C_6` coefficients
+    :param array-like R_vdw: (a.u.) atomic vdW radii
+    :param float beta: MBD damping parameter :math:`\beta`
+    :param array-like lattice: (a.u.) lattice vectors in rows
+    :param int nfreq: number of grid points for frequency quadrature
+
     Returns static polarizabilities, :math:`C_6` coefficients, and
-    :math:`R_\mathrm{vdw}` coefficients.
+    :math:`R_\mathrm{vdw}` coefficients (a.u.).
     """
     freq, freq_w = freq_grid(nfreq)
     omega = 4 / 3 * C6 / alpha_0 ** 2
@@ -43,7 +51,17 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
 
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):
-    """Calculate an MBD energy."""
+    r"""Calculate an MBD energy.
+
+    :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like alpha_0: (a.u.) atomic polarizabilities
+    :param array-like C6: (a.u.) atomic :math:`C_6` coefficients
+    :param array-like R_vdw: (a.u.) atomic vdW radii
+    :param float beta: MBD damping parameter :math:`\beta`
+    :param array-like lattice: (a.u.) lattice vectors in rows
+    :param array-like k_grid: number of :math:`k`-points along reciprocal axes
+    :param int nfreq: number of grid points for frequency quadrature
+    """
     coords, alpha_0, C6, R_vdw, lattice = map(
         _array, (coords, alpha_0, C6, R_vdw, lattice)
     )
@@ -76,9 +94,16 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfre
     return ene
 
 
-def mbd_energy_species(coords, species, vols, beta, **kwargs):
-    """Calculate an MBD energy from atom types and Hirshfed-volume ratios."""
-    alpha_0, C6, R_vdw = from_volumes(species, vols)
+def mbd_energy_species(coords, species, volume_ratios, beta, **kwargs):
+    r"""Calculate an MBD energy from atom types and Hirshfed-volume ratios.
+
+    :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like species: atom types (elements)
+    :param array-like volume_ratios: ratios of Hirshfeld volumes in molecule and vacuum
+    :param float beta: MBD damping parameter :math:`\beta`
+    :param kwargs: see :func:`mbd_energy`
+    """
+    alpha_0, C6, R_vdw = from_volumes(species, volume_ratios)
     return mbd_energy(coords, alpha_0, C6, R_vdw, beta, **kwargs)
 
 

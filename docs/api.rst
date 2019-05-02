@@ -7,7 +7,9 @@ Pure-Python implementation
 .. automodule:: pymbd
     :members:
 
-.. autodata:: ang
+.. autodata:: pymbd.pymbd.ang
+
+    Can be imported directly as :py:data:`pymbd.ang`.
 
 Fortran bindings
 ----------------

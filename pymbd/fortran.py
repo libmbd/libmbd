@@ -45,7 +45,7 @@ def _auto_context(method):
 
 
 class MBDGeom(object):
-    """Represents an initialized Libmbd geom_t object."""
+    """Represents an initialized Libmbd `geom_t <../type/geom_t.html>`_ object."""
 
     def __init__(
         self,
@@ -101,7 +101,7 @@ class MBDGeom(object):
 
     @property
     def coords(self):
-        """Atom coordinates as numpy array."""
+        """(a.u.) Atom coordinates in rows."""
         return self._coords.copy()
 
     @coords.setter
@@ -110,7 +110,7 @@ class MBDGeom(object):
 
     @property
     def lattice(self):
-        """Lattice vectors as numpy array."""
+        """(a.u.) Lattice vectors in rows."""
         return self._lattice.copy()
 
     @lattice.setter
@@ -123,7 +123,15 @@ class MBDGeom(object):
 
     @_auto_context
     def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi'):
-        """Calculate a TS energy."""
+        """Calculate a TS energy.
+
+        :param array-like alpha_0: (a.u.) atomic polarizabilities
+        :param array-like C6: (a.u.) atomic :math:`C_6` coefficients
+        :param array-like R_vdw: (a.u.) atomic vdW radii
+        :param float sR: TS damping parameter :math:`s_R`
+        :param float d: TS damping parameter :math:`d`
+        :param damping str: type of damping
+        """
         alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
         damping_f = _lib.cmbd_init_damping(
             len(self), damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
@@ -147,7 +155,17 @@ class MBDGeom(object):
         variant='rsscs',
         force=False,
     ):
-        """Calculate an MBD energy."""
+        r"""Calculate an MBD energy.
+
+        :param array-like alpha_0: (a.u.) atomic polarizabilities
+        :param array-like C6: (a.u.) atomic :math:`C_6` coefficients
+        :param array-like R_vdw: (a.u.) atomic vdW radii
+        :param float beta: MBD damping parameter :math:`\beta`
+        :param float a: MBD damping parameter :math:`a`
+        :param damping str: type of damping
+        :param variant str: one of 'plain', 'scs', 'rsscs'
+        :param force bool: if True, calculate energy gradients
+        """
         alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
         n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(
@@ -239,14 +257,28 @@ class MBDGeom(object):
         self._check_exc()
         return dipmat
 
-    def mbd_energy_species(self, species, vols, beta, **kwargs):
-        """Calculate an MBD energy from atom types and Hirshfed-volume ratios."""
-        alpha_0, C6, R_vdw = from_volumes(species, vols)
+    def mbd_energy_species(self, species, volume_ratios, beta, **kwargs):
+        r"""Calculate an MBD energy from atom types and Hirshfed-volume ratios.
+
+        :param array-like species: atom types (elements)
+        :param array-like volume_ratios: ratios of Hirshfeld volumes in
+            molecule and vacuum
+        :param float beta: MBD damping parameter :math:`\beta`
+        :param kwargs: see :meth:`mbd_energy`
+        """
+        alpha_0, C6, R_vdw = from_volumes(species, volume_ratios)
         return self.mbd_energy(alpha_0, C6, R_vdw, beta, **kwargs)
 
-    def ts_energy_species(self, species, vols, beta, **kwargs):
-        """Calculate a TS energy from atom types and Hirshfed-volume ratios."""
-        alpha_0, C6, R_vdw = from_volumes(species, vols)
+    def ts_energy_species(self, species, volume_ratios, beta, **kwargs):
+        """Calculate a TS energy from atom types and Hirshfed-volume ratios.
+
+        :param array-like species: atom types (elements)
+        :param array-like volume_ratios: ratios of Hirshfeld volumes in
+            molecule and vacuum
+        :param float sR: TS damping parameter :math:`s_R`
+        :param kwargs: see :meth:`ts_energy`
+        """
+        alpha_0, C6, R_vdw = from_volumes(species, volume_ratios)
         return self.ts_energy(alpha_0, C6, R_vdw, beta, **kwargs)
 
     @_auto_context

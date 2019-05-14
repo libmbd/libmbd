@@ -23,13 +23,13 @@ mbd_hamiltonian.o: mbd_constants.o mbd_damping.o mbd_dipole.o mbd_geom.o mbd_gra
 mbd_lapack.o: mbd_constants.o mbd_utils.o
 mbd_linalg.o: mbd_constants.o
 mbd_matrix.o: mbd_blacs.o mbd_constants.o mbd_lapack.o mbd_scalapack.o mbd_utils.o
-mbd_methods.o: mbd_blacs.o mbd_constants.o mbd_damping.o mbd_formulas.o mbd_geom.o mbd_gradients.o mbd_hamiltonian.o mbd_lapack.o mbd_rpa.o mbd_scs.o mbd_utils.o
-mbd_mpi.o: 
+mbd_methods.o: mbd_blacs.o mbd_constants.o mbd_damping.o mbd_formulas.o mbd_geom.o mbd_gradients.o mbd_hamiltonian.o mbd_lapack.o mbd_mpi.o mbd_rpa.o mbd_scs.o mbd_utils.o
+mbd_mpi.o: mbd_constants.o
 mbd_rpa.o: mbd_constants.o mbd_damping.o mbd_dipole.o mbd_formulas.o mbd_geom.o mbd_matrix.o mbd_utils.o
 mbd_scalapack.o: mbd_blacs.o mbd_constants.o mbd_lapack.o mbd_utils.o
 mbd_scs.o: mbd_constants.o mbd_damping.o mbd_dipole.o mbd_formulas.o mbd_geom.o mbd_gradients.o mbd_matrix.o mbd_utils.o
 mbd_ts.o: mbd_constants.o mbd_damping.o mbd_geom.o mbd_utils.o
-mbd_utils.o: mbd_constants.o mbd_mpi.o
+mbd_utils.o: mbd_constants.o mbd_gradients.o mbd_mpi.o
 mbd_vdw_param.o: mbd_constants.o mbd_utils.o
 
 .PHONY: clean distclean

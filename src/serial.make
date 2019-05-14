@@ -26,7 +26,7 @@ mbd_methods.o: mbd_constants.o mbd_damping.o mbd_formulas.o mbd_geom.o mbd_gradi
 mbd_rpa.o: mbd_constants.o mbd_damping.o mbd_dipole.o mbd_formulas.o mbd_geom.o mbd_matrix.o mbd_utils.o
 mbd_scs.o: mbd_constants.o mbd_damping.o mbd_dipole.o mbd_formulas.o mbd_geom.o mbd_gradients.o mbd_matrix.o mbd_utils.o
 mbd_ts.o: mbd_constants.o mbd_damping.o mbd_geom.o mbd_utils.o
-mbd_utils.o: mbd_constants.o
+mbd_utils.o: mbd_constants.o mbd_gradients.o
 mbd_vdw_param.o: mbd_constants.o mbd_utils.o
 
 .PHONY: clean distclean

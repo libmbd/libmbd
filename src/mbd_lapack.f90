@@ -405,7 +405,11 @@ subroutine eig_complex(A, eigs, exc, src, vals_only)
     n = size(A, 1)
     if (present(src)) A = src
     allocate (rwork(2*n))
-    if (mode(vals_only) == 'V') allocate (vectors(n, n))
+    if (mode(vals_only) == 'V') then
+        allocate (vectors(n, n))
+    else
+        allocate (vectors(1, 1))
+    end if
     call ZGEEV( &
         'N', mode(vals_only), n, A, n, eigs, dummy, 1, &
         vectors, n, lwork_arr, -1, rwork, error_flag &

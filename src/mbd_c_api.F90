@@ -42,7 +42,7 @@ contains
 
 type(c_ptr) function cmbd_init_geom( &
     n_atoms, coords, lattice, k_grid, n_kpts, custom_k_pts, &
-    n_freq, do_rpa, get_spectrum, get_rpa_orders &
+    n_freq, do_rpa, get_spectrum, get_rpa_orders, rpa_rescale_eigs &
 ) bind(c)
     integer(c_int), value, intent(in) :: n_atoms
     real(c_double), intent(in) :: coords(3, n_atoms)
@@ -54,6 +54,7 @@ type(c_ptr) function cmbd_init_geom( &
     logical(c_bool), value, intent(in) :: do_rpa
     logical(c_bool), value, intent(in) :: get_spectrum
     logical(c_bool), value, intent(in) :: get_rpa_orders
+    logical(c_bool), value, intent(in) :: rpa_rescale_eigs
 
     type(geom_t), pointer :: geom
 
@@ -67,6 +68,7 @@ type(c_ptr) function cmbd_init_geom( &
     geom%get_eigs = get_spectrum
     geom%get_modes = get_spectrum
     geom%get_rpa_orders = get_rpa_orders
+    geom%param%rpa_rescale_eigs = rpa_rescale_eigs
     call geom%init()
     cmbd_init_geom = c_loc(geom)
 end function

@@ -441,6 +441,17 @@ def test_benzene_rpa():
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
+@no_scalapack
+def test_benzene_rpa_scaled():
+    coords, species, vol_ratios = benzene_dimer[0]
+    alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
+    ene = MBDGeom(coords, do_rpa=True, rpa_rescale_eigs=True).mbd_energy(
+        alpha_0, C6, R_vdw, 0.83, variant='plain'
+    )
+    assert ene != approx(-0.007002398506090302, rel=1e-9)
+    assert ene == approx(-0.007002398506090302, rel=1e-7)
+
+
 @no_complex_scalapack_macos_py27
 def test_ethylcarbamate():
     enes = [

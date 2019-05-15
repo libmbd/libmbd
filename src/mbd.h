@@ -13,7 +13,8 @@ struct geom_t* cmbd_init_geom(
     int n_freq,
     _Bool do_rpa,
     _Bool get_spectrum,
-    _Bool get_rpa_orders
+    _Bool get_rpa_orders,
+    _Bool rpa_rescale_eigs
 );
 
 void cmbd_update_coords(struct geom_t* geom, double* coords);

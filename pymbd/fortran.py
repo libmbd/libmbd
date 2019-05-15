@@ -45,7 +45,18 @@ def _auto_context(method):
 
 
 class MBDGeom(object):
-    """Represents an initialized Libmbd `geom_t <../type/geom_t.html>`_ object."""
+    """Represents an initialized Libmbd `geom_t <../type/geom_t.html>`_ object.
+
+    :param array-like coords: (a.u.) atomic coordinates as rows
+    :param array-like lattice: (a.u.) lattice vectors as rows
+    :param array-like k_grid: number of :math:`k`-points per reciprocal lattice vector
+    :param array-like custom_k_pts: (a.u.) custom :math:`k`-points as rows
+    :param int n_freq: number of quadrature points for frequency integration
+    :param bool do_rpa: whether to calculate MBD energy via frequency integration
+    :param bool get_spectrum: whether to return eigenvalues and eigenvectors
+    :param bool get_rpa_orders: whether to return RPA order decomposition
+    :param bool rpa_rescale_eigs: whether to rescale RPA eigenvalues
+    """
 
     def __init__(
         self,
@@ -57,6 +68,7 @@ class MBDGeom(object):
         do_rpa=False,
         get_spectrum=False,
         get_rpa_orders=False,
+        rpa_rescale_eigs=False,
     ):
         self._geom_f = None
         self._coords, self._lattice = map(_array, (coords, lattice))
@@ -66,6 +78,7 @@ class MBDGeom(object):
         self._do_rpa = do_rpa
         self._get_spectrum = get_spectrum
         self._get_rpa_orders = get_rpa_orders
+        self._rpa_rescale_eigs = rpa_rescale_eigs
 
     def __len__(self):
         return len(self._coords)
@@ -82,6 +95,7 @@ class MBDGeom(object):
             self._do_rpa,
             self._get_spectrum,
             self._get_rpa_orders,
+            self._rpa_rescale_eigs,
         )
         return self
 

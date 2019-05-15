@@ -44,6 +44,8 @@ type, public :: mbd_input_t
         !! Whether to evalulate the MBD energy as an RPA integral over frequency.
     logical :: rpa_orders = .false.
         !! Whether to calculate individual RPA orders
+    logical :: rpa_rescale_eigs = .false.
+        !! Whether to rescale RPA eigenvalues as in 10.1021/acs.jctc.6b00925.
     real(dp) :: ts_ene_acc = TS_ENERGY_ACCURACY
         !! Required accuracy of the TS energy.
     real(dp) :: ts_f_acc = TS_FORCES_ACCURACY
@@ -142,6 +144,7 @@ subroutine mbd_calc_init(this, input)
     this%geom%get_modes = input%calculate_spectrum
     this%geom%do_rpa = input%do_rpa
     this%geom%get_rpa_orders = input%rpa_orders
+    this%geom%param%rpa_rescale_eigs = input%rpa_rescale_eigs
     this%geom%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
     this%geom%param%n_freq = input%n_omega_grid

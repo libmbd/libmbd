@@ -34,6 +34,7 @@ type, public :: param_t
     real(dp) :: k_grid_shift = K_GRID_SHIFT
     logical :: ewald_on = .true.
     logical :: zero_negative_eigvals = .false.
+    logical :: rpa_rescale_eigs = .false.
     integer :: rpa_order_max = 10
     integer :: n_freq = N_FREQUENCY_GRID
 end type

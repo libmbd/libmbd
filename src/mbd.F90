@@ -180,10 +180,22 @@ subroutine mbd_calc_init(this, input)
         this%damp%a = input%mbd_a
         this%damp%ts_d = input%ts_d
         this%damp%ts_sr = input%ts_sr
+        select case (input%method)
+        case ('ts')
+            if (input%ts_sr < 0) then
+                this%geom%exc%code = MBD_EXC_DAMPING
+                this%geom%exc%msg = 'Damping parameter S_r for TS not specified'
+            end if
+        case default
+            if (input%mbd_beta < 0) then
+                this%geom%exc%code = MBD_EXC_DAMPING
+                this%geom%exc%msg = 'Damping parameter beta for MBD not specified'
+            end if
+        end select
     else
         this%geom%exc = this%damp%set_params_from_xc(input%xc, input%method)
-        if (this%geom%has_exc()) return
     end if
+    if (this%geom%has_exc()) return
     this%debug = input%debug
 end subroutine
 

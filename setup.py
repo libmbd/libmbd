@@ -1,7 +1,7 @@
 import os
 import sys
 
-from setuptools import setup, Extension
+from setuptools import Extension, setup
 
 if '--no-ext' in sys.argv:
     sys.argv.remove('--no-ext')

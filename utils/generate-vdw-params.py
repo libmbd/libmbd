@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import sys
 import csv
+import sys
 from importlib.resources import open_text
 
 sys.path.append('.')

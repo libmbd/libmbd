@@ -6,3 +6,4 @@ black
 pydocstyle
 pep8-naming
 isort
+pytest

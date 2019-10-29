@@ -6,7 +6,7 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_fl
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 
-project(libmbd LANGUAGES Fortran)
+project(libmbd LANGUAGES Fortran C)
 
 option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
 CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_MPI OFF)

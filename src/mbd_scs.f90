@@ -123,10 +123,10 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
                 dQ = alpha_full%mmul(dQ)
                 dQ = dQ%mmul(alpha_full)
                 dalphadA = dQ%contract_n33diag_cols()
-                forall (my_i_atom = 1:size(geom%idx%i_atom))
+                do concurrent (my_i_atom = 1:size(geom%idx%i_atom))
                     dalpha_scs(my_i_atom)%dlattice(i_latt, i_xyz) &
                         = dalphadA(geom%idx%i_atom(my_i_atom))
-                end forall
+                end do
             end do
         end do
     end if

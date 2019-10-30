@@ -203,8 +203,9 @@ function supercell_circum(lattice, radius) result(sc)
     integer :: i
 
     ruc = 2*pi*inverse(transpose(lattice))
-    forall (i = 1:3) &
+    do concurrent (i = 1:3)
         layer_sep(i) = sum(lattice(:, i)*ruc(:, i)/sqrt(sum(ruc(:, i)**2)))
+    end do
     sc = ceiling(radius/layer_sep+0.5d0)
 end function
 

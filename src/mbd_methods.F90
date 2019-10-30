@@ -357,10 +357,10 @@ subroutine make_k_pts(k_pts, k_grid, lattice, shift, dkdlattice, grad)
     k_pts = matmul(2*pi*transpose(latt_inv), k_pts)
     if (grad) then
         allocate (dkdlattice(3, n_kpts, 3, 3))
-        forall (i_kpt = 1:n_kpts, i_latt = 1:3, a = 1:3)
+        do concurrent (i_kpt = 1:n_kpts, i_latt = 1:3, a = 1:3)
             dkdlattice(:, i_kpt, i_latt, a) = &
                 -latt_inv(i_latt, :)*k_pts(a, i_kpt)
-        end forall
+        end do
     end if
 end subroutine
 

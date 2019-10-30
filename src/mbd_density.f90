@@ -27,9 +27,9 @@ function eval_mbd_nonint_density(pts, xyz, charges, masses, omegas) result(rho)
     n_atoms = size(xyz, 1)
     rho(:) = 0.d0
     do i_pt = 1, size(pts, 1)
-        forall (i_atom = 1:n_atoms)
+        do concurrent (i_atom = 1:n_atoms)
             rsq(i_atom) = sum((pts(i_pt, :)-xyz(i_atom, :))**2)
-        end forall
+        end do
         rho(i_pt) = sum(pre*exp(-kernel*rsq))
     end do
 end function
@@ -72,9 +72,9 @@ function eval_mbd_int_density(pts, xyz, charges, masses, omegas, modes) result(r
     do i_pt = 1, size(pts, 1)
         do i_atom = 1, n_atoms
             rdiff(:) = pts(i_pt, :)-xyz(i_atom, :)
-            forall (i_xyz = 1:3, j_xyz = 1:3)
+            do concurrent (i_xyz = 1:3, j_xyz = 1:3)
                 rdiffsq(i_xyz, j_xyz) = rdiff(i_xyz)*rdiff(j_xyz)
-            end forall
+            end do
             factor(i_atom) = sum(kernel(:, :, i_atom)*rdiffsq(:, :))
         end do
         rho(i_pt) = sum(pre*exp(-factor))

@@ -38,7 +38,9 @@ function eye(n) result(A)
     integer :: i
 
     A(:, :) = 0.d0
-    forall (i = 1:n) A(i, i) = 1.d0
+    do concurrent (i = 1:n)
+        A(i, i) = 1.d0
+    end do
 end function
 
 function get_diag_real(A) result(d)
@@ -47,7 +49,9 @@ function get_diag_real(A) result(d)
 
     integer :: i
 
-    forall (i = 1:size(A, 1)) d(i) = A(i, i)
+    do concurrent (i = 1:size(A, 1))
+        d(i) = A(i, i)
+    end do
 end function
 
 function get_diag_complex(A) result(d)
@@ -56,7 +60,9 @@ function get_diag_complex(A) result(d)
 
     integer :: i
 
-    forall (i = 1:size(A, 1)) d(i) = A(i, i)
+    do concurrent (i = 1:size(A, 1))
+        d(i) = A(i, i)
+    end do
 end function
 
 function make_diag_real(d) result(A)
@@ -66,7 +72,9 @@ function make_diag_real(d) result(A)
     integer :: i
 
     A(:, :) = 0.d0
-    forall (i = 1:size(d)) A(i, i) = d(i)
+    do concurrent (i = 1:size(d))
+        A(i, i) = d(i)
+    end do
 end function
 
 end module

@@ -240,16 +240,16 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 exp_qR = exp(-IMI*(dot_product(q, Rnij)))
                 Tij = T*exp_qR
                 if (grad_ij%dcoords) then
-                    forall (i = 1:3)
+                    do concurrent (i = 1:3)
                         dTij%dr(:, :, i) = dT%dr(:, :, i)*exp_qR - IMI*q(i)*Tij
-                    end forall
+                    end do
                 end if
                 if (grad_ij%dsigma) dTij%dsigma = dT%dsigma*exp_qR
                 if (grad_ij%dr_vdw) dTij%dvdw = dT%dvdw*exp_qR
                 if (grad_ij%dq) then
-                    forall (i = 1:3)
+                    do concurrent (i = 1:3)
                         dTij%dq(:, :, i) = -IMI*Rnij(i)*Tij
-                    end forall
+                    end do
                 end if
 #endif
                 i = 3*(my_i_atom-1)
@@ -351,7 +351,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
         k_sq = sum(k**2)
         if (sqrt(k_sq) > geom%rec_space_cutoff .or. sqrt(k_sq) < 1d-15) cycle
         exp_k_sq_gamma = exp(-k_sq/(4*geom%gamm**2))
-        forall (a = 1:3, b = 1:3) k_otimes_k(a, b) = k(a)*k(b)/k_sq
+        do concurrent (a = 1:3, b = 1:3)
+            k_otimes_k(a, b) = k(a)*k(b)/k_sq
+        end do
         each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
             i_atom = dipmat%idx%i_atom(my_i_atom)
             each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
@@ -374,14 +376,14 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                 vol_exp = vol_prefactor*exp_k_sq_gamma*exp_GR
                 if (grad%dcoords .and. i_atom /= j_atom) then
                     associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
-                        forall (i_xyz = 1:3)
+                        do concurrent (i_xyz = 1:3)
                             dTdR_sub(:, :, i_xyz) = dTdR_sub(:, :, i_xyz) &
 #if MBD_TYPE == 1
                                 + Tij*IMI*G(i_xyz)
 #elif MBD_TYPE == 0
                                 - vol_kk_exp_ksq*sin(G_Rij)*G(i_xyz)
 #endif
-                        end forall
+                        end do
                     end associate
                 end if
                 if (grad%dlattice) then
@@ -389,10 +391,10 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                         do i_xyz = 1, 3
                             dGdA = -latt_inv(i_latt, :)*G(i_xyz)
                             dk_sqdA = 2*dot_product(k, dGdA)
-                            forall (a = 1:3, b = 1:3)
+                            do concurrent (a = 1:3, b = 1:3)
                                 dkk_dA(a, b) = k(a)*dGdA(b)/k_sq &
                                     - k(a)*k(b)*dk_sqdA/(2*k_sq**2)
-                            end forall
+                            end do
                             dkk_dA = dkk_dA + transpose(dkk_dA)
                             ! Using associate here was causing weird seg faults
                             ! with some Intel compilers, reporting i_xyz being
@@ -416,21 +418,21 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                 end if
 #if MBD_TYPE == 1
                 if (grad%dq) then
-                    forall (a = 1:3, b = 1:3, c = 1:3)
+                    do concurrent (a = 1:3, b = 1:3, c = 1:3)
                         dkk_dq(a, b, c) = -2*k(a)*k(b)*k(c)/k_sq**2
-                    end forall
-                    forall (a = 1:3, b = 1:3)
+                    end do
+                    do concurrent (a = 1:3, b = 1:3)
                         dkk_dq(b, a, a) = dkk_dq(b, a, a) + k(b)/k_sq
-                    end forall
-                    forall (a = 1:3, b = 1:3)
+                    end do
+                    do concurrent (a = 1:3, b = 1:3)
                         dkk_dq(a, b, a) = dkk_dq(a, b, a) + k(b)/k_sq
-                    end forall
+                    end do
                     associate (dTdq_sub => ddipmat%dq(i+1:i+3, j+1:j+3, :))
                         dTdq_sub = dTdq_sub + vol_exp*dkk_dq
-                        forall (a = 1:3)
+                        do concurrent (a = 1:3)
                             dTdq_sub(:, :, a) = dTdq_sub(:, :, a) &
                                 - Tij*k(a)/(2*geom%gamm**2)
-                        end forall
+                        end do
                     end associate
                 end if
 #endif
@@ -489,36 +491,36 @@ function T_bare(r, dT, grad) result(T)
     r_2 = sum(r**2)
     r_1 = sqrt(r_2)
     r_5 = r_1**5
-    forall (a = 1:3)
+    do concurrent (a = 1:3)
         T(a, a) = (-3*r(a)**2+r_2)/r_5
-        forall (b = a+1:3)
+        do concurrent (b = a+1:3)
             T(a, b) = -3*r(a)*r(b)/r_5
             T(b, a) = T(a, b)
-        end forall
-    end forall
+        end do
+    end do
     if (.not. present(grad)) return
     if (.not. grad) return
     allocate (dT%dr(3, 3, 3))
     r_7 = r_1**7
-    forall (a = 1:3)
+    do concurrent (a = 1:3)
         dT%dr(a, a, a) = -3*(3*r(a)/r_5-5*r(a)**3/r_7)
-        forall (b = a+1:3)
+        do concurrent (b = a+1:3)
             dT%dr(a, a, b) = -3*(r(b)/r_5-5*r(a)**2*r(b)/r_7)
             dT%dr(a, b, a) = dT%dr(a, a, b)
             dT%dr(b, a, a) = dT%dr(a, a, b)
             dT%dr(b, b, a) = -3*(r(a)/r_5-5*r(b)**2*r(a)/r_7)
             dT%dr(b, a, b) = dT%dr(b, b, a)
             dT%dr(a, b, b) = dT%dr(b, b, a)
-            forall (c = b+1:3)
+            do concurrent (c = b+1:3)
                 dT%dr(a, b, c) = 15*r(a)*r(b)*r(c)/r_7
                 dT%dr(a, c, b) = dT%dr(a, b, c)
                 dT%dr(b, a, c) = dT%dr(a, b, c)
                 dT%dr(b, c, a) = dT%dr(a, b, c)
                 dT%dr(c, a, b) = dT%dr(a, b, c)
                 dT%dr(c, b, a) = dT%dr(a, b, c)
-            end forall
-        end forall
-    end forall
+            end do
+        end do
+    end do
 end function
 
 real(dp) function B_erfc(r, gamm, dB, grad) result(B)
@@ -606,24 +608,24 @@ function T_erfc(r, gamm, dT, grad) result(T)
     r_5 = r_3*r_2
     B_ew = B_erfc(r_1, gamm, dB, grad)
     C_ew = C_erfc(r_1, gamm, dC, grad)
-    forall (a = 1:3)
+    do concurrent (a = 1:3)
         T(a, a) = -C_ew*r(a)**2/r_5+B_ew/r_3
-        forall (b = a+1:3)
+        do concurrent (b = a+1:3)
             T(a, b) = -C_ew*r(a)*r(b)/r_5
             T(b, a) = T(a, b)
-        end forall
-    end forall
+        end do
+    end do
     if (.not. present(grad)) return
     if (grad%dcoords) then
         allocate (dT%dr(3, 3, 3))
         r_7 = r_1**7
         r_4 = r_2**2
         r_6 = r_4*r_2
-        forall (c = 1:3)
+        do concurrent (c = 1:3)
             dT%dr(c, c, c) = &
                 -(2*r(c)/r_5-5*r(c)**3/r_7)*C_ew - 3*r(c)/r_5*B_ew &
                 - r(c)**3/r_6*dC%dr_1 + r(c)/r_4*dB%dr_1
-            forall (a = 1:3, a /= c)
+            do concurrent (a = 1:3, a /= c)
                 dT%dr(a, c, c) = &
                     -(r(a)/r_5-5*r(a)*r(c)**2/r_7)*C_ew &
                     - r(a)*r(c)**2/r_6*dC%dr_1
@@ -631,23 +633,23 @@ function T_erfc(r, gamm, dT, grad) result(T)
                 dT%dr(a, a, c) = &
                     5*r(a)**2*r(c)/r_7*C_ew - 3*r(c)/r_5*B_ew &
                     - r(a)**2*r(c)/r_6*dC%dr_1 + r(c)/r_4*dB%dr_1
-                forall (b = a+1:3, b /= c)
+                do concurrent (b = a+1:3, b /= c)
                     dT%dr(a, b, c) = &
                         5*r(a)*r(b)*r(c)/r_7*C_ew - r(a)*r(b)*r(c)/r_6*dC%dr_1
                     dT%dr(b, a, c) = dT%dr(a, b, c)
-                end forall
-            end forall
-        end forall
+                end do
+            end do
+        end do
     end if
     if (grad%dgamma) then
         allocate (dT%dgamma(3, 3))
-        forall (a = 1:3)
+        do concurrent (a = 1:3)
             dT%dgamma(a, a) = -dC%dgamma*r(a)**2/r_5+dB%dgamma/r_3
-            forall (b = a+1:3)
+            do concurrent (b = a+1:3)
                 dT%dgamma(a, b) = -dC%dgamma*r(a)*r(b)/r_5
                 dT%dgamma(b, a) = dT%dgamma(a, b)
-            end forall
-        end forall
+            end do
+        end do
     end if
 end function
 
@@ -696,9 +698,13 @@ function T_erf_coulomb(r, sigma, dT, grad) result(T)
     tmp33 = 2*zeta*theta*(bare+(3-2*zeta**2)*rr_r5)
     if (grad%dcoords) then
         allocate (dT%dr(3, 3, 3))
-        forall (c = 1:3) dT%dr(:, :, c) = tmp33*r(c)/(r_1*sigma)
+        do concurrent (c = 1:3)
+            dT%dr(:, :, c) = tmp33*r(c)/(r_1*sigma)
+        end do
         tmp333 = dbare%dr/3
-        forall (a = 1:3, c = 1:3) tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
+        do concurrent (a = 1:3, c = 1:3)
+            tmp333(a, a, c) = tmp333(a, a, c) + r(c)/r_5
+        end do
         dT%dr = dT%dr + erf_theta*dbare%dr-2*(zeta**2)*theta*tmp333
     end if
     if (grad%dsigma) dT%dsigma = -tmp33*r_1/sigma**2
@@ -730,7 +736,11 @@ function damping_grad(f, df, T, dT, dfT, grad) result(fT)
     fT = f*T
     if (grad%dcoords) then
         allocate (dfT%dr(3, 3, 3), source=0d0)
-        if (allocated(df%dr)) forall (c = 1:3) dfT%dr(:, :, c) = df%dr(c)*T
+        if (allocated(df%dr)) then
+            do concurrent (c = 1:3)
+                dfT%dr(:, :, c) = df%dr(c)*T
+            end do
+        end if
         if (allocated(dT%dr)) dfT%dr = dfT%dr + f*dT%dr
     end if
     if (grad%dr_vdw) then

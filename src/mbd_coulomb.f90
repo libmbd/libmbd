@@ -38,7 +38,9 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
     select case (quadrature)
     case ('original')
         w = 1d0/n_pts_coulomb
-        forall (i = 1:n_pts_coulomb) x(i) = w(1)/2+(i-1)*w(1)
+        do concurrent (i = 1:n_pts_coulomb)
+            x(i) = w(1)/2+(i-1)*w(1)
+        end do
         u = log(1d0/(1d0-x))*L_coulomb/dist
         w = 1d0/(1d0-x)*w*L_coulomb/dist
     case ('simpson')
@@ -98,12 +100,12 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
 
         integer :: i
 
-        forall (i = 1:3)
+        do concurrent (i = 1:3)
             A(i, i) = A(i, i) + u_sq
             A(i, i+3) = A(i, i+3) - u_sq
             A(i+3, i) = A(i+3, i) - u_sq
             A(i+3, i+3) = A(i+3, i+3) + u_sq
-        end forall
+        end do
     end subroutine
 
 end subroutine
@@ -139,9 +141,9 @@ real(dp) function coulomb_energy(geom, q, m, w_t, C, damp)
                 matmul(inverse(O(notAB, notAB)), O(notAB, AB)) &
             )
             i2A = [(A, i = 1, 3), (B, i = 1, 3)]
-            forall (i = 1:6, j = 1:6)
+            do concurrent (i = 1:6, j = 1:6)
                 OABm(i, j) = OAB(i, j)*sqrt(m(i2A(i))*m(i2A(j)))
-            end forall
+            end do
             call calc_coulomb_coupled_gauss(RA, RB, OABm, coul=ene_ABi(1))
             K = m(B)*(OAB(4:6, 4:6) - matmul( &
                 OAB(4:6, 1:3), matmul(inverse(OAB(1:3, 1:3)), OAB(1:3, 4:6)) &

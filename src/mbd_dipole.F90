@@ -305,11 +305,11 @@ end function
 #if MBD_TYPE == 0
 subroutine add_ewald_dipole_parts_real(geom, dipmat, ddipmat, grad)
     type(matrix_re_t), intent(inout) :: dipmat
-    type(grad_matrix_re_t), intent(inout) :: ddipmat
+    type(grad_matrix_re_t), intent(inout), optional :: ddipmat
 #elif MBD_TYPE == 1
 subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     type(matrix_cplx_t), intent(inout) :: dipmat
-    type(grad_matrix_cplx_t), intent(inout) :: ddipmat
+    type(grad_matrix_cplx_t), intent(inout), optional :: ddipmat
 #endif
     type(geom_t), intent(inout) :: geom
     type(grad_request_t), intent(in), optional :: grad

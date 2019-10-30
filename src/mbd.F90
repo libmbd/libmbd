@@ -122,6 +122,7 @@ contains
     procedure :: evaluate_vdw_method => mbd_calc_evaluate_vdw_method
     procedure :: get_gradients => mbd_calc_get_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
+    procedure :: get_lattice_stress => mbd_calc_get_lattice_stress
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
     procedure :: get_rpa_orders => mbd_calc_get_rpa_orders
     procedure :: get_exception => mbd_calc_get_exception
@@ -331,6 +332,21 @@ subroutine mbd_calc_get_lattice_derivs(this, latt_derivs)
         !! a_i\), index \(i\) runs over columns.
 
     latt_derivs = transpose(this%results%dE%dlattice)
+end subroutine
+
+subroutine mbd_calc_get_lattice_stress(this, stress)
+    !! Provide stress tensor of the lattice.
+    !!
+    !! This is a utility function wrapping [[mbd_calc_t:get_lattice_derivs]].
+    !! The lattice vector gradients are coverted to the stress tensor.
+    class(mbd_calc_t), intent(in) :: this
+    real(dp), intent(out) :: stress(:, :)
+        !! (\(3\times 3\), a.u.) Stress tensor.
+
+    stress = ( &
+        matmul(this%geom%lattice, this%results%dE%dlattice) &
+        + matmul(this%geom%coords, this%results%dE%dcoords) &
+    )
 end subroutine
 
 subroutine mbd_calc_get_spectrum_modes(this, spectrum, modes)

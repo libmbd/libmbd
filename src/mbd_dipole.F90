@@ -416,9 +416,13 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                 end if
 #if MBD_TYPE == 1
                 if (grad%dq) then
-                    forall (b = 1:3, a = 1:3)
-                        forall (c = 1:3) dkk_dq(b, c, a) = -2*k(a)*k(b)*k(c)/k_sq**2
+                    forall (a = 1:3, b = 1:3, c = 1:3)
+                        dkk_dq(a, b, c) = -2*k(a)*k(b)*k(c)/k_sq**2
+                    end forall
+                    forall (a = 1:3, b = 1:3)
                         dkk_dq(b, a, a) = dkk_dq(b, a, a) + k(b)/k_sq
+                    end forall
+                    forall (a = 1:3, b = 1:3)
                         dkk_dq(a, b, a) = dkk_dq(a, b, a) + k(b)/k_sq
                     end forall
                     associate (dTdq_sub => ddipmat%dq(i+1:i+3, j+1:j+3, :))

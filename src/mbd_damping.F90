@@ -145,7 +145,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
         end select
     case default
         exc%code = MBD_EXC_DAMPING
-        exc%msg = 'Method is unkonwn: ' // trim(variant)
+        exc%msg = 'Damping paramters of method ' // trim(variant) // ' unkonwn for ' // trim(xc)
     end select
 end function
 

@@ -1,6 +1,10 @@
 LIB = libmbd.a
+OBJS := $objs
+ifeq ($$(LIBMBD_C_API),0)
+OBJS := $$(filter-out mbd_c_api.o,$$(OBJS))
+endif
 
-$$(LIB): $objs
+$$(LIB): $$(OBJS)
 	ar -r $$@ $$^
 
 %.o: %.f90

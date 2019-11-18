@@ -42,7 +42,8 @@ contains
 
 type(c_ptr) function cmbd_init_geom( &
     n_atoms, coords, lattice, k_grid, n_kpts, custom_k_pts, &
-    n_freq, do_rpa, get_spectrum, get_rpa_orders, rpa_rescale_eigs &
+    n_freq, do_rpa, get_spectrum, get_rpa_orders, rpa_rescale_eigs, &
+    max_atoms_per_block &
 ) bind(c)
     integer(c_int), value, intent(in) :: n_atoms
     real(c_double), intent(in) :: coords(3, n_atoms)
@@ -55,6 +56,7 @@ type(c_ptr) function cmbd_init_geom( &
     logical(c_bool), value, intent(in) :: get_spectrum
     logical(c_bool), value, intent(in) :: get_rpa_orders
     logical(c_bool), value, intent(in) :: rpa_rescale_eigs
+    integer(c_int), value, intent(in) :: max_atoms_per_block
 
     type(geom_t), pointer :: geom
 
@@ -64,6 +66,9 @@ type(c_ptr) function cmbd_init_geom( &
     if (present(k_grid)) geom%k_grid = k_grid
     if (present(custom_k_pts)) geom%custom_k_pts = custom_k_pts
     if (n_freq > 0) geom%param%n_freq = n_freq
+#ifdef WITH_SCALAPACK
+    if (max_atoms_per_block > 0) geom%max_atoms_per_block = max_atoms_per_block
+#endif
     geom%do_rpa = do_rpa
     geom%get_eigs = get_spectrum
     geom%get_modes = get_spectrum

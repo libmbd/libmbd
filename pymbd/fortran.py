@@ -69,6 +69,7 @@ class MBDGeom(object):
         get_spectrum=False,
         get_rpa_orders=False,
         rpa_rescale_eigs=False,
+        max_atoms_per_block=None,
     ):
         self._geom_f = None
         self._coords, self._lattice = map(_array, (coords, lattice))
@@ -79,6 +80,7 @@ class MBDGeom(object):
         self._get_spectrum = get_spectrum
         self._get_rpa_orders = get_rpa_orders
         self._rpa_rescale_eigs = rpa_rescale_eigs
+        self._max_atoms_per_block = max_atoms_per_block
 
     def __len__(self):
         return len(self._coords)
@@ -96,6 +98,7 @@ class MBDGeom(object):
             self._get_spectrum,
             self._get_rpa_orders,
             self._rpa_rescale_eigs,
+            self._max_atoms_per_block or 0,
         )
         return self
 

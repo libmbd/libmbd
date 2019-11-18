@@ -34,6 +34,8 @@ type, public :: mbd_input_t
         !!
         !! Only used when compiled with MPI. Leave as is to use the
         !! MPI_COMM_WORLD communicator.
+    integer :: max_atoms_per_block = MAX_ATOMS_PER_BLOCK
+        !! Number of atoms per block in a BLACS grid.
     logical :: debug = .false.
         !! Whether debugging info should be printer
     logical :: calculate_forces = .true.
@@ -138,6 +140,9 @@ subroutine mbd_calc_init(this, input)
 
 #ifdef WITH_MPI
     if (input%comm /= -1) this%geom%mpi_comm = input%comm
+#endif
+#ifdef WITH_SCALAPACK
+    this%geom%max_atoms_per_block = input%max_atoms_per_block
 #endif
     this%method = input%method
     this%calculate_gradients = input%calculate_forces

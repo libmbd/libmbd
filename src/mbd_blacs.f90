@@ -28,6 +28,7 @@ type, public :: blacs_desc_t
     integer :: n_atoms
     integer :: desc(9)
     integer :: ctx
+    integer :: blocksize
     integer :: comm = -1
 contains
     procedure :: init => blacs_desc_init
@@ -79,28 +80,34 @@ subroutine blacs_grid_destroy(this)
     call BLACS_GRIDEXIT(this%ctx)
 end subroutine
 
-subroutine blacs_desc_init(this, n_atoms, grid)
+subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
     class(blacs_desc_t), intent(out) :: this
     type(blacs_grid_t), intent(in) :: grid
     integer, intent(in) :: n_atoms
+    integer, intent(in) :: max_atoms_per_block
 
-    integer :: blocksize, my_nratoms, my_ncatoms, ierr
+    integer :: my_nratoms, my_ncatoms, ierr, atoms_per_block, n_proc
 
     this%comm = grid%comm
     this%ctx = grid%ctx
     this%n_atoms = n_atoms
-    blocksize = 3
-    my_nratoms = NUMROC(n_atoms, blocksize/3, grid%my_prow, 0, grid%nprows)
-    my_ncatoms = NUMROC(n_atoms, blocksize/3, grid%my_pcol, 0, grid%npcols)
+    n_proc = max(grid%nprows, grid%npcols)
+    if (n_proc == 1) return
+    atoms_per_block = (n_atoms - 1) / (n_proc - 1)
+    if (atoms_per_block == 0) return
+    atoms_per_block = min(atoms_per_block, max_atoms_per_block)
+    my_nratoms = NUMROC(n_atoms, atoms_per_block, grid%my_prow, 0, grid%nprows)
+    my_ncatoms = NUMROC(n_atoms, atoms_per_block, grid%my_pcol, 0, grid%npcols)
+    this%blocksize = 3*atoms_per_block
     call DESCINIT( &
-        this%desc, 3*n_atoms, 3*n_atoms, blocksize, blocksize, 0, 0, &
+        this%desc, 3*n_atoms, 3*n_atoms, this%blocksize, this%blocksize, 0, 0, &
         grid%ctx, 3*my_nratoms, ierr &
     )
     this%i_atom = idx_map( &
-        grid%my_prow, grid%nprows, n_atoms, blocksize/3, my_nratoms &
+        grid%my_prow, grid%nprows, n_atoms, atoms_per_block, my_nratoms &
     )
     this%j_atom = idx_map( &
-        grid%my_pcol, grid%npcols, n_atoms, blocksize/3, my_ncatoms &
+        grid%my_pcol, grid%npcols, n_atoms, atoms_per_block, my_ncatoms &
     )
 end subroutine
 

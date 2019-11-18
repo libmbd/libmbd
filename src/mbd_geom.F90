@@ -71,6 +71,9 @@ type, public :: geom_t
     integer :: mpi_comm = MPI_COMM_WORLD
         !! MPI communicator
 #endif
+#ifdef WITH_SCALAPACK
+    integer :: max_atoms_per_block = MAX_ATOMS_PER_BLOCK
+#endif
     ! The following components are set by the initializer and should be
     ! considered read-only
     type(clock_t) :: timer
@@ -106,7 +109,9 @@ subroutine geom_init(this)
 
     integer :: i_atom, n_kpts
     real(dp) :: volume
+    logical :: is_parallel
 #ifdef WITH_MPI
+    logical :: can_parallel_kpts
     integer :: ierr
 #endif
 
@@ -127,43 +132,55 @@ subroutine geom_init(this)
             this%real_space_cutoff = this%param%dipole_cutoff
         end if
     end if
-    if (this%parallel_mode == 'auto') then
-        this%parallel_mode = 'atoms'
-        n_kpts = -1
-        if (allocated(this%custom_k_pts)) then
-            n_kpts = size(this%custom_k_pts, 2)
-        else if (allocated(this%k_grid)) then
-            n_kpts = product(this%k_grid)
-        end if
-        if (allocated(this%lattice) .and. n_kpts > 0) then
-            if (this%siz()**2 < n_kpts) then
-                this%parallel_mode = 'k_points'
-            end if
-        end if
-    end if
 #ifdef WITH_MPI
     call MPI_COMM_SIZE(this%mpi_comm, this%mpi_size, ierr)
     call MPI_COMM_RANK(this%mpi_comm, this%mpi_rank, ierr)
+    if (allocated(this%custom_k_pts)) then
+        n_kpts = size(this%custom_k_pts, 2)
+    else if (allocated(this%k_grid)) then
+        n_kpts = product(this%k_grid)
+    else
+        n_kpts = -1
+    end if
+    can_parallel_kpts = allocated(this%lattice) .and. n_kpts > 0 .and. this%mpi_size > 1
+    if (this%parallel_mode == 'auto' .and. can_parallel_kpts .and. this%siz()**2 < n_kpts) then
+        this%parallel_mode = 'k_points'
+    end if
 #endif
 #ifdef WITH_SCALAPACK
-    this%idx%parallel = this%parallel_mode == 'atoms' .and. this%siz() > 1
-    if (this%idx%parallel) then
+    this%idx%parallel = .false.
+    if (this%parallel_mode == 'auto' .or. this%parallel_mode == 'atoms') then
 #   ifdef WITH_MPI
         call this%blacs_grid%init(this%mpi_comm)
 #   else
         call this%blacs_grid%init()
 #   endif
-        call this%blacs%init(this%siz(), this%blacs_grid)
-        this%idx%i_atom = this%blacs%i_atom
-        this%idx%j_atom = this%blacs%j_atom
-    else
+        call this%blacs%init(this%siz(), this%blacs_grid, this%max_atoms_per_block)
+        if (allocated(this%blacs%i_atom)) then
+            this%parallel_mode = 'atoms'
+            this%idx%parallel = .true.
+            this%idx%i_atom = this%blacs%i_atom
+            this%idx%j_atom = this%blacs%j_atom
+        else
+            call this%blacs_grid%destroy()
+        end if
+    end if
+#endif
+#ifdef WITH_MPI
+    if (this%parallel_mode == 'auto' .and. can_parallel_kpts) then
+        this%parallel_mode = 'k_points'
+    end if
+#endif
+    if (this%parallel_mode == 'auto') this%parallel_mode = 'none'
+#ifdef WITH_SCALAPACK
+    is_parallel = this%idx%parallel
+#else
+    is_parallel = .false.
+#endif
+    if (.not. is_parallel) then
         this%idx%i_atom = [(i_atom, i_atom = 1, this%siz())]
         this%idx%j_atom = this%idx%i_atom
     end if
-#else
-    this%idx%i_atom = [(i_atom, i_atom = 1, this%siz())]
-    this%idx%j_atom = this%idx%i_atom
-#endif
     this%idx%n_atoms = this%siz()
 end subroutine
 

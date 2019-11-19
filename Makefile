@@ -1,40 +1,44 @@
 SRCDIR ?= $(PWD)
-MAKEENV ?= serial-build
+MAKEENV ?= serial-default
+BLDDIR ?= build
+MPIFORT ?= gfortran
+MPI_NODES ?= 2
 
 all:
 
 test: $(MAKEENV)
 
 serial-%:
-	make -C $* check
+	make -C $(BLDDIR)/$* check
 
 mpi-%: serial-%
-	mpirun -n 2 $*/tests/mbd_unit_tests
-	mpirun -n 2 $*/tests/mbd_api_tests
+	env OMP_NUM_THREADS=1 mpirun -n $(MPI_NODES) $(BLDDIR)/$*/tests/mbd_unit_tests
+	env OMP_NUM_THREADS=1 mpirun -n $(MPI_NODES) $(BLDDIR)/$*/tests/mbd_api_tests
 
 setup: $(addprefix setup_,$(MAKEENV))
 
-setup_serial-build: | build
+setup_serial-default: | $(BLDDIR)/default
 	cd -P $| && cmake $(SRCDIR)
 
-setup_serial-build-gfortran49: | build-gfortran49
+setup_serial-gfortran49: | $(BLDDIR)/gfortran49
 	cd -P $| && cmake $(SRCDIR) -DCMAKE_Fortran_COMPILER=gfortran-4.9
 
-setup_serial-build-gfortran5: | build-gfortran5
+setup_serial-gfortran5: | $(BLDDIR)/gfortran5
 	cd -P $| && cmake $(SRCDIR) -DCMAKE_Fortran_COMPILER=gfortran-5
 
-setup_mpi-build-mpi: | build-mpi
-	cd -P $| && cmake $(SRCDIR) -DENABLE_SCALAPACK_MPI=ON
+setup_mpi-mpi: | $(BLDDIR)/mpi
+	cd -P $| && cmake $(SRCDIR) -DENABLE_SCALAPACK_MPI=ON -DCMAKE_Fortran_COMPILER=$(MPIFORT)
 
-build build-gfortran49 build-mpi:
-	mkdir -p $@
+setup_mpi-elsi: | $(BLDDIR)/elsi
+	cd -P $| && cmake $(SRCDIR) -DENABLE_SCALAPACK_MPI=ON -DENABLE_ELSI=ON -DCMAKE_Fortran_COMPILER=$(MPIFORT)
+
+$(BLDDIR)/%:
+	mkdir -p $(BLDDIR)/$*
 
 clean: $(addprefix clean_,$(MAKEENV))
 
 clean_serial-% clean_mpi-%:
-	$(MAKE) -C $* clean
+	$(MAKE) -C $(BLDDIR)/$* clean
 
-distclean: $(addprefix distclean_,$(MAKEENV))
-
-distclean_serial-% distclean_mpi-%:
-	rm -rf $*/*
+distclean:
+	rm -rf $(wildcard $(BLDDIR)/*)

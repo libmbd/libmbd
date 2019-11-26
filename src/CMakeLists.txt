@@ -30,6 +30,7 @@ if(ENABLE_ELSI)
 endif()
 
 add_library(mbd ${SRCS})
+target_include_directories(mbd INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
 
 if(MKL_LIBRARIES)
     target_link_libraries(mbd PRIVATE ${MKL_LIBRARIES})

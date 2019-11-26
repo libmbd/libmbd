@@ -25,6 +25,11 @@ integer, parameter :: MBD_EXC_DAMPING = 5
 integer, parameter :: MBD_EXC_INPUT = 6
     !! Invalid input
 
+integer, parameter :: MBD_LOG_LVL_DEBUG = -1
+integer, parameter :: MBD_LOG_LVL_INFO = 0
+integer, parameter :: MBD_LOG_LVL_WARN = 1
+integer, parameter :: MBD_LOG_LVL_ERROR = 2
+
 real(dp), parameter :: ZERO_REAL = 0d0
 complex(dp), parameter :: ZERO_COMPLEX = (0d0, 0d0)
 complex(dp), parameter :: IMI = (0d0, 1d0)

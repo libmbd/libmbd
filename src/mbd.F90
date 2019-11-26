@@ -13,7 +13,7 @@ use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_request_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: ts_energy
-use mbd_utils, only: result_t, exception_t, printer
+use mbd_utils, only: result_t, exception_t, printer_i
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 
 implicit none
@@ -36,8 +36,10 @@ type, public :: mbd_input_t
         !! MPI_COMM_WORLD communicator.
     integer :: max_atoms_per_block = MAX_ATOMS_PER_BLOCK
         !! Number of atoms per block in a BLACS grid.
-    logical :: debug = .false.
-        !! Whether debugging info should be printer
+    integer :: log_level = MBD_LOG_LVL_INFO
+        !! Level of printing
+    procedure(printer_i), nopass, pointer :: printer => null()
+        !! If assigned, will be used for logging
     logical :: calculate_forces = .true.
         !! Whether to calculate forces.
     logical :: calculate_spectrum = .false.
@@ -112,7 +114,6 @@ type, public :: mbd_calc_t
     type(result_t) :: results
     logical :: calculate_gradients
     real(dp), allocatable :: free_values(:, :)
-    logical :: debug
 contains
     procedure :: init => mbd_calc_init
     procedure :: destroy => mbd_calc_destroy
@@ -202,7 +203,8 @@ subroutine mbd_calc_init(this, input)
         this%geom%exc = this%damp%set_params_from_xc(input%xc, input%method)
     end if
     if (this%geom%has_exc()) return
-    this%debug = input%debug
+    if (associated(input%printer)) this%geom%log%printer => input%printer
+    this%geom%log%level = input%log_level
 end subroutine
 
 subroutine mbd_calc_destroy(this)
@@ -302,7 +304,7 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
     case ('ts')
         energy = ts_energy(this%geom, this%alpha_0, this%C6, this%damp)
     end select
-    if (this%debug) call this%geom%timer%print()
+    if (this%geom%log%level <= MBD_LOG_LVL_DEBUG) call this%geom%timer%print()
 end subroutine
 
 subroutine mbd_calc_get_gradients(this, gradients)  ! 3 by N  dE/dR

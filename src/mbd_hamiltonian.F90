@@ -12,7 +12,7 @@ use mbd_dipole, only: dipole_matrix
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, grad_request_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
-use mbd_utils, only: result_t, tostr, printer
+use mbd_utils, only: result_t, tostr
 
 implicit none
 
@@ -144,7 +144,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
             " negative eigenvalues"
         if (geom%param%zero_negative_eigvals) then
             where (eigs < 0) eigs = 0d0
-            call printer(msg)
+            call geom%log%warn(msg)
         else
             geom%exc%code = MBD_EXC_NEG_EIGVALS
             geom%exc%msg = msg

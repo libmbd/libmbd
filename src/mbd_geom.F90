@@ -11,7 +11,9 @@ module mbd_geom
 
 use mbd_constants
 use mbd_lapack, only: eigvals, inverse
-use mbd_utils, only: shift_idx, atom_index_t, quad_pt_t, exception_t, tostr, clock_t
+use mbd_utils, only: &
+    shift_idx, atom_index_t, quad_pt_t, exception_t, tostr, clock_t, printer, &
+    printer_i, logger_t
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
@@ -67,6 +69,8 @@ type, public :: geom_t
         !! Whether to calculate MBD energy by frequency integration
     logical :: get_rpa_orders = .false.
         !! Whether to calculate RPA orders
+    type(logger_t) :: log
+        !! Used for logging
 #ifdef WITH_MPI
     integer :: mpi_comm = MPI_COMM_WORLD
         !! MPI communicator

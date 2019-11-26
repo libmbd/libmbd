@@ -15,7 +15,7 @@ implicit none
 
 private
 public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, shift_idx, &
-    is_true, printer
+    is_true, printer_i, printer
 
 interface tostr
     module procedure tostr_int
@@ -25,6 +25,22 @@ end interface
 interface findval
     module procedure findval_int
 end interface
+
+abstract interface
+    subroutine printer_i(str)
+        character(len=*), intent(in) :: str
+    end subroutine
+end interface
+
+type, public :: logger_t
+    integer :: level = MBD_LOG_LVL_WARN
+    procedure(printer_i), nopass, pointer :: printer => printer
+    contains
+    procedure :: info => logger_info
+    procedure :: debug => logger_debug
+    procedure :: warn => logger_warn
+    procedure :: error => logger_error
+end type
 
 type, public :: exception_t
     !! Represents an exception.
@@ -260,12 +276,40 @@ subroutine clock_print(this)
 end subroutine
 
 subroutine printer(str)
-    character(len=*) :: str
+    character(len=*), intent(in) :: str
 
 #ifdef WITH_MPI
     if (mpi_get_rank() /= 0) return
 #endif
     print *, str
+end subroutine
+
+subroutine logger_debug(this, str)
+    class(logger_t), intent(in) :: this
+    character(len=*), intent(in) :: str
+
+    if (this%level <= MBD_LOG_LVL_DEBUG) call this%printer(str)
+end subroutine
+
+subroutine logger_info(this, str)
+    class(logger_t), intent(in) :: this
+    character(len=*), intent(in) :: str
+
+    if (this%level <= MBD_LOG_LVL_INFO) call this%printer(str)
+end subroutine
+
+subroutine logger_warn(this, str)
+    class(logger_t), intent(in) :: this
+    character(len=*), intent(in) :: str
+
+    if (this%level <= MBD_LOG_LVL_WARN) call this%printer(str)
+end subroutine
+
+subroutine logger_error(this, str)
+    class(logger_t), intent(in) :: this
+    character(len=*), intent(in) :: str
+
+    if (this%level <= MBD_LOG_LVL_ERROR) call this%printer(str)
 end subroutine
 
 logical function is_true(val) result(res)

@@ -186,6 +186,12 @@ subroutine geom_init(this)
         this%idx%j_atom = this%idx%i_atom
     end if
     this%idx%n_atoms = this%siz()
+    call this%log%info('Will user parallel mode: ' // this%parallel_mode)
+#ifdef WITH_SCALAPACK
+    if (this%idx%parallel) then
+        call this%log%info('BLACS block size: ' // tostr(this%blacs%blocksize))
+    end if
+#endif
 end subroutine
 
 subroutine geom_destroy(this)

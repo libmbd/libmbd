@@ -4,7 +4,6 @@ set(SRCS
     mbd_constants.f90
     mbd_coulomb.f90
     mbd_damping.F90
-    # mbd_density.f90
     mbd_dipole.F90
     mbd_formulas.f90
     mbd_geom.F90
@@ -30,7 +29,10 @@ if(ENABLE_ELSI)
 endif()
 
 add_library(mbd ${SRCS})
-target_include_directories(mbd INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(mbd INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
 
 if(MKL_LIBRARIES)
     target_link_libraries(mbd PRIVATE ${MKL_LIBRARIES})
@@ -59,7 +61,11 @@ if(ENABLE_ELSI)
 endif()
 
 set_property(TARGET mbd PROPERTY PUBLIC_HEADER mbd.h "${CMAKE_CURRENT_BINARY_DIR}/mbd.mod")
-install(TARGETS mbd
+
+install(TARGETS mbd EXPORT LibmbdConfig
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT LibmbdConfig DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mbd)

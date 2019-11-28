@@ -6,10 +6,10 @@ jobs:
       env: TOXENV=py35-serial-codecov MAKEENV=serial
     - language: python
       python: 3.6
-      env: TOXENV=py36-mpi-codecov MAKEENV=mpi MPI_NODES=1
+      env: TOXENV=py36-mpi MAKEENV=mpi MPI_NODES=1
     - language: python
       python: 3.7
-      env: TOXENV=py37-mpi MAKEENV=mpi MPI_NODES=2
+      env: TOXENV=py37-mpi-codecov MAKEENV=mpi MPI_NODES=2
     - language: generic
       os: osx
       env: TOXENV=py37-mpi MAKEENV=mpi MPI_NODES=2

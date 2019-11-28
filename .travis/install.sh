@@ -1,12 +1,13 @@
 #!/bin/bash
 set -ev
 
-pip install tox tox-venv
 if [[ $TRAVIS_OS_NAME = osx ]]; then
     rm -rf /usr/local/include/c++
     brew update
     brew install gcc open-mpi scalapack
+    brew upgrade python3
 fi
+pip3 install tox tox-venv
 if [[ $TOXENV != doc ]]; then
     CMAKE_FLAGS=()
     if [[ $TOXENV = *codecov* ]]; then

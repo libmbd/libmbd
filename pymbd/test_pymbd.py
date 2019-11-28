@@ -12,10 +12,6 @@ from .fortran import MBDFortranException, MBDGeom, with_scalapack
 from .utils import numerical_gradients, numerical_latt_gradients
 
 no_scalapack = pytest.mark.skipif(with_scalapack, reason="doesn't support ScaLAPACK")
-no_complex_scalapack_macos_py27 = pytest.mark.skipif(
-    with_scalapack and sys.platform == 'darwin' and sys.version_info[0] == 2,
-    reason="vecLibFort doesn't work when compiled to Python 2",
-)
 
 benzene_dimer = [
     (
@@ -452,7 +448,6 @@ def test_benzene_rpa_scaled():
     assert ene == approx(-0.007002398506090302, rel=1e-7)
 
 
-@no_complex_scalapack_macos_py27
 def test_ethylcarbamate():
     enes = [
         MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vol_ratios, 0.83)
@@ -462,7 +457,6 @@ def test_ethylcarbamate():
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
-@no_complex_scalapack_macos_py27
 def test_argon_crystal():
     coords, lattice, k_grid, species, vol_ratios = argon_crystal
     ene = MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vol_ratios, 0.83)
@@ -480,7 +474,6 @@ def test_argon_crystal_modes():
     assert abs(C[:, :, 1].imag).sum() != approx(0)
 
 
-@no_complex_scalapack_macos_py27
 def test_argon_crystal_gradients():
     coords, lattice, k_grid, species, vol_ratios = argon_crystal
     ene, gradients, latt_gradients = MBDGeom(
@@ -500,7 +493,6 @@ def test_argon_crystal_gradients():
         assert latt_gradients[i] == approx(num_latt_gradients[i], rel=1e-10, abs=1e-10)
 
 
-@no_complex_scalapack_macos_py27
 def test_lithium():
     with pytest.raises(MBDFortranException):
         [
@@ -523,7 +515,6 @@ def test_ethylcarbamate_python():
     assert ene_int == approx(-0.037040868610822564, rel=1e-10)
 
 
-@no_complex_scalapack_macos_py27
 def test_ethylcarbamate_scs():
     enes = [
         MBDGeom(coords, lattice, k_grid).mbd_energy_species(

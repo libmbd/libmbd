@@ -2,19 +2,19 @@ dist: xenial
 jobs:
   include:
     - language: python
-      python: 2.7
-      env: TOXENV=py27-serial-codecov MAKEENV=serial-build
-    - language: python
-      python: 2.7
-      env: TOXENV=py27-mpi-nodes1-codecov-build MAKEENV=mpi-build
-    - language: python
-      python: 2.7
-      env: TOXENV=py27-mpi-nodes2-build MAKEENV=mpi-build
-    - language: generic
-      os: osx
-      env: TOXENV=py36-mpi-nodes2-build MAKEENV=mpi-build
+      python: 3.5
+      env: TOXENV=py35-serial-codecov MAKEENV=serial
     - language: python
       python: 3.6
+      env: TOXENV=py36-mpi-codecov MAKEENV=mpi MPI_NODES=1
+    - language: python
+      python: 3.7
+      env: TOXENV=py37-mpi MAKEENV=mpi MPI_NODES=2
+    - language: generic
+      os: osx
+      env: TOXENV=py37-mpi MAKEENV=mpi MPI_NODES=2
+    - language: python
+      python: 3.7
       stage: deploy
       env: TOXENV=doc MAKEENV=
     - language: generic

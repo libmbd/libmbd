@@ -18,19 +18,6 @@ else:
     ext = Extension('pymbd._libmbd', sources=[LIBMBDC], libraries=['mbd'])
     kwargs = {'ext_modules': [ext]}
 
-# fix https://bugs.python.org/issue1703178
-if sys.version_info[0] < 3:
-    from distutils.command.build_ext import build_ext
-
-    finalize_options = build_ext.finalize_options
-
-    def _finalize_options(self):
-        finalize_options(self)
-        if isinstance(self.link_objects, str):
-            self.link_objects = self.link_objects.split()
-
-    build_ext.finalize_options = _finalize_options
-
 # fix incorrect rpath flags on darwin
 if True:
     from distutils.unixccompiler import UnixCCompiler

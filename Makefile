@@ -8,6 +8,9 @@ all:
 
 test: $(MAKEENV)
 
+serial: serial-.
+mpi: mpi-.
+
 serial-%:
 	make -C $(BLDDIR)/$* check
 

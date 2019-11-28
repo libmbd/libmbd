@@ -8,8 +8,7 @@ import numpy as np
 __all__ = ()
 
 
-def numerical_gradients(geom, func, *args, **kwargs):
-    delta = kwargs.pop('delta', 1e-3)  # support python 2
+def numerical_gradients(geom, func, *args, delta=1e-3, **kwargs):
     steps, diff = finite_diff_gen(kwargs.pop('npts', 5))
     coords_0 = geom.coords
     gradients = np.zeros(coords_0.shape)

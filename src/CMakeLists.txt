@@ -1,6 +1,5 @@
 set(SRCS
     mbd.F90
-    mbd_c_api.F90
     mbd_constants.f90
     mbd_coulomb.f90
     mbd_damping.F90
@@ -26,6 +25,10 @@ endif()
 
 if(ENABLE_ELSI)
     list(APPEND SRCS mbd_elsi.F90)
+endif()
+
+if(ENABLE_C_API)
+    list(APPEND SRCS mbd_c_api.F90)
 endif()
 
 add_library(mbd ${SRCS})
@@ -60,7 +63,10 @@ if(ENABLE_ELSI)
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_ELSI)
 endif()
 
-set_property(TARGET mbd PROPERTY PUBLIC_HEADER mbd.h "${CMAKE_CURRENT_BINARY_DIR}/mbd.mod")
+set_property(TARGET mbd PROPERTY PUBLIC_HEADER "${CMAKE_CURRENT_BINARY_DIR}/mbd.mod")
+if(ENABLE_C_API)
+    set_property(TARGET mbd APPEND PROPERTY PUBLIC_HEADER mbd.h)
+endif()
 
 install(TARGETS mbd EXPORT LibmbdConfig
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

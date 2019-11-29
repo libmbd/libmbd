@@ -1,5 +1,5 @@
 SRCDIR ?= $(PWD)
-MAKEENV ?= serial-default
+MAKEENV ?= serial
 BLDDIR ?= build
 MPIFORT ?= gfortran
 MPI_NODES ?= 2

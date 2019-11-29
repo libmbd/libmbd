@@ -129,7 +129,7 @@ call calc%destroy()
 For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in the build directory. Use [Tox](https://tox.readthedocs.io/) for comfortable running of Python tests.
 
 ```
-pip install tox tox-venv  # or just make sure you have tox and tox-venv installed
+pip install tox  # or just make sure you have tox and tox-venv installed
 git clone https://github.com/jhrmnn/libmbd.git && cd libmbd
 make setup  # creates ./build and runs cmake
 # do some development

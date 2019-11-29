@@ -111,12 +111,12 @@ contains
 subroutine geom_init(this)
     class(geom_t), intent(inout) :: this
 
-    integer :: i_atom, n_kpts
+    integer :: i_atom
     real(dp) :: volume
     logical :: is_parallel
 #ifdef WITH_MPI
     logical :: can_parallel_kpts
-    integer :: ierr
+    integer :: ierr, n_kpts
 #endif
 
     associate (n => this%param%n_freq)

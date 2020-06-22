@@ -1,6 +1,6 @@
 #!/bin/bash
-set -ev
 
+set -ev
 case $TRAVIS_OS_NAME in
     osx)
         ANACONDA_OS_TAG=MacOSX

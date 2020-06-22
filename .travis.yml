@@ -1,40 +1,55 @@
+os: linux
 dist: xenial
-jobs:
-  include:
-    - language: python
-      python: 3.5
-      env: TOXENV=py35-serial-codecov MAKEENV=serial
-    - language: python
-      python: 3.6
-      env: TOXENV=py36-mpi MAKEENV=mpi MPI_NODES=1
-    - language: python
-      python: 3.7
-      env: TOXENV=py37-mpi-codecov MAKEENV=mpi MPI_NODES=2
-    - language: generic
-      os: osx
-      env: TOXENV=py37-mpi MAKEENV=mpi MPI_NODES=2
-    - language: python
-      python: 3.7
-      stage: deploy
-      env: TOXENV=doc MAKEENV=
-    - language: generic
-      stage: anaconda
-      script: .travis/anaconda.sh
-      install: true
-      after_success: true
-    - language: generic
-      os: osx
-      stage: anaconda
-      script: .travis/anaconda.sh
-      install: true
-      after_success: true
+language: python
+install: source .travis/install.sh
+before_script: source .travis/env.sh
+script: make install test
+after_success: bash <(curl -s https://codecov.io/bash)
 stages:
   - name: test
     if: branch != conda
-  - name: deploy
-    if: branch != conda
-  - name: anaconda
-    if: branch = conda
+jobs:
+  include:
+    - python: 3.5
+    - python: 3.6
+      env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=1
+    - python: 3.7
+      env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
+    - language: minimal
+      os: osx
+      env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
+    - name: Documentation
+      python: 3.7
+      stage: deploy
+      install: skip
+      before_script: skip
+      script: make doc
+      if: branch != conda
+      deploy:
+        provider: pages
+        skip_cleanup: true
+        token: $GITHUB_TOKEN
+        keep_history: true
+        local_dir: docs/build
+        on:
+          branch: master
+    - name: Anaconda Linux
+      language: minimal
+      stage: deploy
+      install: skip
+      before_script: skip
+      script: .travis/anaconda.sh
+      after_success: skip
+      if: branch = conda
+    - name: Anaconda macOS
+      language: minimal
+      os: osx
+      stage: deploy
+      install: skip
+      before_script: skip
+      script: .travis/anaconda.sh
+      after_success: skip
+      if: branch = conda
 addons:
   apt:
     packages:
@@ -44,20 +59,6 @@ addons:
       - mpi-default-dev
       - mpi-default-bin
       - libscalapack-mpi-dev
-install: .travis/install.sh
-script:
-  - make test
-  - tox
-after_success: .travis/after-success.sh
-deploy:
-  provider: pages
-  skip-cleanup: true
-  github-token: $GITHUB_TOKEN
-  keep-history: true
-  local-dir: docs/build
-  on:
-    branch: master
-    condition: $TOXENV = doc
 notifications:
   pushover:
     api_key:

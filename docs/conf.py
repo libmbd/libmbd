@@ -1,8 +1,9 @@
 import datetime
 import os
 import sys
-from configparser import ConfigParser
 from unittest.mock import MagicMock
+
+import toml
 
 sys.path.insert(0, os.path.abspath('..'))
 
@@ -25,13 +26,13 @@ MOCK_MODULES = [
 ]
 sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
-conf = ConfigParser()
-conf.read('../setup.cfg')
+with open('../pyproject.toml') as f:
+    metadata = toml.load(f)['tool']['poetry']
 
-project = 'libmbd'
-version = conf.get('metadata', 'version')
-author = conf.get('metadata', 'author')
-description = conf.get('metadata', 'description')
+project = 'Libmbd'
+version = metadata['version']
+author = ' '.join(metadata['authors'][0].split()[:-1])
+description = metadata['description']
 
 extensions = [
     'sphinx.ext.autodoc',

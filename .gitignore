@@ -1,11 +1,9 @@
 *.pyc
 /pymbd/_libmbd.*
 /*.egg-info/
-/.exrc
 /.tox
 /.pytest_cache/
-/build*
+/build
 /dist/
 /docs/build/
-/Pipfile.lock
-/.env
+/poetry.lock

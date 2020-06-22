@@ -1,5 +1,55 @@
-[tool.black]
-skip-string-normalization = true
-
 [build-system]
-requires = ["setuptools>=40.8.0", "wheel", "cffi"]
+requires = ["poetry>=1", "cffi"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry]
+name = "pymbd"
+version = "0.9.0"
+description = "Many-body dispersion library"
+authors = ["Jan Hermann <dev@jan.hermann.name>"]
+readme = "README.md"
+repository = "https://github.com/jhrmnn/libmbd"
+documentation = "https://jhrmnn.github.io/libmbd/pymbd"
+license = "MPL-2.0"
+build = "build.py"
+include = ["src/mbd.h"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Fortran",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[tool.poetry.dependencies]
+python = "^3.5"
+scipy = "^1"
+numpy = ">=1 <=1.15"
+pytest = { version = "^5", optional = true }
+mpi4py = { version = "^3", optional = true }
+
+[tool.poetry.extras]
+mpi = ["mpi4py"]
+test = ["pytest"]
+
+[tool.poetry.dev-dependencies]
+cffi = "^1"
+flake8 = "^3.5"
+flake8-bugbear = "^19"
+flake8-comprehensions = "^2"
+flake8-quotes = "^2"
+black = { version = ">=19-beta.0", python = "^3.6" }
+pydocstyle = "^5"
+pep8-naming = "^0.8"
+isort = "^4.3"
+
+[tool.black]
+target-version = ["py35"]
+skip-string-normalization = true

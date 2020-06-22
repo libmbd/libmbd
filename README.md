@@ -27,10 +27,10 @@ The easiest way to get Pymbd is to install the Pymbd [Conda](https://conda.io/do
 conda install -c libmbd pymbd
 ```
 
-Alternatively, if you have Libmbd installed on your system (see below), you can install Pymbd via Pip, in which case it links against the installed Libmbd. To support Libmbd built with ScaLAPACK/MPI, the `MPI` extras is required.
+Alternatively, if you have Libmbd installed on your system (see below), you can install Pymbd via Pip, in which case it links against the installed Libmbd. To support Libmbd built with ScaLAPACK/MPI, the `mpi` extras is required.
 
 ```
-pip install pymbd  # or pymbd[MPI]
+pip install pymbd  # or pymbd[mpi]
 ```
 
 In both cases, tests can be run with Pytest.
@@ -39,10 +39,10 @@ In both cases, tests can be run with Pytest.
 pytest -v --durations=3 --pyargs pymbd
 ```
 
-If you don’t need the Fortran bindings in Pymbd, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable
+If you don’t need the Fortran bindings in Pymbd, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable:
 
 ```
-pip install pymbd --install-option="--no-ext"
+env LIBMBD_PREFIX= pip install pymbd
 ```
 
 ## Installing Libmbd
@@ -126,14 +126,12 @@ call calc%destroy()
 
 ## Developing
 
-For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against Libmbd in the build directory. Use [Tox](https://tox.readthedocs.io/) for comfortable running of Python tests.
+For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against local installation of Libmbd.
 
 ```
-pip install tox  # or just make sure you have tox and tox-venv installed
 git clone https://github.com/jhrmnn/libmbd.git && cd libmbd
-make setup  # creates ./build and runs cmake
-# do some development
-make test && tox
-# do some development
-make test && tox
+python3 -m venv venv && source venv/bin/activate
+make
+# development work...
+make
 ```

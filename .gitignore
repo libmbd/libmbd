@@ -1,6 +1,6 @@
 *.pyc
-/pymbd/_libmbd.*
-/*.egg-info/
+*.so
+*.egg-info/
 /.tox
 /.pytest_cache/
 /build

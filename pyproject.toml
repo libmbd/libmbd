@@ -8,6 +8,7 @@ version = "0.9.0"
 description = "Many-body dispersion library"
 authors = ["Jan Hermann <dev@jan.hermann.name>"]
 readme = "README.md"
+packages = [{ include = "pymbd", from = "src" }]
 repository = "https://github.com/jhrmnn/libmbd"
 documentation = "https://jhrmnn.github.io/libmbd/pymbd"
 license = "MPL-2.0"

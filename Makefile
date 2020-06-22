@@ -31,10 +31,10 @@ install_editable: install_libmbd
 install: install_libmbd
 	pip install cffi
 	poetry build
-	cd dist && python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] -f ./dist
+	python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] -f ./dist
 
 test: $(addprefix run-,$(LIBMBD_TESTS))
-	cd $(BLDDIR) && $(RUN_CMD) pytest -v --durations=3 $(PYTEST_FLAGS) --pyargs pymbd
+	$(RUN_CMD) pytest -v --durations=3 $(PYTEST_FLAGS) --pyargs pymbd
 
 run-%:
 	$(RUN_CMD) $(BLDDIR)/tests/$*

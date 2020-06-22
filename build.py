@@ -7,8 +7,10 @@ MBD_H = 'src/mbd.h'
 LIBMBD_PREFIX = os.environ.get('LIBMBD_PREFIX')
 
 if LIBMBD_PREFIX == '':
+
     def build(setup_kwargs):
         pass
+
 
 else:
     if LIBMBD_PREFIX:

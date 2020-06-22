@@ -220,7 +220,7 @@ def T_erf_coulomb(R, sigma):
     R_5 = np.where(R_1 > 0, R_1 ** 5, np.inf)
     RR_R5 = R[:, :, :, None] * R[:, :, None, :] / R_5[:, :, None, None]
     zeta = R_1 / sigma
-    theta = 2 * zeta / np.sqrt(np.pi) * np.exp(-zeta ** 2)
+    theta = 2 * zeta / np.sqrt(np.pi) * np.exp(-(zeta ** 2))
     erf_theta = erf(zeta) - theta
     return (
         erf_theta[:, :, None, None] * bare
@@ -233,12 +233,14 @@ def T_erfc(R, a):
     R_1 = np.sqrt(R_2)
     R_3 = np.where(R_1 > 0, R_1 ** 3, np.inf)
     R_5 = np.where(R_1 > 0, R_1 ** 5, np.inf)
-    B = (erfc(a * R_1) + (2 * a * R_1 / np.sqrt(np.pi)) * np.exp(-(a * R_1) ** 2)) / R_3
+    B = (
+        erfc(a * R_1) + (2 * a * R_1 / np.sqrt(np.pi)) * np.exp(-((a * R_1) ** 2))
+    ) / R_3
     C = (
         3 * erfc(a * R_1)
         + (2 * a * R_1 / np.sqrt(np.pi))
         * (3 + 2 * (a * R_1) ** 2)
-        * np.exp(-(a * R_1) ** 2)
+        * np.exp(-((a * R_1) ** 2))
     ) / R_5
     return -C[:, :, None, None] * R[:, :, :, None] * R[:, :, None, :] + B[
         :, :, None, None

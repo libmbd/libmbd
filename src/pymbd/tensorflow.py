@@ -114,7 +114,7 @@ def T_erf_coulomb(R, sigma):
     R_5 = _set_diag(R_1 ** 5, 1e10)
     RR_R5 = R[:, :, :, None] * R[:, :, None, :] / R_5[:, :, None, None]
     zeta = R_1 / sigma
-    theta = 2 * zeta / tf.sqrt(pi) * tf.exp(-zeta ** 2)
+    theta = 2 * zeta / tf.sqrt(pi) * tf.exp(-(zeta ** 2))
     erf_theta = tf.erf(zeta) - theta
     return (
         erf_theta[:, :, None, None] * bare

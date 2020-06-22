@@ -4,7 +4,7 @@ language: python
 install: source .travis/install.sh
 before_script: source .travis/env.sh
 script: make install test
-after_success: bash <(curl -s https://codecov.io/bash)
+after_success: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
 stages:
   - name: test
     if: branch != conda

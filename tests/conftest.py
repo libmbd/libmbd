@@ -1,4 +1,4 @@
-from .fortran import with_mpi
+from pymbd.fortran import with_mpi
 
 if with_mpi:
     from mpi4py import MPI

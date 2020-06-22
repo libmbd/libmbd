@@ -34,7 +34,7 @@ install: install_libmbd
 	python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] -f ./dist
 
 test: $(addprefix run-,$(LIBMBD_TESTS))
-	$(RUN_CMD) pytest -v --durations=3 $(PYTEST_FLAGS) --pyargs pymbd
+	$(RUN_CMD) pytest -v --durations=3 $(PYTEST_FLAGS)
 
 run-%:
 	$(RUN_CMD) $(BLDDIR)/tests/$*

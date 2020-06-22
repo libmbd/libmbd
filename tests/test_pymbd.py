@@ -1,15 +1,13 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-import sys
-
 import numpy as np
 import pytest
 from pytest import approx
 
-from . import ang, from_volumes, mbd_energy_species
-from .fortran import MBDFortranException, MBDGeom, with_scalapack
-from .utils import numerical_gradients, numerical_latt_gradients
+from pymbd import ang, from_volumes, mbd_energy_species
+from pymbd.fortran import MBDFortranException, MBDGeom, with_scalapack
+from pymbd.utils import numerical_gradients, numerical_latt_gradients
 
 no_scalapack = pytest.mark.skipif(with_scalapack, reason="doesn't support ScaLAPACK")
 

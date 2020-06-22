@@ -1,4 +1,4 @@
-set(SRCS
+add_library(mbd
     mbd.F90
     mbd_constants.f90
     mbd_coulomb.f90
@@ -20,18 +20,17 @@ set(SRCS
 )
 
 if(ENABLE_SCALAPACK_MPI)
-    list(APPEND SRCS mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
+    target_sources(mbd PRIVATE mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
 endif()
 
 if(ENABLE_ELSI)
-    list(APPEND SRCS mbd_elsi.F90)
+    target_sources(mbd PRIVATE mbd_elsi.F90)
 endif()
 
 if(ENABLE_C_API)
-    list(APPEND SRCS mbd_c_api.F90)
+    target_sources(mbd PRIVATE mbd_c_api.F90)
 endif()
 
-add_library(mbd ${SRCS})
 target_include_directories(mbd INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>

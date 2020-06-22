@@ -1,12 +1,15 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.1)
 cmake_policy(SET CMP0042 NEW)
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
+project(libmbd VERSION 0.9.0
+    DESCRIPTION "Many-body dispersion library"
+    LANGUAGES Fortran C
+)
+
 include(GNUInstallDirs)
 include(CMakeDependentOption)
-
-project(libmbd LANGUAGES Fortran C)
 
 option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
 CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_MPI OFF)

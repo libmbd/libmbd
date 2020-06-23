@@ -126,6 +126,7 @@ subroutine geom_init(this)
     this%freq(0)%val = 0d0
     this%freq(0)%weight = 0d0
     call this%timer%init(100)
+    this%log%printer => printer
     if (allocated(this%lattice)) then
         volume = abs(dble(product(eigvals(this%lattice))))
         if (this%param%ewald_on) then

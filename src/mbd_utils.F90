@@ -34,7 +34,8 @@ end interface
 
 type, public :: logger_t
     integer :: level = MBD_LOG_LVL_WARN
-    procedure(printer_i), nopass, pointer :: printer => printer
+    ! TODO cannot use printer() as default because of PGI 19.4
+    procedure(printer_i), nopass, pointer :: printer => null()
     contains
     procedure :: info => logger_info
     procedure :: debug => logger_debug

@@ -57,12 +57,14 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     type(damping_t) :: damp_local
     real(dp), allocatable :: dsij_dsi(:), dsigma_dalpha(:), &
         alpha_prime(:, :), B_prime(:, :), grads_i(:), dalphadA(:)
+    real(dp) :: sigma_tmp(size(alpha))  ! circumventing PGI 19 compiler bug
     type(grad_matrix_re_t) :: dT
     type(grad_request_t) :: grad_req
 
     n_atoms = geom%siz()
     damp_local = damp
-    damp_local%sigma = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
+    sigma_tmp = sigma_selfint(alpha, dsigma_dalpha, grad%dalpha)
+    damp_local%sigma = sigma_tmp
     grad_req = grad_request_t( &
         dcoords=grad%dcoords, &
         dlattice=grad%dlattice, &

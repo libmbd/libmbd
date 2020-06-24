@@ -110,7 +110,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     real(dp) :: Rn(3), Rnij(3), Rnij_norm, T(3, 3), f_damp, &
         sigma_ij, T0(3, 3), beta_R_vdw
     integer :: i_atom, j_atom, i_cell, n(3), range_n(3), i, j, &
-        n_atoms, my_i_atom, my_j_atom, i_latt
+        n_atoms, my_i_atom, my_j_atom, i_latt, my_nr, my_nc
     logical :: do_ewald, is_periodic
     type(grad_matrix_re_t) :: dT, dT0, dTew
     type(grad_scalar_t) :: df
@@ -142,29 +142,29 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
         range_n(:) = 0
     end if
     if (grad_ij%dcoords) allocate (dTij%dr(3, 3, 3))
-    associate (my_nr => size(dipmat%idx%i_atom), my_nc => size(dipmat%idx%j_atom))
-        allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
-        if (present(grad)) then
-            if (grad%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
-            if (grad%dlattice) then
-                allocate (ddipmat%dlattice(3*my_nr, 3*my_nc, 3, 3), source=ZERO)
-            end if
-            if (grad%dr_vdw) then
-                allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
-                allocate (dTij%dvdw(3, 3))
-            end if
-            if (grad%dsigma) then
-                allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
-                allocate (dTij%dsigma(3, 3))
-            end if
-#if MBD_TYPE == 1
-            if (grad%dq) then
-                allocate (ddipmat%dq(3*my_nr, 3*my_nc, 3), source=ZERO)
-                allocate (dTij%dq(3, 3, 3))
-            end if
-#endif
+    my_nr = size(dipmat%idx%i_atom)
+    my_nc = size(dipmat%idx%j_atom)
+    allocate (dipmat%val(3*my_nr, 3*my_nc), source=ZERO)
+    if (present(grad)) then
+        if (grad%dcoords) allocate (ddipmat%dr(3*my_nr, 3*my_nc, 3), source=ZERO)
+        if (grad%dlattice) then
+            allocate (ddipmat%dlattice(3*my_nr, 3*my_nc, 3, 3), source=ZERO)
         end if
-    end associate
+        if (grad%dr_vdw) then
+            allocate (ddipmat%dvdw(3*my_nr, 3*my_nc), source=ZERO)
+            allocate (dTij%dvdw(3, 3))
+        end if
+        if (grad%dsigma) then
+            allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
+            allocate (dTij%dsigma(3, 3))
+        end if
+#if MBD_TYPE == 1
+        if (grad%dq) then
+            allocate (ddipmat%dq(3*my_nr, 3*my_nc, 3), source=ZERO)
+            allocate (dTij%dq(3, 3, 3))
+        end if
+#endif
+    end if
     call geom%clock(11)
     n = [0, 0, -1]
     each_cell: do i_cell = 1, product(1+2*range_n)

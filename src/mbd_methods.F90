@@ -163,8 +163,8 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
     type(grad_request_t), intent(in) :: grad
 
     real(dp), allocatable :: alpha_dyn(:, :), alpha_dyn_scs(:, :), &
-        C6_scs(:), dC6_scs_dalpha_dyn_scs(:, :), &
-        dene_dalpha_scs_dyn(:, :), freq_w(:), omega(:)
+        dC6_scs_dalpha_dyn_scs(:, :), dene_dalpha_scs_dyn(:, :), freq_w(:), omega(:)
+    real(dp) :: C6_scs(size(alpha_0))  ! circumventing PGI 19 compiler bug
     type(grad_t), allocatable :: dalpha_dyn(:), dalpha_dyn_scs(:, :)
     type(grad_t) :: dE, dr_vdw_scs, domega
     type(grad_request_t) :: grad_scs

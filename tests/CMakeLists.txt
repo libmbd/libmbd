@@ -1,5 +1,5 @@
 if(CMAKE_TESTING_ENABLED)
-    add_executable(mbd_unit_tests EXCLUDE_FROM_ALL mbd_unit_tests.F90)
+    add_executable(mbd_unit_tests EXCLUDE_FROM_ALL mbd_unit_tests.F90 mbd_unit_test_cases.f90)
     target_include_directories(mbd_unit_tests PRIVATE $<TARGET_FILE_DIR:mbd>)
     target_link_libraries(mbd_unit_tests PRIVATE mbd)
     add_test(mbd_unit_tests mbd_unit_tests)

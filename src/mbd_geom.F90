@@ -82,7 +82,6 @@ type, public :: geom_t
     ! considered read-only
     type(clock_t) :: timer
     type(exception_t) :: exc
-    logical :: muted = .false.
     type(quad_pt_t), allocatable :: freq(:)
     real(dp) :: gamm = 0d0
     real(dp) :: real_space_cutoff

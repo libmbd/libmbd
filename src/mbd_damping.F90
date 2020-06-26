@@ -121,11 +121,11 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
     case ('mbd-nl')
         select case (lower(xc))
         case ('pbe')
-            this%a = 0.81d0
+            this%beta = 0.81d0
         case ('pbe0')
-            this%a = 0.83d0
+            this%beta = 0.83d0
         case ('hse')
-            this%a = 0.83d0
+            this%beta = 0.83d0
         case default
             exc%code = MBD_EXC_DAMPING
             exc%msg = 'Damping parameter beta of method MBD-NL unknown for ' // trim(xc)

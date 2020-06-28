@@ -23,7 +23,7 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
 endif()
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Setting build type to ${DEFAULT_BUILD_TYPE} as none was set")
-    set(CMAKE_BUILD_TYPE ${DEFAULT_BUILD_TYPE})
+    set(CMAKE_BUILD_TYPE "${DEFAULT_BUILD_TYPE}")
 endif()
 
 separate_arguments(MKL_LIBRARIES)

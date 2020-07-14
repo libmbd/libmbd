@@ -151,7 +151,7 @@ subroutine all_reduce_real_1d(A, blacs)
     real(dp), intent(inout) :: A(:)
     type(blacs_desc_t), intent(in) :: blacs
 
-    call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
+    call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A(1), size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_real_2d(A, blacs)
@@ -159,7 +159,7 @@ subroutine all_reduce_real_2d(A, blacs)
     type(blacs_desc_t), intent(in) :: blacs
 
     call DGSUM2D( &
-        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A(1, 1), size(A, 1), -1, -1 &
     )
 end subroutine
 
@@ -167,7 +167,7 @@ subroutine all_reduce_complex_1d(A, blacs)
     complex(dp), intent(inout) :: A(:)
     type(blacs_desc_t), intent(in) :: blacs
 
-    call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
+    call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A(1), size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_complex_2d(A, blacs)
@@ -175,7 +175,7 @@ subroutine all_reduce_complex_2d(A, blacs)
     type(blacs_desc_t), intent(in) :: blacs
 
     call ZGSUM2D( &
-        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A(1, 1), size(A, 1), -1, -1 &
     )
 end subroutine
 

@@ -205,7 +205,7 @@ subroutine inv_real(A, exc, src)
     call DGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
-    call DGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
+    call DGETRI(n, A, n, i_pivot, work_arr(1), n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -241,7 +241,7 @@ subroutine inv_complex(A, exc, src)
     call ZGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(dble(n_work_arr_optim))
     allocate (work_arr(n_work_arr))
-    call ZGETRI(n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
+    call ZGETRI(n, A, n, i_pivot, work_arr(1), n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -269,7 +269,7 @@ subroutine invh_real(A, exc, src)
     call DSYTRF('U', n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
-    call DSYTRF('U', n, A, n, i_pivot, work_arr, n_work_arr, error_flag)
+    call DSYTRF('U', n, A, n, i_pivot, work_arr(1), n_work_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -307,7 +307,7 @@ subroutine eigh_real(A, eigs, exc, src, vals_only)
     if (present(src)) A = src
     call DSYEV(mode(vals_only), 'U', n, A, n, eigs, n_work_arr, -1, error_flag)
     allocate (work_arr(nint(n_work_arr)))
-    call DSYEV(mode(vals_only), 'U', n, A, n, eigs, work_arr, size(work_arr), error_flag)
+    call DSYEV(mode(vals_only), 'U', n, A, n, eigs, work_arr(1), size(work_arr), error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -344,7 +344,7 @@ subroutine eig_real(A, eigs, exc, src, vals_only)
     allocate (work_arr(nint(n_work_arr)))
     call DGEEV( &
         'N', mode(vals_only), n, A, n, eigs_r, eigs_i, dummy, 1, &
-        vectors, n, work_arr, size(work_arr), error_flag &
+        vectors, n, work_arr(1), size(work_arr), error_flag &
     )
     if (error_flag /= 0) then
         if (present(exc)) then
@@ -376,7 +376,7 @@ subroutine eigh_complex(A, eigs, exc, src, vals_only)
     call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
     lwork = nint(dble(lwork_cmplx))
     allocate (work(lwork))
-    call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, work, lwork, rwork, error_flag)
+    call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, work(1), lwork, rwork, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -418,7 +418,7 @@ subroutine eig_complex(A, eigs, exc, src, vals_only)
     allocate (work(lwork))
     call ZGEEV( &
         'N', mode(vals_only), n, A, n, eigs, dummy, 1, &
-        vectors, n, work, lwork, rwork, error_flag &
+        vectors, n, work(1), lwork, rwork, error_flag &
     )
     if (error_flag /= 0) then
         if (present(exc)) then

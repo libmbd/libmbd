@@ -68,7 +68,7 @@ subroutine pinvh_real(A, blacs, exc, src)
     allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr))
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
-        work_arr, n_work_arr, iwork_arr, n_iwork_arr, error_flag)
+        work_arr(1), n_work_arr, iwork_arr(1), n_iwork_arr, error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -145,7 +145,7 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     allocate (work_arr(nint(n_work_arr)))
     call PDSYEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
-        1, 1, blacs%desc, work_arr, size(work_arr), error_flag &
+        1, 1, blacs%desc, work_arr(1), size(work_arr), error_flag &
     )
     if (error_flag /= 0) then
         if (present(exc)) then

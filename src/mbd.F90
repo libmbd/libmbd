@@ -12,7 +12,7 @@ use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_request_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
-use mbd_ts, only: ts_energy
+use mbd_ts, only: get_ts_energy_num_grad
 use mbd_utils, only: result_t, exception_t, printer_i
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 
@@ -54,6 +54,9 @@ type, public :: mbd_input_t
         !! Required accuracy of the TS energy.
     real(dp) :: ts_f_acc = TS_FORCES_ACCURACY
         !! Required accuracy of the TS gradients.
+    real(dp) :: ts_num_grad_delta = TS_NUM_GRAD_DELTA
+        !! Delta used for finite-differencing of TS energy for numerical
+        !! gradients.
     integer :: n_omega_grid = N_FREQUENCY_GRID
         !! Number of imaginary frequency grid points.
     real(dp) :: k_grid_shift = K_GRID_SHIFT
@@ -154,6 +157,7 @@ subroutine mbd_calc_init(this, input)
     this%geom%param%rpa_rescale_eigs = input%rpa_rescale_eigs
     this%geom%param%ts_energy_accuracy = input%ts_ene_acc
     ! TODO ... = input%ts_f_acc
+    this%geom%param%ts_num_grad_delta = input%ts_num_grad_delta
     this%geom%param%n_freq = input%n_omega_grid
     this%geom%param%k_grid_shift = input%k_grid_shift
     this%geom%param%zero_negative_eigvals = input%zero_negative_eigvals
@@ -302,7 +306,10 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
         )
         energy = this%results%energy
     case ('ts')
-        energy = ts_energy(this%geom, this%alpha_0, this%C6, this%damp)
+        this%results = get_ts_energy_num_grad( &
+            this%geom, this%alpha_0, this%C6, this%damp, grad &
+        )
+        energy = this%results%energy
     end select
     if (this%geom%log%level <= MBD_LOG_LVL_DEBUG) call this%geom%timer%print()
 end subroutine

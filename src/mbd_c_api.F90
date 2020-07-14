@@ -14,7 +14,7 @@ use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
-use mbd_ts, only: ts_energy
+use mbd_ts, only: get_ts_energy
 use mbd_utils, only: result_t
 
 implicit none
@@ -171,7 +171,7 @@ real(c_double) function cmbd_ts_energy(geom_c, alpha_0_c, C6_c, damping_c) bind(
     call c_f_pointer(alpha_0_c, alpha_0, [geom%siz()])
     call c_f_pointer(C6_c, C6, [geom%siz()])
     call c_f_pointer(damping_c, damping)
-    cmbd_ts_energy = ts_energy(geom, alpha_0, C6, damping)
+    cmbd_ts_energy = get_ts_energy(geom, alpha_0, C6, damping)
 end function
 
 type(c_ptr) function cmbd_mbd_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) bind(c)

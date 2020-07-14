@@ -6,18 +6,68 @@ module mbd_ts
 !! Obtaining TS energies.
 
 use mbd_constants
-use mbd_utils, only: shift_idx, tostr
+use mbd_utils, only: shift_idx, tostr, result_t, diff3
 use mbd_damping, only: damping_t, damping_fermi
 use mbd_geom, only: geom_t, supercell_circum
+use mbd_gradients, only: grad_request_t
 
 implicit none
 
 private
-public :: ts_energy
+public :: get_ts_energy, get_ts_energy_num_grad
 
 contains
 
-function ts_energy(geom, alpha_0, C6, damp) result(ene)
+type(result_t) function get_ts_energy_num_grad(geom, alpha_0, C6, damp, grad) result(res)
+    !! Get TS energy and numerical gradients.
+    type(geom_t), intent(inout) :: geom
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    type(damping_t), intent(in) :: damp
+    type(grad_request_t), intent(in) :: grad
+
+    integer :: i_atom, i_xyz, i_step, i_latt
+    real(dp) :: delta
+    real(dp), allocatable :: ene_diffed(:)
+    real(dp), allocatable :: coords_orig(:, :), lattice_orig(:, :)
+
+    res%energy = get_ts_energy(geom, alpha_0, C6, damp)
+    if (.not. grad%any()) return
+    delta = geom%param%ts_num_grad_delta
+    allocate (ene_diffed(-1:1))
+    if (grad%dcoords) then
+        allocate (res%dE%dcoords(geom%siz(), 3))
+        do i_atom = 1, geom%siz()
+            do i_xyz = 1, 3
+                do i_step = -1, 1
+                    if (i_step == 0) cycle
+                    coords_orig = geom%coords
+                    geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + i_step*delta
+                    ene_diffed(i_step) = get_ts_energy(geom, alpha_0, C6, damp)
+                    geom%coords = coords_orig
+                end do
+                res%dE%dcoords(i_atom, i_xyz) = diff3(ene_diffed, delta)
+            end do
+        end do
+    end if
+    if (grad%dlattice) then
+        allocate (res%dE%dlattice(3, 3))
+        do i_latt = 1, 3
+            do i_xyz = 1, 3
+                do i_step = -1, 1
+                    if (i_step == 0) cycle
+                    lattice_orig = geom%lattice
+                    geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt) + i_step*delta
+                    ene_diffed(i_step) = get_ts_energy(geom, alpha_0, C6, damp)
+                    geom%lattice = lattice_orig
+                end do
+                res%dE%dlattice(i_latt, i_xyz) = diff3(ene_diffed, delta)
+            end do
+        end do
+    end if
+end function
+
+function get_ts_energy(geom, alpha_0, C6, damp) result(ene)
     !! Get TS energy.
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha_0(:)

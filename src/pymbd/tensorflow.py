@@ -6,7 +6,6 @@ from __future__ import division, print_function
 from math import pi
 
 import numpy as np
-
 import tensorflow as tf
 
 from .pymbd import freq_grid

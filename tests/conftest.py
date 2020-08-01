@@ -1,9 +1,10 @@
 from pymbd.fortran import with_mpi
 
 if with_mpi:
-    from mpi4py import MPI
     from functools import wraps
+
     import py._io.terminalwriter
+    from mpi4py import MPI
 
     rank = MPI.COMM_WORLD.Get_rank()
     _write_out = py._io.terminalwriter.write_out

@@ -1,9 +1,4 @@
 if [[ $TRAVIS_OS_NAME = osx ]]; then
-    rm -rf /usr/local/include/c++
-    brew update
-    brew unlink python@2
-    brew install open-mpi scalapack
-    brew upgrade python3
     python3 -m venv ~/virtualenv
     source ~/virtualenv/bin/activate
     python --version

@@ -10,6 +10,16 @@ stages:
     if: branch != conda
 jobs:
   include:
+    - name: Style
+      python: 3.7
+      install:
+        - pip install black flake8 flake8-bugbear flake8-comprehensions flake8-quotes pep8-naming isort pydocstyle
+      before_script: skip
+      script:
+        - flake8
+        - black . --check
+        - isort . --check
+        # - pydocstyle src   TODO
     - python: 3.5
     - python: 3.6
       env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=1

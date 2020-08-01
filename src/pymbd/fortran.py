@@ -135,7 +135,7 @@ class MBDGeom(object):
         _lib.cmbd_update_lattice(self._geom_f, _cast('double*', _array(lattice)))
 
     def has_lattice(self):
-        """True if a crystal."""
+        """Whether structure is a crystal."""
         return self._lattice is not None
 
     @_auto_context

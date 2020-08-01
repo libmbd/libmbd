@@ -16,7 +16,7 @@ jobs:
         - flake8
         - black . --check
         - isort . --check
-        # - pydocstyle src   TODO
+        - pydocstyle src
     - python: 3.5
       addons: &apt
         apt:

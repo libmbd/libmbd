@@ -5,9 +5,6 @@ install: source .travis/install.sh
 before_script: source .travis/env.sh
 script: make install test
 after_success: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
-stages:
-  - name: test
-    if: branch != conda
 jobs:
   include:
     - name: Style
@@ -73,21 +70,3 @@ jobs:
         token: $GITHUB_TOKEN
         keep_history: true
         local_dir: docs/build
-    - name: Anaconda Linux
-      language: minimal
-      install: skip
-      before_script: skip
-      script: .travis/anaconda.sh
-      after_success: skip
-      addons: *apt
-      if: branch = conda
-    - name: Anaconda macOS
-      language: minimal
-      os: osx
-      osx_image: xcode11
-      install: skip
-      before_script: skip
-      script: .travis/anaconda.sh
-      after_success: skip
-      addons: *brew
-      if: branch = conda

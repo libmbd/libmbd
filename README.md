@@ -1,6 +1,6 @@
 # Libmbd
 
-[![build](https://img.shields.io/travis/jhrmnn/libmbd/master.svg)](https://travis-ci.org/jhrmnn/libmbd)
+[![build](https://img.shields.io/travis/jhrmnn/libmbd/master.svg)](https://travis-ci.com/jhrmnn/libmbd)
 [![coverage](https://img.shields.io/codecov/c/github/jhrmnn/libmbd.svg)](https://codecov.io/gh/jhrmnn/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
 [![release](https://img.shields.io/github/release/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/releases)

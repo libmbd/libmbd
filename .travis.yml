@@ -21,22 +21,30 @@ jobs:
       env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
     - name: Documentation
       python: 3.7
-      stage: deploy
       install: skip
       before_script: skip
       script: make doc
-      if: branch != conda
+      workspaces:
+        create:
+          name: ws1
+          paths:
+            - docs/build
+    - stage: deploy
+      name: Documentation
+      language: minimal
+      install: skip
+      script: skip
+      if: branch = master
+      workspaces:
+        use: ws1
       deploy:
         provider: pages
         skip_cleanup: true
         token: $GITHUB_TOKEN
         keep_history: true
         local_dir: docs/build
-        on:
-          branch: master
     - name: Anaconda Linux
       language: minimal
-      stage: deploy
       install: skip
       before_script: skip
       script: .travis/anaconda.sh
@@ -46,7 +54,6 @@ jobs:
       language: minimal
       os: osx
       osx_image: xcode11
-      stage: deploy
       install: skip
       before_script: skip
       script: .travis/anaconda.sh

@@ -21,14 +21,30 @@ jobs:
         - isort . --check
         # - pydocstyle src   TODO
     - python: 3.5
+      addons: &apt
+        apt:
+          packages:
+            - gfortran
+            - libblas-dev
+            - liblapack-dev
+            - mpi-default-dev
+            - mpi-default-bin
+            - libscalapack-mpi-dev
     - python: 3.6
       env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=1
+      addons: *apt
     - python: 3.7
       env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
+      addons: *apt
     - language: minimal
       os: osx
       osx_image: xcode11
       env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
+      addons: &brew
+        homebrew:
+          packages:
+            - open-mpi
+            - scalapack
     - name: Documentation
       python: 3.7
       install: skip
@@ -39,6 +55,10 @@ jobs:
           name: ws1
           paths:
             - docs/build
+      addons:
+        apt:
+          packages:
+            - gfortran
     - stage: deploy
       name: Documentation
       language: minimal
@@ -59,6 +79,7 @@ jobs:
       before_script: skip
       script: .travis/anaconda.sh
       after_success: skip
+      addons: *apt
       if: branch = conda
     - name: Anaconda macOS
       language: minimal
@@ -68,20 +89,8 @@ jobs:
       before_script: skip
       script: .travis/anaconda.sh
       after_success: skip
+      addons: *brew
       if: branch = conda
-addons:
-  apt:
-    packages:
-      - gfortran
-      - libblas-dev
-      - liblapack-dev
-      - mpi-default-dev
-      - mpi-default-bin
-      - libscalapack-mpi-dev
-  homebrew:
-    packages:
-      - open-mpi
-      - scalapack
 notifications:
   pushover:
     api_key:

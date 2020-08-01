@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef MBD_TYPE
+#ifndef DO_COMPLEX_TYPE
 module mbd_rpa
 
 use mbd_constants
@@ -24,26 +24,26 @@ end interface
 
 contains
 
-#   define MBD_TYPE 0
+! #   define DO_COMPLEX_TYPE 0
 #endif
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 type(result_t) function get_mbd_rpa_energy_real( &
         geom, alpha, damp) result(res)
-#elif MBD_TYPE == 1
+#else
 type(result_t) function get_mbd_rpa_energy_complex( &
         geom, alpha, damp, q) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:, 0:)
     type(damping_t), intent(in) :: damp
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
     real(dp), intent(in) :: q(3)
 #endif
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     type(matrix_re_t) :: relay, AT
-#elif MBD_TYPE == 1
+#else
     type(matrix_cplx_t) :: relay, AT
 #endif
     complex(dp), allocatable :: eigs_cplx(:)
@@ -59,9 +59,9 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     do i_freq = 0, ubound(geom%freq, 1)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
         ! relay = T
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
         relay = dipole_matrix(geom, damp_alpha)
-#elif MBD_TYPE == 1
+#else
         relay = dipole_matrix(geom, damp_alpha, q=q)
 #endif
         do my_i_atom = 1, size(relay%idx%i_atom)
@@ -110,9 +110,8 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     end do
 end function
 
-#if MBD_TYPE == 0
-#   undef MBD_TYPE
-#   define MBD_TYPE 1
+#ifndef DO_COMPLEX_TYPE
+#   define DO_COMPLEX_TYPE
 #   include "mbd_rpa.F90"
 
 end module

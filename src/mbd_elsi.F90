@@ -29,14 +29,13 @@ end interface
 
 contains
 
-#   define DO_COMPLEX_TYPE 0
 #endif
 
-#if DO_COMPLEX_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine elsi_eigh_real(A, blacs_desc, eigs, exc, src, vals_only)
     real(dp), intent(inout) :: A(:, :)
     real(dp), intent(in), optional :: src(:, :)
-#elif DO_COMPLEX_TYPE == 1
+#else
 subroutine elsi_eigh_complex(A, blacs_desc, eigs, exc, src, vals_only)
     complex(dp), intent(inout) :: A(:, :)
     complex(dp), intent(in), optional :: src(:, :)
@@ -48,10 +47,10 @@ subroutine elsi_eigh_complex(A, blacs_desc, eigs, exc, src, vals_only)
 
     integer :: n_vecs, n
     type(elsi_handle) :: handle
-#if DO_COMPLEX_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     real(dp) :: DUMMY_MATRIX(1, 1)
     real(dp), allocatable :: vecs(:, :)
-#elif DO_COMPLEX_TYPE == 1
+#else
     complex(dp) :: DUMMY_MATRIX(1, 1)
     complex(dp), allocatable :: vecs(:, :)
 #endif
@@ -68,19 +67,19 @@ subroutine elsi_eigh_complex(A, blacs_desc, eigs, exc, src, vals_only)
     call elsi_set_blacs(handle, blacs_desc%ctx, blacs_desc%blocksize)
     call elsi_set_unit_ovlp(handle, 1)
     allocate (vecs(size(A, 1), size(A, 2)))
-#if DO_COMPLEX_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     call elsi_ev_real(handle, A, DUMMY_MATRIX, eigs, vecs)
-#elif DO_COMPLEX_TYPE == 1
+#else
     call elsi_ev_complex(handle, A, DUMMY_MATRIX, eigs, vecs)
 #endif
     A = vecs
     call elsi_finalize(handle)
 end subroutine
 
-#if DO_COMPLEX_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 function elsi_eigvalsh_real(A, blacs_desc, exc, destroy) result(eigs)
     real(dp), allocatable, intent(inout) :: A(:, :)
-#elif DO_COMPLEX_TYPE == 1
+#else
 function elsi_eigvalsh_complex(A, blacs_desc, exc, destroy) result(eigs)
     complex(dp), allocatable, intent(inout) :: A(:, :)
 #endif
@@ -89,9 +88,9 @@ function elsi_eigvalsh_complex(A, blacs_desc, exc, destroy) result(eigs)
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3*blacs_desc%n_atoms)
 
-#if DO_COMPLEX_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     real(dp), allocatable :: A_(:, :)
-#elif DO_COMPLEX_TYPE == 1
+#else
     complex(dp), allocatable :: A_(:, :)
 #endif
 
@@ -103,9 +102,8 @@ function elsi_eigvalsh_complex(A, blacs_desc, exc, destroy) result(eigs)
     call elsi_eigh(A_, blacs_desc, eigs, exc, vals_only=.true.)
 end function
 
-#if DO_COMPLEX_TYPE == 0
-#   undef DO_COMPLEX_TYPE
-#   define DO_COMPLEX_TYPE 1
+#ifndef DO_COMPLEX_TYPE
+#   define DO_COMPLEX_TYPE
 #   include "mbd_elsi.F90"
 
 end module

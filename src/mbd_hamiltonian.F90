@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef MBD_TYPE
+#ifndef DO_COMPLEX_TYPE
 
 module mbd_hamiltonian
 !! Forming and solving MBD Hamiltonian.
@@ -76,13 +76,12 @@ end interface
 
 contains
 
-#   define MBD_TYPE 0
 #endif
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 type(result_t) function get_mbd_hamiltonian_energy_real( &
         geom, alpha_0, omega, damp, grad) result(res)
-#elif MBD_TYPE == 1
+#else
 type(result_t) function get_mbd_hamiltonian_energy_complex( &
         geom, alpha_0, omega, damp, grad, q) result(res)
 #endif
@@ -91,14 +90,14 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     real(dp), intent(in) :: omega(:)
     type(damping_t), intent(in) :: damp
     type(grad_request_t), intent(in) :: grad
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
     real(dp), intent(in) :: q(3)
 #endif
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     type(matrix_re_t) :: relay, dQ, T, modes, c_lambda12i_c
     type(grad_matrix_re_t) :: dT
-#elif MBD_TYPE == 1
+#else
     type(matrix_cplx_t) :: relay, dQ, T, modes, c_lambda12i_c
     type(grad_matrix_cplx_t) :: dT
 #endif
@@ -107,9 +106,9 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     character(120) :: msg
 
     n_atoms = geom%siz()
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     T = dipole_matrix(geom, damp, dT, grad)
-#elif MBD_TYPE == 1
+#else
     T = dipole_matrix(geom, damp, dT, grad, q)
 #endif
     if (geom%has_exc()) return
@@ -126,9 +125,9 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         allocate (eigs(3*n_atoms))
         call modes%eigh(eigs, geom%exc, src=relay)
         if (geom%get_modes) then
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
             call move_alloc(modes%val, res%modes)
-#elif MBD_TYPE == 1
+#else
             call move_alloc(modes%val, res%modes_k_single)
 #endif
         end if
@@ -157,7 +156,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
     c_lambda12i_c%val = conjg(c_lambda12i_c%val)
 #endif
     call dQ%init_from(T)
@@ -202,7 +201,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         dQ%val = c_lambda12i_c%val*dQ%val
         res%dE%dr_vdw = 1d0/2*dble(dQ%contract_n33_rows())
     end if
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
     if (grad%dq) then
         allocate (res%dE%dq(3))
         do i_latt = 1, 3
@@ -216,9 +215,8 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     call geom%clock(-25)
 end function
 
-#if MBD_TYPE == 0
-#   undef MBD_TYPE
-#   define MBD_TYPE 1
+#ifndef DO_COMPLEX_TYPE
+#   define DO_COMPLEX_TYPE
 #   include "mbd_hamiltonian.F90"
 
 end module

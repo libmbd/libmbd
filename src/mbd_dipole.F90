@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef MBD_TYPE
+#ifndef DO_COMPLEX_TYPE
 
 module mbd_dipole
 !! Construction of dipole tensors and dipole matrices.
@@ -84,14 +84,13 @@ end interface
 
 contains
 
-#   define MBD_TYPE 0
 #endif
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 type(matrix_re_t) function dipole_matrix_real( &
         geom, damp, ddipmat, grad) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_REAL
-#elif MBD_TYPE == 1
+#else
 type(matrix_cplx_t) function dipole_matrix_complex( &
         geom, damp, ddipmat, grad, q) result(dipmat)
     use mbd_constants, only: ZERO => ZERO_COMPLEX
@@ -100,9 +99,9 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     type(geom_t), intent(inout) :: geom
     type(damping_t), intent(in) :: damp
     type(grad_request_t), intent(in), optional :: grad
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     type(grad_matrix_re_t), intent(out), optional :: ddipmat
-#elif MBD_TYPE == 1
+#else
     type(grad_matrix_cplx_t), intent(out), optional :: ddipmat
     real(dp), intent(in) :: q(3)
 #endif
@@ -115,10 +114,10 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     type(grad_matrix_re_t) :: dT, dT0, dTew
     type(grad_scalar_t) :: df
     type(grad_request_t) :: grad_ij
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     real(dp) :: Tij(3, 3)
     type(grad_matrix_re_t) :: dTij
-#elif MBD_TYPE == 1
+#else
     complex(dp) :: Tij(3, 3), exp_qR
     type(grad_matrix_cplx_t) :: dTij
 #endif
@@ -158,7 +157,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
             allocate (ddipmat%dsigma(3*my_nr, 3*my_nc), source=ZERO)
             allocate (dTij%dsigma(3, 3))
         end if
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
         if (grad%dq) then
             allocate (ddipmat%dq(3*my_nr, 3*my_nc, 3), source=ZERO)
             allocate (dTij%dq(3, 3, 3))
@@ -236,7 +235,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 if (grad_ij%dcoords) dTij%dr = dT%dr
                 if (grad_ij%dr_vdw) dTij%dvdw = dT%dvdw
                 if (grad_ij%dsigma) dTij%dsigma = dT%dsigma
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
                 exp_qR = exp(-IMI*(dot_product(q, Rnij)))
                 Tij = T*exp_qR
                 if (grad_ij%dcoords) then
@@ -282,7 +281,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                         dTdsigma_sub = dTdsigma_sub + dTij%dsigma
                     end associate
                 end if
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
                 if (grad%dq) then
                     associate (dTdq_sub => ddipmat%dq(i+1:i+3, j+1:j+3, :))
                         dTdq_sub = dTdq_sub + dTij%dq
@@ -294,26 +293,26 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     end do each_cell
     call geom%clock(-11)
     if (do_ewald) then
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
         call add_ewald_dipole_parts_real(geom, dipmat, ddipmat, grad)
-#elif MBD_TYPE == 1
+#else
         call add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
 #endif
     end if
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine add_ewald_dipole_parts_real(geom, dipmat, ddipmat, grad)
     type(matrix_re_t), intent(inout) :: dipmat
     type(grad_matrix_re_t), intent(inout), optional :: ddipmat
-#elif MBD_TYPE == 1
+#else
 subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     type(matrix_cplx_t), intent(inout) :: dipmat
     type(grad_matrix_cplx_t), intent(inout), optional :: ddipmat
 #endif
     type(geom_t), intent(inout) :: geom
     type(grad_request_t), intent(in), optional :: grad
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
     real(dp), intent(in) :: q(3)
 #endif
 
@@ -325,9 +324,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     integer :: &
         i_atom, j_atom, i, j, i_xyz, m(3), i_m, &
         range_m(3), my_i_atom, my_j_atom, i_latt, a, b
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     real(dp) :: Tij(3, 3), exp_GR, vol_exp
-#elif MBD_TYPE == 1
+#else
     complex(dp) :: Tij(3, 3), exp_GR, vol_exp
     integer :: c
     real(dp) :: dkk_dq(3, 3, 3)
@@ -343,9 +342,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     each_recip_vec: do i_m = 1, product(1+2*range_m)
         call shift_idx(m, -range_m, range_m)
         G = matmul(rec_latt, m)
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
         k = G + q
-#elif MBD_TYPE == 0
+#else
         k = G
 #endif
         k_sq = sum(k**2)
@@ -360,9 +359,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                 j_atom = dipmat%idx%j_atom(my_j_atom)
                 Rij = geom%coords(:, i_atom)-geom%coords(:, j_atom)
                 G_Rij = dot_product(G, Rij)
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
                 exp_GR = exp(IMI*G_Rij)
-#elif MBD_TYPE == 0
+#else
                 exp_GR = cos(G_Rij)
 #endif
                 vol_kk_exp_ksq = vol_prefactor*k_otimes_k*exp_k_sq_gamma
@@ -378,9 +377,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                     associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
                         do concurrent (i_xyz = 1:3)
                             dTdR_sub(:, :, i_xyz) = dTdR_sub(:, :, i_xyz) &
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
                                 + Tij*IMI*G(i_xyz)
-#elif MBD_TYPE == 0
+#else
                                 - vol_kk_exp_ksq*sin(G_Rij)*G(i_xyz)
 #endif
                         end do
@@ -407,16 +406,16 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                                 - Tij*latt_inv(i_latt, i_xyz) &
                                 + vol_exp*dkk_dA &
                                 - Tij*dk_sqdA/(4*geom%gamm**2) &
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
                                 + Tij*IMI*dot_product(dGdA, Rij)
-#elif MBD_TYPE == 0
+#else
                                 - vol_kk_exp_ksq*sin(G_Rij)*dot_product(dGdA, Rij)
 #endif
                             ! end associate
                         end do
                     end do
                 end if
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
                 if (grad%dq) then
                     do concurrent (a = 1:3, b = 1:3, c = 1:3)
                         dkk_dq(a, b, c) = -2*k(a)*k(b)*k(c)/k_sq**2
@@ -442,7 +441,7 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     ! self energy
     call dipmat%add_diag_scalar(-4*geom%gamm**3/(3*sqrt(pi)))
     ! surface term
-#if MBD_TYPE == 1
+#ifdef DO_COMPLEX_TYPE
     do_surface = sqrt(sum(q**2)) < 1d-15
 #else
     do_surface = .true.
@@ -466,9 +465,8 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
     call geom%clock(-12)
 end subroutine
 
-#if MBD_TYPE == 0
-#   undef MBD_TYPE
-#   define MBD_TYPE 1
+#ifndef DO_COMPLEX_TYPE
+#   define DO_COMPLEX_TYPE
 #   include "mbd_dipole.F90"
 
 function T_bare(r, dT, grad) result(T)

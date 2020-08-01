@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#ifndef MBD_TYPE
+#ifndef DO_COMPLEX_TYPE
 module mbd_matrix
 
 use mbd_constants
@@ -88,13 +88,12 @@ end interface
 
 contains
 
-#   define MBD_TYPE 0
 #endif
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 integer function matrix_re_siz(this, ndim) result(siz)
     class(matrix_re_t), intent(in) :: this
-#elif MBD_TYPE == 1
+#else
 integer function matrix_cplx_siz(this, ndim) result(siz)
     class(matrix_cplx_t), intent(in) :: this
 #endif
@@ -103,14 +102,14 @@ integer function matrix_cplx_siz(this, ndim) result(siz)
     siz = size(this%val, ndim)
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 #   ifdef WITH_SCALAPACK
 subroutine matrix_re_init(this, idx, blacs)
 #   else
 subroutine matrix_re_init(this, idx)
 #   endif
     class(matrix_re_t), intent(out) :: this
-#elif MBD_TYPE == 1
+#else
 #   ifdef WITH_SCALAPACK
 subroutine matrix_cplx_init(this, idx, blacs)
 #   else
@@ -129,11 +128,11 @@ subroutine matrix_cplx_init(this, idx)
 #endif
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_init_from(this, other)
     class(matrix_re_t), intent(out) :: this
     type(matrix_re_t), intent(in) :: other
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_init_from(this, other)
     class(matrix_cplx_t), intent(out) :: this
     type(matrix_cplx_t), intent(in) :: other
@@ -145,11 +144,11 @@ subroutine matrix_cplx_init_from(this, other)
 #endif
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_copy_from(this, other)
     class(matrix_re_t), intent(out) :: this
     type(matrix_re_t), intent(in) :: other
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_copy_from(this, other)
     class(matrix_cplx_t), intent(out) :: this
     type(matrix_cplx_t), intent(in) :: other
@@ -159,11 +158,11 @@ subroutine matrix_cplx_copy_from(this, other)
     this%val = other%val
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_move_from(this, other)
     class(matrix_re_t), intent(out) :: this
     type(matrix_re_t), intent(inout) :: other
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_move_from(this, other)
     class(matrix_cplx_t), intent(out) :: this
     type(matrix_cplx_t), intent(inout) :: other
@@ -173,11 +172,11 @@ subroutine matrix_cplx_move_from(this, other)
     call move_alloc(other%val, this%val)
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_alloc_from(this, other)
     class(matrix_re_t), intent(out) :: this
     type(matrix_re_t), intent(in) :: other
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_alloc_from(this, other)
     class(matrix_cplx_t), intent(out) :: this
     type(matrix_cplx_t), intent(in) :: other
@@ -191,11 +190,11 @@ subroutine matrix_cplx_alloc_from(this, other)
     allocate (this%val(n1, n2))
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_add(this, other)
     class(matrix_re_t), intent(inout) :: this
     class(matrix_re_t), intent(in) :: other
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_add(this, other)
     class(matrix_cplx_t), intent(inout) :: this
     class(matrix_cplx_t), intent(in) :: other
@@ -204,10 +203,10 @@ subroutine matrix_cplx_add(this, other)
     this%val = this%val + other%val
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_add_diag_scalar(this, d)
     class(matrix_re_t), intent(inout) :: this
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_add_diag_scalar(this, d)
     class(matrix_cplx_t), intent(inout) :: this
 #endif
@@ -218,10 +217,10 @@ subroutine matrix_cplx_add_diag_scalar(this, d)
     call this%add_diag([(d, i = 1, this%idx%n_atoms)])
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_add_diag(this, d)
     class(matrix_re_t), intent(inout) :: this
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_add_diag(this, d)
     class(matrix_cplx_t), intent(inout) :: this
 #endif
@@ -245,10 +244,10 @@ subroutine matrix_cplx_add_diag(this, d)
     end do
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_mult_cross(this, b, c)
     class(matrix_re_t), intent(inout) :: this
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_mult_cross(this, b, c)
     class(matrix_cplx_t), intent(inout) :: this
 #endif
@@ -275,10 +274,10 @@ subroutine matrix_cplx_mult_cross(this, b, c)
     end do
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_mult_rows(this, b)
     class(matrix_re_t), intent(inout) :: this
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_mult_rows(this, b)
     class(matrix_cplx_t), intent(inout) :: this
 #endif
@@ -296,10 +295,10 @@ subroutine matrix_cplx_mult_rows(this, b)
     end do
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_mult_cols_3n(this, b)
     class(matrix_re_t), intent(inout) :: this
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_mult_cols_3n(this, b)
     class(matrix_cplx_t), intent(inout) :: this
 #endif
@@ -319,10 +318,10 @@ subroutine matrix_cplx_mult_cols_3n(this, b)
     end do
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_mult_col(this, idx, a)
     class(matrix_re_t), intent(inout) :: this
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_mult_col(this, idx, a)
     class(matrix_cplx_t), intent(inout) :: this
 #endif
@@ -344,11 +343,11 @@ subroutine matrix_cplx_mult_col(this, idx, a)
     end do
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_eigh(A, eigs, exc, src, vals_only)
     class(matrix_re_t), intent(inout) :: A
     type(matrix_re_t), intent(in), optional :: src
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_eigh(A, eigs, exc, src, vals_only)
     class(matrix_cplx_t), intent(inout) :: A
     type(matrix_cplx_t), intent(in), optional :: src
@@ -370,10 +369,10 @@ subroutine matrix_cplx_eigh(A, eigs, exc, src, vals_only)
     call eigh(A%val, eigs, exc, src%val, vals_only)
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 function matrix_re_eigvalsh(A, exc, destroy) result(eigs)
     class(matrix_re_t), intent(inout) :: A
-#elif MBD_TYPE == 1
+#else
 function matrix_cplx_eigvalsh(A, exc, destroy) result(eigs)
     class(matrix_cplx_t), intent(inout) :: A
 #endif
@@ -394,10 +393,10 @@ function matrix_cplx_eigvalsh(A, exc, destroy) result(eigs)
     eigs = eigvalsh(A%val, exc, destroy)
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 function matrix_re_eigvals(A, exc, destroy) result(eigs)
     class(matrix_re_t), target, intent(in) :: A
-#elif MBD_TYPE == 1
+#else
 function matrix_cplx_eigvals(A, exc, destroy) result(eigs)
     class(matrix_cplx_t), target, intent(in) :: A
 #endif
@@ -417,10 +416,10 @@ function matrix_cplx_eigvals(A, exc, destroy) result(eigs)
 #endif
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 real(dp) function matrix_re_sum_all(this) result(res)
     class(matrix_re_t), intent(in) :: this
-#elif MBD_TYPE == 1
+#else
 complex(dp) function matrix_cplx_sum_all(this) result(res)
     class(matrix_cplx_t), intent(in) :: this
 #endif
@@ -431,11 +430,11 @@ complex(dp) function matrix_cplx_sum_all(this) result(res)
 #endif
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 subroutine matrix_re_contract_n_transp(this, dir, res)
     class(matrix_re_t), intent(in) :: this
     real(dp), intent(out), target :: res(:, :)
-#elif MBD_TYPE == 1
+#else
 subroutine matrix_cplx_contract_n_transp(this, dir, res)
     class(matrix_cplx_t), intent(in) :: this
     complex(dp), intent(out), target :: res(:, :)
@@ -443,9 +442,9 @@ subroutine matrix_cplx_contract_n_transp(this, dir, res)
     character(len=*), intent(in) :: dir
 
     integer :: my_i_atom, my_j_atom
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
     real(dp), pointer :: res_sub(:, :)
-#elif MBD_TYPE == 1
+#else
     complex(dp), pointer :: res_sub(:, :)
 #endif
 
@@ -470,12 +469,12 @@ subroutine matrix_cplx_contract_n_transp(this, dir, res)
 #endif
 end subroutine
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 function contract_cross_33_real(k_atom, A, A_prime, B, B_prime) result(res)
     type(matrix_re_t), intent(in) :: A, B
     real(dp), intent(in) :: A_prime(:, :), B_prime(:, :)
     real(dp) :: res(A%idx%n_atoms)
-#elif MBD_TYPE == 1
+#else
 function contract_cross_33_complex(k_atom, A, A_prime, B, B_prime) result(res)
     type(matrix_cplx_t), intent(in) :: A, B
     complex(dp), intent(in) :: A_prime(:, :), B_prime(:, :)
@@ -516,11 +515,11 @@ function contract_cross_33_complex(k_atom, A, A_prime, B, B_prime) result(res)
 #endif
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 function matrix_re_contract_n33diag_cols(A) result(res)
     class(matrix_re_t), intent(in) :: A
     real(dp) :: res(A%idx%n_atoms)
-#elif MBD_TYPE == 1
+#else
 function matrix_cplx_contract_n33diag_cols(A) result(res)
     class(matrix_cplx_t), intent(in) :: A
     complex(dp) :: res(A%idx%n_atoms)
@@ -542,11 +541,11 @@ function matrix_cplx_contract_n33diag_cols(A) result(res)
 #endif
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 function matrix_re_contract_n33_rows(A) result(res)
     class(matrix_re_t), intent(in) :: A
     real(dp) :: res(A%idx%n_atoms)
-#elif MBD_TYPE == 1
+#else
 function matrix_cplx_contract_n33_rows(A) result(res)
     class(matrix_cplx_t), intent(in) :: A
     complex(dp) :: res(A%idx%n_atoms)
@@ -566,12 +565,12 @@ function matrix_cplx_contract_n33_rows(A) result(res)
 #endif
 end function
 
-#if MBD_TYPE == 0
+#ifndef DO_COMPLEX_TYPE
 type(matrix_re_t) function matrix_re_mmul( &
         A, B, transA, transB) result(C)
     class(matrix_re_t), intent(in) :: A
     type(matrix_re_t), intent(in) :: B
-#elif MBD_TYPE == 1
+#else
 type(matrix_cplx_t) function matrix_cplx_mmul( &
         A, B, transA, transB) result(C)
     class(matrix_cplx_t), intent(in) :: A
@@ -592,9 +591,8 @@ type(matrix_cplx_t) function matrix_cplx_mmul( &
 #endif
 end function
 
-#if MBD_TYPE == 0
-#   undef MBD_TYPE
-#   define MBD_TYPE 1
+#ifndef DO_COMPLEX_TYPE
+#   define DO_COMPLEX_TYPE
 #include "mbd_matrix.F90"
 
 subroutine matrix_re_invh(A, exc, src)

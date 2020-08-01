@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Compiler error with GCC 10
 - Compatibility with Cmake 3.1 when part of a superbuild
+- Cmake crash on some platforms
 
 ## [0.9.1] - 2020-06-26
 

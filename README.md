@@ -3,8 +3,7 @@
 [![build](https://img.shields.io/travis/jhrmnn/libmbd/master.svg)](https://travis-ci.com/jhrmnn/libmbd)
 [![coverage](https://img.shields.io/codecov/c/github/jhrmnn/libmbd.svg)](https://codecov.io/gh/jhrmnn/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
-[![release](https://img.shields.io/github/release/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/releases)
-[![conda](https://img.shields.io/conda/v/libmbd/pymbd.svg)](https://anaconda.org/libmbd/pymbd)
+[![conda](https://img.shields.io/conda/vn/conda-forge/libmbd.svg)](https://anaconda.org/conda-forge/libmbd)
 [![pypi](https://img.shields.io/pypi/v/pymbd.svg)](https://pypi.org/project/pymbd/)
 [![commits since](https://img.shields.io/github/commits-since/jhrmnn/libmbd/latest.svg)](https://github.com/jhrmnn/libmbd/releases)
 [![last commit](https://img.shields.io/github/last-commit/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/commits/master)
@@ -22,10 +21,16 @@ The Python-based implementations as well as Python bindings to the Libmbd C API 
 
 ## Installing Pymbd
 
-The easiest way to get Pymbd is to install the Pymbd [Conda](https://conda.io/docs/) package, which ships with pre-built Libmbd.
+The easiest way to get Pymbd is to install the Libmbd [Conda](https://conda.io/docs/) package, available via [Conda-forge](https://conda-forge.org), which ships with a pre-built Fortran library.
 
 ```
-conda install -c libmbd pymbd
+conda install -c conda-forge libmbd
+```
+
+One can also install the ScaLAPACK/MPI version.
+
+```
+conda install -c conda-forge 'libmbd=*=mpi_*'
 ```
 
 Alternatively, if you have Libmbd already installed on your system (see below), you can install Pymbd with Pip, in which case it links against the installed Libmbd. To support Libmbd built with ScaLAPACK/MPI, the `mpi` extras is required, which installs `mpi4py` as an extra dependency.

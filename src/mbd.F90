@@ -175,6 +175,8 @@ subroutine mbd_calc_init(this, input)
         this%geom%lattice = input%lattice_vectors
     end if
     this%geom%parallel_mode = input%parallel_mode
+    if (associated(input%printer)) this%geom%log%printer => input%printer
+    this%geom%log%level = input%log_level
     call this%geom%init()
     if (allocated(input%free_values)) then
         this%free_values = input%free_values
@@ -207,8 +209,6 @@ subroutine mbd_calc_init(this, input)
         this%geom%exc = this%damp%set_params_from_xc(input%xc, input%method)
     end if
     if (this%geom%has_exc()) return
-    if (associated(input%printer)) this%geom%log%printer => input%printer
-    this%geom%log%level = input%log_level
 end subroutine
 
 subroutine mbd_calc_destroy(this)

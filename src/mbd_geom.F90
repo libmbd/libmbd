@@ -119,6 +119,7 @@ subroutine geom_init(this)
     integer :: ierr, n_kpts
 #endif
 
+    if (.not. associated(this%log%printer)) this%log%printer => printer
     associate (n => this%param%n_freq)
         allocate (this%freq(0:n))
         call get_freq_grid(n, this%freq(1:n)%val, this%freq(1:n)%weight)
@@ -126,7 +127,6 @@ subroutine geom_init(this)
     this%freq(0)%val = 0d0
     this%freq(0)%weight = 0d0
     call this%timer%init(100)
-    this%log%printer => printer
     if (allocated(this%lattice)) then
         volume = abs(dble(product(eigvals(this%lattice))))
         if (this%param%ewald_on) then

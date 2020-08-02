@@ -10,10 +10,13 @@ module mbd_geom
 !! Representing a molecule or a crystal unit cell.
 
 use mbd_constants
+use mbd_formulas, only: alpha_dyn_qho, C6_from_alpha, omega_qho
+use mbd_gradients, only: grad_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse
 use mbd_utils, only: &
     shift_idx, atom_index_t, quad_pt_t, exception_t, tostr, clock_t, printer, &
     printer_i, logger_t
+use mbd_vdw_param, only: ts_vdw_params
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, blacs_grid_t
 #endif
@@ -112,7 +115,7 @@ subroutine geom_init(this)
     class(geom_t), intent(inout) :: this
 
     integer :: i_atom
-    real(dp) :: volume
+    real(dp) :: volume, freq_grid_err
     logical :: is_parallel
 #ifdef WITH_MPI
     logical :: can_parallel_kpts
@@ -126,6 +129,8 @@ subroutine geom_init(this)
     end associate
     this%freq(0)%val = 0d0
     this%freq(0)%weight = 0d0
+    freq_grid_err = test_frequency_grid(this%freq)
+    call this%log%info('Frequency grid relative error: ' // tostr(freq_grid_err))
     call this%timer%init(100)
     if (allocated(this%lattice)) then
         volume = abs(dble(product(eigvals(this%lattice))))
@@ -306,5 +311,21 @@ subroutine gauss_legendre(n, r, w)
         w(i) = dble(2/((1-x**2)*df**2))
     end do
 end subroutine
+
+real(dp) function test_frequency_grid(freq) result(error)
+    !! Calculate relative quadrature error in C6 of a carbon atom
+    type(quad_pt_t), intent(in) :: freq(0:)
+
+    real(dp) :: alpha(1, 0:ubound(freq, 1)), C6(1), C6_ref(1), w(1), a0(1)
+    type(grad_t), allocatable :: dalpha(:)
+    type(grad_request_t) :: grad
+
+    a0(1) = ts_vdw_params(1, 6)
+    C6_ref(1) = ts_vdw_params(2, 6)
+    w = omega_qho(C6_ref, a0)
+    alpha = alpha_dyn_qho(a0, w, freq, dalpha, grad)
+    C6 = C6_from_alpha(alpha, freq)
+    error = abs(C6(1)/C6_ref(1)-1d0)
+end function
 
 end module

@@ -14,7 +14,7 @@ use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
 use mbd_lapack, only: eigvals, inverse
 use mbd_rpa, only: get_mbd_rpa_energy
 use mbd_scs, only: run_scs
-use mbd_utils, only: result_t, tostr, quad_pt_t, shift_idx
+use mbd_utils, only: result_t, tostr, shift_idx
 #ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_all_reduce
 #endif
@@ -315,19 +315,6 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
     end if
     res%dE = dE
     call geom%clock(-91)
-end function
-
-real(dp) function test_frequency_grid(freq) result(error)
-    !! Calculate relative quadrature error in C6 of a carbon atom
-    type(quad_pt_t), intent(in) :: freq(:)
-
-    real(dp) :: alpha(1, 0:ubound(freq, 1)), C6(1)
-    type(grad_t), allocatable :: dalpha(:)
-    type(grad_request_t) :: grad
-
-    alpha = alpha_dyn_qho([21d0], [99.5d0], freq, dalpha, grad)
-    C6 = C6_from_alpha(alpha, freq)
-    error = abs(C6(1)/99.5d0-1d0)
 end function
 
 ! This used to be a function returning the k_pts array, but that was causing

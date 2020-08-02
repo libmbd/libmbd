@@ -82,7 +82,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             where (eigs < 0) eigs = -erf(sqrt(pi)/2*eigs**4)**(1d0/4)
         end if
         ! The count construct won't work here due to a bug in Cray compiler
-        ! Has to manually unroll the counting
+        ! Has to manually unroll the counting TODO
         n_negative_eigs = 0
         do i = 1, size(eigs)
            if (eigs(i) <= -1) n_negative_eigs = n_negative_eigs + 1

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Missing `cffi` dependency of Pymbd
+
 ## [0.9.2] - 2020-08-01
 
 ### Added

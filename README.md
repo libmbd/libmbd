@@ -19,39 +19,23 @@ Libmbd implements the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104
 
 The Python-based implementations as well as Python bindings to the Libmbd C API are accessible from the Python package called Pymbd.
 
-## Installing Pymbd
+## Installing
 
-The easiest way to get Pymbd is to install the Libmbd [Conda](https://conda.io/docs/) package, available via [Conda-forge](https://conda-forge.org), which ships with a pre-built Fortran library.
+**TL;DR** Install prebuilt Libmbd binaries via [Conda-forge](https://conda-forge.org) and Pymbd with [Pip](https://pip.pypa.io/en/stable/quickstart/).
 
 ```
 conda install -c conda-forge libmbd
+pip install pymbd
 ```
 
 One can also install the ScaLAPACK/MPI version.
 
 ```
-conda install -c conda-forge 'libmbd=*=mpi_*'
+conda install -c conda-forge 'libmbd=*=mpi_*' mpi4py
+pip install pymbd[mpi]
 ```
 
-Alternatively, if you have Libmbd already installed on your system (see below), you can install Pymbd with Pip, in which case it links against the installed Libmbd. To support Libmbd built with ScaLAPACK/MPI, the `mpi` extras is required, which installs `mpi4py` as an extra dependency.
-
-```
-pip install pymbd  # or pymbd[mpi]
-```
-
-If Libmbd is installed in a non-standard location, you can point Pymbd to it with
-
-```
-env LIBMBD_PREFIX=<path to Libmbd> pip install pymbd
-```
-
-If you don’t need the Fortran bindings in Pymbd, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable:
-
-```
-env LIBMBD_PREFIX= pip install pymbd
-```
-
-## Installing Libmbd
+###  Libmbd
 
 Libmbd uses CMake for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
 
@@ -78,6 +62,33 @@ make install
 ```
 
 This installs the Libmbd shared library, C API header file, and high-level Fortran API module file.
+
+### Pymbd
+
+Pymbd can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed Libmbd as a dependency (see above).
+
+```
+pip install pymbd
+```
+
+To support Libmbd built with ScaLAPACK/MPI, the `mpi` extras is required, which installs `mpi4py` as an extra dependency. In this case one has to make sure that `mpi4py` is linked against the same MPI library as Libmbd (for instance by compiling both manually, or installing both via Conda-forge).
+
+```
+pip install pymbd[mpi]
+```
+
+If Libmbd is installed in a non-standard location, you can point Pymbd to it with
+
+```
+env LIBMBD_PREFIX=<path to Libmbd install prefix> pip install pymbd
+```
+
+If you don’t need the Fortran bindings in Pymbd, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable:
+
+```
+env LIBMBD_PREFIX= pip install pymbd
+```
+
 
 ## Examples
 

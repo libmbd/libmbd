@@ -35,6 +35,14 @@ conda install -c conda-forge 'libmbd=*=mpi_*' mpi4py
 pip install pymbd[mpi]
 ```
 
+Verify installation with
+
+```
+$ python -m pymbd
+Expected energy:   -0.0002462647623815428
+Calculated energy: -0.0002462647623817456
+```
+
 ###  Libmbd
 
 Libmbd uses CMake for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.

@@ -311,7 +311,9 @@ subroutine matrix_cplx_mult_cols_3n(this, b)
                 b_sub => b(3*(this%idx%j_atom(my_j_atom)-1)+1:), &
                 this_sub => this%val(:, 3*(my_j_atom-1)+1:) &
         )
-            do concurrent (i = 1:3)
+            ! TODO should be do-concurrent, but this crashes IBM XL 16.1.1,
+            ! see issue #16
+            do i = 1, 3
                 this_sub(:, i) = this_sub(:, i)*b_sub(i)
             end do
         end associate

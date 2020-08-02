@@ -375,7 +375,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                 vol_exp = vol_prefactor*exp_k_sq_gamma*exp_GR
                 if (grad%dcoords .and. i_atom /= j_atom) then
                     associate (dTdR_sub => ddipmat%dr(i+1:i+3, j+1:j+3, :))
-                        do concurrent (i_xyz = 1:3)
+                        ! TODO should be do-concurrent, but this crashes IBM XL
+                        ! 16.1.1, see issue #16
+                        do i_xyz = 1, 3
                             dTdR_sub(:, :, i_xyz) = dTdR_sub(:, :, i_xyz) &
 #ifdef DO_COMPLEX_TYPE
                                 + Tij*IMI*G(i_xyz)
@@ -428,7 +430,9 @@ subroutine add_ewald_dipole_parts_complex(geom, dipmat, ddipmat, grad, q)
                     end do
                     associate (dTdq_sub => ddipmat%dq(i+1:i+3, j+1:j+3, :))
                         dTdq_sub = dTdq_sub + vol_exp*dkk_dq
-                        do concurrent (a = 1:3)
+                        ! TODO should be do-concurrent, but this crashes IBM XL
+                        ! 16.1.1, see issue #16
+                        do a = 1, 3
                             dTdq_sub(:, :, a) = dTdq_sub(:, :, a) &
                                 - Tij*k(a)/(2*geom%gamm**2)
                         end do

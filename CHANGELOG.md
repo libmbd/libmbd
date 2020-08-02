@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2020-08-02
+
 ### Added
 
 - Simple `python -m pymbd` installation check
@@ -113,7 +115,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.9.2...HEAD
+[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.9.3...HEAD
+[0.9.3]: https://github.com/jhrmnn/libmbd/compare/0.9.2...0.9.3
 [0.9.2]: https://github.com/jhrmnn/libmbd/compare/0.9.1...0.9.2
 [0.9.1]: https://github.com/jhrmnn/libmbd/compare/0.9.0...0.9.1
 [0.9.0]: https://github.com/jhrmnn/libmbd/compare/0.8.0...0.9.0

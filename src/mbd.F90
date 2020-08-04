@@ -164,7 +164,7 @@ subroutine mbd_calc_init(this, input)
     if (.not. all(input%k_grid == -1)) this%geom%k_grid = input%k_grid
     this%geom%coords = input%coords
     if (allocated(input%lattice_vectors)) then
-        if (.not. allocated(this%geom%k_grid)) then
+        if (input%method /= 'ts' .and. .not. allocated(this%geom%k_grid)) then
             this%geom%exc = exception_t( &
                 MBD_EXC_INPUT, &
                 'calc%init()', &

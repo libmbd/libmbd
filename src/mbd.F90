@@ -1,6 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#include "version.h"
 #include "defaults.h"
 
 module mbd
@@ -19,6 +20,10 @@ use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
 implicit none
 
 private
+
+integer, public :: mbd_version_major = MBD_VERSION_MAJOR
+integer, public :: mbd_version_minor = MBD_VERSION_MINOR
+integer, public :: mbd_version_patch = MBD_VERSION_PATCH
 
 type, public :: mbd_input_t
     !! Contains user input to an MBD calculation.

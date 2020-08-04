@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for IBM Fortran compiler by circumventing ICE
+- Version checking of Libmbd from Pymbd
 
 ## [0.9.3] - 2020-08-02
 

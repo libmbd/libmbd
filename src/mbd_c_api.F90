@@ -1,6 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+#include "version.h"
 
 module mbd_c_api
 !! Implementation of C API.
@@ -20,7 +21,8 @@ use mbd_utils, only: result_t
 implicit none
 
 private
-public :: cmbd_with_scalapack, cmbd_with_mpi
+public :: cmbd_with_scalapack, cmbd_with_mpi, cmbd_version_major, &
+    cmbd_version_minor, cmbd_version_patch
 public :: cmbd_init_geom, cmbd_destroy_geom, cmbd_init_damping, &
     cmbd_destroy_damping, cmbd_get_exception, cmbd_update_coords, cmbd_update_lattice, &
     cmbd_get_results, cmbd_destroy_result
@@ -37,6 +39,10 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .true.
 #else
 logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 #endif
+
+integer(c_int), bind(c) :: cmbd_version_major = MBD_VERSION_MAJOR
+integer(c_int), bind(c) :: cmbd_version_minor = MBD_VERSION_MINOR
+integer(c_int), bind(c) :: cmbd_version_patch = MBD_VERSION_PATCH
 
 contains
 

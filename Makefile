@@ -41,6 +41,6 @@ run-%:
 
 doc:
 	python -m pip install sphinx toml git+https://github.com/jhrmnn/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
-	ford docs/libmbd.md -o build
-	sphinx-build -d $(BLDDIR)/doctrees docs docs/build/pymbd
+	ford -I. docs/libmbd.md -o build
+	sphinx-build -W -d $(BLDDIR)/doctrees docs docs/build/pymbd
 	touch docs/build/.nojekyll

@@ -1,3 +1,5 @@
+configure_file(version.h.in "${CMAKE_CURRENT_BINARY_DIR}/version.h")
+
 add_library(mbd
     mbd.F90
     mbd_constants.f90
@@ -31,9 +33,12 @@ if(ENABLE_C_API)
     target_sources(mbd PRIVATE mbd_c_api.F90)
 endif()
 
-target_include_directories(mbd INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+target_include_directories(mbd
+    PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}
+    INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 if(DEFINED MKL_LIBRARIES)

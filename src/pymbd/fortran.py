@@ -7,6 +7,7 @@ from functools import wraps
 
 import numpy as np
 
+from .__init__ import __version__ as PYMBD_VERSION
 from .pymbd import _array, from_volumes
 
 try:
@@ -21,6 +22,20 @@ with_mpi = _lib.cmbd_with_mpi
 
 with_scalapack = _lib.cmbd_with_scalapack
 """Whether Libmbd was compiled with Scalapack"""
+
+LIBMBD_VERSION = (
+    _lib.cmbd_version_major,
+    _lib.cmbd_version_minor,
+    _lib.cmbd_version_patch,
+)
+
+# do not test versions when running autodoc
+if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
+    assert PYMBD_VERSION[0] == LIBMBD_VERSION[0]
+    if PYMBD_VERSION[0] == 0:
+        assert PYMBD_VERSION[1] == LIBMBD_VERSION[1]
+    else:
+        assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
 
 if with_mpi:
     from mpi4py import MPI  # noqa

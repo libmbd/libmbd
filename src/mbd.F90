@@ -306,6 +306,7 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
         )
         energy = this%results%energy
     case ('ts')
+        this%damp%version = 'fermi'
         this%results = get_ts_energy_num_grad( &
             this%geom, this%alpha_0, this%C6, this%damp, grad &
         )

@@ -17,6 +17,8 @@ private
 public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, shift_idx, &
     is_true, printer_i, printer
 
+integer, parameter :: i8 = selected_int_kind(18)
+
 interface tostr
     module procedure tostr_int
     module procedure tostr_real
@@ -76,7 +78,7 @@ end type
 type, public :: clock_t
     !! Used for measuring performance.
     logical :: active = .true.
-    integer(kind=8), allocatable :: timestamps(:), counts(:)
+    integer(i8), allocatable :: timestamps(:), counts(:)
     contains
     procedure :: init => clock_init
     procedure :: clock => clock_clock
@@ -219,15 +221,15 @@ subroutine clock_init(this, n)
     class(clock_t), intent(inout) :: this
     integer, intent(in) :: n
 
-    allocate (this%timestamps(n), source=0_8)
-    allocate (this%counts(n), source=0_8)
+    allocate (this%timestamps(n), source=0_i8)
+    allocate (this%counts(n), source=0_i8)
 end subroutine
 
 subroutine clock_clock(this, id)
     class(clock_t), intent(inout) :: this
     integer, intent(in) :: id
 
-    integer(kind=8) :: cnt, rate, cnt_max
+    integer(i8) :: cnt, rate, cnt_max
     integer :: absid
 
     if (.not. this%active) return
@@ -244,7 +246,7 @@ end subroutine
 subroutine clock_print(this)
     class(clock_t), intent(inout) :: this
 
-    integer(kind=8) :: cnt, rate, cnt_max
+    integer(i8) :: cnt, rate, cnt_max
     integer :: i
     character(len=20) :: label
 

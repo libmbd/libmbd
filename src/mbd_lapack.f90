@@ -354,7 +354,7 @@ subroutine eig_real(A, eigs, exc, src, vals_only)
         end if
         return
     endif
-    eigs = cmplx(eigs_r, eigs_i, 8)
+    eigs = cmplx(eigs_r, eigs_i, dp)
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 

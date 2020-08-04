@@ -44,8 +44,8 @@ function eye(n) result(A)
 end function
 
 function get_diag_real(A) result(d)
-    real(8), intent(in) :: A(:, :)
-    real(8) :: d(size(A, 1))
+    real(dp), intent(in) :: A(:, :)
+    real(dp) :: d(size(A, 1))
 
     integer :: i
 

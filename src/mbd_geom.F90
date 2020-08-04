@@ -2,7 +2,7 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #ifndef LEGENDRE_PREC
-#define LEGENDRE_PREC 8
+#define LEGENDRE_PREC 15
 #endif
 #include "defaults.h"
 
@@ -272,7 +272,7 @@ subroutine gauss_legendre(n, r, w)
     integer, intent(in) :: n
     real(dp), intent(out) :: r(n), w(n)
 
-    integer, parameter :: q = LEGENDRE_PREC
+    integer, parameter :: q = selected_real_kind(LEGENDRE_PREC)
     integer, parameter :: n_iter = 1000
     real(q) :: x, f, df, dx
     integer :: k, iter, i

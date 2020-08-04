@@ -1,5 +1,4 @@
 os: linux
-dist: xenial
 language: python
 install: source .travis/install.sh
 before_script: source .travis/env.sh

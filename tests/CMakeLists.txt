@@ -1,41 +1,3 @@
-set(TESTS
-    grad/T_bare_deriv
-    grad/T_GG_deriv_expl
-    grad/T_GG_deriv_impl
-    grad/T_erfc_deriv_expl
-    grad/T_fermi_deriv_impl
-    grad/mbd_deriv_expl
-    grad/mbd_ewald_deriv_expl
-    grad/mbd_ewald_deriv_stress
-    grad/scs_deriv_expl
-    grad/scs_ewald_deriv_expl
-    grad/scs_ewald_deriv_stress
-    grad/scs_deriv_impl_alpha
-    grad/scs_ewald_deriv_impl_alpha
-    grad/scs_deriv_impl_vdw
-    grad/scs_ewald_deriv_impl_vdw
-    grad/mbd_deriv_impl_alpha
-    grad/mbd_ewald_deriv_impl_alpha
-    grad/mbd_deriv_impl_omega
-    grad/mbd_ewald_deriv_impl_omega
-    grad/mbd_deriv_impl_vdw
-    grad/mbd_ewald_deriv_impl_vdw
-    grad/mbd_ewald_deriv_impl_q
-    grad/mbd_rsscs_deriv_expl
-    grad/mbd_rsscs_ewald_deriv_expl
-    grad/mbd_rsscs_ewald_deriv_stress
-    grad/mbd_rsscs_deriv_impl_alpha
-    grad/mbd_rsscs_deriv_impl_C6
-    grad/mbd_rsscs_deriv_impl_vdw
-    grad/mbd_rsscs_ewald_deriv_impl_alpha
-    grad/mbd_rsscs_ewald_deriv_impl_C6
-    grad/mbd_rsscs_ewald_deriv_impl_vdw
-    api/energy
-    api/energy_from_ratios
-    api/gradients
-    api/exception
-)
-
 add_executable(mbd_grad_tests mbd_grad_tests.F90 mbd_grad_test_cases.f90)
 add_executable(mbd_api_tests mbd_api_tests.F90)
 foreach(TEST_APP mbd_grad_tests mbd_api_tests)
@@ -51,6 +13,12 @@ foreach(TEST_APP mbd_grad_tests mbd_api_tests)
     endif()
 endforeach()
 
+execute_process(
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/collect-mbd-tests.py
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    OUTPUT_VARIABLE TESTS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 foreach(TEST ${TESTS})
     string(REPLACE "/" ";" TEST_APP_CASE ${TEST})
     list(GET TEST_APP_CASE 0 TEST_APP)

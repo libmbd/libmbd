@@ -14,7 +14,7 @@ use mbd_mpi
 implicit none
 
 private
-public :: tostr, diff3, diff5, print_matrix, lower, diff7, findval, shift_idx, &
+public :: tostr, diff3, diff5, lower, diff7, findval, shift_idx, &
     is_true, printer_i, printer
 
 integer, parameter :: i8 = selected_int_kind(18)
@@ -144,31 +144,6 @@ real(dp) pure function diff7(x, delta)
         + 1.d0/60*x(3) &
     )/delta
 end function
-
-subroutine print_matrix(label, A, prec)
-    character(len=*), intent(in) :: label
-    real(dp), intent(in) :: A(:, :)
-    integer, optional, intent(in) :: prec
-
-    integer :: m, n, i, j, prec_
-    character(len=10) :: fm
-
-    if (present(prec)) then
-        prec_ = prec
-    else
-        prec_ = 3
-    end if
-    m = size(A, 1)
-    n = size(A, 2)
-    write (fm, '("(g",i2,".",i1,")")') prec_+8, prec_
-    write (6, '(A,":")') label
-    do i = 1, m
-        do j = 1, n
-            write (6, fm, advance="no") A(i, j)
-        end do
-        write (6, *)
-    end do
-end subroutine
 
 pure function lower(str)
     character(len=*), intent(in) :: str

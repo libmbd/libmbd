@@ -11,7 +11,7 @@ use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_request_t, grad_scalar_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
 use mbd_methods, only: get_mbd_scs_energy
 use mbd_scs, only: run_scs
-use mbd_utils, only: diff7, findval, print_matrix, tostr, result_t
+use mbd_utils, only: diff7, findval, tostr, result_t
 
 implicit none
 
@@ -27,6 +27,31 @@ logical function failed(diff, thre)
     if (rank == 0) write (6, '(A,G10.3,A,G10.3,A)') 'diff:', diff, ', threshold:', thre, ': '
     if (failed) n_failed = n_failed + 1
 end function
+
+subroutine print_matrix(label, A, prec)
+    character(len=*), intent(in) :: label
+    real(dp), intent(in) :: A(:, :)
+    integer, optional, intent(in) :: prec
+
+    integer :: m, n, i, j, prec_
+    character(len=10) :: fm
+
+    if (present(prec)) then
+        prec_ = prec
+    else
+        prec_ = 3
+    end if
+    m = size(A, 1)
+    n = size(A, 2)
+    write (fm, '("(g",i2,".",i1,")")') prec_+8, prec_
+    write (6, '(A,":")') label
+    do i = 1, m
+        do j = 1, n
+            write (6, fm, advance="no") A(i, j)
+        end do
+        write (6, *)
+    end do
+end subroutine
 
 subroutine test_T_bare_deriv()
     real(dp) :: r(3), r_diff(3), T(3, 3), diff(3, 3), T_diff_num(3, 3, -3:3), delta

@@ -3,13 +3,15 @@ cmake_policy(SET CMP0042 NEW)
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
-project(libmbd VERSION 0.9.3
+project(Libmbd
+    VERSION 0.9.3
     DESCRIPTION "Many-body dispersion library"
     LANGUAGES Fortran C
 )
 
 include(GNUInstallDirs)
 include(CMakeDependentOption)
+include(CTest)
 
 option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
 CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_MPI OFF)
@@ -71,10 +73,8 @@ if(ENABLE_ELSI)
     endif()
 endif()
 
-enable_testing()
-
-set(CMAKE_CTEST_COMMAND ctest -V)
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
-
 add_subdirectory(src)
-add_subdirectory(tests)
+
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

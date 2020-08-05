@@ -1,7 +1,7 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-module mbd_unit_test_cases
+module mbd_grad_test_cases
 
 use mbd_constants
 use mbd_damping, only: damping_t, damping_fermi
@@ -24,16 +24,8 @@ logical function failed(diff, thre)
     real(dp), intent(in) :: diff, thre
 
     failed = .not. abs(diff) < thre
-    if (rank == 0) write (6, '(A,G10.3,A,G10.3,A)', advance='no') &
-        'diff:', diff, ', threshold:', thre, ': '
+    if (rank == 0) write (6, '(A,G10.3,A,G10.3,A)') 'diff:', diff, ', threshold:', thre, ': '
     if (failed) n_failed = n_failed + 1
-    if (rank == 0) then
-        if (failed) then
-            write (6, *) 'FAILED!'
-        else
-            write (6, *) 'OK'
-        end if
-    end if
 end function
 
 subroutine test_T_bare_deriv()

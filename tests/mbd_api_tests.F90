@@ -3,17 +3,16 @@
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 program mbd_api_tests
 
+use mbd_constants
 use mbd, only: mbd_input_t, mbd_calc_t
-
 #ifdef WITH_MPI
 use mbd_mpi
 #endif
 
 implicit none
 
-integer, parameter :: dp = kind(0d0)
-
 logical :: failed
+character(len=50) :: test_name
 
 #ifdef WITH_MPI
 integer :: err
@@ -21,9 +20,9 @@ integer :: err
 call MPI_INIT(err)
 #endif
 
+call get_command_argument(1, test_name)
 failed = .false.
-
-call test()
+call test(test_name)
 
 #ifdef WITH_MPI
 call MPI_FINALIZE(err)
@@ -33,8 +32,8 @@ if (failed) stop 1
 
 contains
 
-subroutine test()
-    real(dp), parameter :: ang = 1.8897259886d0
+subroutine test(test_name)
+    character(len=*), intent(in) :: test_name
 
     type(mbd_input_t) :: inp
     type(mbd_calc_t) :: calc
@@ -45,36 +44,42 @@ subroutine test()
 
     inp%atom_types = ['Ar', 'Ar']
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2])
-    inp%xc = 'xxx'
-    call calc%init(inp)
-    call calc%get_exception(code, origin, msg)
-    print *, msg
-    call calc%destroy()
-    inp%xc = 'pbe'
-    call calc%init(inp)
-    call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
-    call calc%evaluate_vdw_method(energy)
-    call check('Ar2 energy', energy, -2.4329456747018696d-4, 1d-10)
-    allocate (gradients(3, 2))
-    call calc%get_gradients(gradients)
-    call check('Ar2 sum(abs(gradients))', sum(abs(gradients)), 2.3279742219399908d-4, 1d-10)
-    call calc%update_vdw_params_from_ratios([1d0, 1d0])
-    call calc%evaluate_vdw_method(energy)
-    call check('Ar2 energy 2', energy, -0.0002462647623815428d0, 1d-10)
+    select case (test_name)
+    case ('exception')
+        inp%xc = 'xxx'
+        call calc%init(inp)
+        call calc%get_exception(code, origin, msg)
+        if (code /= MBD_EXC_DAMPING) failed = .true.
+    case ('energy')
+        inp%xc = 'pbe'
+        call calc%init(inp)
+        call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc%evaluate_vdw_method(energy)
+        call check(energy, -2.4329456747018696d-4, 1d-10)
+    case ('gradients')
+        inp%xc = 'pbe'
+        call calc%init(inp)
+        call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc%evaluate_vdw_method(energy)
+        allocate (gradients(3, 2))
+        call calc%get_gradients(gradients)
+        call check(sum(abs(gradients)), 2.3279742219399908d-4, 1d-10)
+    case ('energy_from_ratios')
+        inp%xc = 'pbe'
+        call calc%init(inp)
+        call calc%update_vdw_params_from_ratios([1d0, 1d0])
+        call calc%evaluate_vdw_method(energy)
+        call check(energy, -0.0002462647623815428d0, 1d-10)
+    end select
     call calc%destroy()
 end subroutine
 
-subroutine check(label, val, ref, rel)
-    character(len=*), intent(in) :: label
+subroutine check(val, ref, rel)
     real(dp), intent(in) :: val, ref, rel
 
-    if (abs((val-ref)/ref) < rel) then
-        write (6, *) label, ' OK'
-    else
+    if (.not. abs((val-ref)/ref) < rel) then
         failed = .true.
-        write (6, *) label, val, ref, ' FAILED!'
     end if
 end subroutine
 
 end program
-

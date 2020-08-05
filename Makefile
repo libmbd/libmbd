@@ -16,14 +16,12 @@ EMPTY =
 SPACE = $(EMPTY) $(EMPTY)
 COMMA = ,
 
-LIBMBD_TESTS = mbd_unit_tests mbd_api_tests
-
 all: install_editable test
 
 install_libmbd:
 	mkdir -p $(BLDDIR)
 	cd $(BLDDIR) && cmake $(SRCDIR) -DCMAKE_INSTALL_PREFIX=$(LIBMBD_PREFIX) $(CMAKE_FLAGS)
-	make -C $(BLDDIR) mbd $(LIBMBD_TESTS) install
+	make -C $(BLDDIR) all install
 
 install_editable: install_libmbd
 	poetry install $(foreach ext,$(PYMBD_EXTRAS),-E $(ext))
@@ -33,11 +31,11 @@ install: install_libmbd
 	poetry build
 	python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] -f ./dist
 
-test: $(addprefix run-,$(LIBMBD_TESTS))
-	$(RUN_CMD) pytest -v -s --durations=3 $(PYTEST_FLAGS)
+test_libmbd:
+	make -C $(BLDDIR) test
 
-run-%:
-	$(RUN_CMD) $(BLDDIR)/tests/$*
+test: test_libmbd
+	$(RUN_CMD) pytest -v -s --durations=3 $(PYTEST_FLAGS)
 
 doc:
 	python -m pip install sphinx toml git+https://github.com/jhrmnn/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930

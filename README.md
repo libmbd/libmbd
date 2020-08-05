@@ -62,14 +62,14 @@ brew install gcc [open-mpi scalapack]
 The compiling and installation can then proceed with
 
 ```
-git clone https://github.com/jhrmnn/libmbd.git && cd libmbd
 mkdir build && cd build
 cmake .. [-DENABLE_SCALAPACK_MPI=ON]
 make
 make install
+[make test]
 ```
 
-This installs the Libmbd shared library, C API header file, and high-level Fortran API module file.
+This installs the Libmbd shared library, C API header file,  high-level Fortran API module file, and Cmake package files, and optionally runs tests.
 
 ### Pymbd
 
@@ -143,7 +143,7 @@ call calc%destroy()
 
 ## Developing
 
-For development, Libmbd doesn't have to be installed on the system, and Pymbd can be linked against local installation of Libmbd.
+For development, a top-level `Makefile` is included, which configures and compiles Libmbd, compiles the Pymbd C extension, and runs both Libmbd and Pymbd tests.
 
 ```
 git clone https://github.com/jhrmnn/libmbd.git && cd libmbd

@@ -71,6 +71,15 @@ subroutine test(test_name)
         call calc%update_vdw_params_from_ratios([1d0, 1d0])
         call calc%evaluate_vdw_method(energy)
         call check(energy, -0.0002462647623815428d0, 1d-10)
+    case ('ts_gradients')
+        inp%xc = 'pbe'
+        inp%method = 'ts'
+        call calc%init(inp)
+        call calc%update_vdw_params_from_ratios([1d0, 1d0])
+        call calc%evaluate_vdw_method(energy)
+        allocate (gradients(3, 2))
+        call calc%get_gradients(gradients)
+        call check(sum(abs(gradients)), 3.8405254013557403d-4, 1d-10)
     end select
     call calc%destroy()
 end subroutine

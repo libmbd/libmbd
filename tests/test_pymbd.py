@@ -314,11 +314,23 @@ bulk_lithium = [
 ]
 
 
+def test_main():
+    from pymbd.__main__ import ene, ene_expected
+
+    assert ene == approx(ene_expected, rel=1e-10)
+
+
 def test_argon_dimer_plain():
     ene = MBDGeom([(0, 0, 0), (0, 0, 4 * ang)]).mbd_energy(
         [11, 11], [63.525, 63.525], [3.55, 3.55], 0.83, variant='plain'
     )
     assert ene == approx(-0.00024329110270970844, rel=1e-10)
+
+
+@no_scalapack
+def test_argon_dimer_dipole_matrix():
+    dip = MBDGeom([(0, 0, 0), (0, 0, 4 * ang)]).dipole_matrix('bare')
+    assert (dip != 0).sum() == 6
 
 
 def test_argon_dimer_rsscs():
@@ -459,6 +471,15 @@ def test_argon_crystal():
     coords, lattice, k_grid, species, vol_ratios = argon_crystal
     ene = MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vol_ratios, 0.83)
     assert ene == approx(-0.0021037562496878173, rel=1e-10)
+
+
+@no_scalapack
+def test_argon_crystal_rpa():
+    coords, lattice, k_grid, species, vol_ratios = argon_crystal
+    ene = MBDGeom(coords, lattice, k_grid, do_rpa=True).mbd_energy_species(
+        species, vol_ratios, 0.83, variant='plain'
+    )
+    assert ene == approx(-0.0021036969146744147, rel=1e-10)
 
 
 @no_scalapack

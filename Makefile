@@ -35,7 +35,7 @@ test_libmbd:
 	cd $(BLDDIR) && ctest --output-on-failure
 
 test: test_libmbd
-	$(RUN_CMD) pytest -v -s --durations=3 $(PYTEST_FLAGS)
+	$(RUN_CMD) pytest -v --durations=3 $(PYTEST_FLAGS)
 
 doc:
 	python -m pip install sphinx toml git+https://github.com/jhrmnn/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930

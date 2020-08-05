@@ -19,6 +19,10 @@ execute_process(
     OUTPUT_VARIABLE TESTS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+set(MPI_NODES $ENV{MPI_NODES})
+if(NOT "${MPI_NODES}")
+    set(MPI_NODES ${MPIEXEC_MAX_NUMPROCS})
+endif()
 foreach(TEST ${TESTS})
     string(REPLACE "/" ";" TEST_APP_CASE ${TEST})
     list(GET TEST_APP_CASE 0 TEST_APP)
@@ -26,7 +30,7 @@ foreach(TEST ${TESTS})
     add_test(NAME "${TEST_APP}/${TEST_CASE}" COMMAND
         ${MPIEXEC_EXECUTABLE}
         ${MPIEXEC_NUMPROC_FLAG}
-        ${MPIEXEC_MAX_NUMPROCS}
+        ${MPI_NODES}
         ${MPIEXEC_PREFLAGS}
         $<TARGET_FILE:mbd_${TEST_APP}_tests>
         ${TEST_CASE}

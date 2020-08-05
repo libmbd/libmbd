@@ -6,7 +6,7 @@ BLDDIR ?= $(CURDIR)/build
 SRCDIR = $(CURDIR)
 export LIBMBD_PREFIX = $(VIRTUAL_ENV)
 ifdef MPI_NODES
-RUN_CMD = env OMP_NUM_THREADS=1 mpirun -n $(MPI_NODES)
+RUN_CMD = env OMP_NUM_THREADS=1 mpiexec -n $(MPI_NODES)
 endif
 PYMBD_EXTRAS = test
 ifneq (,$(findstring ENABLE_SCALAPACK_MPI=ON,$(CMAKE_FLAGS)))

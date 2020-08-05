@@ -101,17 +101,15 @@ env LIBMBD_PREFIX= pip install pymbd
 ## Examples
 
 ```python
-from pymbd import mbd_energy_species, ang
-from pymbd.fortran import MBDCalc
+from pymbd import mbd_energy_species
+from pymbd.fortran import MBDGeom
 
-ene_py = mbd_energy_species(  # pure Python implementation
-    [(0, 0, 0), (0, 0, 4*ang)], ['Ar', 'Ar'], [1, 1], 0.83
+# pure Python implementation
+energy = mbd_energy_species([(0, 0, 0), (0, 0, 7.5)], ['Ar', 'Ar'], [1, 1], 0.83)
+# Fortran implementation
+energy = MBDGeom([(0, 0, 0), (0, 0, 7.5)]).mbd_energy_species(
+    ['Ar', 'Ar'], [1, 1], 0.83
 )
-with MBDCalc() as calc:
-    ene_f = calc.mbd_energy_species(  # Fortran implementation
-        [(0, 0, 0), (0, 0, 4*ang)], ['Ar', 'Ar'], [1, 1], 0.83
-    )
-assert abs(ene_f-ene_py) < 1e-15
 ```
 
 ```fortran
@@ -130,7 +128,7 @@ call calc%init(inp)
 call calc%get_exception(code, origin, msg)
 if (code > 0) then
     print *, msg
-    stop
+    stop 1
 end if
 call calc%update_vdw_params_from_ratios([0.98d0, 0.98d0])
 call calc%evaluate_vdw_method(energy)

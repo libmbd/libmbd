@@ -44,6 +44,7 @@ subroutine test(test_name)
 
     inp%atom_types = ['Ar', 'Ar']
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2])
+    inp%log_level = MBD_LOG_LVL_DEBUG
     select case (test_name)
     case ('exception')
         inp%xc = 'xxx'

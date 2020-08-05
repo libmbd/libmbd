@@ -39,6 +39,7 @@ subroutine exec_test(test_name)
     character(len=*), intent(in) :: test_name
 
     allocate (geom)
+    geom%log%level = MBD_LOG_LVL_INFO
     select case (test_name)
     case ('T_bare_deriv'); call test_T_bare_deriv()
     case ('T_GG_deriv_expl'); call test_T_GG_deriv_expl()

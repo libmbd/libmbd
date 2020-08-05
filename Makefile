@@ -32,7 +32,7 @@ install: install_libmbd
 	python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] -f ./dist
 
 test_libmbd:
-	make -C $(BLDDIR) test
+	cd $(BLDDIR) && ctest --output-on-failure
 
 test: test_libmbd
 	$(RUN_CMD) pytest -v -s --durations=3 $(PYTEST_FLAGS)

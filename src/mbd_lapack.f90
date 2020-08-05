@@ -9,8 +9,7 @@ use mbd_utils, only: exception_t, tostr
 implicit none
 
 private
-public :: mmul, inv, invh, inverse, eig, eigh, eigvals, eigvalsh, &
-    det, solve, mode
+public :: mmul, inv, invh, inverse, eig, eigh, eigvals, eigvalsh, det, mode
 
 interface mmul
     module procedure mmul_real
@@ -19,7 +18,6 @@ end interface
 
 interface inv
     module procedure inv_real
-    module procedure inv_complex
 end interface
 
 interface invh
@@ -216,42 +214,6 @@ subroutine inv_real(A, exc, src)
     endif
 end subroutine
 
-subroutine inv_complex(A, exc, src)
-    complex(dp), intent(inout) :: A(:, :)
-    type(exception_t), intent(out), optional :: exc
-    complex(dp), intent(in), optional :: src(:, :)
-
-    integer, allocatable :: i_pivot(:)
-    complex(dp), allocatable :: work_arr(:)
-    integer :: n, n_work_arr, error_flag
-    complex(dp) :: n_work_arr_optim
-
-    n = size(A, 1)
-    if (present(src)) A = src
-    allocate (i_pivot(n))
-    call ZGETRF(n, n, A, n, i_pivot, error_flag)
-    if (error_flag /= 0) then
-        if (present(exc)) then
-            exc%code = MBD_EXC_LINALG
-            exc%origin = 'ZGETRF'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
-        end if
-        return
-    endif
-    call ZGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
-    n_work_arr = nint(dble(n_work_arr_optim))
-    allocate (work_arr(n_work_arr))
-    call ZGETRI(n, A, n, i_pivot, work_arr(1), n_work_arr, error_flag)
-    if (error_flag /= 0) then
-        if (present(exc)) then
-            exc%code = MBD_EXC_LINALG
-            exc%origin = 'ZGETRI'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
-        end if
-        return
-    endif
-end subroutine
-
 subroutine invh_real(A, exc, src)
     real(dp), intent(inout) :: A(:, :)
     type(exception_t), intent(out), optional :: exc
@@ -430,30 +392,6 @@ subroutine eig_complex(A, eigs, exc, src, vals_only)
     endif
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
-
-function solve(A, b, exc) result(x)
-    real(dp), intent(in) :: A(:, :), b(:)
-    real(dp) :: x(size(b))
-    type(exception_t), intent(out), optional :: exc
-
-    real(dp) :: A_(size(b), size(b))
-    integer :: i_pivot(size(b))
-    integer :: n
-    integer :: error_flag
-
-    A_ = A
-    x = b
-    n = size(b)
-    call DGESV(n, 1, A_, n, i_pivot, x, n, error_flag)
-    if (error_flag /= 0) then
-        if (present(exc)) then
-            exc%code = MBD_EXC_LINALG
-            exc%origin = 'DGESV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
-        end if
-        return
-    endif
-end function
 
 real(dp) function det(A) result(D)
     real(dp), intent(in) :: A(:, :)

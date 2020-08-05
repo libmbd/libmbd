@@ -29,7 +29,6 @@ type, public :: matrix_re_t
     contains
     procedure :: siz => matrix_re_siz
     procedure :: init => matrix_re_init
-    procedure :: add => matrix_re_add
     procedure :: add_diag => matrix_re_add_diag
     procedure :: add_diag_scalar => matrix_re_add_diag_scalar
     procedure :: mult_cross => matrix_re_mult_cross
@@ -60,7 +59,6 @@ type, public :: matrix_cplx_t
     contains
     procedure :: siz => matrix_cplx_siz
     procedure :: init => matrix_cplx_init
-    procedure :: add => matrix_cplx_add
     procedure :: add_diag => matrix_cplx_add_diag
     procedure :: add_diag_scalar => matrix_cplx_add_diag_scalar
     procedure :: mult_cross => matrix_cplx_mult_cross
@@ -188,19 +186,6 @@ subroutine matrix_cplx_alloc_from(this, other)
     n1 = other%siz(1)
     n2 = other%siz(2)
     allocate (this%val(n1, n2))
-end subroutine
-
-#ifndef DO_COMPLEX_TYPE
-subroutine matrix_re_add(this, other)
-    class(matrix_re_t), intent(inout) :: this
-    class(matrix_re_t), intent(in) :: other
-#else
-subroutine matrix_cplx_add(this, other)
-    class(matrix_cplx_t), intent(inout) :: this
-    class(matrix_cplx_t), intent(in) :: other
-#endif
-
-    this%val = this%val + other%val
 end subroutine
 
 #ifndef DO_COMPLEX_TYPE

@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2020-08-06
+
 ### Added
 
-- Support for IBM Fortran compiler by circumventing ICE
 - Version checking of Libmbd from Pymbd
+- Support for IBM Fortran compiler by circumventing ICE
 
 ## [0.9.3] - 2020-08-02
 
@@ -120,7 +122,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.9.3...HEAD
+[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.10.0...HEAD
+[0.10.0]: https://github.com/jhrmnn/libmbd/compare/0.9.3...0.10.0
 [0.9.3]: https://github.com/jhrmnn/libmbd/compare/0.9.2...0.9.3
 [0.9.2]: https://github.com/jhrmnn/libmbd/compare/0.9.1...0.9.2
 [0.9.1]: https://github.com/jhrmnn/libmbd/compare/0.9.0...0.9.1

@@ -180,9 +180,10 @@ class MBDGeom(object):
         self,
         alpha_0,
         C6,
-        R_vdw,
-        beta,
+        R_vdw=None,
+        beta=0.0,
         a=6.0,
+        sigma=None,
         damping='fermi,dip',
         variant='rsscs',
         force=False,
@@ -192,16 +193,22 @@ class MBDGeom(object):
         :param array-like alpha_0: (a.u.) atomic polarizabilities
         :param array-like C6: (a.u.) atomic :math:`C_6` coefficients
         :param array-like R_vdw: (a.u.) atomic vdW radii
+        :param array-like sigma: (a.u.) oscillator widths
         :param float beta: MBD damping parameter :math:`\beta`
         :param float a: MBD damping parameter :math:`a`
         :param damping str: type of damping
         :param variant str: one of 'plain', 'scs', 'rsscs'
         :param force bool: if True, calculate energy gradients
         """
-        alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
+        alpha_0, C6, R_vdw, sigma = map(_array, (alpha_0, C6, R_vdw, sigma))
         n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(
-            n_atoms, damping.encode(), _cast('double*', R_vdw), _ffi.NULL, beta, a
+            n_atoms,
+            damping.encode(),
+            _cast('double*', R_vdw),
+            _cast('double*', sigma),
+            beta,
+            a,
         )
         args = (
             self._geom_f,

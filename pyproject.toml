@@ -46,7 +46,7 @@ flake8 = "^3.5"
 flake8-bugbear = "^19"
 flake8-comprehensions = "^2"
 flake8-quotes = "^2"
-black = { version = ">=19-beta.0", python = "^3.6" }
+black = { version = ">=20-beta.0", python = "^3.6" }
 pydocstyle = "^5"
 pep8-naming = "^0.8"
 isort = { version = "^5", python = "^3.6" }

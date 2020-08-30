@@ -23,7 +23,7 @@ else:
         ext_kwargs = {}
     ffibuilder = cffi.FFI()
     ffibuilder.set_source(
-        'pymbd._libmbd', '#include "mbd.h"', libraries=['mbd'], **ext_kwargs,
+        'pymbd._libmbd', '#include "mbd.h"', libraries=['mbd'], **ext_kwargs
     )
     with open(MBD_H) as f:
         ffibuilder.cdef(f.read())

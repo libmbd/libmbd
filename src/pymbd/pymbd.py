@@ -136,7 +136,7 @@ def dipole_matrix(
                 Rs, sigma_ij
             )
         else:
-            raise ValueError('Unsupported damping: {}'.format(damping))
+            raise ValueError(f'Unsupported damping: {damping}')
         if do_ewald:
             T += T_erfc(Rs, ewald_alpha) - T_bare(Rs)
         if k_point is not None:
@@ -270,7 +270,7 @@ def from_volumes(species, volumes, kind='TS'):
             for param in 'alpha_0(TSsurf) C6(TSsurf) R_vdw(TSsurf)'.split()
         )
     else:
-        raise ValueError('Unkonwn vdW parameter kind: {}'.format(kind))
+        raise ValueError(f'Unkonwn vdW parameter kind: {kind}')
     volumes = np.array(volumes)
     alpha_0 *= volumes
     C6 *= volumes ** 2

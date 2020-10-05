@@ -22,7 +22,6 @@ classifiers = [
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Fortran",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.5",
     "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Topic :: Scientific/Engineering :: Chemistry",
@@ -30,7 +29,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.5"
+python = "^3.6"
 scipy = "^1"
 numpy = "^1"
 cffi = "^1"
@@ -46,11 +45,11 @@ flake8 = "^3.5"
 flake8-bugbear = "^19"
 flake8-comprehensions = "^2"
 flake8-quotes = "^2"
-black = { version = ">=20-beta.0", python = "^3.6" }
+black = ">=20-beta.0"
 pydocstyle = "^5"
 pep8-naming = "^0.8"
-isort = { version = "^5", python = "^3.6" }
+isort = "^5"
 
 [tool.black]
-target-version = ["py35"]
+target-version = ["py36"]
 skip-string-normalization = true

@@ -16,7 +16,7 @@ jobs:
         - black . --check
         - isort . --check
         - pydocstyle src
-    - python: 3.5
+    - python: 3.6
       addons: &apt
         apt:
           packages:

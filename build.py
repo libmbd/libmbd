@@ -15,9 +15,9 @@ if LIBMBD_PREFIX == '':
 else:
     if LIBMBD_PREFIX:
         ext_kwargs = {
-            'include_dirs': ['{}/include'.format(LIBMBD_PREFIX)],
-            'library_dirs': ['{}/lib'.format(LIBMBD_PREFIX)],
-            'runtime_library_dirs': ['{}/lib'.format(LIBMBD_PREFIX)],
+            'include_dirs': [f'{LIBMBD_PREFIX}/include'],
+            'library_dirs': [f'{LIBMBD_PREFIX}/lib'],
+            'runtime_library_dirs': [f'{LIBMBD_PREFIX}/lib'],
         }
     else:
         ext_kwargs = {}

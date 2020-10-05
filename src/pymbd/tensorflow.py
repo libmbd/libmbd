@@ -88,7 +88,7 @@ def dipole_matrix(coords, damping, beta=0.0, R_vdw=None, sigma=None, a=6.0):
             Rs, sigmaij
         )
     else:
-        raise ValueError('Unsupported damping: {}'.format(damping))
+        raise ValueError(f'Unsupported damping: {damping}')
     n_atoms = tf.shape(coords)[0]
     return tf.reshape(tf.transpose(dipmat, (0, 2, 1, 3)), (3 * n_atoms, 3 * n_atoms))
 

@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.1)
 cmake_policy(SET CMP0042 NEW)
 
+# Allow defining cache variables as normal variables in a host project.
+if(CMAKE_MAJOR_VERSION GREATER 3
+    OR (CMAKE_MAJOR_VERSION EQUAL 3 AND CMAKE_MINOR_VERSION GREATER_EQUAL 13))
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
 project(Libmbd

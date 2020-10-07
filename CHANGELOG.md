@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.10.1] - 2020-10-08
+
+### Fixed
+
+- Pymbd installation
+
 ## [0.10.0] - 2020-10-07
 
 ### Added
@@ -124,7 +132,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.10.0...HEAD
+[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.10.1...HEAD
+[0.10.1]: https://github.com/jhrmnn/libmbd/compare/0.10.0...0.10.1
 [0.10.0]: https://github.com/jhrmnn/libmbd/compare/0.9.3...0.10.0
 [0.9.3]: https://github.com/jhrmnn/libmbd/compare/0.9.2...0.9.3
 [0.9.2]: https://github.com/jhrmnn/libmbd/compare/0.9.1...0.9.2

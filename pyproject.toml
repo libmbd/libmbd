@@ -1,6 +1,6 @@
 [build-system]
-requires = ["poetry>=1", "cffi"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry_core>=1", "cffi", "setuptools"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "pymbd"

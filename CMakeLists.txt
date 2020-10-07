@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.1)
 cmake_policy(SET CMP0042 NEW)
+if(NOT CMAKE_VERSION VERSION_LESS 3.13)
+    cmake_policy(SET CMP0077 NEW)
+endif()
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 

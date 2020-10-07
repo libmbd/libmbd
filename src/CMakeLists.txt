@@ -73,11 +73,13 @@ if(ENABLE_C_API)
 endif()
 
 if(CMAKE_INSTALL_LIBDIR)
-    install(TARGETS mbd EXPORT LibmbdConfig
+    install(TARGETS mbd EXPORT MbdConfig
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
-
-    install(EXPORT LibmbdConfig DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mbd")
+    add_library(Mbd INTERFACE)
+    target_link_libraries(Mbd INTERFACE mbd)
+    install(TARGETS Mbd EXPORT MbdConfig)
+    install(EXPORT MbdConfig NAMESPACE Mbd:: DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mbd")
 endif()

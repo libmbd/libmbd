@@ -17,7 +17,7 @@ if with_mpi:
 else:
     rank = 0
 if rank == 0:
-    print('Expected energy:   {ene_expected}')
-    print('Calculated energy: {ene}')
+    print(f'Expected energy:   {ene_expected}')
+    print(f'Calculated energy: {ene}')
 if ene - ene_expected > 1e-10:
     sys.exit(1)

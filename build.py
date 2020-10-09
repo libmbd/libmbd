@@ -13,6 +13,12 @@ if LIBMBD_PREFIX == '':
 
 
 else:
+
+    # some Conda environments do not add their include dir into default includes
+    CONDA_PREFIX = os.environ.get('CONDA_PREFIX')
+    if not LIBMBD_PREFIX and CONDA_PREFIX:
+        LIBMBD_PREFIX = CONDA_PREFIX
+
     if LIBMBD_PREFIX:
         ext_kwargs = {
             'include_dirs': [f'{LIBMBD_PREFIX}/include'],

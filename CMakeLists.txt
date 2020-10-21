@@ -4,13 +4,13 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.13)
     cmake_policy(SET CMP0077 NEW)
 endif()
 
-set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
+set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
+    "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
 project(Libmbd
     VERSION 0.10.1
     DESCRIPTION "Many-body dispersion library"
-    LANGUAGES Fortran C
-)
+    LANGUAGES Fortran C)
 
 include(GNUInstallDirs)
 include(CMakeDependentOption)
@@ -35,14 +35,16 @@ separate_arguments(MKL_LIBRARIES)
 if(NOT LAPACK_LIBRARIES AND NOT MKL_LIBRARIES)
     find_package(LAPACK)
     if(NOT LAPACK_FOUND)
-        message(SEND_ERROR "BLAS/LAPACK not found, specify custom installation with LAPACK_LIBRARIES or MKL_LIBRARIES variable")
+        message(SEND_ERROR "BLAS/LAPACK not found, specify custom installation with \
+LAPACK_LIBRARIES or MKL_LIBRARIES variable")
     endif()
 endif()
 
 if(ENABLE_SCALAPACK_MPI)
     find_package(MPI)
     if(NOT MPI_Fortran_FOUND)
-        message(SEND_ERROR "MPI not found, specify the MPI Fortran compiler with MPI_Fortran_COMPILER variable")
+        message(SEND_ERROR "MPI not found, specify the MPI Fortran compiler with \
+MPI_Fortran_COMPILER variable")
     endif()
     if(APPLE)
         # -flat_namespace (Darwin-specific) is causing a crash (seg fault) when the
@@ -52,7 +54,8 @@ if(ENABLE_SCALAPACK_MPI)
         # Only mention of anything possibly related I could find is at
         #
         #   https://trac.mpich.org/projects/mpich/ticket/1590
-        string(REPLACE "-Wl,-flat_namespace" "" MPI_Fortran_LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
+        string(REPLACE "-Wl,-flat_namespace" ""
+            MPI_Fortran_LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
         string(STRIP "${MPI_Fortran_LINK_FLAGS}" MPI_Fortran_LINK_FLAGS)
     endif()
     if(NOT SCALAPACK_LIBRARIES AND NOT MKL_LIBRARIES)
@@ -71,7 +74,8 @@ if(ENABLE_ELSI)
         if(elsi_FOUND)
             message(STATUS "ELSI CMake package found in ${elsi_DIR}")
         else()
-            message(SEND_ERROR "ELSI CMake package not found, specify custom installation with ELSI_LIBRARIES variable")
+            message(SEND_ERROR "ELSI CMake package not found, specify custom \
+installation with ELSI_LIBRARIES variable")
         endif()
     endif()
 endif()

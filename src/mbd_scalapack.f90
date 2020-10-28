@@ -40,6 +40,7 @@ interface
 
   subroutine pdsyev(jobz, uplo, nn, aa, ia, ja, desca, ww, zz, iz, jz, descz, work, lwork, info)
     import :: dp, DLEN, LLD
+    implicit none
     character, intent(in) :: jobz, uplo
     integer, intent(in) :: nn
     integer, intent(in) :: ia, ja, desca(DLEN)
@@ -54,6 +55,7 @@ interface
   subroutine pdheev(jobz, uplo, nn, aa, ia, ja, desca, ww, zz, iz, jz, descz, work, lwork, rwork,&
       & lrwork, info)
     import :: dp, DLEN, LLD
+    implicit none
     character, intent(in) :: jobz, uplo
     integer, intent(in) :: nn
     integer, intent(in) :: ia, ja, desca(DLEN)
@@ -70,6 +72,7 @@ interface
 
   subroutine pdgetrf(mm, nn, aa, ia, ja, desca, ipiv, info)
     import :: dp, DLEN, LLD
+    implicit none
     integer, intent(in) :: mm
     integer, intent(in) :: nn
     integer, intent(in) :: ia, ja, desca(DLEN)
@@ -80,6 +83,7 @@ interface
 
   subroutine pdgetri(nn, aa, ia, ja, desca, ipiv, work, lwork, iwork, liwork, info)
     import :: dp, DLEN, LLD
+    implicit none
     integer, intent(in) :: nn
     integer, intent(in) :: desca(DLEN)
     real(dp), intent(inout) :: aa(desca(LLD), *)
@@ -89,12 +93,14 @@ interface
     real(dp), intent(inout) :: work(*)
     integer, intent(in) :: lwork
     integer, intent(inout) :: iwork(*)
+    integer, intent(in) :: liwork
     integer, intent(out) :: info
   end subroutine pdgetri
 
   subroutine pdgemm(transa, transb, mm, nn, kk, alpha, aa, ia, ja, desca, bb, ib, jb, descb, beta,&
       & cc, ic, jc, descc)
     import :: dp, DLEN, LLD
+    implicit none
     character, intent(in) :: transa, transb
     integer, intent(in) :: mm, nn, kk
     real(dp), intent(in) :: alpha
@@ -113,6 +119,7 @@ interface
   subroutine pzgemm(transa, transb, mm, nn, kk, alpha, aa, ia, ja, desca, bb, ib, jb, descb, beta,&
       & cc, ic, jc, descc)
     import :: dp, DLEN, LLD
+    implicit none
     character, intent(in) :: transa, transb
     integer, intent(in) :: mm, nn, kk
     complex(dp), intent(in) :: alpha
@@ -141,7 +148,7 @@ subroutine pinvh_real(A, blacs, exc, src)
     integer, allocatable :: i_pivot(:), iwork_arr(:)
     real(dp), allocatable :: work_arr(:)
     integer :: n, n_work_arr, error_flag, n_iwork_arr
-    integer :: n_iwork_arr_dummy(1)
+    integer :: n_iwork_arr_optim(1)
     real(dp) :: n_work_arr_optim(1)
 
     n = 3*blacs%n_atoms
@@ -159,9 +166,10 @@ subroutine pinvh_real(A, blacs, exc, src)
     endif
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
-        n_work_arr_optim, -1, n_iwork_arr_dummy, -1, error_flag &
+        n_work_arr_optim, -1, n_iwork_arr_optim, -1, error_flag &
     )
     n_work_arr = nint(n_work_arr_optim(1))
+    n_iwork_arr = n_iwork_arr_optim(1)
     allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr))
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &

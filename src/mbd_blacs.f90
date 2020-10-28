@@ -49,42 +49,50 @@ end interface
 interface
 
     subroutine blacs_pinfo(id, nproc)
+        implicit none
         integer, intent(out) :: id, nproc
     end subroutine blacs_pinfo
 
     subroutine blacs_gridinit(ictxt, order, nprow, npcol)
+        implicit none
         integer, intent(inout) :: ictxt
         character, intent(in) :: order
         integer, intent(in) :: nprow, npcol
     end subroutine blacs_gridinit
 
     subroutine blacs_gridinfo(ictxt, nprow, npcol, myrow, mycol)
+        implicit none
         integer, intent(in) :: ictxt,nprow, npcol
         integer, intent(out) :: myrow, mycol
     end subroutine blacs_gridinfo
 
     subroutine blacs_gridexit(ictxt)
+        implicit none
         integer, intent(in) :: ictxt
     end subroutine blacs_gridexit
 
     integer function numroc(nn, nb, iproc, isrcproc, nprocs)
+        implicit none
         integer, intent(in) :: nn, nb, iproc, isrcproc, nprocs
     end function numroc
 
     subroutine descinit(desc, mm, nn, mb, nb, irsrc, icsrc, ictxt, lld, info)
         import :: DLEN
+        implicit none
         integer, intent(out) :: desc(DLEN)
         integer, intent(in) :: mm, nn, mb, nb, irsrc, icsrc, ictxt, lld
         integer, intent(out) :: info
     end subroutine descinit
 
     subroutine blacs_get(ictxt, what, val)
+        implicit none
         integer, intent(in) :: ictxt, what
         integer, intent(out) :: val
     end subroutine blacs_get
 
     subroutine dgsum2d(ictxt, scope, top, mm, nn, aa, lda, rdest, cdest)
         import :: dp
+        implicit none
         integer, intent(in) :: ictxt
         character, intent(in) :: scope, top
         integer, intent(in) :: mm, nn
@@ -95,6 +103,7 @@ interface
 
     subroutine zgsum2d(ictxt, scope, top, mm, nn, aa, lda, rdest, cdest)
         import :: dp
+        implicit none
         integer, intent(in) :: ictxt
         character, intent(in) :: scope, top
         integer, intent(in) :: mm, nn

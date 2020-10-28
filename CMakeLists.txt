@@ -5,7 +5,7 @@ if(NOT CMAKE_VERSION VERSION_LESS 3.13)
 endif()
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
-    "${CMAKE_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
 project(Libmbd
     VERSION 0.10.2
@@ -23,7 +23,7 @@ option(ENABLE_C_API "Enable C API" ON)
 option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)
 
 set(DEFAULT_BUILD_TYPE "Release")
-if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
     set(DEFAULT_BUILD_TYPE "Debug")
 endif()
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

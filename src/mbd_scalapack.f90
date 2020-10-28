@@ -32,110 +32,7 @@ interface peigvalsh
     module procedure peigvalsh_complex
 end interface
 
-
-integer, parameter :: DLEN = 9
-integer, parameter :: LLD = 9
-
-interface
-
-  subroutine pdsyev(jobz, uplo, nn, aa, ia, ja, desca, ww, zz, iz, jz, descz, work, lwork, info)
-    import :: dp, DLEN, LLD
-    implicit none
-    character, intent(in) :: jobz, uplo
-    integer, intent(in) :: nn
-    integer, intent(in) :: ia, ja, desca(DLEN)
-    real(dp), intent(inout) :: aa(desca(LLD), *)
-    integer, intent(in) :: iz, jz, descz(DLEN)
-    real(dp), intent(out) :: ww(nn), zz(descz(LLD),*)
-    real(dp), intent(inout) :: work(*)
-    integer, intent(in) :: lwork
-    integer, intent(out) :: info
-  end subroutine pdsyev
-
-  subroutine pdheev(jobz, uplo, nn, aa, ia, ja, desca, ww, zz, iz, jz, descz, work, lwork, rwork,&
-      & lrwork, info)
-    import :: dp, DLEN, LLD
-    implicit none
-    character, intent(in) :: jobz, uplo
-    integer, intent(in) :: nn
-    integer, intent(in) :: ia, ja, desca(DLEN)
-    complex(dp), intent(inout) :: aa(desca(LLD), *)
-    integer, intent(in) :: iz, jz, descz(DLEN)
-    real(dp), intent(out) :: ww(nn)
-    complex(dp), intent(out) ::  zz(descz(LLD),*)
-    complex(dp), intent(inout) :: work(*)
-    integer, intent(in) :: lwork
-    real(dp), intent(inout) :: rwork(*)
-    integer, intent(in) :: lrwork
-    integer, intent(out) :: info
-  end subroutine pdheev
-
-  subroutine pdgetrf(mm, nn, aa, ia, ja, desca, ipiv, info)
-    import :: dp, DLEN, LLD
-    implicit none
-    integer, intent(in) :: mm
-    integer, intent(in) :: nn
-    integer, intent(in) :: ia, ja, desca(DLEN)
-    real(dp), intent(inout) :: aa(desca(LLD), *)
-    integer, intent(out) :: ipiv(*)
-    integer, intent(out) :: info
-  end subroutine pdgetrf
-
-  subroutine pdgetri(nn, aa, ia, ja, desca, ipiv, work, lwork, iwork, liwork, info)
-    import :: dp, DLEN, LLD
-    implicit none
-    integer, intent(in) :: nn
-    integer, intent(in) :: desca(DLEN)
-    real(dp), intent(inout) :: aa(desca(LLD), *)
-    integer, intent(in) :: ia
-    integer, intent(in) :: ja
-    integer, intent(in) :: ipiv(*)
-    real(dp), intent(inout) :: work(*)
-    integer, intent(in) :: lwork
-    integer, intent(inout) :: iwork(*)
-    integer, intent(in) :: liwork
-    integer, intent(out) :: info
-  end subroutine pdgetri
-
-  subroutine pdgemm(transa, transb, mm, nn, kk, alpha, aa, ia, ja, desca, bb, ib, jb, descb, beta,&
-      & cc, ic, jc, descc)
-    import :: dp, DLEN, LLD
-    implicit none
-    character, intent(in) :: transa, transb
-    integer, intent(in) :: mm, nn, kk
-    real(dp), intent(in) :: alpha
-    integer, intent(in) :: desca(DLEN)
-    real(dp), intent(in) :: aa(desca(LLD), *)
-    integer, intent(in) :: ia, ja
-    integer, intent(in) :: descb(DLEN)
-    real(dp), intent(in) :: bb(descb(LLD), *)
-    integer, intent(in) :: ib, jb
-    real(dp), intent(in) :: beta
-    integer, intent(in) :: descc(DLEN)
-    real(dp), intent(inout) :: cc(descc(LLD), *)
-    integer, intent(in) :: ic, jc
-  end subroutine pdgemm
-
-  subroutine pzgemm(transa, transb, mm, nn, kk, alpha, aa, ia, ja, desca, bb, ib, jb, descb, beta,&
-      & cc, ic, jc, descc)
-    import :: dp, DLEN, LLD
-    implicit none
-    character, intent(in) :: transa, transb
-    integer, intent(in) :: mm, nn, kk
-    complex(dp), intent(in) :: alpha
-    integer, intent(in) :: desca(DLEN)
-    complex(dp), intent(in) :: aa(desca(LLD), *)
-    integer, intent(in) :: ia, ja
-    integer, intent(in) :: descb(DLEN)
-    complex(dp), intent(in) :: bb(descb(LLD), *)
-    integer, intent(in) :: ib, jb
-    complex(dp), intent(in) :: beta
-    integer, intent(in) :: descc(DLEN)
-    complex(dp), intent(inout) :: cc(descc(LLD), *)
-    integer, intent(in) :: ic, jc
-  end subroutine pzgemm
-
-end interface
+external :: PDSYEV, PZHEEV, PDGETRF, PDGETRI, PDGEMM, PZGEMM
 
 contains
 
@@ -147,8 +44,7 @@ subroutine pinvh_real(A, blacs, exc, src)
 
     integer, allocatable :: i_pivot(:), iwork_arr(:)
     real(dp), allocatable :: work_arr(:)
-    integer :: n, n_work_arr, error_flag, n_iwork_arr
-    integer :: n_iwork_arr_optim(1)
+    integer :: n, n_work_arr, error_flag, n_iwork_arr(1)
     real(dp) :: n_work_arr_optim(1)
 
     n = 3*blacs%n_atoms
@@ -166,14 +62,13 @@ subroutine pinvh_real(A, blacs, exc, src)
     endif
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
-        n_work_arr_optim, -1, n_iwork_arr_optim, -1, error_flag &
+        n_work_arr_optim, -1, n_iwork_arr, -1, error_flag &
     )
     n_work_arr = nint(n_work_arr_optim(1))
-    n_iwork_arr = n_iwork_arr_optim(1)
-    allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr))
+    allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr(1)))
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
-        work_arr, n_work_arr, iwork_arr, n_iwork_arr, error_flag)
+        work_arr, n_work_arr, iwork_arr, n_iwork_arr(1), error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG

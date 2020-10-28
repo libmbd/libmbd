@@ -23,6 +23,10 @@ add_library(mbd
 
 if(ENABLE_SCALAPACK_MPI)
     target_sources(mbd PRIVATE mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
+    # NAG compiler won't compile this file without the '-mismatch' option
+    if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "NAG")
+        set_source_files_properties(SOURCE mbd_mpi.F90 PROPERTY COMPILE_FLAGS -mismatch)
+    endif()
 endif()
 
 if(ENABLE_ELSI)

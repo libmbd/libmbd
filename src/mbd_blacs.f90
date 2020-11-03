@@ -137,29 +137,40 @@ subroutine all_reduce_real_scalar(x, blacs)
     real(dp), intent(inout) :: x
     type(blacs_desc_t), intent(in) :: blacs
 
-    call DGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x, 1, -1, -1)
+    real(dp) :: x_arr(1)
+
+    x_arr(1) = x
+    call DGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)
+    x = x_arr(1)
 end subroutine
 
 subroutine all_reduce_complex_scalar(x, blacs)
     complex(dp), intent(inout) :: x
     type(blacs_desc_t), intent(in) :: blacs
 
-    call ZGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x, 1, -1, -1)
+    complex(dp) :: x_arr(1)
+
+    x_arr(1) = x
+    call ZGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)
+    x = x_arr(1)
 end subroutine
 
 subroutine all_reduce_real_1d(A, blacs)
     real(dp), intent(inout) :: A(:)
     type(blacs_desc_t), intent(in) :: blacs
 
-    call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A(1), size(A), -1, -1)
+    call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_real_2d(A, blacs)
-    real(dp), intent(inout) :: A(:, :)
+    real(dp), contiguous, target, intent(inout) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
 
+    real(dp), pointer :: A_p(:)
+
+    A_p(1:size(A)) => A
     call DGSUM2D( &
-        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A(1, 1), size(A, 1), -1, -1 &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A_p, size(A, 1), -1, -1 &
     )
 end subroutine
 
@@ -167,15 +178,18 @@ subroutine all_reduce_complex_1d(A, blacs)
     complex(dp), intent(inout) :: A(:)
     type(blacs_desc_t), intent(in) :: blacs
 
-    call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A(1), size(A), -1, -1)
+    call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A, size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_complex_2d(A, blacs)
-    complex(dp), intent(inout) :: A(:, :)
+    complex(dp), contiguous, target, intent(inout) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
 
+    complex(dp), pointer :: A_p(:)
+
+    A_p(1:size(A)) => A
     call ZGSUM2D( &
-        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A(1, 1), size(A, 1), -1, -1 &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A_p, size(A, 1), -1, -1 &
     )
 end subroutine
 

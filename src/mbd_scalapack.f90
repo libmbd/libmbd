@@ -44,8 +44,8 @@ subroutine pinvh_real(A, blacs, exc, src)
 
     integer, allocatable :: i_pivot(:), iwork_arr(:)
     real(dp), allocatable :: work_arr(:)
-    integer :: n, n_work_arr, error_flag, n_iwork_arr
-    real(dp) :: n_work_arr_optim
+    integer :: n, n_work_arr, error_flag, n_iwork_arr(1)
+    real(dp) :: n_work_arr_optim(1)
 
     n = 3*blacs%n_atoms
     if (n == 0) return
@@ -64,11 +64,11 @@ subroutine pinvh_real(A, blacs, exc, src)
         n, A, 1, 1, blacs%desc, i_pivot, &
         n_work_arr_optim, -1, n_iwork_arr, -1, error_flag &
     )
-    n_work_arr = nint(n_work_arr_optim)
-    allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr))
+    n_work_arr = nint(n_work_arr_optim(1))
+    allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr(1)))
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
-        work_arr(1), n_work_arr, iwork_arr(1), n_iwork_arr, error_flag)
+        work_arr, n_work_arr, iwork_arr, n_iwork_arr(1), error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -128,7 +128,7 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     logical, intent(in), optional :: vals_only
 
     real(dp), allocatable :: work_arr(:), vectors(:, :)
-    real(dp) :: n_work_arr
+    real(dp) :: n_work_arr(1)
     integer :: error_flag, n
 
     n = 3*blacs%n_atoms
@@ -142,7 +142,7 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, n_work_arr, -1, error_flag &
     )
-    allocate (work_arr(nint(n_work_arr)))
+    allocate (work_arr(nint(n_work_arr(1))))
     call PDSYEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, work_arr(1), size(work_arr), error_flag &

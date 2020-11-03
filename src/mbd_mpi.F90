@@ -28,38 +28,34 @@ subroutine mpi_all_reduce_real_0d(x, comm)
     real(dp), intent(inout) :: x
     integer, intent(in) :: comm
 
-    real(dp) :: x_buffer
+    real(dp) :: x_arr(1), x_buffer(1)
     integer :: ierr
 
-    call MPI_ALLREDUCE(x, x_buffer, 1, MPI_DOUBLE_PRECISION, MPI_SUM, comm, ierr)
-    x = x_buffer
-end subroutine
-
-subroutine mpi_all_reduce_real(x, n, comm)
-    integer, intent(in) :: n
-    real(dp), intent(inout) :: x(n)
-    integer, intent(in) :: comm
-
-    real(dp), allocatable :: x_buffer(:)
-    integer :: ierr
-
-    allocate (x_buffer(n))
-    call MPI_ALLREDUCE(x, x_buffer, n, MPI_DOUBLE_PRECISION, MPI_SUM, comm, ierr)
-    x = x_buffer
+    x_arr(1) = x
+    call MPI_ALLREDUCE(x_arr, x_buffer, 1, MPI_DOUBLE_PRECISION, MPI_SUM, comm, ierr)
+    x = x_buffer(1)
 end subroutine
 
 subroutine mpi_all_reduce_real_1d(x, comm)
     real(dp), intent(inout) :: x(:)
     integer, intent(in) :: comm
 
-    call mpi_all_reduce_real(x, size(x), comm)
+    real(dp), allocatable :: x_buffer(:)
+    integer :: ierr
+
+    allocate (x_buffer(size(x)))
+    call MPI_ALLREDUCE(x, x_buffer, size(x), MPI_DOUBLE_PRECISION, MPI_SUM, comm, ierr)
+    x = x_buffer
 end subroutine
 
 subroutine mpi_all_reduce_real_2d(x, comm)
-    real(dp), intent(inout) :: x(:, :)
+    real(dp), contiguous, target, intent(inout) :: x(:, :)
     integer, intent(in) :: comm
 
-    call mpi_all_reduce_real(x, size(x), comm)
+    real(dp), pointer :: x_p(:)
+
+    x_p(1:size(x)) => x
+    call mpi_all_reduce_real_1d(x_p, comm)
 end subroutine
 
 integer function mpi_get_rank() result(rank)

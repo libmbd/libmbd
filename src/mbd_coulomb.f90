@@ -17,10 +17,6 @@ private
 
 public :: coulomb_energy, dipole_energy
 
-integer :: n_pts_coulomb = 500
-real(dp) :: L_coulomb = 10d0
-character(len=20) :: quadrature = 'simpson'
-
 contains
 
 subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
@@ -32,6 +28,10 @@ subroutine calc_coulomb_coupled_gauss(R1, R2, K, dip, coul)
     integer :: i
     real(dp) :: det_K_plus_U2, coul_u, dot, dist, work(6, 6)
     real(dp), dimension(:, :), allocatable :: K11, K12, K22, dip_u
+
+    integer, parameter :: n_pts_coulomb = 500
+    real(dp), parameter :: L_coulomb = 10d0
+    character(len=20), parameter :: quadrature = 'simpson'
 
     dist = sqrt(sum((R1-R2)**2))
     allocate (x(n_pts_coulomb), w(n_pts_coulomb))

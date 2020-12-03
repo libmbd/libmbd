@@ -21,9 +21,9 @@ implicit none
 
 private
 
-integer, public :: mbd_version_major = MBD_VERSION_MAJOR
-integer, public :: mbd_version_minor = MBD_VERSION_MINOR
-integer, public :: mbd_version_patch = MBD_VERSION_PATCH
+integer, parameter, public :: mbd_version_major = MBD_VERSION_MAJOR
+integer, parameter, public :: mbd_version_minor = MBD_VERSION_MINOR
+integer, parameter, public :: mbd_version_patch = MBD_VERSION_PATCH
 
 type, public :: mbd_input_t
     !! Contains user input to an MBD calculation.

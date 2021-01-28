@@ -1,5 +1,6 @@
 import datetime
 import os
+import subprocess
 import sys
 from unittest.mock import MagicMock
 
@@ -30,7 +31,11 @@ with open('../pyproject.toml') as f:
     metadata = toml.load(f)['tool']['poetry']
 
 project = 'Libmbd'
-version = metadata['version']
+release = version = (
+    subprocess.run(['poetry', 'version'], capture_output=True, cwd='..')
+    .stdout.decode()
+    .split()[1]
+)
 author = ' '.join(metadata['authors'][0].split()[:-1])
 description = metadata['description']
 
@@ -43,7 +48,6 @@ extensions = [
 source_suffix = '.rst'
 master_doc = 'index'
 copyright = f'2018-{datetime.date.today().year}, {author}'
-release = version
 language = None
 exclude_patterns = ['build', '.DS_Store']
 pygments_style = 'sphinx'

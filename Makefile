@@ -29,7 +29,7 @@ install_editable: install_libmbd
 install: install_libmbd
 	pip install cffi
 	poetry build
-	python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] -f ./dist
+	python -m pip install pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] --pre -f ./dist
 
 test_libmbd:
 	cd $(BLDDIR) && ctest --output-on-failure

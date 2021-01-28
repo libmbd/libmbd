@@ -43,7 +43,6 @@ jobs:
             - scalapack
     - name: Documentation
       python: 3.7
-      install: skip
       before_script: skip
       script: make doc
       workspaces:

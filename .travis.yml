@@ -32,6 +32,12 @@ jobs:
     - python: 3.7
       env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
       addons: *apt
+    - python: 3.8
+      env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
+      addons: *apt
+    - python: 3.9
+      env: CMAKE_FLAGS="-DENABLE_SCALAPACK_MPI=ON" MPI_NODES=2
+      addons: *apt
     - language: minimal
       os: osx
       osx_image: xcode11

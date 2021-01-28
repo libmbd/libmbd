@@ -7,9 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.4] - 2021-01-28
+
+### Added
+
+- Support for Python 3.8 and 3.9
+
 ## [0.10.3] - 2020-11-13
 
-## Fixed
+### Fixed
 
 - Compatibility with NAG compiler
 
@@ -144,7 +150,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.10.3...HEAD
+[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.10.4...HEAD
+[0.10.4]: https://github.com/jhrmnn/libmbd/compare/0.10.3...0.10.4
 [0.10.3]: https://github.com/jhrmnn/libmbd/compare/0.10.2...0.10.3
 [0.10.2]: https://github.com/jhrmnn/libmbd/compare/0.10.1...0.10.2
 [0.10.1]: https://github.com/jhrmnn/libmbd/compare/0.10.0...0.10.1

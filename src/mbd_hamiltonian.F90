@@ -117,12 +117,12 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     else
         call relay%move_from(T)
     end if
-    call relay%mult_cross(omega*sqrt(alpha_0))
+    call relay%mult_cross(omega * sqrt(alpha_0))
     call relay%add_diag(omega**2)
     call geom%clock(21)
     if (geom%get_modes .or. grad%any()) then
         call modes%alloc_from(relay)
-        allocate (eigs(3*n_atoms))
+        allocate (eigs(3 * n_atoms))
         call modes%eigh(eigs, geom%exc, src=relay)
         if (geom%get_modes) then
 #ifndef DO_COMPLEX_TYPE
@@ -139,7 +139,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     if (geom%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)
     if (n_negative_eigs > 0) then
-        msg = "CDM Hamiltonian has " // trim(tostr(n_negative_eigs)) // &
+        msg = "CDM Hamiltonian has "//trim(tostr(n_negative_eigs))// &
             " negative eigenvalues"
         if (geom%param%zero_negative_eigvals) then
             where (eigs < 0) eigs = 0d0
@@ -150,11 +150,11 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
             return
         end if
     end if
-    res%energy = 1d0/2*sum(sqrt(eigs))-3d0/2*sum(omega)
+    res%energy = 1d0 / 2 * sum(sqrt(eigs)) - 3d0 / 2 * sum(omega)
     if (.not. grad%any()) return
     call geom%clock(25)
     call c_lambda12i_c%copy_from(modes)
-    call c_lambda12i_c%mult_cols_3n(eigs**(-1d0/4))
+    call c_lambda12i_c%mult_cols_3n(eigs**(-1d0 / 4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
 #ifdef DO_COMPLEX_TYPE
     c_lambda12i_c%val = conjg(c_lambda12i_c%val)
@@ -164,9 +164,9 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         allocate (res%dE%dcoords(n_atoms, 3))
         do i_xyz = 1, 3
             dQ%val = dT%dr(:, :, i_xyz)
-            call dQ%mult_cross(omega*sqrt(alpha_0))
-            dQ%val = c_lambda12i_c%val*dQ%val
-            res%dE%dcoords(:, i_xyz) = 1d0/2*dble(dQ%contract_n33_rows())
+            call dQ%mult_cross(omega * sqrt(alpha_0))
+            dQ%val = c_lambda12i_c%val * dQ%val
+            res%dE%dcoords(:, i_xyz) = 1d0 / 2 * dble(dQ%contract_n33_rows())
         end do
     end if
     if (grad%dlattice) then
@@ -174,41 +174,41 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         do i_latt = 1, 3
             do i_xyz = 1, 3
                 dQ%val = dT%dlattice(:, :, i_latt, i_xyz)
-                call dQ%mult_cross(omega*sqrt(alpha_0))
-                dQ%val = c_lambda12i_c%val*dQ%val
-                res%dE%dlattice(i_latt, i_xyz) = 1d0/4*dble(dQ%sum_all())
+                call dQ%mult_cross(omega * sqrt(alpha_0))
+                dQ%val = c_lambda12i_c%val * dQ%val
+                res%dE%dlattice(i_latt, i_xyz) = 1d0 / 4 * dble(dQ%sum_all())
             end do
         end do
     end if
     if (grad%dalpha) then
         dQ%val = T%val
-        call dQ%mult_cross(omega*sqrt(alpha_0))
-        call dQ%mult_rows(1d0/(2*alpha_0))
-        dQ%val = c_lambda12i_c%val*dQ%val
-        res%dE%dalpha = 1d0/2*dble(dQ%contract_n33_rows())
+        call dQ%mult_cross(omega * sqrt(alpha_0))
+        call dQ%mult_rows(1d0 / (2 * alpha_0))
+        dQ%val = c_lambda12i_c%val * dQ%val
+        res%dE%dalpha = 1d0 / 2 * dble(dQ%contract_n33_rows())
     end if
     if (grad%domega) then
         dQ%val = T%val
-        call dQ%mult_cross(omega*sqrt(alpha_0))
-        call dQ%mult_rows(1d0/omega)
+        call dQ%mult_cross(omega * sqrt(alpha_0))
+        call dQ%mult_rows(1d0 / omega)
         call dQ%add_diag(omega)
-        dQ%val = c_lambda12i_c%val*dQ%val
-        res%dE%domega = 1d0/2*dble(dQ%contract_n33_rows())-3d0/2
+        dQ%val = c_lambda12i_c%val * dQ%val
+        res%dE%domega = 1d0 / 2 * dble(dQ%contract_n33_rows()) - 3d0 / 2
     end if
     if (grad%dr_vdw) then
         dQ%val = dT%dvdw
-        call dQ%mult_cross(omega*sqrt(alpha_0))
-        dQ%val = c_lambda12i_c%val*dQ%val
-        res%dE%dr_vdw = 1d0/2*dble(dQ%contract_n33_rows())
+        call dQ%mult_cross(omega * sqrt(alpha_0))
+        dQ%val = c_lambda12i_c%val * dQ%val
+        res%dE%dr_vdw = 1d0 / 2 * dble(dQ%contract_n33_rows())
     end if
 #ifdef DO_COMPLEX_TYPE
     if (grad%dq) then
         allocate (res%dE%dq(3))
         do i_latt = 1, 3
             dQ%val = dT%dq(:, :, i_latt)
-            call dQ%mult_cross(omega*sqrt(alpha_0))
-            dQ%val = c_lambda12i_c%val*dQ%val
-            res%dE%dq(i_latt) = 1d0/4*dble(dQ%sum_all())
+            call dQ%mult_cross(omega * sqrt(alpha_0))
+            dQ%val = c_lambda12i_c%val * dQ%val
+            res%dE%dq(i_latt) = 1d0 / 4 * dble(dQ%sum_all())
         end do
     end if
 #endif

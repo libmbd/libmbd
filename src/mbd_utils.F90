@@ -121,14 +121,14 @@ real(dp) pure function diff3(x, delta)
     real(dp), intent(in) :: x(-1:)
     real(dp), intent(in) :: delta
 
-    diff3 = (x(1)-x(-1))/(2*delta)
+    diff3 = (x(1) - x(-1)) / (2 * delta)
 end function
 
 real(dp) pure function diff5(x, delta)
     real(dp), intent(in) :: x(-2:)
     real(dp), intent(in) :: delta
 
-    diff5 = (1.d0/12*x(-2)-2.d0/3*x(-1)+2.d0/3*x(1)-1.d0/12*x(2))/delta
+    diff5 = (1.d0 / 12 * x(-2) - 2.d0 / 3 * x(-1) + 2.d0 / 3 * x(1) - 1.d0 / 12 * x(2)) / delta
 end function
 
 real(dp) pure function diff7(x, delta)
@@ -136,13 +136,13 @@ real(dp) pure function diff7(x, delta)
     real(dp), intent(in) :: delta
 
     diff7 = ( &
-        -1.d0/60*x(-3) &
-        + 3.d0/20*x(-2) &
-        - 3.d0/4*x(-1) &
-        + 3.d0/4*x(1) &
-        - 3.d0/20*x(2) &
-        + 1.d0/60*x(3) &
-    )/delta
+        -1.d0 / 60 * x(-3) &
+        + 3.d0 / 20 * x(-2) &
+        - 3.d0 / 4 * x(-1) &
+        + 3.d0 / 4 * x(1) &
+        - 3.d0 / 20 * x(2) &
+        + 1.d0 / 60 * x(3) &
+    ) / delta
 end function
 
 pure function lower(str)
@@ -154,7 +154,7 @@ pure function lower(str)
     do i = 1, len(str)
         select case (str(i:i))
             case ('A':'Z')
-                lower(i:i) = achar(iachar(str(i:i))+32)
+                lower(i:i) = achar(iachar(str(i:i)) + 32)
             case default
                 lower(i:i) = str(i:i)
         end select
@@ -182,7 +182,7 @@ subroutine shift_idx(idx, start, finish)
     integer :: i_dim, i
 
     do i_dim = size(idx), 1, -1
-        i = idx(i_dim)+1
+        i = idx(i_dim) + 1
         if (i <= finish(i_dim)) then
             idx(i_dim) = i
             return
@@ -214,7 +214,7 @@ subroutine clock_clock(this, id)
     else
         absid = abs(id)
         this%timestamps(absid) = this%timestamps(absid) + cnt
-        this%counts(absid) = this%counts(absid)+1
+        this%counts(absid) = this%counts(absid) + 1
     end if
 end subroutine
 
@@ -247,9 +247,9 @@ subroutine clock_print(this)
         case (90); label = 'MBD@rsSCS'
         case (91); label = 'MBD@rsSCS forces'
         case default
-            label = '(' // trim(tostr(i)) // ')'
+            label = '('//trim(tostr(i))//')'
         end select
-        print '(A20,I10,F10.3)', label, this%counts(i), dble(this%timestamps(i))/rate
+        print '(A20,I10,F10.3)', label, this%counts(i), dble(this%timestamps(i)) / rate
     end do
 end subroutine
 

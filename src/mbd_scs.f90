@@ -78,7 +78,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     else
         call alpha_full%move_from(T)
     end if
-    call alpha_full%add_diag(1d0/alpha)
+    call alpha_full%add_diag(1d0 / alpha)
     call geom%clock(32)
     call alpha_full%invh(geom%exc)
     if (geom%has_exc()) return
@@ -90,8 +90,8 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         return
     end if
     if (.not. grad%any()) return
-    allocate (alpha_prime(3, 3*n_atoms), source=0d0)
-    allocate (B_prime(3*n_atoms, 3), source=0d0)
+    allocate (alpha_prime(3, 3 * n_atoms), source=0d0)
+    allocate (B_prime(3 * n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
     call alpha_full%contract_n_transp('R', alpha_prime)
     call dQ%init_from(T)
@@ -125,7 +125,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
                 dQ = alpha_full%mmul(dQ)
                 dQ = dQ%mmul(alpha_full)
                 dalphadA = dQ%contract_n33diag_cols()
-                do concurrent (my_i_atom = 1:size(geom%idx%i_atom))
+                do concurrent(my_i_atom=1:size(geom%idx%i_atom))
                     dalpha_scs(my_i_atom)%dlattice(i_latt, i_xyz) &
                         = dalphadA(geom%idx%i_atom(my_i_atom))
                 end do
@@ -135,11 +135,11 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     if (grad%dalpha) then
         dQ%val = dT%dsigma
         do i_atom = 1, n_atoms
-            dsij_dsi = damp_local%sigma(i_atom)*dsigma_dalpha(i_atom) / &
-                sqrt(damp_local%sigma(i_atom)**2+damp_local%sigma**2)
+            dsij_dsi = damp_local%sigma(i_atom) * dsigma_dalpha(i_atom) / &
+                sqrt(damp_local%sigma(i_atom)**2 + damp_local%sigma**2)
             call dQ%mult_col(i_atom, dsij_dsi)
         end do
-        call dQ%add_diag(-0.5d0/alpha**2)
+        call dQ%add_diag(-0.5d0 / alpha**2)
         dQ = alpha_full%mmul(dQ)
         call dQ%contract_n_transp('C', B_prime)
         do i_atom = 1, n_atoms

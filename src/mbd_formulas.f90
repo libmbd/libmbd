@@ -29,10 +29,10 @@ function omega_qho(C6, alpha, domega, grad) result(omega)
     type(grad_request_t), intent(in), optional :: grad
     real(dp) :: omega(size(C6))
 
-    omega = 4d0/3*C6/alpha**2
+    omega = 4d0 / 3 * C6 / alpha**2
     if (.not. present(grad)) return
-    if (grad%dC6) domega%dC6 = omega/C6
-    if (grad%dalpha) domega%dalpha = -2*omega/alpha
+    if (grad%dC6) domega%dC6 = omega / C6
+    if (grad%dalpha) domega%dalpha = -2 * omega / alpha
 end function
 
 function alpha_dyn_qho(alpha_0, omega, freq, dalpha, grad) result(alpha)
@@ -56,9 +56,9 @@ function alpha_dyn_qho(alpha_0, omega, freq, dalpha, grad) result(alpha)
     allocate (dalpha(0:ubound(alpha, 2)))
     do i_freq = 0, ubound(alpha, 2)
         associate (alpha => alpha(:, i_freq), u => freq(i_freq)%val)
-            alpha = alpha_0/(1+(u/omega)**2)
-            if (grad%dalpha) dalpha(i_freq)%dalpha = alpha/alpha_0
-            if (grad%domega) dalpha(i_freq)%domega = alpha*2d0/omega/(1d0+(omega/u)**2)
+            alpha = alpha_0 / (1 + (u / omega)**2)
+            if (grad%dalpha) dalpha(i_freq)%dalpha = alpha / alpha_0
+            if (grad%domega) dalpha(i_freq)%domega = alpha * 2d0 / omega / (1d0 + (omega / u)**2)
         end associate
     end do
 end function
@@ -80,13 +80,13 @@ function C6_from_alpha(alpha, freq, dC6_dalpha, grad) result(C6)
     n_atoms = size(alpha, 1)
     C6 = 0d0
     do i_freq = 0, ubound(alpha, 2)
-        C6 = C6 + 3d0/pi*alpha(:, i_freq)**2*freq(i_freq)%weight
+        C6 = C6 + 3d0 / pi * alpha(:, i_freq)**2 * freq(i_freq)%weight
     end do
     if (.not. present(grad)) return
     if (.not. grad) return
     allocate (dC6_dalpha(n_atoms, 0:ubound(alpha, 2)), source=0d0)
     do i_freq = 0, ubound(alpha, 2)
-        dC6_dalpha(:, i_freq) = dC6_dalpha(:, i_freq) + 6d0/pi*alpha(:, i_freq)
+        dC6_dalpha(:, i_freq) = dC6_dalpha(:, i_freq) + 6d0 / pi * alpha(:, i_freq)
     end do
 end function
 
@@ -105,9 +105,9 @@ function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
     logical, intent(in), optional :: grad
     real(dp) :: sigma(size(alpha))
 
-    sigma = (sqrt(2d0/pi)*alpha/3d0)**(1d0/3)
+    sigma = (sqrt(2d0 / pi) * alpha / 3d0)**(1d0 / 3)
     if (.not. present(grad)) return
-    if (grad) dsigma_dalpha = sigma/(3*alpha)
+    if (grad) dsigma_dalpha = sigma / (3 * alpha)
 end function
 
 function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)
@@ -125,11 +125,11 @@ function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)
     type(grad_request_t), intent(in), optional :: grad
     real(dp) :: xp(size(x))
 
-    xp = x*(yp/y)**q
+    xp = x * (yp / y)**q
     if (.not. present(grad)) return
-    if (grad%dX_free) dx%dX_free = xp/x
-    if (grad%dV) dx%dV = xp*q/yp
-    if (grad%dV_free) dx%dV_free = -xp*q/y
+    if (grad%dX_free) dx%dX_free = xp / x
+    if (grad%dV) dx%dV = xp * q / yp
+    if (grad%dV_free) dx%dV_free = -xp * q / y
 end function
 
 end module

@@ -55,7 +55,7 @@ subroutine elsi_eigh_complex(A, blacs_desc, eigs, exc, src, vals_only)
     complex(dp), allocatable :: vecs(:, :)
 #endif
 
-    n = 3*blacs_desc%n_atoms
+    n = 3 * blacs_desc%n_atoms
     if (present(src)) A = src
     if (is_true(vals_only)) then
         n_vecs = 0
@@ -86,7 +86,7 @@ function elsi_eigvalsh_complex(A, blacs_desc, exc, destroy) result(eigs)
     type(blacs_desc_t), intent(in) :: blacs_desc
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    real(dp) :: eigs(3*blacs_desc%n_atoms)
+    real(dp) :: eigs(3 * blacs_desc%n_atoms)
 
 #ifndef DO_COMPLEX_TYPE
     real(dp), allocatable :: A_(:, :)

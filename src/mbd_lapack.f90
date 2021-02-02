@@ -153,7 +153,7 @@ function mmul_real(A, B, transA, transB) result(C)
     character :: transA_, transB_
     integer :: n
 
-    transA_= 'N'
+    transA_ = 'N'
     transB_ = 'N'
     if (present(transA)) transA_ = transA
     if (present(transB)) transB_ = transB
@@ -169,7 +169,7 @@ function mmul_complex(A, B, transA, transB) result(C)
     character :: transA_, transB_
     integer :: n
 
-    transA_= 'N'
+    transA_ = 'N'
     transB_ = 'N'
     if (present(transA)) transA_ = transA
     if (present(transB)) transB_ = transB
@@ -196,10 +196,10 @@ subroutine inv_real(A, exc, src)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'DGETRF'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     call DGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
     n_work_arr = nint(n_work_arr_optim)
     allocate (work_arr(n_work_arr))
@@ -208,10 +208,10 @@ subroutine inv_real(A, exc, src)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'DGETRI'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
 end subroutine
 
 subroutine invh_real(A, exc, src)
@@ -236,10 +236,10 @@ subroutine invh_real(A, exc, src)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'DSYTRF'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     deallocate (work_arr)
     allocate (work_arr(n))
     call DSYTRI('U', n, A, n, i_pivot, work_arr, error_flag)
@@ -247,10 +247,10 @@ subroutine invh_real(A, exc, src)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'DSYTRI'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     call fill_tril(A)
 end subroutine
 
@@ -274,10 +274,10 @@ subroutine eigh_real(A, eigs, exc, src, vals_only)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'DSYEV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
 end subroutine
 
 subroutine eig_real(A, eigs, exc, src, vals_only)
@@ -312,10 +312,10 @@ subroutine eig_real(A, eigs, exc, src, vals_only)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'DGEEV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     eigs = cmplx(eigs_r, eigs_i, dp)
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
@@ -334,7 +334,7 @@ subroutine eigh_complex(A, eigs, exc, src, vals_only)
 
     n = size(A, 1)
     if (present(src)) A = src
-    allocate (rwork(max(1, 3*n-2)))
+    allocate (rwork(max(1, 3 * n - 2)))
     call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
     lwork = nint(dble(lwork_cmplx))
     allocate (work(lwork))
@@ -343,10 +343,10 @@ subroutine eigh_complex(A, eigs, exc, src, vals_only)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'ZHEEV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
 end subroutine
 
 subroutine eig_complex(A, eigs, exc, src, vals_only)
@@ -366,7 +366,7 @@ subroutine eig_complex(A, eigs, exc, src, vals_only)
 
     n = size(A, 1)
     if (present(src)) A = src
-    allocate (rwork(2*n))
+    allocate (rwork(2 * n))
     if (mode(vals_only) == 'V') then
         allocate (vectors(n, n))
     else
@@ -386,10 +386,10 @@ subroutine eig_complex(A, eigs, exc, src, vals_only)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'ZGEEV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
@@ -404,7 +404,7 @@ real(dp) function det(A) result(D)
     allocate (ipiv(n))
     LU = A
     call DGETRF(n, n, LU, n, ipiv, info)
-    D = product([(LU(i, i), i = 1, n)])
+    D = product([(LU(i, i), i=1, n)])
 end function
 
 subroutine fill_tril(A)
@@ -413,7 +413,7 @@ subroutine fill_tril(A)
     integer :: i, j
 
     do i = 1, size(A, 1)
-        do j = i+1, size(A, 1)
+        do j = i + 1, size(A, 1)
             A(j, i) = A(i, j)
         end do
     end do

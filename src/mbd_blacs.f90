@@ -58,9 +58,9 @@ subroutine blacs_grid_init(this, comm)
     call BLACS_PINFO(my_task, n_tasks)
     do nprows = int(sqrt(dble(n_tasks))), 1, -1
         if (mod(n_tasks, nprows) == 0) exit
-    enddo
+    end do
     this%nprows = nprows
-    this%npcols = n_tasks/this%nprows
+    this%npcols = n_tasks / this%nprows
     if (present(comm)) then
         this%ctx = comm
         this%comm = comm
@@ -98,10 +98,10 @@ subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
     atoms_per_block = min(atoms_per_block, max_atoms_per_block)
     my_nratoms = NUMROC(n_atoms, atoms_per_block, grid%my_prow, 0, grid%nprows)
     my_ncatoms = NUMROC(n_atoms, atoms_per_block, grid%my_pcol, 0, grid%npcols)
-    this%blocksize = 3*atoms_per_block
+    this%blocksize = 3 * atoms_per_block
     call DESCINIT( &
-        this%desc, 3*n_atoms, 3*n_atoms, this%blocksize, this%blocksize, 0, 0, &
-        grid%ctx, 3*my_nratoms, ierr &
+        this%desc, 3 * n_atoms, 3 * n_atoms, this%blocksize, this%blocksize, 0, 0, &
+        grid%ctx, 3 * my_nratoms, ierr &
     )
     this%i_atom = idx_map( &
         grid%my_prow, grid%nprows, n_atoms, atoms_per_block, my_nratoms &

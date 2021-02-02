@@ -199,7 +199,7 @@ subroutine matrix_cplx_add_diag_scalar(this, d)
 
     integer :: i
 
-    call this%add_diag([(d, i = 1, this%idx%n_atoms)])
+    call this%add_diag([(d, i=1, this%idx%n_atoms)])
 end subroutine
 
 #ifndef DO_COMPLEX_TYPE
@@ -218,7 +218,7 @@ subroutine matrix_cplx_add_diag(this, d)
             associate ( &
                     i_atom => this%idx%i_atom(my_i_atom), &
                     j_atom => this%idx%j_atom(my_j_atom), &
-                    this_diag => this%val(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                    this_diag => this%val(3 * (my_i_atom - 1) + 1:, 3 * (my_j_atom - 1) + 1:) &
             )
                 if (i_atom /= j_atom) cycle
                 do i = 1, 3
@@ -246,13 +246,13 @@ subroutine matrix_cplx_mult_cross(this, b, c)
             associate ( &
                     i_atom => this%idx%i_atom(my_i_atom), &
                     j_atom => this%idx%j_atom(my_j_atom), &
-                    this_sub => this%val(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                    this_sub => this%val(3 * (my_i_atom - 1) + 1:, 3 * (my_j_atom - 1) + 1:) &
             )
                 if (present(c)) then
                     this_sub(:3, :3) = this_sub(:3, :3) * &
-                        (b(i_atom)*c(j_atom)+c(i_atom)*b(j_atom))
+                        (b(i_atom) * c(j_atom) + c(i_atom) * b(j_atom))
                 else
-                    this_sub(:3, :3) = this_sub(:3, :3)*b(i_atom)*b(j_atom)
+                    this_sub(:3, :3) = this_sub(:3, :3) * b(i_atom) * b(j_atom)
                 end if
             end associate
         end do
@@ -273,9 +273,9 @@ subroutine matrix_cplx_mult_rows(this, b)
     do my_i_atom = 1, size(this%idx%i_atom)
         associate ( &
                 i_atom => this%idx%i_atom(my_i_atom), &
-                this_sub => this%val(3*(my_i_atom-1)+1:, :) &
+                this_sub => this%val(3 * (my_i_atom - 1) + 1:, :) &
         )
-            this_sub(:3, :) = this_sub(:3, :)*b(i_atom)
+            this_sub(:3, :) = this_sub(:3, :) * b(i_atom)
         end associate
     end do
 end subroutine
@@ -293,13 +293,13 @@ subroutine matrix_cplx_mult_cols_3n(this, b)
 
     do my_j_atom = 1, size(this%idx%j_atom)
         associate ( &
-                b_sub => b(3*(this%idx%j_atom(my_j_atom)-1)+1:), &
-                this_sub => this%val(:, 3*(my_j_atom-1)+1:) &
+                b_sub => b(3 * (this%idx%j_atom(my_j_atom) - 1) + 1:), &
+                this_sub => this%val(:, 3 * (my_j_atom - 1) + 1:) &
         )
             ! TODO should be do-concurrent, but this crashes IBM XL 16.1.1,
             ! see issue #16
             do i = 1, 3
-                this_sub(:, i) = this_sub(:, i)*b_sub(i)
+                this_sub(:, i) = this_sub(:, i) * b_sub(i)
             end do
         end associate
     end do
@@ -322,9 +322,9 @@ subroutine matrix_cplx_mult_col(this, idx, a)
         do my_i_atom = 1, size(this%idx%i_atom)
             associate ( &
                     i_atom => this%idx%i_atom(my_i_atom), &
-                    this_sub => this%val(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                    this_sub => this%val(3 * (my_i_atom - 1) + 1:, 3 * (my_j_atom - 1) + 1:) &
             )
-                this_sub(:3, :3) = this_sub(:3, :3)*a(i_atom)
+                this_sub(:3, :3) = this_sub(:3, :3) * a(i_atom)
             end associate
         end do
     end do
@@ -365,7 +365,7 @@ function matrix_cplx_eigvalsh(A, exc, destroy) result(eigs)
 #endif
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    real(dp) :: eigs(3*A%idx%n_atoms)
+    real(dp) :: eigs(3 * A%idx%n_atoms)
 
 #ifdef WITH_SCALAPACK
     if (A%idx%parallel) then
@@ -389,7 +389,7 @@ function matrix_cplx_eigvals(A, exc, destroy) result(eigs)
 #endif
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    complex(dp) :: eigs(3*A%idx%n_atoms)
+    complex(dp) :: eigs(3 * A%idx%n_atoms)
 
 #ifdef WITH_SCALAPACK
     if (A%idx%parallel) then
@@ -440,12 +440,12 @@ subroutine matrix_cplx_contract_n_transp(this, dir, res)
         do my_j_atom = 1, size(this%idx%j_atom)
             select case (dir(1:1))
             case ('R')
-                res_sub => res(:, 3*(this%idx%i_atom(my_i_atom)-1)+1:)
+                res_sub => res(:, 3 * (this%idx%i_atom(my_i_atom) - 1) + 1:)
             case ('C')
-                res_sub => res(3*(this%idx%j_atom(my_j_atom)-1)+1:, :)
+                res_sub => res(3 * (this%idx%j_atom(my_j_atom) - 1) + 1:, :)
             end select
             associate ( &
-                    this_sub => this%val(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:) &
+                    this_sub => this%val(3 * (my_i_atom - 1) + 1:, 3 * (my_j_atom - 1) + 1:) &
             )
                 res_sub(:3, :3) = res_sub(:3, :3) + transpose(this_sub(:3, :3))
             end associate
@@ -477,10 +477,10 @@ function contract_cross_33_complex(k_atom, A, A_prime, B, B_prime) result(res)
         do my_j_atom = 1, size(A%idx%j_atom)
             j_atom = A%idx%j_atom(my_j_atom)
             associate ( &
-                    A_sub => A%val(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
-                    A_prime_sub => A_prime(:, 3*(j_atom-1)+1:) &
+                    A_sub => A%val(3 * (my_i_atom - 1) + 1:, 3 * (my_j_atom - 1) + 1:), &
+                    A_prime_sub => A_prime(:, 3 * (j_atom - 1) + 1:) &
             )
-                res(j_atom) = -1d0/3*sum(A_sub(:3, :3)*A_prime_sub(:, :3))
+                res(j_atom) = -1d0 / 3 * sum(A_sub(:3, :3) * A_prime_sub(:, :3))
             end associate
         end do
     end if
@@ -489,11 +489,11 @@ function contract_cross_33_complex(k_atom, A, A_prime, B, B_prime) result(res)
         do my_i_atom = 1, size(A%idx%i_atom)
             i_atom = A%idx%i_atom(my_i_atom)
             associate ( &
-                    B_sub => B%val(3*(my_i_atom-1)+1:, 3*(my_j_atom-1)+1:), &
-                    B_prime_sub => B_prime(3*(i_atom-1)+1:, :) &
+                    B_sub => B%val(3 * (my_i_atom - 1) + 1:, 3 * (my_j_atom - 1) + 1:), &
+                    B_prime_sub => B_prime(3 * (i_atom - 1) + 1:, :) &
             )
                 res(i_atom) = res(i_atom) + &
-                    (-1d0/3)*sum(B_prime_sub(:3, :)*B_sub(:3, :3))
+                    (-1d0 / 3) * sum(B_prime_sub(:3, :) * B_sub(:3, :3))
             end associate
         end do
     end if
@@ -519,10 +519,10 @@ function matrix_cplx_contract_n33diag_cols(A) result(res)
         j_atom = A%idx%j_atom(my_j_atom)
         do i_xyz = 1, 3
             res(j_atom) = res(j_atom) + &
-                sum(A%val(i_xyz::3, 3*(my_j_atom-1)+i_xyz))
+                sum(A%val(i_xyz::3, 3 * (my_j_atom - 1) + i_xyz))
         end do
     end do
-    res = res/3
+    res = res / 3
 #ifdef WITH_SCALAPACK
     if (A%idx%parallel) call blacs_all_reduce(res, A%blacs)
 #endif
@@ -543,7 +543,7 @@ function matrix_cplx_contract_n33_rows(A) result(res)
     res(:) = 0d0
     do my_i_atom = 1, size(A%idx%i_atom)
         i_atom = A%idx%i_atom(my_i_atom)
-        associate (A_sub => A%val(3*(my_i_atom-1)+1:, :))
+        associate (A_sub => A%val(3 * (my_i_atom - 1) + 1:, :))
             res(i_atom) = res(i_atom) + sum(A_sub(:3, :))
         end associate
     end do

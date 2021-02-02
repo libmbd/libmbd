@@ -26,7 +26,7 @@ function outer(a, b) result(c)
 
     do i = 1, size(a)
         do j = 1, size(b)
-            c(i, j) = a(i)*b(j)
+            c(i, j) = a(i) * b(j)
         end do
     end do
 end function
@@ -38,7 +38,7 @@ function eye(n) result(A)
     integer :: i
 
     A(:, :) = 0.d0
-    do concurrent (i = 1:n)
+    do concurrent(i=1:n)
         A(i, i) = 1.d0
     end do
 end function
@@ -49,7 +49,7 @@ function get_diag_real(A) result(d)
 
     integer :: i
 
-    do concurrent (i = 1:size(A, 1))
+    do concurrent(i=1:size(A, 1))
         d(i) = A(i, i)
     end do
 end function
@@ -60,7 +60,7 @@ function get_diag_complex(A) result(d)
 
     integer :: i
 
-    do concurrent (i = 1:size(A, 1))
+    do concurrent(i=1:size(A, 1))
         d(i) = A(i, i)
     end do
 end function
@@ -72,7 +72,7 @@ function make_diag_real(d) result(A)
     integer :: i
 
     A(:, :) = 0.d0
-    do concurrent (i = 1:size(d))
+    do concurrent(i=1:size(d))
         A(i, i) = d(i)
     end do
 end function

@@ -325,11 +325,11 @@ subroutine cmbd_dipole_matrix(geom_c, damping_c, q_point, dipmat_c) bind(c)
     call c_f_pointer(damping_c, damp)
     if (present(q_point)) then
         dipmat_cplx = dipole_matrix(geom, damp, q=q_point)
-        call c_f_pointer(dipmat_c, dipmat_cplx_p, [3*n_atoms, 3*n_atoms])
+        call c_f_pointer(dipmat_c, dipmat_cplx_p, [3 * n_atoms, 3 * n_atoms])
         dipmat_cplx_p = transpose(dipmat_cplx%val)
     else
         dipmat_re = dipole_matrix(geom, damp)
-        call c_f_pointer(dipmat_c, dipmat_re_p, [3*n_atoms, 3*n_atoms])
+        call c_f_pointer(dipmat_c, dipmat_re_p, [3 * n_atoms, 3 * n_atoms])
         dipmat_re_p = transpose(dipmat_re%val)
     end if
 end subroutine
@@ -339,8 +339,8 @@ real(c_double) function cmbd_coulomb_energy( &
     type(c_ptr), value :: geom_c
     integer(c_int), value, intent(in) :: n_atoms
     real(c_double), value, intent(in) :: a, beta
-    real(c_double), intent(in) ::  C(3*n_atoms, 3*n_atoms), &
-        w_t(3*n_atoms), q(n_atoms), m(n_atoms), r_vdw(n_atoms)
+    real(c_double), intent(in) :: C(3 * n_atoms, 3 * n_atoms), &
+        w_t(3 * n_atoms), q(n_atoms), m(n_atoms), r_vdw(n_atoms)
     character(c_char), intent(in) :: version(20)
 
     type(geom_t), pointer :: geom
@@ -358,8 +358,8 @@ real(c_double) function cmbd_dipole_energy( &
         geom_c, n_atoms, a0, w, w_t, version, r_vdw, beta, a, C) bind(c)
     type(c_ptr), value :: geom_c
     integer(c_int), value, intent(in) :: n_atoms
-    real(c_double), intent(in) :: C(3*n_atoms, 3*n_atoms), &
-        w_t(3*n_atoms), w(n_atoms), a0(n_atoms), r_vdw(n_atoms)
+    real(c_double), intent(in) :: C(3 * n_atoms, 3 * n_atoms), &
+        w_t(3 * n_atoms), w(n_atoms), a0(n_atoms), r_vdw(n_atoms)
     real(c_double), value, intent(in) :: a, beta
     character(c_char), intent(in) :: version(20)
 
@@ -382,7 +382,7 @@ function f_string(str_c) result(str_f)
 
     i = 0
     do
-        if (str_c(i+1) == c_null_char) exit
+        if (str_c(i + 1) == c_null_char) exit
         i = i + 1
     end do
     allocate (character(len=i) :: str_f)
@@ -395,7 +395,7 @@ subroutine f_c_string(str_f, str_c)
 
     integer :: i
 
-    do i = 1, min(len(trim(str_f)), size(str_c)-1)
+    do i = 1, min(len(trim(str_f)), size(str_c) - 1)
         str_c(i) = str_f(i:i)
     end do
     str_c(i) = c_null_char

@@ -47,7 +47,7 @@ subroutine pinvh_real(A, blacs, exc, src)
     integer :: n, n_work_arr, error_flag, n_iwork_arr(1)
     real(dp) :: n_work_arr_optim(1)
 
-    n = 3*blacs%n_atoms
+    n = 3 * blacs%n_atoms
     if (n == 0) return
     if (present(src)) A = src
     allocate (i_pivot(n))
@@ -56,10 +56,10 @@ subroutine pinvh_real(A, blacs, exc, src)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'PDGETRF'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
         n_work_arr_optim, -1, n_iwork_arr, -1, error_flag &
@@ -73,10 +73,10 @@ subroutine pinvh_real(A, blacs, exc, src)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'PDSYTRI'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
 end subroutine
 
 function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
@@ -88,11 +88,11 @@ function pmmul_real(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     character :: transA_, transB_
     integer :: n
 
-    transA_= 'N'
+    transA_ = 'N'
     transB_ = 'N'
     if (present(transA)) transA_ = transA
     if (present(transB)) transB_ = transB
-    n = 3*blacsA%n_atoms
+    n = 3 * blacsA%n_atoms
     call PDGEMM( &
         transA_, transB_, n, n, n, 1d0, A, 1, 1, blacsA%desc, &
         B, 1, 1, blacsB%desc, 0d0, C, 1, 1, blacsC%desc &
@@ -108,11 +108,11 @@ function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     character :: transA_, transB_
     integer :: n
 
-    transA_= 'N'
+    transA_ = 'N'
     transB_ = 'N'
     if (present(transA)) transA_ = transA
     if (present(transB)) transB_ = transB
-    n = 3*blacsA%n_atoms
+    n = 3 * blacsA%n_atoms
     call PZGEMM( &
         transA_, transB_, n, n, n, (1d0, 0d0), A, 1, 1, blacsA%desc, &
         B, 1, 1, blacsB%desc, (0d0, 0d0), C, 1, 1, blacsC%desc &
@@ -131,7 +131,7 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     real(dp) :: n_work_arr(1)
     integer :: error_flag, n
 
-    n = 3*blacs%n_atoms
+    n = 3 * blacs%n_atoms
     if (present(src)) A = src
     if (mode(vals_only) == 'V') then
         allocate (vectors(size(A, 1), size(A, 2)))
@@ -151,10 +151,10 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'PDSYEV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
@@ -171,7 +171,7 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     real(dp), allocatable :: rwork_arr(:)
     integer :: error_flag, n
 
-    n = 3*blacs%n_atoms
+    n = 3 * blacs%n_atoms
     if (present(src)) A = src
     if (mode(vals_only) == 'V') then
         allocate (vectors(size(A, 1), size(A, 2)))
@@ -181,15 +181,15 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     allocate (work_arr(1), rwork_arr(1))
     call PZHEEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
-        1, 1, blacs%desc, work_arr , -1, rwork_arr, -1, error_flag &
+        1, 1, blacs%desc, work_arr, -1, rwork_arr, -1, error_flag &
     )
     n_work_arr = nint(dble(work_arr(1)))
     n_rwork_arr = nint(rwork_arr(1))
     deallocate (work_arr, rwork_arr)
     if (mode(vals_only) == 'N') then
-        n_rwork_arr = max(2*n, n_rwork_arr)
+        n_rwork_arr = max(2 * n, n_rwork_arr)
     else
-        n_rwork_arr = max(4*n - 2, n_rwork_arr)
+        n_rwork_arr = max(4 * n - 2, n_rwork_arr)
     end if
     allocate (work_arr(n_work_arr), source=(0d0, 0d0))
     allocate (rwork_arr(n_rwork_arr), source=0d0)
@@ -202,10 +202,10 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
             exc%origin = 'PZHEEV'
-            exc%msg = 'Failed with code ' // trim(tostr(error_flag))
+            exc%msg = 'Failed with code '//trim(tostr(error_flag))
         end if
         return
-    endif
+    end if
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
@@ -214,7 +214,7 @@ function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
     type(blacs_desc_t), intent(in) :: blacs
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    real(dp) :: eigs(3*blacs%n_atoms)
+    real(dp) :: eigs(3 * blacs%n_atoms)
 
     real(dp), allocatable, target :: A_work(:, :)
     real(dp), pointer :: A_p(:, :)
@@ -237,7 +237,7 @@ function peigvalsh_complex(A, blacs, exc, destroy) result(eigs)
     type(blacs_desc_t), intent(in) :: blacs
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
-    real(dp) :: eigs(3*blacs%n_atoms)
+    real(dp) :: eigs(3 * blacs%n_atoms)
 
     complex(dp), allocatable, target :: A_work(:, :)
     complex(dp), pointer :: A_p(:, :)

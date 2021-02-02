@@ -67,8 +67,8 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%do_rpa) then
             res = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, grad_ham)
-            if (grad%dC6) res%dE%dC6 = res%dE%domega*domega%dC6
-            if (grad%dalpha) res%dE%dalpha = res%dE%dalpha + res%dE%domega*domega%dalpha
+            if (grad%dC6) res%dE%dC6 = res%dE%domega * domega%dC6
+            if (grad%dalpha) res%dE%dalpha = res%dE%dalpha + res%dE%domega * domega%dalpha
             if (allocated(res%dE%domega)) deallocate (res%dE%domega)
         else
             res = get_mbd_rpa_energy(geom, alpha, damp)
@@ -86,9 +86,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
         n_kpts = size(k_pts, 2)
         res%energy = 0d0
         if (geom%get_eigs) &
-            allocate (res%mode_eigs_k(3*geom%siz(), n_kpts), source=0d0)
+            allocate (res%mode_eigs_k(3 * geom%siz(), n_kpts), source=0d0)
         if (geom%get_modes) &
-            allocate (res%modes_k(3*geom%siz(), 3*geom%siz(), n_kpts), source=(0d0, 0d0))
+            allocate (res%modes_k(3 * geom%siz(), 3 * geom%siz(), n_kpts), source=(0d0, 0d0))
         if (geom%get_rpa_orders) allocate ( &
             res%rpa_orders_k(geom%param%rpa_order_max, n_kpts), source=0d0 &
         )
@@ -124,21 +124,21 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
             if (geom%get_rpa_orders) then
                 res%rpa_orders_k(:, i_kpt) = res_k%rpa_orders
             end if
-            res%energy = res%energy + res_k%energy/n_kpts
-            if (grad%dcoords) res%dE%dcoords = res%dE%dcoords + res_k%dE%dcoords/n_kpts
+            res%energy = res%energy + res_k%energy / n_kpts
+            if (grad%dcoords) res%dE%dcoords = res%dE%dcoords + res_k%dE%dcoords / n_kpts
             if (grad%dlattice) then
-                res%dE%dlattice = res%dE%dlattice + res_k%dE%dlattice/n_kpts
+                res%dE%dlattice = res%dE%dlattice + res_k%dE%dlattice / n_kpts
                 do a = 1, 3
                     res%dE%dlattice = res%dE%dlattice &
-                        + res_k%dE%dq(a)*dkdlattice(a, i_kpt, :, :)/n_kpts
+                        + res_k%dE%dq(a) * dkdlattice(a, i_kpt, :, :) / n_kpts
                 end do
             end if
             if (grad%dalpha) then
                 res%dE%dalpha = res%dE%dalpha &
-                    + (res_k%dE%dalpha + res_k%dE%domega*domega%dalpha)/n_kpts
+                    + (res_k%dE%dalpha + res_k%dE%domega * domega%dalpha) / n_kpts
             end if
-            if (grad%dC6) res%dE%dC6 = res%dE%dC6 + res_k%dE%domega*domega%dC6/n_kpts
-            if (grad%dR_vdw) res%dE%dR_vdw = res%dE%dR_vdw + res_k%dE%dR_vdw/n_kpts
+            if (grad%dC6) res%dE%dC6 = res%dE%dC6 + res_k%dE%domega * domega%dC6 / n_kpts
+            if (grad%dR_vdw) res%dE%dR_vdw = res%dE%dR_vdw + res_k%dE%dR_vdw / n_kpts
         end do
 #ifdef WITH_MPI
         if (geom%parallel_mode == 'k_points') then
@@ -209,7 +209,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
     C6_scs = C6_from_alpha(alpha_dyn_scs, geom%freq, dC6_scs_dalpha_dyn_scs, grad%any())
     damp_mbd = damp
     damp_mbd%r_vdw = scale_with_ratio( &
-        damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0/3, dr_vdw_scs, &
+        damp%r_vdw, alpha_dyn_scs(:, 0), alpha_dyn(:, 0), 1d0 / 3, dr_vdw_scs, &
         grad_request_t(dV=grad%any(), dV_free=grad%dalpha, dX_free=grad%dr_vdw) &
     )
     damp_mbd%version = damping_types(2)
@@ -226,10 +226,10 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
     allocate (freq_w(0:ubound(geom%freq, 1)))
     freq_w = geom%freq%weight
     freq_w(0) = 1d0
-    dene_dalpha_scs_dyn(:, 0) = res%dE%dalpha + res%dE%dr_vdw*dr_vdw_scs%dV
+    dene_dalpha_scs_dyn(:, 0) = res%dE%dalpha + res%dE%dr_vdw * dr_vdw_scs%dV
     do i_freq = 1, n_freq
         dene_dalpha_scs_dyn(:, i_freq) = &
-            res%dE%dC6*dC6_scs_dalpha_dyn_scs(:, i_freq)
+            res%dE%dC6 * dC6_scs_dalpha_dyn_scs(:, i_freq)
     end do
     if (grad%dcoords) then
         allocate (dE%dcoords(n_atoms, 3), source=0d0)
@@ -238,7 +238,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             do i_freq = 0, n_freq
                 dE%dcoords(geom%idx%j_atom, :) &
                     = dE%dcoords(geom%idx%j_atom, :) &
-                    + freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) &
+                    + freq_w(i_freq) * dene_dalpha_scs_dyn(i_atom, i_freq) &
                     * dalpha_dyn_scs(my_i_atom, i_freq)%dcoords
             end do
         end do
@@ -254,7 +254,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             if (.not. any(i_atom == geom%idx%j_atom)) cycle
             do i_freq = 0, n_freq
                 dE%dlattice = dE%dlattice &
-                    + freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) &
+                    + freq_w(i_freq) * dene_dalpha_scs_dyn(i_atom, i_freq) &
                     * dalpha_dyn_scs(my_i_atom, i_freq)%dlattice
             end do
         end do
@@ -269,7 +269,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
                 dE%dalpha(geom%idx%j_atom) = dE%dalpha(geom%idx%j_atom) + &
-                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    freq_w(i_freq) * dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * ( &
                         dalpha_dyn(i_freq)%dalpha(geom%idx%j_atom) &
                         + dalpha_dyn(i_freq)%domega(geom%idx%j_atom) &
@@ -280,7 +280,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
 #ifdef WITH_SCALAPACK
         if (geom%idx%parallel) call blacs_all_reduce(dE%dalpha, geom%blacs)
 #endif
-        dE%dalpha = dE%dalpha + res%dE%dr_vdw*dr_vdw_scs%dV_free
+        dE%dalpha = dE%dalpha + res%dE%dr_vdw * dr_vdw_scs%dV_free
     end if
     if (grad%dC6) then
         allocate (dE%dC6(n_atoms), source=0d0)
@@ -288,7 +288,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
                 dE%dC6(geom%idx%j_atom) = dE%dC6(geom%idx%j_atom) + &
-                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    freq_w(i_freq) * dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dalpha * &
                     dalpha_dyn(i_freq)%domega(geom%idx%j_atom) &
                     * domega%dC6(geom%idx%j_atom)
@@ -304,14 +304,14 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             i_atom = geom%idx%i_atom(my_i_atom)
             do i_freq = 0, n_freq
                 dE%dr_vdw(geom%idx%j_atom) = dE%dr_vdw(geom%idx%j_atom) + &
-                    freq_w(i_freq)*dene_dalpha_scs_dyn(i_atom, i_freq) * &
+                    freq_w(i_freq) * dene_dalpha_scs_dyn(i_atom, i_freq) * &
                     dalpha_dyn_scs(my_i_atom, i_freq)%dr_vdw
             end do
         end do
 #ifdef WITH_SCALAPACK
         if (geom%idx%parallel) call blacs_all_reduce(dE%dr_vdw, geom%blacs)
 #endif
-        dE%dr_vdw = dE%dr_vdw + res%dE%dr_vdw*dr_vdw_scs%dX_free
+        dE%dr_vdw = dE%dr_vdw + res%dE%dr_vdw * dr_vdw_scs%dX_free
     end if
     res%dE = dE
     call geom%clock(-91)
@@ -335,18 +335,18 @@ subroutine make_k_pts(k_pts, k_grid, lattice, shift, dkdlattice, grad)
     allocate (k_pts(3, n_kpts))
     n_kpt = [0, 0, -1]
     do i_kpt = 1, n_kpts
-        call shift_idx(n_kpt, [0, 0, 0], k_grid-1)
-        n_kpt_shifted = dble(n_kpt)+shift
-        where (2*n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted-dble(k_grid)
-        k_pts(:, i_kpt) = n_kpt_shifted/k_grid
+        call shift_idx(n_kpt, [0, 0, 0], k_grid - 1)
+        n_kpt_shifted = dble(n_kpt) + shift
+        where (2 * n_kpt_shifted > k_grid) n_kpt_shifted = n_kpt_shifted - dble(k_grid)
+        k_pts(:, i_kpt) = n_kpt_shifted / k_grid
     end do
     latt_inv = inverse(lattice)
-    k_pts = matmul(2*pi*transpose(latt_inv), k_pts)
+    k_pts = matmul(2 * pi * transpose(latt_inv), k_pts)
     if (grad) then
         allocate (dkdlattice(3, n_kpts, 3, 3))
-        do concurrent (i_kpt = 1:n_kpts, i_latt = 1:3, a = 1:3)
+        do concurrent(i_kpt=1:n_kpts, i_latt=1:3, a=1:3)
             dkdlattice(:, i_kpt, i_latt, a) = &
-                -latt_inv(i_latt, :)*k_pts(a, i_kpt)
+                -latt_inv(i_latt, :) * k_pts(a, i_kpt)
         end do
     end if
 end subroutine

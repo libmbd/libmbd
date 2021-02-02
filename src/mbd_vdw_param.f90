@@ -191,7 +191,6 @@ real(dp), parameter :: tssurf_vdw_params(3, 86) = reshape([ &
 
 contains
 
-
 integer elemental function species_index(species)
     character(len=*), intent(in) :: species
 

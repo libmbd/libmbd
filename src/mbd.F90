@@ -267,7 +267,7 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     allocate (ones(size(ratios)), source=1d0)
     this%alpha_0 = scale_with_ratio(this%free_values(1, :), ratios, ones, 1d0)
     this%C6 = scale_with_ratio(this%free_values(2, :), ratios, ones, 2d0)
-    this%damp%r_vdw = scale_with_ratio(this%free_values(3, :), ratios, ones, 1d0/3)
+    this%damp%r_vdw = scale_with_ratio(this%free_values(3, :), ratios, ones, 1d0 / 3)
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
@@ -280,9 +280,9 @@ subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
         !! Ratios of free-atom exact \(C_6\) coefficients and those from the VV
         !! functional.
 
-    this%alpha_0 = this%free_values(1, :)*alpha_0_ratios
-    this%C6 = this%free_values(2, :)*C6_ratios
-    this%damp%r_vdw = 2.5d0*this%free_values(1, :)**(1d0/7)*alpha_0_ratios**(1d0/3)
+    this%alpha_0 = this%free_values(1, :) * alpha_0_ratios
+    this%C6 = this%free_values(2, :) * C6_ratios
+    this%damp%r_vdw = 2.5d0 * this%free_values(1, :)**(1d0 / 7) * alpha_0_ratios**(1d0 / 3)
 end subroutine
 
 subroutine mbd_calc_evaluate_vdw_method(this, energy)

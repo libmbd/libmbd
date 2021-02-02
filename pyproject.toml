@@ -46,6 +46,7 @@ black = ">=20-beta.0"
 pydocstyle = "^5"
 pep8-naming = "^0.8"
 isort = "^5"
+fprettify = "^0.3.7"
 
 [tool.poetry-dynamic-versioning]
 enable = true

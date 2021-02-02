@@ -42,7 +42,7 @@ type(result_t) function get_ts_energy_num_grad(geom, alpha_0, C6, damp, grad) re
                 do i_step = -1, 1
                     if (i_step == 0) cycle
                     coords_orig = geom%coords
-                    geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + i_step*delta
+                    geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + i_step * delta
                     ene_diffed(i_step) = get_ts_energy(geom, alpha_0, C6, damp)
                     geom%coords = coords_orig
                 end do
@@ -57,7 +57,7 @@ type(result_t) function get_ts_energy_num_grad(geom, alpha_0, C6, damp, grad) re
                 do i_step = -1, 1
                     if (i_step == 0) cycle
                     lattice_orig = geom%lattice
-                    geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt) + i_step*delta
+                    geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt) + i_step * delta
                     ene_diffed(i_step) = get_ts_energy(geom, alpha_0, C6, damp)
                     geom%lattice = lattice_orig
                 end do
@@ -85,15 +85,15 @@ function get_ts_energy(geom, alpha_0, C6, damp) result(ene)
     ene = 0d0
     i_shell = 0
     do
-        i_shell = i_shell+1
+        i_shell = i_shell + 1
         ene_shell = 0d0
         if (is_periodic) then
-            range_cell = supercell_circum(geom%lattice, i_shell*shell_thickness)
+            range_cell = supercell_circum(geom%lattice, i_shell * shell_thickness)
         else
             range_cell = [0, 0, 0]
         end if
         idx_cell = [0, 0, -1]
-        do i_cell = 1, product(1+2*range_cell)
+        do i_cell = 1, product(1 + 2 * range_cell)
             call shift_idx(idx_cell, -range_cell, range_cell)
             if (is_periodic) then
                 R_cell = matmul(geom%lattice, idx_cell)
@@ -105,12 +105,12 @@ function get_ts_energy(geom, alpha_0, C6, damp) result(ene)
                     if (i_cell == 1) then
                         if (i_atom == j_atom) cycle
                     end if
-                    r = geom%coords(:, i_atom)-geom%coords(:, j_atom)-R_cell
+                    r = geom%coords(:, i_atom) - geom%coords(:, j_atom) - R_cell
                     r_norm = sqrt(sum(r**2))
                     if (r_norm > geom%param%ts_cutoff_radius) cycle
                     if (is_periodic) then
-                        if (r_norm >= i_shell*shell_thickness &
-                            .or. r_norm < (i_shell-1)*shell_thickness) then
+                        if (r_norm >= i_shell * shell_thickness &
+                            .or. r_norm < (i_shell - 1) * shell_thickness) then
                             cycle
                         end if
                     end if
@@ -118,26 +118,26 @@ function get_ts_energy(geom, alpha_0, C6, damp) result(ene)
                         C6(i_atom), C6(j_atom), &
                         alpha_0(i_atom), alpha_0(j_atom))
                     if (allocated(damp%r_vdw)) then
-                        R_vdw_ij = damp%r_vdw(i_atom)+damp%r_vdw(j_atom)
+                        R_vdw_ij = damp%r_vdw(i_atom) + damp%r_vdw(j_atom)
                     end if
                     select case (damp%version)
                         case ("fermi")
-                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d)
+                            f_damp = damping_fermi(r, damp%ts_sr * R_vdw_ij, damp%ts_d)
                         case ("fermi2")
-                            f_damp = damping_fermi(r, damp%ts_sr*R_vdw_ij, damp%ts_d)**2
+                            f_damp = damping_fermi(r, damp%ts_sr * R_vdw_ij, damp%ts_d)**2
                         case ("custom")
                             f_damp = damp%damping_custom(i_atom, j_atom)
                     end select
-                    ene_pair = -C6_ij*f_damp/r_norm**6
+                    ene_pair = -C6_ij * f_damp / r_norm**6
                     if (i_atom == j_atom) then
-                        ene_shell = ene_shell+ene_pair/2
+                        ene_shell = ene_shell + ene_pair / 2
                     else
-                        ene_shell = ene_shell+ene_pair
-                    endif
+                        ene_shell = ene_shell + ene_pair
+                    end if
                 end do ! j_atom
             end do ! i_atom
         end do ! i_cell
-        ene = ene+ene_shell
+        ene = ene + ene_shell
         if (.not. is_periodic) exit
         if (i_shell > 1 .and. abs(ene_shell) < geom%param%ts_energy_accuracy) exit
     end do ! i_shell
@@ -147,7 +147,7 @@ elemental function combine_C6(C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     real(dp), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
     real(dp) :: C6_ij
 
-    C6_ij = 2*C6_i*C6_j/(alpha_0_j/alpha_0_i*C6_i+alpha_0_i/alpha_0_j*C6_j)
+    C6_ij = 2 * C6_i * C6_j / (alpha_0_j / alpha_0_i * C6_i + alpha_0_i / alpha_0_j * C6_j)
 end function
 
 end module

@@ -55,12 +55,12 @@ real(dp) function damping_fermi(r, s_vdw, d, df, grad) result(f)
     real(dp) :: pre, eta, r_1
 
     r_1 = sqrt(sum(r**2))
-    eta = r_1/s_vdw
-    f = 1d0/(1+exp(-d*(eta-1)))
+    eta = r_1 / s_vdw
+    f = 1d0 / (1 + exp(-d * (eta - 1)))
     if (.not. present(grad)) return
-    pre = d/(2+2*cosh(d-d*eta))
-    if (grad%dcoords) df%dr = pre*r/(r_1*s_vdw)
-    if (grad%dr_vdw) df%dvdw = -pre*r_1/s_vdw**2
+    pre = d / (2 + 2 * cosh(d - d * eta))
+    if (grad%dcoords) df%dr = pre * r / (r_1 * s_vdw)
+    if (grad%dr_vdw) df%dvdw = -pre * r_1 / s_vdw**2
 end function
 
 real(dp) function damping_sqrtfermi(r, s_vdw, d) result(f)
@@ -75,7 +75,7 @@ subroutine op1minus_grad(f, df)
     real(dp), intent(inout) :: f
     type(grad_scalar_t), intent(inout) :: df
 
-    f = 1-f
+    f = 1 - f
     if (allocated(df%dr)) df%dr = -df%dr
     if (allocated(df%dvdw)) df%dvdw = -df%dvdw
 end subroutine
@@ -104,7 +104,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             this%ts_sr = 0.84d0
         case default
             exc%code = MBD_EXC_DAMPING
-            exc%msg = 'Damping parameter S_r of method TS unknown for ' // trim(xc)
+            exc%msg = 'Damping parameter S_r of method TS unknown for '//trim(xc)
         end select
     case ('mbd-rsscs')
         select case (lower(xc))
@@ -116,7 +116,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             this%beta = 0.85d0
         case default
             exc%code = MBD_EXC_DAMPING
-            exc%msg = 'Damping parameter beta of method MBD@rsSCS unknown for ' // trim(xc)
+            exc%msg = 'Damping parameter beta of method MBD@rsSCS unknown for '//trim(xc)
         end select
     case ('mbd-nl')
         select case (lower(xc))
@@ -128,7 +128,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             this%beta = 0.83d0
         case default
             exc%code = MBD_EXC_DAMPING
-            exc%msg = 'Damping parameter beta of method MBD-NL unknown for ' // trim(xc)
+            exc%msg = 'Damping parameter beta of method MBD-NL unknown for '//trim(xc)
         end select
     case ('mbd-ts')
         select case (lower(xc))
@@ -140,7 +140,7 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             this%beta = 0.83d0
         case default
             exc%code = MBD_EXC_DAMPING
-            exc%msg = 'Damping parameter beta of method MBD@TS unknown for ' // trim(xc)
+            exc%msg = 'Damping parameter beta of method MBD@TS unknown for '//trim(xc)
         end select
     case ('mbd-scs')
         select case (lower(xc))
@@ -152,11 +152,11 @@ type(exception_t) function damping_set_params_from_xc(this, xc, variant) result(
             this%a = 2.53d0
         case default
             exc%code = MBD_EXC_DAMPING
-            exc%msg = 'Damping parameter a of method MBD@SCS unknown for ' // trim(xc)
+            exc%msg = 'Damping parameter a of method MBD@SCS unknown for '//trim(xc)
         end select
     case default
         exc%code = MBD_EXC_DAMPING
-        exc%msg = 'Damping paramters of method ' // trim(variant) // ' unkonwn for ' // trim(xc)
+        exc%msg = 'Damping paramters of method '//trim(variant)//' unkonwn for '//trim(xc)
     end select
 end function
 

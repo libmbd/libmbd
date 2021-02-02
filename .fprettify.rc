@@ -1,0 +1,6 @@
+indent = 4
+whitespace = 3
+enable-replacements = true
+disable-indent-mod = true
+c-relations = true
+disable-indent = true

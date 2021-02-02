@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Ewald evaluation of pairwise dispersion
+
 ## [0.10.4] - 2021-01-28
 
 ### Added

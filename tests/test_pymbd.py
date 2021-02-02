@@ -551,7 +551,7 @@ def test_ethylcarbamate_ts():
         for coords, lattice, _, species, vol_ratios in ethylcarbamate
     ]
     ene_int = enes[0] - 2 * enes[1]
-    assert ene_int == approx(-0.052171811689150846, rel=1e-10)
+    assert ene_int == approx(-0.05218213230219945, rel=1e-10)
 
 
 @no_scalapack

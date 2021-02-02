@@ -10,6 +10,7 @@ use mbd_utils, only: shift_idx, tostr, result_t, diff3
 use mbd_damping, only: damping_t, damping_fermi
 use mbd_geom, only: geom_t, supercell_circum
 use mbd_gradients, only: grad_request_t
+use mbd_lapack, only: eigvals, inverse
 
 implicit none
 
@@ -75,79 +76,123 @@ function get_ts_energy(geom, alpha_0, C6, damp) result(ene)
     type(damping_t), intent(in) :: damp
     real(dp) :: ene
 
-    real(dp) :: C6_ij, r(3), r_norm, R_vdw_ij, ene_shell, ene_pair, R_cell(3), &
+    real(dp) :: C6_ij, Rnij(3), Rnij_norm, R_vdw_ij, ene_ij, Rn(3), &
         f_damp
-    integer :: i_shell, i_cell, i_atom, j_atom, range_cell(3), idx_cell(3)
-    real(dp), parameter :: shell_thickness = 10d0
-    logical :: is_periodic
+    integer :: i_cell, i_atom, j_atom, range_n(3), n(3)
+    logical :: is_periodic, do_ewald
 
+    do_ewald = .false.
     is_periodic = allocated(geom%lattice)
+    if (is_periodic) then
+        do_ewald = geom%gamm > 0d0
+        range_n = supercell_circum(geom%lattice, geom%real_space_cutoff)
+    else
+        range_n(:) = 0
+    end if
     ene = 0d0
-    i_shell = 0
-    do
-        i_shell = i_shell + 1
-        ene_shell = 0d0
+    n = [0, 0, -1]
+    each_cell: do i_cell = 1, product(1 + 2 * range_n)
+        call shift_idx(n, -range_n, range_n)
         if (is_periodic) then
-            range_cell = supercell_circum(geom%lattice, i_shell * shell_thickness)
+            Rn = matmul(geom%lattice, n)
         else
-            range_cell = [0, 0, 0]
+            Rn(:) = 0d0
         end if
-        idx_cell = [0, 0, -1]
-        do i_cell = 1, product(1 + 2 * range_cell)
-            call shift_idx(idx_cell, -range_cell, range_cell)
-            if (is_periodic) then
-                R_cell = matmul(geom%lattice, idx_cell)
-            else
-                R_cell = [0d0, 0d0, 0d0]
-            end if
-            do i_atom = 1, geom%siz()
-                do j_atom = 1, i_atom
-                    if (i_cell == 1) then
-                        if (i_atom == j_atom) cycle
-                    end if
-                    r = geom%coords(:, i_atom) - geom%coords(:, j_atom) - R_cell
-                    r_norm = sqrt(sum(r**2))
-                    if (r_norm > geom%param%ts_cutoff_radius) cycle
-                    if (is_periodic) then
-                        if (r_norm >= i_shell * shell_thickness &
-                            .or. r_norm < (i_shell - 1) * shell_thickness) then
-                            cycle
-                        end if
-                    end if
-                    C6_ij = combine_C6( &
-                        C6(i_atom), C6(j_atom), &
-                        alpha_0(i_atom), alpha_0(j_atom))
-                    if (allocated(damp%r_vdw)) then
-                        R_vdw_ij = damp%r_vdw(i_atom) + damp%r_vdw(j_atom)
-                    end if
-                    select case (damp%version)
-                        case ("fermi")
-                            f_damp = damping_fermi(r, damp%ts_sr * R_vdw_ij, damp%ts_d)
-                        case ("fermi2")
-                            f_damp = damping_fermi(r, damp%ts_sr * R_vdw_ij, damp%ts_d)**2
-                        case ("custom")
-                            f_damp = damp%damping_custom(i_atom, j_atom)
-                    end select
-                    ene_pair = -C6_ij * f_damp / r_norm**6
-                    if (i_atom == j_atom) then
-                        ene_shell = ene_shell + ene_pair / 2
-                    else
-                        ene_shell = ene_shell + ene_pair
-                    end if
-                end do ! j_atom
-            end do ! i_atom
-        end do ! i_cell
-        ene = ene + ene_shell
-        if (.not. is_periodic) exit
-        if (i_shell > 1 .and. abs(ene_shell) < geom%param%ts_energy_accuracy) exit
-    end do ! i_shell
+        each_atom: do i_atom = 1, geom%siz()
+            each_atom_pair: do j_atom = 1, i_atom
+                if (i_cell == 1) then
+                    if (i_atom == j_atom) cycle
+                end if
+                Rnij = geom%coords(:, i_atom) - geom%coords(:, j_atom) - Rn
+                Rnij_norm = sqrt(sum(Rnij**2))
+                if (is_periodic .and. Rnij_norm > geom%real_space_cutoff) cycle
+                C6_ij = combine_C6( &
+                    C6(i_atom), C6(j_atom), alpha_0(i_atom), alpha_0(j_atom) &
+                )
+                if (allocated(damp%r_vdw)) then
+                    R_vdw_ij = damp%r_vdw(i_atom) + damp%r_vdw(j_atom)
+                end if
+                select case (damp%version)
+                    case ("fermi")
+                        f_damp = damping_fermi(Rnij, damp%ts_sr * R_vdw_ij, damp%ts_d)
+                    case ("fermi2")
+                        f_damp = damping_fermi(Rnij, damp%ts_sr * R_vdw_ij, damp%ts_d)**2
+                    case ("custom")
+                        f_damp = damp%damping_custom(i_atom, j_atom)
+                end select
+                ene_ij = -C6_ij * f_damp / Rnij_norm**6
+                if (do_ewald) then
+                    ene_ij = ene_ij &
+                        + C6_ij * (disp_real(Rnij_norm, geom%gamm) + 1d0 / Rnij_norm**6)
+                end if
+                if (i_atom == j_atom) ene_ij = ene_ij / 2
+                ene = ene + ene_ij
+            end do each_atom_pair
+        end do each_atom
+    end do each_cell
+    if (do_ewald) call add_ewald_ts_parts(geom, alpha_0, C6, ene)
 end function
+
+subroutine add_ewald_ts_parts(geom, alpha_0, C6, ene)
+    type(geom_t), intent(in) :: geom
+    real(dp), intent(in) :: alpha_0(:)
+    real(dp), intent(in) :: C6(:)
+    real(dp), intent(inout) :: ene
+
+    real(dp) :: rec_latt(3, 3), volume, Rij(3), k(3), &
+        k_norm, k_Rij, latt_inv(3, 3), C6_ij, exp_kR, ene_ij
+    integer :: i_atom, j_atom, m(3), i_m, range_m(3)
+
+    latt_inv = inverse(geom%lattice)
+    rec_latt = 2 * pi * transpose(latt_inv)
+    volume = abs(dble(product(eigvals(geom%lattice))))
+    range_m = supercell_circum(rec_latt, geom%rec_space_cutoff)
+    m = [0, 0, -1]
+    each_recip_vec: do i_m = 1, product(1 + 2 * range_m)
+        call shift_idx(m, -range_m, range_m)
+        k = matmul(rec_latt, m)
+        k_norm = sqrt(sum(k**2))
+        if (k_norm > geom%rec_space_cutoff) cycle
+        each_atom: do i_atom = 1, geom%siz()
+            each_atom_pair: do j_atom = 1, i_atom
+                C6_ij = combine_C6( &
+                    C6(i_atom), C6(j_atom), alpha_0(i_atom), alpha_0(j_atom) &
+                )
+                Rij = geom%coords(:, i_atom) - geom%coords(:, j_atom)
+                k_Rij = dot_product(k, Rij)
+                exp_kR = cos(k_Rij)
+                ene_ij = C6_ij * disp_rec(k_norm, geom%gamm) / volume * exp_kR
+                if (i_atom == j_atom) ene_ij = ene_ij / 2
+                ene = ene + ene_ij
+            end do each_atom_pair
+        end do each_atom
+    end do each_recip_vec
+    ene = ene + geom%gamm**6 / 12 * sum(C6)  ! self energy
+end subroutine
 
 elemental function combine_C6(C6_i, C6_j, alpha_0_i, alpha_0_j) result(C6_ij)
     real(dp), intent(in) :: C6_i, C6_j, alpha_0_i, alpha_0_j
     real(dp) :: C6_ij
 
     C6_ij = 2 * C6_i * C6_j / (alpha_0_j / alpha_0_i * C6_i + alpha_0_i / alpha_0_j * C6_j)
+end function
+
+elemental real(dp) function disp_real(r, gamm)
+    real(dp), intent(in) :: r, gamm
+
+    disp_real = -( &
+        1 / r**6 + gamm**2 / r**4 + gamm**4 / (2 * r**2) &
+    ) * exp(-((gamm * r)**2))
+end function
+
+elemental real(dp) function disp_rec(k, gamm)
+    real(dp), intent(in) :: k, gamm
+
+    disp_rec = -(pi**(3d0 / 2) / 12) * ( &
+        sqrt(pi) * k**3 * erfc(k / (2 * gamm)) &
+        + (4 * gamm**3 - 2 * gamm * k**2) &
+        * exp(-(k**2) / (4 * gamm**2)) &
+    )
 end function
 
 end module

@@ -45,11 +45,12 @@ struct cmbd_damping* cmbd_init_damping(
 
 void cmbd_destroy_damping(struct cmbd_damping* damping);
 
-double cmbd_ts_energy(
+struct result_t* cmbd_ts_energy(
     struct geom_t* geom,
     double* alpha_0,
     double* C6,
-    struct cmbd_damping* damping
+    struct cmbd_damping* damping,
+    _Bool grad
 );
 
 struct result_t* cmbd_mbd_energy(

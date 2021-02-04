@@ -154,7 +154,7 @@ class MBDGeom(object):
         return self._lattice is not None
 
     @_auto_context
-    def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi'):
+    def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi', force=False):
         """Calculate a TS energy.
 
         :param array-like alpha_0: (a.u.) atomic polarizabilities
@@ -163,16 +163,36 @@ class MBDGeom(object):
         :param float sR: TS damping parameter :math:`s_R`
         :param float d: TS damping parameter :math:`d`
         :param damping str: type of damping
+        :param force bool: if True, calculate energy gradients
         """
         alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
+        n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(
             len(self), damping.encode(), _cast('double*', R_vdw), _ffi.NULL, sR, d
         )
-        ene = _lib.cmbd_ts_energy(
-            self._geom_f, _cast('double*', alpha_0), _cast('double*', C6), damping_f
+        res_f = _lib.cmbd_ts_energy(
+            self._geom_f,
+            _cast('double*', alpha_0),
+            _cast('double*', C6),
+            damping_f,
+            force,
         )
         _lib.cmbd_destroy_damping(damping_f)
         self._check_exc()
+        ene = np.empty(1)  # for some reason np.array(0) doesn't work
+        gradients, lattice_gradients = 2 * [None]
+        if force:
+            gradients = np.zeros((n_atoms, 3))
+            if self.has_lattice():
+                lattice_gradients = np.zeros((3, 3))
+        results = ene, gradients, lattice_gradients, None, None, None, None, None
+        _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
+        _lib.cmbd_destroy_result(res_f)
+        ene = ene.item()
+        if force:
+            ene = (ene, gradients)
+            if self.has_lattice():
+                ene += (lattice_gradients,)
         return ene
 
     @_auto_context

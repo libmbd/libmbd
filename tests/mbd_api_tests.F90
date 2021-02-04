@@ -79,7 +79,7 @@ subroutine test(test_name)
         call calc%evaluate_vdw_method(energy)
         allocate (gradients(3, 2))
         call calc%get_gradients(gradients)
-        call check(sum(abs(gradients)), 3.8405254013557403d-4, 1d-10)
+        call check(sum(abs(gradients)), 3.8405275467790542d-4, 1d-10)
     end select
     call calc%destroy()
 end subroutine

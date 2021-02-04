@@ -162,22 +162,30 @@ subroutine cmbd_destroy_damping(damping_c) bind(c)
     deallocate (damping)
 end subroutine
 
-real(c_double) function cmbd_ts_energy(geom_c, alpha_0_c, C6_c, damping_c) bind(c)
+type(c_ptr) function cmbd_ts_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) bind(c)
     type(c_ptr), value, intent(in) :: geom_c
     type(c_ptr), value, intent(in) :: alpha_0_c
     type(c_ptr), value, intent(in) :: C6_c
     type(c_ptr), value, intent(in) :: damping_c
+    logical(c_bool), value, intent(in) :: grad
 
     type(geom_t), pointer :: geom
     real(c_double), pointer :: alpha_0(:)
     real(c_double), pointer :: C6(:)
     type(damping_t), pointer :: damping
+    type(result_t), pointer :: res
 
     call c_f_pointer(geom_c, geom)
     call c_f_pointer(alpha_0_c, alpha_0, [geom%siz()])
     call c_f_pointer(C6_c, C6, [geom%siz()])
     call c_f_pointer(damping_c, damping)
-    cmbd_ts_energy = get_ts_energy(geom, alpha_0, C6, damping)
+    allocate (res)
+    res = get_ts_energy( &
+        geom, alpha_0, C6, damping, grad_request_t( &
+            dcoords=grad, dlattice=grad .and. allocated(geom%lattice) &
+        ) &
+    )
+    cmbd_ts_energy = c_loc(res)
 end function
 
 type(c_ptr) function cmbd_mbd_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) bind(c)

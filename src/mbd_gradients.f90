@@ -49,8 +49,14 @@ type, public :: grad_scalar_t
     !! Derivatives of a scalar with respect to various quantities
     real(dp), allocatable :: dr(:)
     real(dp), allocatable :: dr_1
+    real(dp), allocatable :: dk_1
     real(dp), allocatable :: dvdw
     real(dp), allocatable :: dgamma
+    real(dp), allocatable :: dC6
+    real(dp), allocatable :: dC6i
+    real(dp), allocatable :: dC6j
+    real(dp), allocatable :: da0i
+    real(dp), allocatable :: da0j
 end type
 
 type, public :: grad_request_t

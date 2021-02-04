@@ -16,7 +16,7 @@ add_library(mbd
     mbd_methods.F90
     mbd_rpa.F90
     mbd_scs.f90
-    mbd_ts.f90
+    mbd_ts.F90
     mbd_utils.F90
     mbd_vdw_param.f90
 )

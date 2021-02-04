@@ -11,6 +11,9 @@ use mbd_damping, only: damping_t, damping_fermi
 use mbd_geom, only: geom_t, supercell_circum
 use mbd_gradients, only: grad_request_t, grad_scalar_t
 use mbd_lapack, only: eigvals, inverse
+#ifdef WITH_MPI
+use mbd_mpi, only: mpi_all_reduce
+#endif
 
 implicit none
 
@@ -59,6 +62,9 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
             Rn(:) = 0d0
         end if
         each_atom: do i_atom = 1, geom%siz()
+#ifdef WITH_MPI
+            if (modulo(i_atom, geom%mpi_size) /= geom%mpi_rank) cycle
+#endif
             each_atom_pair: do j_atom = 1, i_atom
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
@@ -127,6 +133,14 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
         end do each_atom
     end do each_cell
     if (do_ewald) call add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
+#ifdef WITH_MPI
+    call mpi_all_reduce(res%energy, geom%mpi_comm)
+    if (grad%dcoords) call mpi_all_reduce(res%dE%dcoords, geom%mpi_comm)
+    if (grad%dlattice) call mpi_all_reduce(res%dE%dlattice, geom%mpi_comm)
+    if (grad%dalpha) call mpi_all_reduce(res%dE%dalpha, geom%mpi_comm)
+    if (grad%dC6) call mpi_all_reduce(res%dE%dC6, geom%mpi_comm)
+    if (grad%dR_vdw) call mpi_all_reduce(res%dE%dR_vdw, geom%mpi_comm)
+#endif
 end function
 
 subroutine add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
@@ -152,6 +166,9 @@ subroutine add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
         k_norm = sqrt(sum(k**2))
         if (k_norm > geom%rec_space_cutoff) cycle
         each_atom: do i_atom = 1, geom%siz()
+#ifdef WITH_MPI
+            if (modulo(i_atom, geom%mpi_size) /= geom%mpi_rank) cycle
+#endif
             each_atom_pair: do j_atom = 1, i_atom
                 C6_ij = combine_C6( &
                     C6(i_atom), C6(j_atom), alpha_0(i_atom), alpha_0(j_atom), dC6, grad &
@@ -193,10 +210,15 @@ subroutine add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
             end do each_atom_pair
         end do each_atom
     end do each_recip_vec
-    res%energy = res%energy + geom%gamm**6 / 12 * sum(C6)  ! self energy
-    if (grad%dC6) then
-        res%dE%dC6 = res%dE%dC6 + geom%gamm**6 / 12
-    end if
+    do i_atom = 1, geom%siz()
+#ifdef WITH_MPI
+        if (modulo(i_atom, geom%mpi_size) /= geom%mpi_rank) cycle
+#endif
+        res%energy = res%energy + geom%gamm**6 / 12 * C6(i_atom)  ! self energy
+        if (grad%dC6) then
+            res%dE%dC6(i_atom) = res%dE%dC6(i_atom) + geom%gamm**6 / 12
+        end if
+    end do
 end subroutine
 
 real(dp) function combine_C6( &

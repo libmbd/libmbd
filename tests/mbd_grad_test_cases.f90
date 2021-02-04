@@ -43,7 +43,7 @@ subroutine print_matrix(label, A, prec)
     end if
     m = size(A, 1)
     n = size(A, 2)
-    write (fm, '("(g",i2,".",i1,")")') prec_+8, prec_
+    write (fm, '("(g",i2,".",i1,")")') prec_ + 8, prec_
     write (6, '(A,":")') label
     do i = 1, m
         do j = 1, n
@@ -66,13 +66,13 @@ subroutine test_T_bare_deriv()
         do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
-            r_diff(c) = r_diff(c)+i_step*delta
+            r_diff(c) = r_diff(c) + i_step * delta
             T_diff_num(:, :, i_step) = T_bare(r_diff)
         end do
-        do concurrent (a = 1:3, b = 1:3)
+        do concurrent(a=1:3, b=1:3)
             T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end do
-        diff = max(diff, abs(T_diff_num(:, :, 0)-dT%dr(:, :, c))/T_diff_num(:, :, 0))
+        diff = max(diff, abs(T_diff_num(:, :, 0) - dT%dr(:, :, c)) / T_diff_num(:, :, 0))
     end do
     if (failed(maxval(abs(diff)), 1d-10)) then
     end if
@@ -92,13 +92,13 @@ subroutine test_T_GG_deriv_expl()
         do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
-            r_diff(c) = r_diff(c)+i_step*delta
+            r_diff(c) = r_diff(c) + i_step * delta
             T_diff_num(:, :, i_step) = T_erf_coulomb(r_diff, sigma)
         end do
-        do concurrent (a = 1:3, b = 1:3)
+        do concurrent(a=1:3, b=1:3)
             T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end do
-        diff = max(diff, abs(T_diff_num(:, :, 0)-dT%dr(:, :, c))/T_diff_num(:, :, 0))
+        diff = max(diff, abs(T_diff_num(:, :, 0) - dT%dr(:, :, c)) / T_diff_num(:, :, 0))
     end do
     if (failed(maxval(abs(diff)), 1d-10)) then
     end if
@@ -115,13 +115,13 @@ subroutine test_T_GG_deriv_impl()
     T = T_erf_coulomb(r, sigma, dT, grad_request_t(dsigma=.true.))
     do i_step = -3, 3
         if (i_step == 0) cycle
-        sigma_diff = sigma+i_step*delta
+        sigma_diff = sigma + i_step * delta
         T_diff_num(:, :, i_step) = T_erf_coulomb(r, sigma_diff)
     end do
-    do concurrent (a = 1:3, b = 1:3)
+    do concurrent(a=1:3, b=1:3)
         T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
     end do
-    diff = (T_diff_num(:, :, 0)-dT%dsigma)/T_diff_num(:, :, 0)
+    diff = (T_diff_num(:, :, 0) - dT%dsigma) / T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTGG', diff)
     end if
@@ -142,13 +142,13 @@ subroutine test_T_fermi_deriv_impl()
     T = damping_grad(f, df, T0, dT0, dT, grad_request_t(dr_vdw=.true.))
     do i_step = -3, 3
         if (i_step == 0) cycle
-        rvdw_diff =rvdw+i_step*delta
-        T_diff_num(:, :, i_step) = damping_fermi(r, rvdw_diff, 6d0)*T_bare(r)
+        rvdw_diff = rvdw + i_step * delta
+        T_diff_num(:, :, i_step) = damping_fermi(r, rvdw_diff, 6d0) * T_bare(r)
     end do
-    do concurrent (a = 1:3, b = 1:3)
+    do concurrent(a=1:3, b=1:3)
         T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
     end do
-    diff = (T_diff_num(:, :, 0)-dT%dvdw)/T_diff_num(:, :, 0)
+    diff = (T_diff_num(:, :, 0) - dT%dvdw) / T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
         call print_matrix('delta dTfermi', diff)
     end if
@@ -168,13 +168,13 @@ subroutine test_T_erfc_deriv_expl()
         do i_step = -3, 3
             if (i_step == 0) cycle
             r_diff = r
-            r_diff(c) = r_diff(c)+i_step*delta
+            r_diff(c) = r_diff(c) + i_step * delta
             T_diff_num(:, :, i_step) = T_erfc(r_diff, gamm)
         end do
-        do concurrent (a = 1:3, b = 1:3)
+        do concurrent(a=1:3, b=1:3)
             T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
         end do
-        diff = max(diff, abs(T_diff_num(:, :, 0)-dT%dr(:, :, c))/T_diff_num(:, :, 0))
+        diff = max(diff, abs(T_diff_num(:, :, 0) - dT%dr(:, :, c)) / T_diff_num(:, :, 0))
     end do
     if (failed(maxval(abs(diff)), 1d-9)) then
     end if
@@ -213,14 +213,14 @@ subroutine test_mbd_deriv_expl()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 geom%coords = coords
-                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom)+i_step*delta
+                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + i_step * delta
                 res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, grad_request_t())
             end do
             gradients(i_atom, i_xyz) = diff7(res%energy, delta)
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
@@ -259,7 +259,7 @@ subroutine test_mbd_ewald_deriv_expl()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 geom%coords = coords
-                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom)+i_step*delta
+                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + i_step * delta
                 res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                     grad_request_t(), k_point)
             end do
@@ -267,7 +267,7 @@ subroutine test_mbd_ewald_deriv_expl()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
         call print_matrix('anl', gradients_anl)
@@ -305,14 +305,14 @@ subroutine test_mbd_ewald_deriv_impl_q()
         do i_step = -3, 3
             if (i_step == 0) cycle
             k_point_diff = k_point
-            k_point_diff(i_xyz) = k_point_diff(i_xyz)+i_step*delta
+            k_point_diff(i_xyz) = k_point_diff(i_xyz) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                 grad_request_t(), k_point_diff)
         end do
         gradients(i_xyz) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         print *, 'delta gradients', diff
         print *, 'anl', gradients_anl
@@ -353,7 +353,7 @@ subroutine test_mbd_ewald_deriv_stress()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 geom%lattice = lattice
-                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
+                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt) + i_step * delta
                 res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                     grad_request_t(), k_point)
             end do
@@ -361,7 +361,7 @@ subroutine test_mbd_ewald_deriv_stress()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('delta gradients', diff)
         call print_matrix('anl', gradients_anl)
@@ -410,7 +410,7 @@ subroutine test_scs_deriv_expl()
                 if (i_step == 0) cycle
                 geom%coords = coords
                 geom%coords(i_xyz, j_atom) = geom%coords(i_xyz, j_atom) + &
-                    i_step*delta
+                    i_step * delta
                 alpha_scs(:, i_step) = &
                     run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t())
             end do
@@ -424,7 +424,7 @@ subroutine test_scs_deriv_expl()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('diff x', diff(:, :, 1))
         call print_matrix('diff y', diff(:, :, 2))
@@ -474,7 +474,7 @@ subroutine test_scs_ewald_deriv_expl()
                 if (i_step == 0) cycle
                 geom%coords = coords
                 geom%coords(i_xyz, j_atom) = geom%coords(i_xyz, j_atom) + &
-                    i_step*delta
+                    i_step * delta
                 alpha_scs(:, i_step) = &
                     run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t())
             end do
@@ -488,7 +488,7 @@ subroutine test_scs_ewald_deriv_expl()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('diff x', diff(:, :, 1))
         call print_matrix('diff y', diff(:, :, 2))
@@ -534,7 +534,7 @@ subroutine test_scs_ewald_deriv_stress()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 geom%lattice = lattice
-                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
+                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt) + i_step * delta
                 alpha_scs(:, i_step) = &
                     run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t())
             end do
@@ -545,7 +545,7 @@ subroutine test_scs_ewald_deriv_stress()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-4)) then
         call print_matrix('diff x', diff(:, :, 1))
         call print_matrix('diff y', diff(:, :, 2))
@@ -590,7 +590,7 @@ subroutine test_scs_deriv_impl_alpha
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step*delta
+            alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step * delta
             alpha_scs(:, i_step) = &
                 run_scs(geom, alpha_0_diff, damp, dalpha_scs, grad_request_t())
         end do
@@ -602,7 +602,7 @@ subroutine test_scs_deriv_impl_alpha
     end if
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff)
     end if
@@ -646,7 +646,7 @@ subroutine test_scs_ewald_deriv_impl_alpha
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step*delta
+            alpha_0_diff(j_atom) = alpha_0_diff(j_atom) + i_step * delta
             alpha_scs(:, i_step) = &
                 run_scs(geom, alpha_0_diff, damp, dalpha_scs, grad_request_t())
         end do
@@ -658,7 +658,7 @@ subroutine test_scs_ewald_deriv_impl_alpha
     end if
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff)
     end if
@@ -701,7 +701,7 @@ subroutine test_scs_deriv_impl_vdw
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = rvdw
-            damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step*delta
+            damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step * delta
             alpha_scs(:, i_step) = &
                 run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t())
         end do
@@ -713,7 +713,7 @@ subroutine test_scs_deriv_impl_vdw
         end if
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', diff(:, :))
     end if
@@ -757,7 +757,7 @@ subroutine test_scs_ewald_deriv_impl_vdw
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = rvdw
-            damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step*delta
+            damp%r_vdw(j_atom) = damp%r_vdw(j_atom) + i_step * delta
             alpha_scs(:, i_step) = &
                 run_scs(geom, alpha_0, damp, dalpha_scs, grad_request_t())
         end do
@@ -769,7 +769,7 @@ subroutine test_scs_ewald_deriv_impl_vdw
         end if
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-5)) then
         call print_matrix('diff', diff(:, :))
     end if
@@ -804,14 +804,14 @@ subroutine test_mbd_deriv_impl_alpha()
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0_diff, omega, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', reshape(diff, [n_atoms, 1]))
     end if
@@ -848,14 +848,14 @@ subroutine test_mbd_ewald_deriv_impl_alpha()
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0_diff, omega, damp, &
                 grad_request_t(), k_point)
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('diff', reshape(diff, [n_atoms, 1]))
         call print_matrix('anl', reshape(gradients_anl, [n_atoms, 1]))
@@ -892,14 +892,14 @@ subroutine test_mbd_deriv_impl_omega()
         do i_step = -3, 3
             if (i_step == 0) cycle
             omega_diff = omega
-            omega_diff(i_atom) = omega_diff(i_atom) + i_step*delta
+            omega_diff(i_atom) = omega_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega_diff, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -936,14 +936,14 @@ subroutine test_mbd_ewald_deriv_impl_omega()
         do i_step = -3, 3
             if (i_step == 0) cycle
             omega_diff = omega
-            omega_diff(i_atom) = omega_diff(i_atom) + i_step*delta
+            omega_diff(i_atom) = omega_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega_diff, damp, &
                 grad_request_t(), k_point)
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -978,14 +978,14 @@ subroutine test_mbd_deriv_impl_vdw()
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
-            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -1023,14 +1023,14 @@ subroutine test_mbd_ewald_deriv_impl_vdw()
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
-            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step * delta
             res(i_step) = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, &
                 grad_request_t(), k_point)
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
         call print_matrix('gradients anl', reshape(gradients_anl, [n_atoms, 1]))
@@ -1071,7 +1071,7 @@ subroutine test_mbd_rsscs_deriv_expl()
                 if (i_step == 0) cycle
                 geom%coords = coords
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + &
-                    i_step*delta
+                    i_step * delta
                 res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                     grad_request_t())
             end do
@@ -1079,7 +1079,7 @@ subroutine test_mbd_rsscs_deriv_expl()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
@@ -1121,7 +1121,7 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
                 if (i_step == 0) cycle
                 geom%coords = coords
                 geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + &
-                    i_step*delta
+                    i_step * delta
                 res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                     grad_request_t())
             end do
@@ -1129,7 +1129,7 @@ subroutine test_mbd_rsscs_ewald_deriv_expl()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', diff)
     end if
@@ -1167,7 +1167,7 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
             do i_step = -3, 3
                 if (i_step == 0) cycle
                 geom%lattice = lattice
-                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt)+i_step*delta
+                geom%lattice(i_xyz, i_latt) = geom%lattice(i_xyz, i_latt) + i_step * delta
                 res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                     grad_request_t())
             end do
@@ -1175,7 +1175,7 @@ subroutine test_mbd_rsscs_ewald_deriv_stress()
         end do
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 3d-6)) then
         call print_matrix('delta gradients', diff)
         call print_matrix('gradients anl', gradients_anl)
@@ -1212,14 +1212,14 @@ subroutine test_mbd_rsscs_deriv_impl_alpha()
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -1254,14 +1254,14 @@ subroutine test_mbd_rsscs_deriv_impl_C6()
         do i_step = -3, 3
             if (i_step == 0) cycle
             C6_diff = C6
-            C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
+            C6_diff(i_atom) = C6_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 5d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -1296,14 +1296,14 @@ subroutine test_mbd_rsscs_deriv_impl_vdw()
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
-            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step * delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -1340,14 +1340,14 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_alpha()
         do i_step = -3, 3
             if (i_step == 0) cycle
             alpha_0_diff = alpha_0
-            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step*delta
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0_diff, C6, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -1384,14 +1384,14 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_C6()
         do i_step = -3, 3
             if (i_step == 0) cycle
             C6_diff = C6
-            C6_diff(i_atom) = C6_diff(i_atom) + i_step*delta
+            C6_diff(i_atom) = C6_diff(i_atom) + i_step * delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6_diff, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 5d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
@@ -1429,14 +1429,14 @@ subroutine test_mbd_rsscs_ewald_deriv_impl_vdw()
         do i_step = -3, 3
             if (i_step == 0) cycle
             damp%r_vdw = r_vdw
-            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step*delta
+            damp%r_vdw(i_atom) = damp%r_vdw(i_atom) + i_step * delta
             res(i_step) = get_mbd_scs_energy(geom, 'rsscs', alpha_0, C6, damp, &
                 grad_request_t())
         end do
         gradients(i_atom) = diff7(res%energy, delta)
     end do
     call geom%destroy()
-    diff = (gradients-gradients_anl)/gradients_anl
+    diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-8)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if

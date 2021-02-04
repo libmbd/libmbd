@@ -43,7 +43,7 @@ subroutine test(test_name)
     character(200) :: origin, msg
 
     inp%atom_types = ['Ar', 'Ar']
-    inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0*ang], [3, 2])
+    inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0 * ang], [3, 2])
     inp%log_level = MBD_LOG_LVL_DEBUG
     select case (test_name)
     case ('exception')
@@ -87,7 +87,7 @@ end subroutine
 subroutine check(val, ref, rel)
     real(dp), intent(in) :: val, ref, rel
 
-    if (.not. abs((val-ref)/ref) < rel) then
+    if (.not. abs((val - ref) / ref) < rel) then
         failed = .true.
     end if
 end subroutine

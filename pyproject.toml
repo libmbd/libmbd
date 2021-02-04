@@ -1,5 +1,5 @@
 [build-system]
-requires = ["poetry_core>=1", "poetry-dynamic-versioning", "cffi", "setuptools"]
+requires = ["poetry_core>=1", "cffi", "setuptools"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]

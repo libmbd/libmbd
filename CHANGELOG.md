@@ -16,8 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Parameters in mbd_input_t related to real-space evaluation of TS
-- Parameters in mbd_input_t related to numerical evaluation of TS gradients
+- Parameters in `mbd_input_t` related to real-space evaluation of TS
+- Parameters in `mbd_input_t` related to numerical evaluation of TS gradients
 
 ## [0.10.4] - 2021-01-28
 

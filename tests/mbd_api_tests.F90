@@ -45,6 +45,7 @@ subroutine test(test_name)
     inp%atom_types = ['Ar', 'Ar']
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0 * ang], [3, 2])
     inp%log_level = MBD_LOG_LVL_DEBUG
+    inp%xc = 'pbe'
     select case (test_name)
     case ('exception')
         inp%xc = 'xxx'
@@ -52,13 +53,11 @@ subroutine test(test_name)
         call calc%get_exception(code, origin, msg)
         if (code /= MBD_EXC_DAMPING) failed = .true.
     case ('energy')
-        inp%xc = 'pbe'
         call calc%init(inp)
         call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
         call calc%evaluate_vdw_method(energy)
         call check(energy, -2.4329456747018696d-4, 1d-10)
     case ('gradients')
-        inp%xc = 'pbe'
         call calc%init(inp)
         call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
         call calc%evaluate_vdw_method(energy)
@@ -66,13 +65,19 @@ subroutine test(test_name)
         call calc%get_gradients(gradients)
         call check(sum(abs(gradients)), 2.3279742219399908d-4, 1d-10)
     case ('energy_from_ratios')
-        inp%xc = 'pbe'
         call calc%init(inp)
         call calc%update_vdw_params_from_ratios([1d0, 1d0])
         call calc%evaluate_vdw_method(energy)
         call check(energy, -0.0002462647623815428d0, 1d-10)
+    case ('hirshfeld_gradients')
+        inp%calculate_vdw_params_gradients = .true.
+        call calc%init(inp)
+        call calc%update_vdw_params_from_ratios([1d0, 1d0])
+        call calc%evaluate_vdw_method(energy)
+        allocate (gradients(2, 1))
+        call calc%get_vdw_params_ratios_gradients(gradients(:, 1))
+        call check(sum(abs(gradients)), 2.9686524938125897d-004, 1d-10)
     case ('ts_gradients')
-        inp%xc = 'pbe'
         inp%method = 'ts'
         call calc%init(inp)
         call calc%update_vdw_params_from_ratios([1d0, 1d0])

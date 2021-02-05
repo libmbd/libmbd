@@ -11,7 +11,7 @@ use mbd_constants
 use mbd_damping, only: damping_t
 use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
-use mbd_gradients, only: grad_request_t
+use mbd_gradients, only: grad_request_t, grad_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
 use mbd_ts, only: get_ts_energy
 use mbd_utils, only: result_t, exception_t, printer_i
@@ -47,6 +47,8 @@ type, public :: mbd_input_t
         !! If assigned, will be used for logging
     logical :: calculate_forces = .true.
         !! Whether to calculate forces.
+    logical :: calculate_vdw_params_gradients = .false.
+        !! Whether to calculate gradients of energy w.r.t. vdW parameters
     logical :: calculate_spectrum = .false.
         !! Whether to keep MBD eigenvalues.
     logical :: do_rpa = .false.
@@ -113,8 +115,11 @@ type, public :: mbd_calc_t
     real(dp), allocatable :: C6(:)
     character(len=30) :: method
     type(result_t) :: results
+    type(grad_t) :: dalpha_0, dC6, dr_vdw
     logical :: calculate_gradients
+    logical :: calculate_vdw_params_gradients
     real(dp), allocatable :: free_values(:, :)
+    character(len=30) :: vdw_params_update
 contains
     procedure :: init => mbd_calc_init
     procedure :: destroy => mbd_calc_destroy
@@ -125,6 +130,7 @@ contains
     procedure :: update_vdw_params_nl => mbd_calc_update_vdw_params_nl
     procedure :: evaluate_vdw_method => mbd_calc_evaluate_vdw_method
     procedure :: get_gradients => mbd_calc_get_gradients
+    procedure :: get_vdw_params_ratios_gradients => mbd_calc_get_vdw_params_ratios_gradients
     procedure :: get_lattice_derivs => mbd_calc_get_lattice_derivs
     procedure :: get_lattice_stress => mbd_calc_get_lattice_stress
     procedure :: get_spectrum_modes => mbd_calc_get_spectrum_modes
@@ -148,6 +154,7 @@ subroutine mbd_calc_init(this, input)
 #endif
     this%method = input%method
     this%calculate_gradients = input%calculate_forces
+    this%calculate_vdw_params_gradients = input%calculate_vdw_params_gradients
     this%geom%get_eigs = input%calculate_spectrum
     this%geom%get_modes = input%calculate_spectrum
     this%geom%do_rpa = input%do_rpa
@@ -244,6 +251,7 @@ subroutine mbd_calc_update_vdw_params_custom(this, alpha_0, C6, r_vdw)
     this%alpha_0 = alpha_0
     this%C6 = C6
     this%damp%r_vdw = r_vdw
+    this%vdw_params_update = 'custom'
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
@@ -253,11 +261,35 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
         !! Ratios of atomic volumes in the system and in vacuum.
 
     real(dp), allocatable :: ones(:)
+    type(grad_request_t) :: grad
 
     allocate (ones(size(ratios)), source=1d0)
-    this%alpha_0 = scale_with_ratio(this%free_values(1, :), ratios, ones, 1d0)
-    this%C6 = scale_with_ratio(this%free_values(2, :), ratios, ones, 2d0)
-    this%damp%r_vdw = scale_with_ratio(this%free_values(3, :), ratios, ones, 1d0 / 3)
+    grad%dV = this%calculate_vdw_params_gradients
+    this%alpha_0 = scale_with_ratio( &
+        this%free_values(1, :), ratios, ones, 1d0, this%dalpha_0, grad &
+    )
+    this%C6 = scale_with_ratio( &
+        this%free_values(2, :), ratios, ones, 2d0, this%dC6, grad &
+    )
+    this%damp%r_vdw = scale_with_ratio( &
+        this%free_values(3, :), ratios, ones, 1d0 / 3, this%dr_vdw, grad &
+    )
+    this%vdw_params_update = 'ratios'
+end subroutine
+
+subroutine mbd_calc_get_vdw_params_ratios_gradients(this, dE_dratios)
+    !! Get gradients of the energy w.r.t. Hirshfeld ratios if they were
+    !! requested in the MBD input.
+    class(mbd_calc_t), intent(inout) :: this
+    real(dp), intent(out) :: dE_dratios(:)
+        !! Gradients of the energy w.r.t. Hirshfeld ratios.
+
+    if (this%vdw_params_update /= 'ratios') return
+    dE_dratios = ( &
+        this%results%dE%dalpha * this%dalpha_0%dV &
+        + this%results%dE%dC6 * this%dC6%dV &
+        + this%results%dE%dr_vdw * this%dr_vdw%dV &
+     )
 end subroutine
 
 subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
@@ -273,6 +305,7 @@ subroutine mbd_calc_update_vdw_params_nl(this, alpha_0_ratios, C6_ratios)
     this%alpha_0 = this%free_values(1, :) * alpha_0_ratios
     this%C6 = this%free_values(2, :) * C6_ratios
     this%damp%r_vdw = 2.5d0 * this%free_values(1, :)**(1d0 / 7) * alpha_0_ratios**(1d0 / 3)
+    this%vdw_params_update = 'nl'
 end subroutine
 
 subroutine mbd_calc_evaluate_vdw_method(this, energy)
@@ -287,6 +320,11 @@ subroutine mbd_calc_evaluate_vdw_method(this, energy)
     if (this%calculate_gradients) then
         grad%dcoords = .true.
         if (allocated(this%geom%lattice)) grad%dlattice = .true.
+    end if
+    if (this%calculate_vdw_params_gradients) then
+        grad%dalpha = .true.
+        grad%dC6 = .true.
+        grad%dr_vdw = .true.
     end if
     select case (this%method)
     case ('mbd', 'mbd-nl')

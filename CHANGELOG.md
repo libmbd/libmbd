@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - MPI parallelization for TS
+- API for gradients w.r.t. vdW parameters
 
 ## [0.11.0] - 2021-02-04
 

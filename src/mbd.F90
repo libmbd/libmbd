@@ -123,6 +123,7 @@ type, public :: mbd_calc_t
 contains
     procedure :: init => mbd_calc_init
     procedure :: destroy => mbd_calc_destroy
+    procedure :: switch_forces => mbd_calc_switch_forces
     procedure :: update_coords => mbd_calc_update_coords
     procedure :: update_lattice_vectors => mbd_calc_update_lattice_vectors
     procedure :: update_vdw_params_custom => mbd_calc_update_vdw_params_custom
@@ -218,6 +219,15 @@ subroutine mbd_calc_destroy(this)
     class(mbd_calc_t), target, intent(inout) :: this
 
     call this%geom%destroy()
+end subroutine
+
+subroutine mbd_calc_switch_forces(this, forces)
+    !! Update whether to calculate forces.
+    class(mbd_calc_t), intent(inout) :: this
+    logical, intent(in) :: forces
+        !! Whether to calcualte forces.
+
+    this%calculate_gradients = forces
 end subroutine
 
 subroutine mbd_calc_update_coords(this, coords)

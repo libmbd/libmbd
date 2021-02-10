@@ -26,7 +26,6 @@ end interface
 
 interface eig
     module procedure eig_real
-    module procedure eig_complex
 end interface
 
 interface eigh
@@ -36,7 +35,6 @@ end interface
 
 interface eigvals
     module procedure eigvals_real
-    module procedure eigvals_complex
 end interface
 
 interface eigvalsh
@@ -121,28 +119,6 @@ function eigvals_real(A, exc, destroy) result(eigvals)
         A_p => A_work
     end if
     call eig_real(A_p, eigvals, exc, vals_only=.true.)
-end function
-
-function eigvals_complex(A, exc, destroy) result(eigvals)
-    complex(dp), target, intent(in) :: A(:, :)
-    type(exception_t), intent(out), optional :: exc
-    logical, intent(in), optional :: destroy
-    complex(dp) :: eigvals(size(A, 1))
-
-    complex(dp), allocatable, target :: A_work(:, :)
-    complex(dp), pointer :: A_p(:, :)
-
-    nullify (A_p)
-    if (present(destroy)) then
-        if (destroy) then
-            A_p => A
-        end if
-    end if
-    if (.not. associated(A_p)) then
-        allocate (A_work(size(A, 1), size(A, 1)), source=A)
-        A_p => A_work
-    end if
-    call eig_complex(A_p, eigvals, exc, vals_only=.true.)
 end function
 
 function mmul_real(A, B, transA, transB) result(C)
@@ -347,50 +323,6 @@ subroutine eigh_complex(A, eigs, exc, src, vals_only)
         end if
         return
     end if
-end subroutine
-
-subroutine eig_complex(A, eigs, exc, src, vals_only)
-    complex(dp), intent(inout) :: A(:, :)
-    complex(dp), intent(out) :: eigs(:)
-    type(exception_t), intent(out), optional :: exc
-    complex(dp), intent(in), optional :: src(:, :)
-    logical, intent(in), optional :: vals_only
-
-    complex(dp), allocatable :: work(:)
-    real(dp), allocatable :: rwork(:)
-    integer :: n, lwork
-    complex(dp) :: lwork_arr
-    integer :: error_flag
-    complex(dp) :: dummy
-    complex(dp), allocatable :: vectors(:, :)
-
-    n = size(A, 1)
-    if (present(src)) A = src
-    allocate (rwork(2 * n))
-    if (mode(vals_only) == 'V') then
-        allocate (vectors(n, n))
-    else
-        allocate (vectors(1, 1))
-    end if
-    call ZGEEV( &
-        'N', mode(vals_only), n, A, n, eigs, dummy, 1, &
-        vectors, n, lwork_arr, -1, rwork, error_flag &
-    )
-    lwork = nint(dble(lwork_arr))
-    allocate (work(lwork))
-    call ZGEEV( &
-        'N', mode(vals_only), n, A, n, eigs, dummy, 1, &
-        vectors, n, work(1), lwork, rwork, error_flag &
-    )
-    if (error_flag /= 0) then
-        if (present(exc)) then
-            exc%code = MBD_EXC_LINALG
-            exc%origin = 'ZGEEV'
-            exc%msg = 'Failed with code '//trim(tostr(error_flag))
-        end if
-        return
-    end if
-    if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
 real(dp) function det(A) result(D)

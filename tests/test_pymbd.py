@@ -340,7 +340,6 @@ def test_argon_dimer_rsscs():
     assert ene == approx(-0.0002462647623815428, rel=1e-10)
 
 
-@no_scalapack
 def test_argon_dimer_rsscs_rpa():
     geom = MBDGeom([(0, 0, 0), (0, 0, 4 * ang)], do_rpa=True, get_rpa_orders=True)
     ene, orders = geom.mbd_energy_species(['Ar', 'Ar'], [1, 1], 0.83)
@@ -437,7 +436,6 @@ def test_benzene():
     assert ene == approx(-0.007002398506090302, rel=1e-10)
 
 
-@no_scalapack
 def test_benzene_rpa():
     coords, species, vol_ratios = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
@@ -447,7 +445,6 @@ def test_benzene_rpa():
     assert ene == approx(-0.007002398506090302, rel=1e-9)
 
 
-@no_scalapack
 def test_benzene_rpa_scaled():
     coords, species, vol_ratios = benzene_dimer[0]
     alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
@@ -473,7 +470,6 @@ def test_argon_crystal():
     assert ene == approx(-0.0021037562496878173, rel=1e-10)
 
 
-@no_scalapack
 def test_argon_crystal_rpa():
     coords, lattice, k_grid, species, vol_ratios = argon_crystal
     ene = MBDGeom(coords, lattice, k_grid, do_rpa=True).mbd_energy_species(

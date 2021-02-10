@@ -67,7 +67,6 @@ type, public :: matrix_cplx_t
     procedure :: mult_col => matrix_cplx_mult_col
     procedure :: mmul => matrix_cplx_mmul
     procedure :: eigh => matrix_cplx_eigh
-    procedure :: eigvals => matrix_cplx_eigvals
     procedure :: eigvalsh => matrix_cplx_eigvalsh
     procedure :: sum_all => matrix_cplx_sum_all
     procedure :: contract_n_transp => matrix_cplx_contract_n_transp
@@ -381,29 +380,6 @@ function matrix_cplx_eigvalsh(A, exc, destroy) result(eigs)
 end function
 
 #ifndef DO_COMPLEX_TYPE
-function matrix_re_eigvals(A, exc, destroy) result(eigs)
-    class(matrix_re_t), target, intent(in) :: A
-#else
-function matrix_cplx_eigvals(A, exc, destroy) result(eigs)
-    class(matrix_cplx_t), target, intent(in) :: A
-#endif
-    type(exception_t), intent(out), optional :: exc
-    logical, intent(in), optional :: destroy
-    complex(dp) :: eigs(3 * A%idx%n_atoms)
-
-#ifdef WITH_SCALAPACK
-    if (A%idx%parallel) then
-        exc%code = MBD_EXC_UNIMPL
-        exc%msg = 'Complex general matrix diagonalization not implemented for scalapack'
-    else
-        eigs = eigvals(A%val, exc, destroy)
-    end if
-#else
-    eigs = eigvals(A%val, exc, destroy)
-#endif
-end function
-
-#ifndef DO_COMPLEX_TYPE
 real(dp) function matrix_re_sum_all(this) result(res)
     class(matrix_re_t), intent(in) :: this
 #else
@@ -609,6 +585,24 @@ subroutine matrix_re_invh(A, exc, src)
     end if
 #endif
 end subroutine
+
+function matrix_re_eigvals(A, exc, destroy) result(eigs)
+    class(matrix_re_t), target, intent(in) :: A
+    type(exception_t), intent(out), optional :: exc
+    logical, intent(in), optional :: destroy
+    complex(dp) :: eigs(3 * A%idx%n_atoms)
+
+#ifdef WITH_SCALAPACK
+    if (A%idx%parallel) then
+        exc%code = MBD_EXC_UNIMPL
+        exc%msg = 'Complex general matrix diagonalization not implemented for scalapack'
+    else
+        eigs = eigvals(A%val, exc, destroy)
+    end if
+#else
+    eigs = eigvals(A%val, exc, destroy)
+#endif
+end function
 
 end module
 

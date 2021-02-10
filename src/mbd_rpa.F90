@@ -46,9 +46,8 @@ type(result_t) function get_mbd_rpa_energy_complex( &
 #else
     type(matrix_cplx_t) :: relay, AT
 #endif
-    complex(dp), allocatable :: eigs_cplx(:)
     real(dp), allocatable :: eigs(:), log_eigs(:)
-    integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs
+    integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs, my_j_atom
     type(damping_t) :: damp_alpha
 
     res%energy = 0d0
@@ -65,19 +64,25 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         relay = dipole_matrix(geom, damp_alpha, q=q)
 #endif
         do my_i_atom = 1, size(relay%idx%i_atom)
-            associate ( &
-                    i_atom => relay%idx%i_atom(my_i_atom), &
-                    relay_sub => relay%val(3 * (my_i_atom - 1) + 1:, :) &
-            )
-                relay_sub(:3, :) = relay_sub(:3, :) * alpha(i_atom, i_freq)
-            end associate
+            do my_j_atom = 1, size(relay%idx%j_atom)
+                associate ( &
+                        i_atom => relay%idx%i_atom(my_i_atom), &
+                        j_atom => relay%idx%j_atom(my_j_atom), &
+                        relay_sub => relay%val( &
+                            3 * (my_i_atom - 1) + 1:, &
+                            3 * (my_j_atom - 1) + 1: &
+                        ) &
+                )
+                    relay_sub(:3, :3) = relay_sub(:3, :3) &
+                        * sqrt(alpha(i_atom, i_freq) * alpha(j_atom, i_freq))
+                end associate
+            end do
         end do
         call AT%move_from(relay)
         call geom%clock(23)
-        eigs_cplx = AT%eigvals(geom%exc, destroy=.true.)
+        eigs = AT%eigvalsh(geom%exc, destroy=.true.)
         call geom%clock(-23)
         if (geom%has_exc()) return
-        eigs = dble(eigs_cplx)
         if (geom%param%rpa_rescale_eigs) then
             where (eigs < 0) eigs = -erf(sqrt(pi) / 2 * eigs**4)**(1d0 / 4)
         end if

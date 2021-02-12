@@ -47,7 +47,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     type(matrix_cplx_t) :: relay, AT
 #endif
     real(dp), allocatable :: eigs(:), log_eigs(:)
-    integer :: i_freq, i, my_i_atom, n_order, n_negative_eigs, my_j_atom
+    integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom
     type(damping_t) :: damp_alpha
 
     res%energy = 0d0
@@ -86,12 +86,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         if (geom%param%rpa_rescale_eigs) then
             where (eigs < 0) eigs = -erf(sqrt(pi) / 2 * eigs**4)**(1d0 / 4)
         end if
-        ! The count construct won't work here due to a bug in Cray compiler
-        ! Has to manually unroll the counting TODO
-        n_negative_eigs = 0
-        do i = 1, size(eigs)
-           if (eigs(i) <= -1) n_negative_eigs = n_negative_eigs + 1
-        end do
+        n_negative_eigs = count(eigs(:) <= -1)
         if (n_negative_eigs > 0) then
             geom%exc%code = MBD_EXC_NEG_EIGVALS
             geom%exc%msg = "1+AT matrix has "// &

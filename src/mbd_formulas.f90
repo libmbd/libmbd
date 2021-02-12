@@ -58,7 +58,13 @@ function alpha_dyn_qho(alpha_0, omega, freq, dalpha, grad) result(alpha)
         associate (alpha => alpha(:, i_freq), u => freq(i_freq)%val)
             alpha = alpha_0 / (1 + (u / omega)**2)
             if (grad%dalpha) dalpha(i_freq)%dalpha = alpha / alpha_0
-            if (grad%domega) dalpha(i_freq)%domega = alpha * 2d0 / omega / (1d0 + (omega / u)**2)
+            if (grad%domega) then
+                if (u <= 0d0) then
+                    allocate (dalpha(i_freq)%domega(size(omega)), source=0d0)
+                else
+                    dalpha(i_freq)%domega = alpha * 2d0 / omega / (1d0 + (omega / u)**2)
+                end if
+            end if
         end associate
     end do
 end function

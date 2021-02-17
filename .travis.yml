@@ -74,3 +74,5 @@ jobs:
         token: $GITHUB_TOKEN
         keep_history: true
         local_dir: docs/build
+        repo: libmbd/libmbd.github.io
+        target_branch: master

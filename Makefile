@@ -38,7 +38,7 @@ test: test_libmbd
 	$(RUN_CMD) pytest -v --durations=3 $(PYTEST_FLAGS)
 
 doc:
-	python -m pip install sphinx toml git+https://github.com/jhrmnn/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
+	python -m pip install sphinx toml git+https://github.com/libmbd/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
 	ford -I. docs/libmbd.md -o build
 	sphinx-build -W -d $(BLDDIR)/doctrees docs docs/build/pymbd
 	touch docs/build/.nojekyll

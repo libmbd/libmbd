@@ -171,23 +171,23 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/jhrmnn/libmbd/compare/0.12.0...HEAD
-[0.12.0]: https://github.com/jhrmnn/libmbd/compare/0.11.0...0.12.0
-[0.11.0]: https://github.com/jhrmnn/libmbd/compare/0.10.4...0.11.0
-[0.10.4]: https://github.com/jhrmnn/libmbd/compare/0.10.3...0.10.4
-[0.10.3]: https://github.com/jhrmnn/libmbd/compare/0.10.2...0.10.3
-[0.10.2]: https://github.com/jhrmnn/libmbd/compare/0.10.1...0.10.2
-[0.10.1]: https://github.com/jhrmnn/libmbd/compare/0.10.0...0.10.1
-[0.10.0]: https://github.com/jhrmnn/libmbd/compare/0.9.3...0.10.0
-[0.9.3]: https://github.com/jhrmnn/libmbd/compare/0.9.2...0.9.3
-[0.9.2]: https://github.com/jhrmnn/libmbd/compare/0.9.1...0.9.2
-[0.9.1]: https://github.com/jhrmnn/libmbd/compare/0.9.0...0.9.1
-[0.9.0]: https://github.com/jhrmnn/libmbd/compare/0.8.0...0.9.0
-[0.8.0]: https://github.com/jhrmnn/libmbd/compare/0.7.0...0.8.0
-[0.7.0]: https://github.com/jhrmnn/libmbd/compare/0.6.0...0.7.0
-[0.6.0]: https://github.com/jhrmnn/libmbd/compare/0.5.0...0.6.0
-[0.5.0]: https://github.com/jhrmnn/libmbd/compare/0.4.3...0.5.0
-[0.4.3]: https://github.com/jhrmnn/libmbd/compare/0.4.2...0.4.3
-[0.4.2]: https://github.com/jhrmnn/libmbd/compare/0.4.1...0.4.2
-[0.4.1]: https://github.com/jhrmnn/libmbd/compare/0.4.0...0.4.1
-[0.4.0]: https://github.com/jhrmnn/libmbd/releases/tag/0.4.0
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.12.0...HEAD
+[0.12.0]: https://github.com/libmbd/libmbd/compare/0.11.0...0.12.0
+[0.11.0]: https://github.com/libmbd/libmbd/compare/0.10.4...0.11.0
+[0.10.4]: https://github.com/libmbd/libmbd/compare/0.10.3...0.10.4
+[0.10.3]: https://github.com/libmbd/libmbd/compare/0.10.2...0.10.3
+[0.10.2]: https://github.com/libmbd/libmbd/compare/0.10.1...0.10.2
+[0.10.1]: https://github.com/libmbd/libmbd/compare/0.10.0...0.10.1
+[0.10.0]: https://github.com/libmbd/libmbd/compare/0.9.3...0.10.0
+[0.9.3]: https://github.com/libmbd/libmbd/compare/0.9.2...0.9.3
+[0.9.2]: https://github.com/libmbd/libmbd/compare/0.9.1...0.9.2
+[0.9.1]: https://github.com/libmbd/libmbd/compare/0.9.0...0.9.1
+[0.9.0]: https://github.com/libmbd/libmbd/compare/0.8.0...0.9.0
+[0.8.0]: https://github.com/libmbd/libmbd/compare/0.7.0...0.8.0
+[0.7.0]: https://github.com/libmbd/libmbd/compare/0.6.0...0.7.0
+[0.6.0]: https://github.com/libmbd/libmbd/compare/0.5.0...0.6.0
+[0.5.0]: https://github.com/libmbd/libmbd/compare/0.4.3...0.5.0
+[0.4.3]: https://github.com/libmbd/libmbd/compare/0.4.2...0.4.3
+[0.4.2]: https://github.com/libmbd/libmbd/compare/0.4.1...0.4.2
+[0.4.1]: https://github.com/libmbd/libmbd/compare/0.4.0...0.4.1
+[0.4.0]: https://github.com/libmbd/libmbd/releases/tag/0.4.0

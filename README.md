@@ -1,13 +1,13 @@
 # Libmbd
 
-[![build](https://img.shields.io/travis/com/jhrmnn/libmbd/master.svg)](https://travis-ci.com/jhrmnn/libmbd)
-[![coverage](https://img.shields.io/codecov/c/github/jhrmnn/libmbd.svg)](https://codecov.io/gh/jhrmnn/libmbd)
+[![build](https://img.shields.io/travis/com/libmbd/libmbd/master.svg)](https://travis-ci.com/libmbd/libmbd)
+[![coverage](https://img.shields.io/codecov/c/github/libmbd/libmbd.svg)](https://codecov.io/gh/libmbd/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
 [![conda](https://img.shields.io/conda/vn/conda-forge/libmbd.svg)](https://anaconda.org/conda-forge/libmbd)
 [![pypi](https://img.shields.io/pypi/v/pymbd.svg)](https://pypi.org/project/pymbd/)
-[![commits since](https://img.shields.io/github/commits-since/jhrmnn/libmbd/latest.svg)](https://github.com/jhrmnn/libmbd/releases)
-[![last commit](https://img.shields.io/github/last-commit/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/commits/master)
-[![license](https://img.shields.io/github/license/jhrmnn/libmbd.svg)](https://github.com/jhrmnn/libmbd/blob/master/LICENSE)
+[![commits since](https://img.shields.io/github/commits-since/libmbd/libmbd/latest.svg)](https://github.com/libmbd/libmbd/releases)
+[![last commit](https://img.shields.io/github/last-commit/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/commits/master)
+[![license](https://img.shields.io/github/license/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/blob/master/LICENSE)
 [![code style](https://img.shields.io/badge/code%20style-black-202020.svg)](https://github.com/ambv/black)
 [![chat](https://img.shields.io/gitter/room/libmbd/community)](https://gitter.im/libmbd/community)
 [![doi](https://img.shields.io/badge/doi-10.5281%2Fzenodo.594879-blue)](http://doi.org/10.5281/zenodo.594879)
@@ -139,15 +139,15 @@ call calc%destroy()
 
 ## Links
 
-- Libmbd documentation: https://jhrmnn.github.io/libmbd
-- Pymbd documentation: https://jhrmnn.github.io/libmbd/pymbd
+- Libmbd documentation: https://libmbd.github.io
+- Pymbd documentation: https://libmbd.github.io/pymbd
 
 ## Developing
 
 For development, a top-level `Makefile` is included, which configures and compiles Libmbd, compiles the Pymbd C extension, and runs both Libmbd and Pymbd tests.
 
 ```
-git clone https://github.com/jhrmnn/libmbd.git && cd libmbd
+git clone https://github.com/libmbd/libmbd.git && cd libmbd
 python3 -m venv venv && source venv/bin/activate
 make
 # development work...

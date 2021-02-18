@@ -25,6 +25,9 @@ integer, parameter, public :: mbd_version_major = MBD_VERSION_MAJOR
 integer, parameter, public :: mbd_version_minor = MBD_VERSION_MINOR
 integer, parameter, public :: mbd_version_patch = MBD_VERSION_PATCH
 
+public :: MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_LINALG, MBD_EXC_UNIMPL, &
+    MBD_EXC_DAMPING, MBD_EXC_INPUT
+
 type, public :: mbd_input_t
     !! Contains user input to an MBD calculation.
     character(len=30) :: method = 'mbd-rsscs'

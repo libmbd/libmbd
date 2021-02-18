@@ -20,7 +20,7 @@ all: install_editable test
 
 install_libmbd:
 	mkdir -p $(BLDDIR)
-	cd $(BLDDIR) && cmake $(SRCDIR) -DCMAKE_INSTALL_PREFIX=$(LIBMBD_PREFIX) $(CMAKE_FLAGS)
+	cd -P $(BLDDIR) && cmake $(SRCDIR) -DCMAKE_INSTALL_PREFIX=$(LIBMBD_PREFIX) $(CMAKE_FLAGS)
 	make -C $(BLDDIR) all install
 
 install_editable: install_libmbd
@@ -42,3 +42,6 @@ doc:
 	ford -I. docs/libmbd.md -o build
 	sphinx-build -W -d $(BLDDIR)/doctrees docs docs/build/pymbd
 	touch docs/build/.nojekyll
+
+distclean:
+	rm -r $(BLDDIR)/*

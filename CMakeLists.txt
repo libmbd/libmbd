@@ -8,7 +8,7 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
 project(Libmbd
-    VERSION 0.12.0
+    VERSION 0.12.1
     DESCRIPTION "Many-body dispersion library"
     LANGUAGES Fortran C)
 

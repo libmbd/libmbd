@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2021-03-01
+
+### Added
+
+- API: Exception integer codes
+
 ## [0.12.0] - 2021-02-12
 
 ### Added
@@ -171,7 +177,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.12.0...HEAD
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.12.1...HEAD
+[0.12.1]: https://github.com/libmbd/libmbd/compare/0.12.0...0.12.1
 [0.12.0]: https://github.com/libmbd/libmbd/compare/0.11.0...0.12.0
 [0.11.0]: https://github.com/libmbd/libmbd/compare/0.10.4...0.11.0
 [0.10.4]: https://github.com/libmbd/libmbd/compare/0.10.3...0.10.4

@@ -72,7 +72,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         dr_vdw=grad%dr_vdw &
     )
     T = dipole_matrix(geom, damp_local, dT, grad_req)
-    if (geom%has_exc()) return
+    ! if (geom%has_exc()) return
     if (grad%any()) then
         call alpha_full%copy_from(T)
     else
@@ -81,7 +81,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
     call alpha_full%add_diag(1d0 / alpha)
     call geom%clock(32)
     call alpha_full%invh(geom%exc)
-    if (geom%has_exc()) return
+    ! if (geom%has_exc()) return
     call geom%clock(-32)
     alpha_scs = alpha_full%contract_n33diag_cols()
     if (any(alpha_scs < 0)) then

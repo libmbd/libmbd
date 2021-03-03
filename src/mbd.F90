@@ -214,7 +214,7 @@ subroutine mbd_calc_init(this, input)
     else
         this%geom%exc = this%damp%set_params_from_xc(input%xc, input%method)
     end if
-    if (this%geom%has_exc()) return
+    ! if (this%geom%has_exc()) return
 end subroutine
 
 subroutine mbd_calc_destroy(this)

@@ -114,12 +114,15 @@ subroutine geom_init(this)
     integer :: i_atom
     real(dp) :: volume, freq_grid_err
     logical :: is_parallel
+    character(len=10) :: log_level_str
 #ifdef WITH_MPI
     logical :: can_parallel_kpts
     integer :: ierr, n_kpts
 #endif
 
     if (.not. associated(this%log%printer)) this%log%printer => printer
+    call get_environment_variable('LIBMBD_LOG_LEVEL', log_level_str)
+    if (log_level_str /= '') read (log_level_str, *) this%log%level
     associate (n => this%param%n_freq)
         allocate (this%freq(0:n))
         call get_freq_grid(n, this%freq(1:n)%val, this%freq(1:n)%weight)

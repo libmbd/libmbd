@@ -1,13 +1,12 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#include "version.h"
-
 module mbd
 !! High-level Fortran API.
 
 use mbd_constants
 use mbd_defaults
+use mbd_version
 use mbd_damping, only: damping_t
 use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
@@ -21,11 +20,7 @@ implicit none
 
 private
 
-integer, parameter, public :: mbd_version_major = MBD_VERSION_MAJOR
-integer, parameter, public :: mbd_version_minor = MBD_VERSION_MINOR
-integer, parameter, public :: mbd_version_patch = MBD_VERSION_PATCH
-character(len=30), parameter, public :: mbd_version_suffix = MBD_VERSION_SUFFIX
-
+public :: MBD_VERSION_MAJOR, MBD_VERSION_MINOR, MBD_VERSION_PATCH, MBD_VERSION_SUFFIX
 public :: MBD_EXC_NEG_EIGVALS, MBD_EXC_NEG_POL, MBD_EXC_LINALG, MBD_EXC_UNIMPL, &
     MBD_EXC_DAMPING, MBD_EXC_INPUT
 

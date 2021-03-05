@@ -2,7 +2,6 @@
 
 extern const _Bool cmbd_with_mpi;
 extern const _Bool cmbd_with_scalapack;
-extern const char cmbd_version[40];
 extern const int cmbd_version_major;
 extern const int cmbd_version_minor;
 extern const int cmbd_version_patch;

@@ -1,4 +1,4 @@
-configure_file(version.h.in "${CMAKE_CURRENT_BINARY_DIR}/version.h")
+configure_file(mbd_version.f90.in "${CMAKE_CURRENT_BINARY_DIR}/mbd_version.f90")
 
 add_library(mbd
     mbd.F90
@@ -19,6 +19,7 @@ add_library(mbd
     mbd_scs.f90
     mbd_ts.F90
     mbd_utils.F90
+    "${CMAKE_CURRENT_BINARY_DIR}/mbd_version.f90"
     mbd_vdw_param.f90
 )
 

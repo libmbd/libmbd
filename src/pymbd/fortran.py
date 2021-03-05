@@ -27,7 +27,7 @@ LIBMBD_VERSION = (
     _lib.cmbd_version_major,
     _lib.cmbd_version_minor,
     _lib.cmbd_version_patch,
-    _ffi.string(_lib.cmbd_version_suffix).decode(),
+    _ffi.string(_lib.cmbd_version_suffix).strip().decode(),
 )
 
 # do not test versions when running autodoc

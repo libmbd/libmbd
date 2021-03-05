@@ -1,0 +1,107 @@
+name: Tests
+on: [push, pull_request]
+jobs:
+  all:
+    name: All
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-16.04
+            python-version: 3.6
+          - os: ubuntu-16.04
+            python-version: 3.6
+            mpi-nodes: 1
+          - os: ubuntu-16.04
+            python-version: 3.7
+            mpi-nodes: 2
+          - os: ubuntu-16.04
+            python-version: 3.8
+            mpi-nodes: 2
+          - os: ubuntu-16.04
+            python-version: 3.9
+            mpi-nodes: 2
+          - os: macos-10.15
+            python-version: 3.9
+            mpi-nodes: 2
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
+        if: ${{ contains(matrix.os, 'ubuntu') }}
+      - run: brew install open-mpi scalapack
+        if: ${{ contains(matrix.os, 'macos') }}
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Poetry
+        run: |
+          curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
+          echo $HOME/.poetry/bin >>$GITHUB_PATH
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Create Python virtual environment
+        run: |
+          python -m venv venv
+          echo VIRTUAL_ENV=$PWD/venv >>$GITHUB_ENV
+          echo $PWD/venv/bin >>$GITHUB_PATH
+          echo venv >>.git/info/exclude
+      - name: Report environment
+        run: |
+          type python
+          type pip
+          type poetry
+          python --version
+          cmake --version
+          pip --version
+          git describe --tags --dirty=.dirty
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ${{ env.VIRTUAL_ENV }}/bin
+            ${{ env.VIRTUAL_ENV }}/lib/python${{ matrix.python-version }}/site-packages
+          key: ${{ runner.os }}-${{ matrix.python-version }}-v3
+      - name: Install dependencies
+        run: pip install -U wheel cffi codecov pytest-cov "coverage<5" poetry-dynamic-versioning
+      - name: Set CMAKE_FLAGS
+        run: |
+          CMAKE_FLAGS='-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"'
+          if [[ "${{ matrix.mpi-nodes }}" ]]; then
+              CMAKE_FLAGS="$CMAKE_FLAGS"' -DENABLE_SCALAPACK_MPI=ON'
+              if [[ "${{ runner.os }}" == "Linux" ]]; then
+                  CMAKE_FLAGS="$CMAKE_FLAGS"' -DSCALAPACK_LIBRARIES="-lscalapack-openmpi -lblacs-openmpi"'
+              fi
+          fi
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+              CMAKE_FLAGS="$CMAKE_FLAGS"' -DCMAKE_Fortran_COMPILER=gfortran-10'
+          fi
+          echo CMAKE_FLAGS=$CMAKE_FLAGS
+          echo CMAKE_FLAGS=$CMAKE_FLAGS >>$GITHUB_ENV
+      - name: Cmake
+        run: |
+          mkdir -p build
+          cd -P build && cmake .. -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ${{ env.CMAKE_FLAGS }}
+          echo LIBMBD_PREFIX=$VIRTUAL_ENV >>$GITHUB_ENV
+        env:
+          MPI_NODES: ${{ matrix.mpi-nodes }}
+      - name: Build Libmbd
+        run: make -C build all
+      - name: Install Libmbd
+        run: |
+          make -C build install
+      - name: Build Pymbd
+        run: poetry build
+      - name: Install Pymbd
+        run: pip install -U pymbd[test,mpi] --pre -f ./dist
+      - name: Test Libmbd
+        run: "cd build && ctest --output-on-failure"
+      - name: Test Pymbd
+        run: |
+          if [[ "${{ matrix.mpi-nodes }}" ]]; then
+              RUN_CMD="env OMP_NUM_THREADS=1 mpiexec -n ${{ matrix.mpi-nodes }}"
+          fi
+          $RUN_CMD pytest -v --durations=3 --cov=pymbd --cov-report=xml
+      - name: Upload to Codecov
+        run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
+      - name: Uninstall Pymbd
+        run: pip uninstall -y pymbd

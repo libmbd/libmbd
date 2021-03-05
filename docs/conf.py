@@ -60,7 +60,6 @@ html_theme_options = {
     'github_repo': 'libmbd',
     'badge_branch': 'master',
     'codecov_button': True,
-    'travis_button': True,
 }
 html_sidebars = {
     '**': ['about.html', 'navigation.html', 'relations.html', 'searchbox.html']

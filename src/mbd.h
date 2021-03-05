@@ -2,9 +2,11 @@
 
 extern const _Bool cmbd_with_mpi;
 extern const _Bool cmbd_with_scalapack;
+extern const char cmbd_version[40];
 extern const int cmbd_version_major;
 extern const int cmbd_version_minor;
 extern const int cmbd_version_patch;
+extern const char cmbd_version_suffix[30];
 
 struct geom_t* cmbd_init_geom(
     int n_atoms,

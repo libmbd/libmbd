@@ -22,7 +22,7 @@ implicit none
 
 private
 public :: cmbd_with_scalapack, cmbd_with_mpi, cmbd_version_major, &
-    cmbd_version_minor, cmbd_version_patch
+    cmbd_version_minor, cmbd_version_patch, cmbd_version_suffix, cmbd_version
 public :: cmbd_init_geom, cmbd_destroy_geom, cmbd_init_damping, &
     cmbd_destroy_damping, cmbd_get_exception, cmbd_update_coords, cmbd_update_lattice, &
     cmbd_get_results, cmbd_destroy_result
@@ -40,9 +40,13 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .true.
 logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 #endif
 
+integer :: i
+character(c_char), bind(c) :: cmbd_version(40) = [(MBD_VERSION(i:i), i=1, 40)]
 integer(c_int), bind(c) :: cmbd_version_major = MBD_VERSION_MAJOR
 integer(c_int), bind(c) :: cmbd_version_minor = MBD_VERSION_MINOR
 integer(c_int), bind(c) :: cmbd_version_patch = MBD_VERSION_PATCH
+character(c_char), bind(c) :: cmbd_version_suffix(30) &
+    = [(MBD_VERSION_SUFFIX(i:i), i=1, 30)]
 
 contains
 

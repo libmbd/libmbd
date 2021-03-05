@@ -27,6 +27,7 @@ LIBMBD_VERSION = (
     _lib.cmbd_version_major,
     _lib.cmbd_version_minor,
     _lib.cmbd_version_patch,
+    _ffi.string(_lib.cmbd_version_suffix).decode(),
 )
 
 # do not test versions when running autodoc
@@ -36,6 +37,9 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
         assert PYMBD_VERSION[1] == LIBMBD_VERSION[1]
     else:
         assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
+    if len(PYMBD_VERSION) == 4:
+        git_commit = PYMBD_VERSION[3].split('+')[1]
+        assert LIBMBD_VERSION[3].endswith(git_commit)
 
 if with_mpi:
     from mpi4py import MPI  # noqa

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.9)
 cmake_policy(SET CMP0042 NEW)
 if(NOT CMAKE_VERSION VERSION_LESS 3.13)
     cmake_policy(SET CMP0077 NEW)
@@ -8,10 +8,11 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
 project(Libmbd
-    VERSION 0.12.1
     DESCRIPTION "Many-body dispersion library"
     LANGUAGES Fortran C)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(LibmbdVersion)
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 include(CTest)

@@ -4,12 +4,12 @@
 #ifndef LEGENDRE_PREC
 #define LEGENDRE_PREC 15
 #endif
-#include "defaults.h"
 
 module mbd_geom
 !! Representing a molecule or a crystal unit cell.
 
 use mbd_constants
+use mbd_defaults
 use mbd_formulas, only: alpha_dyn_qho, C6_from_alpha, omega_qho
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_lapack, only: eigvals, inverse

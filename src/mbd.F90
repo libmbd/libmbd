@@ -2,12 +2,12 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 #include "version.h"
-#include "defaults.h"
 
 module mbd
 !! High-level Fortran API.
 
 use mbd_constants
+use mbd_defaults
 use mbd_damping, only: damping_t
 use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t

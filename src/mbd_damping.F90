@@ -1,12 +1,11 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
-#include "defaults.h"
-
 module mbd_damping
 !! Damping functions.
 
 use mbd_constants
+use mbd_defaults
 use mbd_gradients, only: grad_scalar_t, grad_request_t
 use mbd_utils, only: lower, exception_t
 

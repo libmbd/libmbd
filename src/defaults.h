@@ -1,5 +1,0 @@
-#define N_FREQUENCY_GRID 15
-#define K_GRID_SHIFT 0.5d0
-#define TS_DAMPING_D 20d0
-#define MBD_DAMPING_A 6d0
-#define MAX_ATOMS_PER_BLOCK 6

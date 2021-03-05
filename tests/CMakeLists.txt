@@ -19,9 +19,11 @@ execute_process(
     OUTPUT_VARIABLE TESTS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-set(MPI_NODES $ENV{MPI_NODES})
-if(NOT "${MPI_NODES}")
-    set(MPI_NODES ${MPIEXEC_MAX_NUMPROCS})
+if(ENABLE_SCALAPACK_MPI)
+    set(MPI_NODES $ENV{MPI_NODES})
+    if(NOT "${MPI_NODES}")
+        set(MPI_NODES ${MPIEXEC_MAX_NUMPROCS})
+    endif()
 endif()
 foreach(TEST ${TESTS})
     string(REPLACE "/" ";" TEST_APP_CASE ${TEST})

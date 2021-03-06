@@ -39,9 +39,9 @@ test: test_libmbd
 
 doc:
 	python -m pip install sphinx toml git+https://github.com/libmbd/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
-	ford -I. docs/libmbd.md -o build
-	sphinx-build -W -d $(BLDDIR)/doctrees docs docs/build/pymbd
-	touch docs/build/.nojekyll
+	ford -I. doc/libmbd.md -o build
+	sphinx-build -W -d $(BLDDIR)/doctrees doc doc/build/pymbd
+	touch doc/build/.nojekyll
 
 distclean:
 	rm -r $(BLDDIR)/*

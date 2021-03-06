@@ -16,7 +16,7 @@ jobs:
         run: pip install sphinx toml git+https://github.com/libmbd/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
       - uses: actions/checkout@v2
       - name: Libmbd documentation
-        run: ford -I. docs/libmbd.md -o build
+        run: ford -I. doc/libmbd.md -o build
       - name: Pymbd documentation
-        run: sphinx-build -W -d build/doctrees docs docs/build/pymbd
-      - run: touch docs/build/.nojekyll
+        run: sphinx-build -W -d build/doctrees doc doc/build/pymbd
+      - run: touch doc/build/.nojekyll

@@ -5,5 +5,5 @@
 /.pytest_cache/
 /build
 /dist/
-/docs/build/
+/doc/build/
 /poetry.lock

@@ -62,7 +62,7 @@ jobs:
             ${{ env.VIRTUAL_ENV }}/lib/python${{ matrix.python-version }}/site-packages
           key: ${{ runner.os }}-${{ matrix.python-version }}-v3
       - name: Install dependencies
-        run: pip install -U wheel cffi codecov pytest-cov "coverage<5" poetry-dynamic-versioning
+        run: pip install -U wheel cffi coverage poetry-dynamic-versioning
       - name: Set CMAKE_FLAGS
         run: |
           CMAKE_FLAGS='-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"'
@@ -100,7 +100,7 @@ jobs:
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               RUN_CMD="env OMP_NUM_THREADS=1 mpiexec -n ${{ matrix.mpi-nodes }}"
           fi
-          $RUN_CMD pytest -v --durations=3 --cov=pymbd --cov-report=xml
+          $RUN_CMD coverage run -m pytest -v --durations=3
       - name: Upload to Codecov
         run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
       - name: Uninstall Pymbd

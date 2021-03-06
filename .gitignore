@@ -1,6 +1,7 @@
 *.pyc
 *.so
 *.egg-info/
+/.coverage*
 /.tox
 /.pytest_cache/
 /build

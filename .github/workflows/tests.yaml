@@ -17,10 +17,10 @@ jobs:
             mpi-nodes: 2
           - os: ubuntu-16.04
             python-version: 3.8
-            mpi-nodes: 2
+            mpi-nodes: 4
           - os: ubuntu-16.04
             python-version: 3.9
-            mpi-nodes: 2
+            mpi-nodes: 8
           - os: macos-10.15
             python-version: 3.9
             mpi-nodes: 2
@@ -98,7 +98,7 @@ jobs:
       - name: Test Pymbd
         run: |
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
-              RUN_CMD="env OMP_NUM_THREADS=1 mpiexec -n ${{ matrix.mpi-nodes }}"
+              RUN_CMD="env OMP_NUM_THREADS=1 mpiexec --oversubscribe -n ${{ matrix.mpi-nodes }}"
           fi
           $RUN_CMD coverage run -m pytest -v --durations=3
       - name: Upload to Codecov

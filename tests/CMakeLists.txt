@@ -24,6 +24,7 @@ if(ENABLE_SCALAPACK_MPI)
     if(NOT "${MPI_NODES}")
         set(MPI_NODES ${MPIEXEC_MAX_NUMPROCS})
     endif()
+    set(MPIEXEC_EXTRA_FLAGS "--oversubscribe")
 endif()
 foreach(TEST ${TESTS})
     string(REPLACE "/" ";" TEST_APP_CASE ${TEST})
@@ -31,6 +32,7 @@ foreach(TEST ${TESTS})
     list(GET TEST_APP_CASE 1 TEST_CASE)
     add_test(NAME "${TEST_APP}/${TEST_CASE}" COMMAND
         ${MPIEXEC_EXECUTABLE}
+        ${MPIEXEC_EXTRA_FLAGS}
         ${MPIEXEC_NUMPROC_FLAG}
         ${MPI_NODES}
         ${MPIEXEC_PREFLAGS}

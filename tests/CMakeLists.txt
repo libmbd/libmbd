@@ -31,7 +31,7 @@ foreach(TEST ${TESTS})
     list(GET TEST_APP_CASE 0 TEST_APP)
     list(GET TEST_APP_CASE 1 TEST_CASE)
     add_test(NAME "${TEST_APP}/${TEST_CASE}" COMMAND
-        ${MPIEXEC_EXECUTABLE}
+        ${MPIEXEC}
         ${MPIEXEC_EXTRA_FLAGS}
         ${MPIEXEC_NUMPROC_FLAG}
         ${MPI_NODES}

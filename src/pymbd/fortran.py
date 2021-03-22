@@ -41,9 +41,6 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
         git_commit = PYMBD_VERSION[3].split('+')[1]
         assert LIBMBD_VERSION[3].endswith(git_commit)
 
-if with_mpi:
-    from mpi4py import MPI  # noqa
-
 
 class MBDFortranException(Exception):
     def __init__(self, code, origin, msg):

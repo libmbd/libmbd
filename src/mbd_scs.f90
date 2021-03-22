@@ -71,7 +71,9 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         dsigma=grad%dalpha, &
         dr_vdw=grad%dr_vdw &
     )
+    call geom%clock(30)
     T = dipole_matrix(geom, damp_local, dT, grad_req)
+    call geom%clock(-30)
     ! if (geom%has_exc()) return
     if (grad%any()) then
         call alpha_full%copy_from(T)
@@ -90,6 +92,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         return
     end if
     if (.not. grad%any()) return
+    call geom%clock(33)
     allocate (alpha_prime(3, 3 * n_atoms), source=0d0)
     allocate (B_prime(3 * n_atoms, 3), source=0d0)
     allocate (grads_i(n_atoms))
@@ -101,7 +104,10 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
         end do
         do i_xyz = 1, 3
             dQ%val = -dT%dr(:, :, i_xyz)
+            call geom%clock(34)
             dQ = alpha_full%mmul(dQ)
+            call geom%clock(-34)
+            call geom%clock(35)
             call dQ%contract_n_transp('C', B_prime)
             do i_atom = 1, n_atoms
                 grads_i = contract_cross_33( &
@@ -113,6 +119,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
                         grads_i(geom%idx%j_atom)
                 end if
             end do
+            call geom%clock(-35)
         end do
     end if
     if (grad%dlattice) then
@@ -166,6 +173,7 @@ function run_scs(geom, alpha, damp, dalpha_scs, grad) result(alpha_scs)
             end if
         end do
     end if
+    call geom%clock(-33)
 end function
 
 end module

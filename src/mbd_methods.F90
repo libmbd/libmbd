@@ -66,7 +66,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
     if (grad%dlattice) grad_ham%dq = .true.
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%do_rpa) then
+            call geom%clock(52)
             res = get_mbd_hamiltonian_energy(geom, alpha_0, omega, damp, grad_ham)
+            call geom%clock(-52)
             if (grad%dC6) res%dE%dC6 = res%dE%domega * domega%dC6
             if (grad%dalpha) res%dE%dalpha = res%dE%dalpha + res%dE%domega * domega%dalpha
             if (allocated(res%dE%domega)) deallocate (res%dE%domega)

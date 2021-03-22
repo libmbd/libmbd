@@ -157,6 +157,10 @@ class MBDGeom(object):
         """Whether structure is a crystal."""
         return self._lattice is not None
 
+    def print_timing(self):
+        """Print timing from Libmbd."""
+        _lib.cmbd_print_timing(self._geom_f)
+
     @_auto_context
     def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi', force=False):
         """Calculate a TS energy.

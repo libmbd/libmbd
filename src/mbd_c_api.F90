@@ -24,7 +24,7 @@ public :: cmbd_with_scalapack, cmbd_with_mpi, cmbd_version_major, &
     cmbd_version_minor, cmbd_version_patch, cmbd_version_suffix
 public :: cmbd_init_geom, cmbd_destroy_geom, cmbd_init_damping, &
     cmbd_destroy_damping, cmbd_get_exception, cmbd_update_coords, cmbd_update_lattice, &
-    cmbd_get_results, cmbd_destroy_result
+    cmbd_get_results, cmbd_destroy_result, cmbd_print_timing
 public :: cmbd_ts_energy, cmbd_mbd_energy, cmbd_mbd_scs_energy, &
     cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy
 
@@ -313,6 +313,15 @@ subroutine cmbd_destroy_result(res_c) bind(c)
 
     call c_f_pointer(res_c, res)
     deallocate (res)
+end subroutine
+
+subroutine cmbd_print_timing(geom_c) bind(c)
+    type(c_ptr), value, intent(in) :: geom_c
+
+    type(geom_t), pointer :: geom
+
+    call c_f_pointer(geom_c, geom)
+    call geom%timer%print()
 end subroutine
 
 subroutine cmbd_dipole_matrix(geom_c, damping_c, q_point, dipmat_c) bind(c)

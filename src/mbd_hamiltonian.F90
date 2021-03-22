@@ -106,11 +106,13 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     character(120) :: msg
 
     n_atoms = geom%siz()
+    call geom%clock(20)
 #ifndef DO_COMPLEX_TYPE
     T = dipole_matrix(geom, damp, dT, grad)
 #else
     T = dipole_matrix(geom, damp, dT, grad, q)
 #endif
+    call geom%clock(-20)
     ! if (geom%has_exc()) return
     if (grad%any()) then
         call relay%copy_from(T)
@@ -152,7 +154,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     end if
     res%energy = 1d0 / 2 * sum(sqrt(eigs)) - 3d0 / 2 * sum(omega)
     if (.not. grad%any()) return
-    call geom%clock(25)
+    call geom%clock(22)
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0 / 4))
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
@@ -212,7 +214,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         end do
     end if
 #endif
-    call geom%clock(-25)
+    call geom%clock(-22)
 end function
 
 #ifndef DO_COMPLEX_TYPE

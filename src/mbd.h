@@ -46,6 +46,8 @@ struct cmbd_damping* cmbd_init_damping(
 
 void cmbd_destroy_damping(struct cmbd_damping* damping);
 
+void cmbd_print_timing(struct geom_t* geom);
+
 struct result_t* cmbd_ts_energy(
     struct geom_t* geom,
     double* alpha_0,

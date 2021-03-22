@@ -5,6 +5,7 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         ERROR_QUIET
         OUTPUT_STRIP_TRAILING_WHITESPACE)
+    message(STATUS "Setting version tag to ${VERSION_TAG} from Git")
 else()
     include(LibmbdVersionTag)
 endif()

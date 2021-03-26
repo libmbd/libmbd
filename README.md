@@ -20,6 +20,8 @@ Libmbd implements the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104
 
 The Python-based implementations as well as Python bindings to the Libmbd C API are accessible from the Python package called Pymbd.
 
+Libmbd is available in [FHI-aims](https://aimsclub.fhi-berlin.mpg.de), [Quantum Espresso](https://www.quantum-espresso.org), [DFTB+](https://github.com/dftbplus/dftbplus), and [ESL Bundle](https://esl.cecam.org/bundle/).
+
 ## Installing
 
 **TL;DR** Install prebuilt Libmbd binaries via [Conda-forge](https://conda-forge.org) and Pymbd with [Pip](https://pip.pypa.io/en/stable/quickstart/).

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- LIBMBD_LOG_LEVEL environment variable
+- pymbd.fortran.print_timing() and C API cmbd_print_timing()
+- python -m pymbd.benchmark
+
+### Fixed
+
+- MPI issues from exceptions when k-point parallelization
+
 ## [0.12.1] - 2021-03-01
 
 ### Added

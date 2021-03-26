@@ -195,7 +195,6 @@ def test_argon_crystal_gradients(argon_crystal):
         assert latt_gradients[i] == approx(num_latt_gradients[i], rel=1e-10, abs=1e-10)
 
 
-@pytest.mark.xfail
 def test_lithium(bulk_lithium):
     coords, lattice, k_grid, species, vol_ratios = bulk_lithium
     with pytest.raises(MBDFortranException):

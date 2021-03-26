@@ -82,7 +82,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         call geom%clock(23)
         eigs = AT%eigvalsh(geom%exc, destroy=.true.)
         call geom%clock(-23)
-        ! if (geom%has_exc()) return
+        if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
             where (eigs < 0) eigs = -erf(sqrt(pi) / 2 * eigs**4)**(1d0 / 4)
         end if

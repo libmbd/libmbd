@@ -116,7 +116,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
                 end if
             end associate
             call geom%clock(-51)
-            ! if (geom%has_exc()) return
+            if (geom%has_exc()) return
             if (geom%get_eigs) then
                 res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
             end if
@@ -205,7 +205,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
         alpha_dyn_scs(:, i_freq) = run_scs( &
             geom, alpha_dyn(:, i_freq), damp_scs, dalpha_dyn_scs(:, i_freq), grad_scs &
         )
-        ! if (geom%has_exc()) return
+        if (geom%has_exc()) return
     end do
     call geom%clock(-50)
     C6_scs = C6_from_alpha(alpha_dyn_scs, geom%freq, dC6_scs_dalpha_dyn_scs, grad%any())
@@ -222,7 +222,7 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
         ) &
     )
     call geom%clock(-90)
-    ! if (geom%has_exc()) return
+    if (geom%has_exc()) return
     if (.not. grad%any()) return
     call geom%clock(91)
     allocate (freq_w(0:ubound(geom%freq, 1)))

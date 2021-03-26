@@ -136,7 +136,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     else
         eigs = relay%eigvalsh(geom%exc, destroy=.true.)
     end if
-    ! if (geom%has_exc()) return
+    if (geom%has_exc()) return
     call geom%clock(-21)
     if (geom%get_eigs) res%mode_eigs = eigs
     n_negative_eigs = count(eigs(:) < 0)

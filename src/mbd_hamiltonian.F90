@@ -113,7 +113,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     T = dipole_matrix(geom, damp, dT, grad, q)
 #endif
     call geom%clock(-20)
-    ! if (geom%has_exc()) return
+    if (geom%has_exc()) return
     if (grad%any()) then
         call relay%copy_from(T)
     else

@@ -24,7 +24,6 @@ end interface
 
 contains
 
-! #   define DO_COMPLEX_TYPE 0
 #endif
 
 #ifndef DO_COMPLEX_TYPE
@@ -57,7 +56,6 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     if (geom%get_rpa_orders) allocate (res%rpa_orders(geom%param%rpa_order_max), source=0d0)
     do i_freq = 0, ubound(geom%freq, 1)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
-        ! relay = T
 #ifndef DO_COMPLEX_TYPE
         relay = dipole_matrix(geom, damp_alpha)
 #else

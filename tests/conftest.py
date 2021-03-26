@@ -14,10 +14,12 @@ def pytest_collection_modifyitems(config, items):
 
 
 if with_mpi:
+    from mpi4py import MPI
+
+if with_mpi:
     from functools import wraps
 
     import py._io.terminalwriter
-    from mpi4py import MPI
 
     rank = MPI.COMM_WORLD.Get_rank()
     _write_out = py._io.terminalwriter.write_out

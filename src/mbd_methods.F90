@@ -116,7 +116,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
                 end if
             end associate
             call geom%clock(-51)
-            if (geom%has_exc()) return
+            if (geom%has_exc()) exit
             if (geom%get_eigs) then
                 res%mode_eigs_k(:, i_kpt) = res_k%mode_eigs
             end if
@@ -143,6 +143,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
             if (grad%dR_vdw) res%dE%dR_vdw = res%dE%dR_vdw + res_k%dE%dR_vdw / n_kpts
         end do
 #ifdef WITH_MPI
+        call geom%sync_exc()
         if (geom%parallel_mode == 'k_points') then
             call mpi_all_reduce(res%energy, geom%mpi_comm)
             if (grad%dcoords) call mpi_all_reduce(res%dE%dcoords, geom%mpi_comm)

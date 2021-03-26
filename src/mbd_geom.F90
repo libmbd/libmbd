@@ -103,6 +103,9 @@ type, public :: geom_t
     procedure :: destroy => geom_destroy
     procedure :: siz => geom_siz
     procedure :: has_exc => geom_has_exc
+#ifdef WITH_MPI
+    procedure :: sync_exc => geom_sync_exc
+#endif
     procedure :: clock => geom_clock
 end type
 
@@ -226,6 +229,30 @@ logical function geom_has_exc(this) result(has_exc)
 
     has_exc = this%exc%code /= 0
 end function
+
+#ifdef WITH_MPI
+subroutine geom_sync_exc(this)
+    class(geom_t), intent(in) :: this
+
+    integer, allocatable :: codes(:)
+    integer :: err, rank
+
+    allocate (codes(this%mpi_size))
+    call MPI_ALLGATHER(this%exc%code, 1, MPI_INT, codes, 1, MPI_INT, this%mpi_comm, err)
+    do rank = 0, size(codes) - 1
+        if (codes(rank + 1) /= 0) then
+            call MPI_BCAST(this%exc%code, 1, MPI_INT, rank, this%mpi_comm, err)
+            call MPI_BCAST( &
+                this%exc%msg, len(this%exc%msg), MPI_CHARACTER, rank, this%mpi_comm, err &
+            )
+            call MPI_BCAST( &
+                this%exc%origin, len(this%exc%origin), MPI_CHARACTER, rank, this%mpi_comm, err &
+            )
+            exit
+        end if
+    end do
+end subroutine
+#endif
 
 function supercell_circum(lattice, radius) result(sc)
     real(dp), intent(in) :: lattice(3, 3)

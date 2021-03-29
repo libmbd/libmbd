@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import sys
 from argparse import ArgumentParser
-from itertools import dropwhile
 
 import numpy as np
 
@@ -43,6 +42,13 @@ def parse(output):
         for block in output.split('--------------')[1:-1]
     ]
     n_atoms = int(blocks[0][0][-1])
+    block_size = None
+    block = iter(blocks[1])
+    for words in block:
+        if words[0] == 'id':
+            break
+        elif words[0] == 'BLACS':
+            block_size = int(words[-1])
     timing = [
         {
             'id': int(words[0]),
@@ -51,10 +57,15 @@ def parse(output):
             'count': int(words[-2]),
             'time': float(words[-1]),
         }
-        for words in list(dropwhile(lambda ws: ws[0] != 'id', blocks[1]))[1:]
+        for words in block
     ]
     energy = float(blocks[2][0][-1])
-    return {'n_atoms': n_atoms, 'timing': timing, 'energy': energy}
+    return {
+        'n_atoms': n_atoms,
+        'timing': timing,
+        'energy': energy,
+        'block_size': block_size,
+    }
 
 
 def make_supercell(coords, lattice, species, vol_ratios, sc):

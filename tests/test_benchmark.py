@@ -9,7 +9,9 @@ import pytest
 from pymbd.benchmark import parse
 
 
-@pytest.mark.parametrize('args', [[], ['--finite']], ids=lambda x: ' '.join(x))
+@pytest.mark.parametrize(
+    'args', [[], ['--finite'], ['--method=ts']], ids=lambda x: ' '.join(x)
+)
 @pytest.mark.no_scalapack
 def test_benchmark(args):
     stdout = subprocess.run(
@@ -17,4 +19,4 @@ def test_benchmark(args):
         check=True,
         stdout=subprocess.PIPE,
     ).stdout.decode()
-    assert parse(stdout)['timing']
+    assert parse(stdout)['energy']

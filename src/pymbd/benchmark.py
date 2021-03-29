@@ -75,7 +75,7 @@ def _print(*args):
         print(*args)
 
 
-def run(supercell, k_grid, finite, force):
+def run(supercell, k_grid, finite, force, method):
     if with_mpi:
         from mpi4py import MPI
 
@@ -86,8 +86,9 @@ def run(supercell, k_grid, finite, force):
     _print('number of atoms:', len(coords))
     _print('--------------')
     geom = MBDGeom(coords) if finite else MBDGeom(coords, lattice, k_grid)
+    func = getattr(geom, f'{method}_energy_species')
     with geom:
-        ene, grad, *_ = geom.mbd_energy_species(species, vol_ratios, 0.83, force=force)
+        ene, grad, *_ = func(species, vol_ratios, 0.83, force=force)
         geom.print_timing()
     ene = ene / len(coords)
     grad = grad[0]
@@ -125,6 +126,12 @@ def main(args):
         action='store_false',
         dest='force',
         help='switch off calculation of gradients',
+    )
+    parser.add_argument(
+        '--method',
+        default='mbd',
+        choices=['mbd', 'ts'],
+        help='method to run',
     )
     args = parser.parse_args(args)
     run(**vars(args))

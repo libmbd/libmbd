@@ -198,6 +198,10 @@ subroutine geom_init(this)
     call this%log%info('Will use parallel mode: '//this%parallel_mode)
 #ifdef WITH_SCALAPACK
     if (this%idx%parallel) then
+        call this%log%info( &
+            'BLACS grid: '//trim(tostr(this%blacs_grid%nprows))//' x ' &
+            //trim(tostr(this%blacs_grid%npcols)) &
+        )
         call this%log%info('BLACS block size: '//tostr(this%blacs%blocksize))
     end if
 #endif

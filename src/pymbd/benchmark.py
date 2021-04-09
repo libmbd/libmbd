@@ -43,13 +43,16 @@ def parse(output):
         for block in output.split('--------------')[1:-1]
     ]
     n_atoms = int(blocks[0][0][-1])
-    block_size = None
+    block_size, grid = None, None
     block = iter(blocks[1])
     for words in block:
         if words[0] == 'id':
             break
         elif words[0] == 'BLACS':
-            block_size = int(words[-1])
+            if words[1] == 'block':
+                block_size = int(words[-1])
+            else:
+                grid = [int(words[-3]), int(words[-1])]
     timing = [
         {
             'id': int(words[0]),
@@ -66,6 +69,7 @@ def parse(output):
         'timing': timing,
         'energy': energy,
         'block_size': block_size,
+        'grid': grid,
     }
 
 
@@ -124,6 +128,11 @@ def run(supercell, k_grid, finite, force, method, early_return):
 def main(args):
     parser = ArgumentParser()
     parser.add_argument(
+        '--parse',
+        action='store_true',
+        help='parse stdin and output JSON',
+    )
+    parser.add_argument(
         '--supercell',
         nargs=3,
         type=int,
@@ -161,8 +170,13 @@ def main(args):
         action='store_true',
         help='return before doing any work',
     )
-    args = parser.parse_args(args)
-    run(**vars(args))
+    args = vars(parser.parse_args(args))
+    if args.pop('parse', False):
+        from pprint import pprint
+
+        pprint(parse(sys.stdin.read()))
+    else:
+        run(**args)
 
 
 if __name__ == '__main__':

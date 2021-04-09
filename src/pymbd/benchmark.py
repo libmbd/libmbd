@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from argparse import ArgumentParser
+from functools import partial
 
 import numpy as np
 
@@ -86,7 +87,7 @@ def _print(*args):
         print(*args)
 
 
-def run(supercell, k_grid, finite, force, method):
+def run(supercell, k_grid, finite, force, method, early_return):
     if with_mpi:
         from mpi4py import MPI
 
@@ -96,16 +97,27 @@ def run(supercell, k_grid, finite, force, method):
     coords, lattice, species, vol_ratios = make_supercell(*unit_cell, supercell)
     _print('number of atoms:', len(coords))
     _print('--------------')
+    if early_return:
+        return
     geom = MBDGeom(coords) if finite else MBDGeom(coords, lattice, k_grid)
-    func = getattr(geom, f'{method}_energy_species')
+    if method == 'mbd@rsscs':
+        func = geom.mbd_energy_species
+    elif method == 'mbd':
+        func = partial(geom.mbd_energy_species, variant='plain')
+    elif method == 'ts':
+        func = geom.ts_energy_species
     with geom:
-        ene, grad, *_ = func(species, vol_ratios, 0.83, force=force)
+        res = func(species, vol_ratios, 0.83, force=force)
         geom.print_timing()
+    if force:
+        ene, grad, *_ = res
+    else:
+        ene = res
     ene = ene / len(coords)
-    grad = grad[0]
     _print('--------------')
     _print('energy:', ene)
-    _print('grad[0]:', grad)
+    if force:
+        _print('grad[0]:', grad[0])
     _print('--------------')
 
 
@@ -140,9 +152,14 @@ def main(args):
     )
     parser.add_argument(
         '--method',
-        default='mbd',
-        choices=['mbd', 'ts'],
+        default='mbd@rsscs',
+        choices=['mbd@rsscs', 'mbd', 'ts'],
         help='method to run',
+    )
+    parser.add_argument(
+        '--early-return',
+        action='store_true',
+        help='return before doing any work',
     )
     args = parser.parse_args(args)
     run(**vars(args))

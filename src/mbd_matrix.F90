@@ -6,7 +6,7 @@ module mbd_matrix
 
 use mbd_constants
 use mbd_lapack, only: mmul, invh, invh, eigh, eigvals, eigvalsh
-use mbd_utils, only: findval, exception_t, atom_index_t, is_true
+use mbd_utils, only: findval, exception_t, atom_index_t, is_true, clock_t
 #   ifdef WITH_SCALAPACK
 use mbd_blacs, only: blacs_desc_t, blacs_all_reduce
 use mbd_scalapack, only: pmmul, pinvh, pinvh, peigh, peigvalsh
@@ -356,22 +356,23 @@ subroutine matrix_cplx_eigh(A, eigs, exc, src, vals_only)
 end subroutine
 
 #ifndef DO_COMPLEX_TYPE
-function matrix_re_eigvalsh(A, exc, destroy) result(eigs)
+function matrix_re_eigvalsh(A, exc, destroy, clock) result(eigs)
     class(matrix_re_t), intent(inout) :: A
 #else
-function matrix_cplx_eigvalsh(A, exc, destroy) result(eigs)
+function matrix_cplx_eigvalsh(A, exc, destroy, clock) result(eigs)
     class(matrix_cplx_t), intent(inout) :: A
 #endif
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3 * A%idx%n_atoms)
+    type(clock_t), intent(inout), optional :: clock
 
 #ifdef WITH_SCALAPACK
     if (A%idx%parallel) then
 #   ifdef WITH_ELSI
         eigs = elsi_eigvalsh(A%val, A%blacs, exc, destroy)
 #   else
-        eigs = peigvalsh(A%val, A%blacs, exc, destroy)
+        eigs = peigvalsh(A%val, A%blacs, exc, destroy, clock)
 #   endif
         return
     end if

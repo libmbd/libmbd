@@ -6,7 +6,7 @@ module mbd_scalapack
 use mbd_constants
 use mbd_lapack, only: mode
 use mbd_blacs, only: blacs_desc_t
-use mbd_utils, only: exception_t, tostr
+use mbd_utils, only: exception_t, tostr, clock_t
 
 implicit none
 
@@ -119,13 +119,14 @@ function pmmul_complex(A, blacsA, B, blacsB, transA, transB, blacsC) result(C)
     )
 end function
 
-subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
+subroutine peigh_real(A, blacs, eigs, exc, src, vals_only, clock)
     real(dp), intent(inout) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
     real(dp), intent(out) :: eigs(:)
     type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
+    type(clock_t), intent(inout), optional :: clock
 
     real(dp), allocatable :: work_arr(:), vectors(:, :)
     real(dp) :: n_work_arr(1)
@@ -138,15 +139,19 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only)
     else
         allocate (vectors(1, 1))
     end if
+    if (present(clock)) call clock%clock(61)
     call PDSYEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, n_work_arr, -1, error_flag &
     )
+    if (present(clock)) call clock%clock(-61)
     allocate (work_arr(nint(n_work_arr(1))))
+    if (present(clock)) call clock%clock(62)
     call PDSYEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, work_arr(1), size(work_arr), error_flag &
     )
+    if (present(clock)) call clock%clock(-62)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -209,12 +214,13 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
-function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
+function peigvalsh_real(A, blacs, exc, destroy, clock) result(eigs)
     real(dp), target, intent(in) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3 * blacs%n_atoms)
+    type(clock_t), intent(inout), optional :: clock
 
     real(dp), allocatable, target :: A_work(:, :)
     real(dp), pointer :: A_p(:, :)
@@ -229,15 +235,16 @@ function peigvalsh_real(A, blacs, exc, destroy) result(eigs)
         allocate (A_work(size(A, 1), size(A, 1)), source=A)
         A_p => A_work
     end if
-    call peigh_real(A_p, blacs, eigs, exc, vals_only=.true.)
+    call peigh_real(A_p, blacs, eigs, exc, vals_only=.true., clock=clock)
 end function
 
-function peigvalsh_complex(A, blacs, exc, destroy) result(eigs)
+function peigvalsh_complex(A, blacs, exc, destroy, clock) result(eigs)
     complex(dp), target, intent(in) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: destroy
     real(dp) :: eigs(3 * blacs%n_atoms)
+    type(clock_t), intent(inout), optional :: clock
 
     complex(dp), allocatable, target :: A_work(:, :)
     complex(dp), pointer :: A_p(:, :)

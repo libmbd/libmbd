@@ -134,7 +134,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
 #endif
         end if
     else
-        eigs = relay%eigvalsh(geom%exc, destroy=.true.)
+        eigs = relay%eigvalsh(geom%exc, destroy=.true., clock=geom%timer)
     end if
     if (geom%has_exc()) return
     call geom%clock(-21)

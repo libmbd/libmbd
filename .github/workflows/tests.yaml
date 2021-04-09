@@ -60,7 +60,7 @@ jobs:
           path: |
             ${{ env.VIRTUAL_ENV }}/bin
             ${{ env.VIRTUAL_ENV }}/lib/python${{ matrix.python-version }}/site-packages
-          key: ${{ runner.os }}-${{ matrix.python-version }}-v3
+          key: ${{ runner.os }}-${{ matrix.python-version }}-v4
       - name: Install dependencies
         run: pip install -U wheel cffi coverage poetry-dynamic-versioning
       - name: Set CMAKE_FLAGS

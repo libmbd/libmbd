@@ -3,6 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 from __future__ import division, print_function
 
+import re
 from functools import wraps
 
 import numpy as np
@@ -38,7 +39,7 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
     else:
         assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
     if len(PYMBD_VERSION) == 4:
-        git_commit = PYMBD_VERSION[3].split('+')[1]
+        git_commit = re.split('[+-]', PYMBD_VERSION[3])[1]
         assert LIBMBD_VERSION[3].endswith(git_commit)
 
 

@@ -93,6 +93,8 @@ jobs:
         run: poetry build
       - name: Install Pymbd
         run: pip install -U pymbd[test,mpi] --pre -f ./dist
+      - name: Report packages
+        run: pip list
       - name: Test Libmbd
         run: "cd build && ctest --output-on-failure"
       - name: Test Pymbd

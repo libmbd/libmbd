@@ -7,21 +7,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-16.04
+          - os: ubuntu-latest
             python-version: 3.6
-          - os: ubuntu-16.04
+          - os: ubuntu-latest
             python-version: 3.6
             mpi-nodes: 1
-          - os: ubuntu-16.04
+          - os: ubuntu-latest
             python-version: 3.7
             mpi-nodes: 2
-          - os: ubuntu-16.04
+          - os: ubuntu-latest
             python-version: 3.8
             mpi-nodes: 4
-          - os: ubuntu-16.04
+          - os: ubuntu-latest
             python-version: 3.9
             mpi-nodes: 8
-          - os: macos-10.15
+          - os: macos-latest
             python-version: 3.9
             mpi-nodes: 2
     runs-on: ${{ matrix.os }}
@@ -31,12 +31,19 @@ jobs:
       - run: brew install open-mpi scalapack
         if: ${{ contains(matrix.os, 'macos') }}
       - uses: actions/setup-python@v2
+        id: setup-python
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Poetry
         run: |
-          curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-          echo $HOME/.poetry/bin >>$GITHUB_PATH
+          curl -sSL https://install.python-poetry.org | python -
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            ROOT=$HOME/.local/share
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            ROOT="$HOME/Library/Application Support"
+          fi
+          "$ROOT"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
+          echo $HOME/.local/bin >>$GITHUB_PATH
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
@@ -46,6 +53,8 @@ jobs:
           echo VIRTUAL_ENV=$PWD/venv >>$GITHUB_ENV
           echo $PWD/venv/bin >>$GITHUB_PATH
           echo venv >>.git/info/exclude
+      - name: Set year/month
+        run: echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
       - name: Report environment
         run: |
           type python
@@ -60,17 +69,14 @@ jobs:
           path: |
             ${{ env.VIRTUAL_ENV }}/bin
             ${{ env.VIRTUAL_ENV }}/lib/python${{ matrix.python-version }}/site-packages
-          key: ${{ runner.os }}-${{ matrix.python-version }}-v4
+          key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ env.YEAR_MONTH }}
       - name: Install dependencies
-        run: pip install -U wheel cffi coverage poetry-dynamic-versioning
+        run: pip install -U wheel cffi coverage
       - name: Set CMAKE_FLAGS
         run: |
           CMAKE_FLAGS='-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"'
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               CMAKE_FLAGS="$CMAKE_FLAGS"' -DENABLE_SCALAPACK_MPI=ON'
-              if [[ "${{ runner.os }}" == "Linux" ]]; then
-                  CMAKE_FLAGS="$CMAKE_FLAGS"' -DSCALAPACK_LIBRARIES="-lscalapack-openmpi -lblacs-openmpi"'
-              fi
           fi
           if [[ "${{ runner.os }}" == "macOS" ]]; then
               CMAKE_FLAGS="$CMAKE_FLAGS"' -DCMAKE_Fortran_COMPILER=gfortran-10'

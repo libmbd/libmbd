@@ -14,7 +14,7 @@ from .pymbd import _array, from_volumes
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
 except ImportError:
-    raise Exception('Pymbd C extension unimportable, cannot use Fortran')
+    raise Exception('Pymbd C extension unimportable, cannot use Fortran') from None
 
 __all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 
@@ -43,9 +43,9 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
         assert LIBMBD_VERSION[3].endswith(git_commit)
 
 
-class MBDFortranException(Exception):
+class MBDFortranError(Exception):
     def __init__(self, code, origin, msg):
-        super(MBDFortranException, self).__init__(msg)
+        super(MBDFortranError, self).__init__(msg)
         self.code = code
         self.origin = origin
 
@@ -129,7 +129,7 @@ class MBDGeom(object):
         msg = _ffi.new('char[150]')
         _lib.cmbd_get_exception(self._geom_f, _cast('int*', code), origin, msg)
         if code != 0:
-            raise MBDFortranException(
+            raise MBDFortranError(
                 int(code), _ffi.string(origin).decode(), _ffi.string(msg).decode()
             )
 

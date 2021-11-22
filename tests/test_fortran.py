@@ -3,7 +3,7 @@ import pytest
 from pytest import approx
 
 from pymbd import ang, from_volumes
-from pymbd.fortran import MBDFortranException, MBDGeom
+from pymbd.fortran import MBDFortranError, MBDGeom
 from pymbd.utils import numerical_gradients, numerical_latt_gradients
 
 
@@ -197,7 +197,7 @@ def test_argon_crystal_gradients(argon_crystal):
 
 def test_lithium(bulk_lithium):
     coords, lattice, k_grid, species, vol_ratios = bulk_lithium
-    with pytest.raises(MBDFortranException):
+    with pytest.raises(MBDFortranError):
         MBDGeom(coords, lattice, k_grid).mbd_energy_species(species, vol_ratios, 0.83)
 
 

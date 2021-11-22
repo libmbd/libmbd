@@ -38,13 +38,13 @@ mpi = ["mpi4py"]
 test = ["pytest"]
 
 [tool.poetry.dev-dependencies]
-flake8 = "^3.5"
-flake8-bugbear = "^19"
-flake8-comprehensions = "^2"
-flake8-quotes = ">=2"
+flake8 = "^4"
+flake8-bugbear = "^21"
+flake8-comprehensions = "^3"
+flake8-quotes = "^3"
+pep8-naming = "^0.12"
 black = ">=20-beta.0"
 pydocstyle = "^5"
-pep8-naming = "^0.8"
 isort = "^5"
 fprettify = { git = "https://github.com/jhrmnn/fprettify.git", rev = "fix-config-search" }
 

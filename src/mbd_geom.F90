@@ -242,10 +242,10 @@ subroutine geom_sync_exc(this)
     integer :: err, rank
 
     allocate (codes(this%mpi_size))
-    call MPI_ALLGATHER(this%exc%code, 1, MPI_INT, codes, 1, MPI_INT, this%mpi_comm, err)
+    call MPI_ALLGATHER(this%exc%code, 1, MPI_INTEGER, codes, 1, MPI_INTEGER, this%mpi_comm, err)
     do rank = 0, size(codes) - 1
         if (codes(rank + 1) /= 0) then
-            call MPI_BCAST(this%exc%code, 1, MPI_INT, rank, this%mpi_comm, err)
+            call MPI_BCAST(this%exc%code, 1, MPI_INTEGER, rank, this%mpi_comm, err)
             call MPI_BCAST( &
                 this%exc%msg, len(this%exc%msg), MPI_CHARACTER, rank, this%mpi_comm, err &
             )

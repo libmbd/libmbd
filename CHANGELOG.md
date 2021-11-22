@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - MPI issues from exceptions when k-point parallelization
+- Missing vdW parameters for f-block elements
 
 ## [0.12.1] - 2021-03-01
 

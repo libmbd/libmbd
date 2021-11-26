@@ -6,8 +6,14 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
         ERROR_QUIET
         OUTPUT_STRIP_TRAILING_WHITESPACE)
     message(STATUS "Setting version tag to ${VERSION_TAG} from Git")
-else()
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/LibmbdVersionTag.cmake")
     include(LibmbdVersionTag)
+else()
+    message(FATAL_ERROR
+        "Not in a Git repository and version tag is missing, you most likely "
+        "attempt to install from a copy of the source tree. Obtain the source "
+        "distribution (libmbd-<version>.tar.gz) from a Github release page "
+        "instead.")
 endif()
 
 set(PROJECT_VERSION ${VERSION_TAG})

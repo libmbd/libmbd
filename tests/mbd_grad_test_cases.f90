@@ -269,7 +269,7 @@ subroutine test_mbd_ewald_deriv_expl()
     end do
     call geom%destroy()
     diff = (gradients - gradients_anl) / gradients_anl
-    if (failed(maxval(abs(diff)), 1d-8)) then
+    if (failed(maxval(abs(diff)), 2d-8)) then
         call print_matrix('delta gradients', diff)
         call print_matrix('anl', gradients_anl)
         call print_matrix('num', gradients)

@@ -5,8 +5,8 @@ from functools import partial
 
 import numpy as np
 
-from pymbd import ang
-from pymbd.fortran import MBDGeom, with_mpi
+from pymbd import __version__ as _version, ang
+from pymbd.fortran import LIBMBD_VERSION, MBDGeom, with_mpi
 
 __all__ = ()
 
@@ -43,6 +43,8 @@ def parse(output):
         for block in output.split('--------------')[1:-1]
     ]
     n_atoms = int(blocks[0][0][-1])
+    version_pymbd = blocks[0][1][-1]
+    version_libmbd = blocks[0][2][-1]
     block_size, grid = None, None
     block = iter(blocks[1])
     for words in block:
@@ -65,6 +67,8 @@ def parse(output):
     ]
     energy = float(blocks[2][0][-1])
     return {
+        'version_pymbd': version_pymbd,
+        'version_libmbd': version_libmbd,
         'n_atoms': n_atoms,
         'timing': timing,
         'energy': energy,
@@ -100,6 +104,8 @@ def run(supercell, k_grid, finite, force, method, early_return):
     _print('--------------')
     coords, lattice, species, vol_ratios = make_supercell(*unit_cell, supercell)
     _print('number of atoms:', len(coords))
+    _print('Pymbd version:', '.'.join(map(str, _version)))
+    _print('Libmbd version:', '{}.{}.{}-{}'.format(*LIBMBD_VERSION))
     _print('--------------')
     if early_return:
         return

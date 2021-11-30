@@ -125,7 +125,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     if (geom%get_modes .or. grad%any()) then
         call modes%alloc_from(relay)
         allocate (eigs(3 * n_atoms))
-        call modes%eigh(eigs, geom%exc, src=relay)
+        call modes%eigh(eigs, geom%exc, src=relay, clock=geom%timer)
         if (geom%get_modes) then
 #ifndef DO_COMPLEX_TYPE
             call move_alloc(modes%val, res%modes)
@@ -157,11 +157,14 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
     call geom%clock(22)
     call c_lambda12i_c%copy_from(modes)
     call c_lambda12i_c%mult_cols_3n(eigs**(-1d0 / 4))
+    call geom%clock(14)
     c_lambda12i_c = c_lambda12i_c%mmul(c_lambda12i_c, transB='C')
+    call geom%clock(-14)
 #ifdef DO_COMPLEX_TYPE
     c_lambda12i_c%val = conjg(c_lambda12i_c%val)
 #endif
     call dQ%init_from(T)
+    call geom%clock(15)
     if (grad%dcoords) then
         allocate (res%dE%dcoords(n_atoms, 3))
         do i_xyz = 1, 3
@@ -214,6 +217,7 @@ type(result_t) function get_mbd_hamiltonian_energy_complex( &
         end do
     end if
 #endif
+    call geom%clock(-15)
     call geom%clock(-22)
 end function
 

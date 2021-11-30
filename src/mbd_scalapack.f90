@@ -36,11 +36,12 @@ external :: PDSYEV, PZHEEV, PDGETRF, PDGETRI, PDGEMM, PZGEMM
 
 contains
 
-subroutine pinvh_real(A, blacs, exc, src)
+subroutine pinvh_real(A, blacs, exc, src, clock)
     real(dp), intent(inout) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
     type(exception_t), intent(out), optional :: exc
     real(dp), intent(in), optional :: src(:, :)
+    type(clock_t), intent(inout), optional :: clock
 
     integer, allocatable :: i_pivot(:), iwork_arr(:)
     real(dp), allocatable :: work_arr(:)
@@ -51,7 +52,9 @@ subroutine pinvh_real(A, blacs, exc, src)
     if (n == 0) return
     if (present(src)) A = src
     allocate (i_pivot(n))
+    if (present(clock)) call clock%clock(16)
     call PDGETRF(n, n, A, 1, 1, blacs%desc, i_pivot, error_flag)
+    if (present(clock)) call clock%clock(-16)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -66,9 +69,12 @@ subroutine pinvh_real(A, blacs, exc, src)
     )
     n_work_arr = nint(n_work_arr_optim(1))
     allocate (work_arr(n_work_arr), iwork_arr(n_iwork_arr(1)))
+    if (present(clock)) call clock%clock(17)
     call PDGETRI( &
         n, A, 1, 1, blacs%desc, i_pivot, &
-        work_arr, n_work_arr, iwork_arr, n_iwork_arr(1), error_flag)
+        work_arr, n_work_arr, iwork_arr, n_iwork_arr(1), error_flag &
+    )
+    if (present(clock)) call clock%clock(-17)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -139,19 +145,17 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only, clock)
     else
         allocate (vectors(1, 1))
     end if
-    if (present(clock)) call clock%clock(61)
     call PDSYEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, n_work_arr, -1, error_flag &
     )
-    if (present(clock)) call clock%clock(-61)
     allocate (work_arr(nint(n_work_arr(1))))
-    if (present(clock)) call clock%clock(62)
+    if (present(clock)) call clock%clock(13)
     call PDSYEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, work_arr(1), size(work_arr), error_flag &
     )
-    if (present(clock)) call clock%clock(-62)
+    if (present(clock)) call clock%clock(-13)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG
@@ -163,13 +167,14 @@ subroutine peigh_real(A, blacs, eigs, exc, src, vals_only, clock)
     if (mode(vals_only) == 'V') A = vectors
 end subroutine
 
-subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
+subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only, clock)
     complex(dp), intent(inout) :: A(:, :)
     type(blacs_desc_t), intent(in) :: blacs
     real(dp), intent(out) :: eigs(:)
     type(exception_t), intent(out), optional :: exc
     complex(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
+    type(clock_t), intent(inout), optional :: clock
 
     complex(dp), allocatable :: work_arr(:), vectors(:, :)
     integer :: n_work_arr, n_rwork_arr
@@ -198,11 +203,13 @@ subroutine peigh_complex(A, blacs, eigs, exc, src, vals_only)
     end if
     allocate (work_arr(n_work_arr), source=(0d0, 0d0))
     allocate (rwork_arr(n_rwork_arr), source=0d0)
+    if (present(clock)) call clock%clock(13)
     call PZHEEV( &
         mode(vals_only), 'U', n, A, 1, 1, blacs%desc, eigs, vectors, &
         1, 1, blacs%desc, work_arr, n_work_arr, rwork_arr, n_rwork_arr, &
         error_flag &
     )
+    if (present(clock)) call clock%clock(-13)
     if (error_flag /= 0) then
         if (present(exc)) then
             exc%code = MBD_EXC_LINALG

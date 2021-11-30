@@ -236,12 +236,18 @@ subroutine clock_print(this)
 #endif
     call system_clock(cnt, rate, cnt_max)
 
-    print '(A5,A7,A20,A10,A10)', 'id', 'level', 'label', 'count', 'time (s)'
+    print '(A5,A7,A20,A10,A16)', 'id', 'level', 'label', 'count', 'time (s)'
     do i = 1, size(this%counts)
         if (this%counts(i) == 0) cycle
         select case (i)
         case (11); label = 'dipmat real'
         case (12); label = 'dipmat rec'
+        case (13); label = 'P_EVR'
+        case (14); label = 'mmul'
+        case (15); label = 'force contractions'
+        case (16); label = 'PDGETRF'
+        case (17); label = 'PDGETRI'
+        case (18); label = 'ELSI ev'
         case (20); label = 'MBD dipole'
         case (21); label = 'MBD eig'
         case (22); label = 'MBD forces'
@@ -249,8 +255,6 @@ subroutine clock_print(this)
         case (30); label = 'SCS dipole'
         case (32); label = 'SCS inv'
         case (33); label = 'SCS forces'
-        case (34); label = 'SCS forces mmul'
-        case (35); label = 'SCS forces contract'
         case (50); label = 'SCS'
         case (51); label = 'MBD k-point'
         case (52); label = 'MBD'
@@ -259,7 +263,7 @@ subroutine clock_print(this)
         case default
             label = '('//trim(tostr(i))//')'
         end select
-        print '(I5,I7,"  ",A20,I10,F10.3)', i, this%levels(i), label, this%counts(i), &
+        print '(I5,I7,"  ",A20,I10,F16.6)', i, this%levels(i), label, this%counts(i), &
             dble(this%timestamps(i)) / rate
     end do
 end subroutine

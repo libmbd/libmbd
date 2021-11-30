@@ -330,24 +330,27 @@ subroutine matrix_cplx_mult_col(this, idx, a)
 end subroutine
 
 #ifndef DO_COMPLEX_TYPE
-subroutine matrix_re_eigh(A, eigs, exc, src, vals_only)
+subroutine matrix_re_eigh(A, eigs, exc, src, vals_only, clock)
     class(matrix_re_t), intent(inout) :: A
     type(matrix_re_t), intent(in), optional :: src
 #else
-subroutine matrix_cplx_eigh(A, eigs, exc, src, vals_only)
+subroutine matrix_cplx_eigh(A, eigs, exc, src, vals_only, clock)
     class(matrix_cplx_t), intent(inout) :: A
     type(matrix_cplx_t), intent(in), optional :: src
 #endif
     real(dp), intent(out) :: eigs(:)
     type(exception_t), intent(out), optional :: exc
     logical, intent(in), optional :: vals_only
+    type(clock_t), intent(inout), optional :: clock
 
 #ifdef WITH_SCALAPACK
     if (A%idx%parallel) then
 #   ifdef WITH_ELSI
+        if (present(clock)) call clock%clock(18)
         call elsi_eigh(A%val, A%blacs, eigs, exc, src%val, vals_only)
+        if (present(clock)) call clock%clock(-18)
 #   else
-        call peigh(A%val, A%blacs, eigs, exc, src%val, vals_only)
+        call peigh(A%val, A%blacs, eigs, exc, src%val, vals_only, clock)
 #   endif
         return
     end if
@@ -559,10 +562,11 @@ end function
 #   define DO_COMPLEX_TYPE
 #include "mbd_matrix.F90"
 
-subroutine matrix_re_invh(A, exc, src)
+subroutine matrix_re_invh(A, exc, src, clock)
     class(matrix_re_t), intent(inout) :: A
     type(matrix_re_t), intent(in), optional :: src
     type(exception_t), intent(out), optional :: exc
+    type(clock_t), intent(inout), optional :: clock
 
 #ifdef WITH_SCALAPACK
     if (.not. A%idx%parallel) then
@@ -573,9 +577,9 @@ subroutine matrix_re_invh(A, exc, src)
         end if
     else
         if (present(src)) then
-            call pinvh(A%val, A%blacs, exc, src%val)
+            call pinvh(A%val, A%blacs, exc, src%val, clock=clock)
         else
-            call pinvh(A%val, A%blacs, exc)
+            call pinvh(A%val, A%blacs, exc, clock=clock)
         end if
     end if
 #else

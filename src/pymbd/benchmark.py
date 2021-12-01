@@ -95,7 +95,7 @@ def _print(*args):
         print(*args)
 
 
-def run(supercell, k_grid, finite, force, method, early_return):
+def run(supercell, k_grid, finite, force, method, early_return, repeat):
     if with_mpi:
         from mpi4py import MPI
 
@@ -117,7 +117,8 @@ def run(supercell, k_grid, finite, force, method, early_return):
     elif method == 'ts':
         func = geom.ts_energy_species
     with geom:
-        res = func(species, vol_ratios, 0.83, force=force)
+        for _ in range(repeat):
+            res = func(species, vol_ratios, 0.83, force=force)
         geom.print_timing()
     if force:
         ene, grad, *_ = res
@@ -175,6 +176,12 @@ def main(args):
         '--early-return',
         action='store_true',
         help='return before doing any work',
+    )
+    parser.add_argument(
+        '--repeat',
+        type=int,
+        default=1,
+        help='run benchmark repeatedly',
     )
     args = vars(parser.parse_args(args))
     if args.pop('parse', False):

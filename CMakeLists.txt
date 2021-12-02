@@ -83,7 +83,7 @@ specify custom installation with SCALAPACK_LIBRARIES or MKL_LIBRARIES variable")
 endif()
 
 if(ENABLE_ELSI)
-    if(NOT DEFINED ELSI_LIBRARIES)
+    if(NOT DEFINED ELSI_LIBRARIES AND NOT TARGET elsi::elsi)
         find_package(elsi 2.0 QUIET)
         if(elsi_FOUND)
             message(STATUS "ELSI CMake package found in ${elsi_DIR}")

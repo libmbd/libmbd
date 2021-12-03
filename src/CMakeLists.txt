@@ -61,11 +61,7 @@ if(ENABLE_SCALAPACK_MPI)
 endif()
 
 if(ENABLE_ELSI)
-    if(DEFINED ELSI_LIBRARIES)
-        target_link_libraries(mbd PRIVATE ${ELSI_LIBRARIES})
-    else()
-        target_link_libraries(mbd PRIVATE elsi::elsi)
-    endif()
+    target_link_libraries(mbd PRIVATE elsi::elsi)
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_ELSI)
 endif()
 

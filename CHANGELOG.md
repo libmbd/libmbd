@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- pkg-config support for ELSI
+
 ### Removed
 
 - Support for CMake<3.14

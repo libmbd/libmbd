@@ -83,6 +83,9 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" ]]; then
               CMAKE_FLAGS="$CMAKE_FLAGS"' -DCMAKE_Fortran_COMPILER=gfortran-10'
           fi
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            CMAKE_FLAGS="$CMAKE_FLAGS"' -DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"'
+          fi
           echo CMAKE_FLAGS=$CMAKE_FLAGS
           echo CMAKE_FLAGS=$CMAKE_FLAGS >>$GITHUB_ENV
       - name: Cmake

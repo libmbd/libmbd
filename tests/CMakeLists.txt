@@ -4,8 +4,7 @@ foreach(TEST_APP mbd_grad_tests mbd_api_tests)
     target_include_directories(${TEST_APP} PRIVATE $<TARGET_FILE_DIR:mbd>)
     target_link_libraries(${TEST_APP} PRIVATE mbd)
     if(ENABLE_SCALAPACK_MPI)
-        target_include_directories(${TEST_APP} PRIVATE ${MPI_Fortran_INCLUDE_PATH})
-        target_link_libraries(${TEST_APP} PRIVATE ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
+        target_link_libraries(${TEST_APP} PRIVATE MPI::MPI_Fortran)
         set_property(TARGET ${TEST_APP} APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
     endif()
     if(ENABLE_ELSI)
@@ -31,7 +30,7 @@ foreach(TEST ${TESTS})
     list(GET TEST_APP_CASE 0 TEST_APP)
     list(GET TEST_APP_CASE 1 TEST_CASE)
     add_test(NAME "${TEST_APP}/${TEST_CASE}" COMMAND
-        ${MPIEXEC}
+        ${MPIEXEC_EXECUTABLE}
         ${MPIEXEC_EXTRA_FLAGS}
         ${MPIEXEC_NUMPROC_FLAG}
         ${MPI_NODES}

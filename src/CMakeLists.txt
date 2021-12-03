@@ -25,6 +25,16 @@ add_library(mbd
 
 if(ENABLE_SCALAPACK_MPI)
     target_sources(mbd PRIVATE mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
+
+    # Disable argument mismatch checking for specific files (needed for some MPI-frameworks)
+    set(mismatch mbd_geom.F90 mbd_methods.F90 mbd_mpi.F90 mbd_ts.F90)
+    if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "NAG")
+        set_source_files_properties(SOURCE ${mismatch} PROPERTY COMPILE_FLAGS -mismatch)
+    endif()
+    if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU"
+        AND "${CMAKE_Fortran_COMPILER_VERSION}" VERSION_GREATER_EQUAL "11")
+        set_source_files_properties(SOURCE ${mismatch} PROPERTY COMPILE_FLAGS -fallow-argument-mismatch)
+    endif()
 endif()
 
 if(ENABLE_ELSI)
@@ -43,12 +53,6 @@ target_include_directories(mbd
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-if(DEFINED MKL_LIBRARIES)
-    target_link_libraries(mbd PRIVATE ${MKL_LIBRARIES})
-else()
-    target_link_libraries(mbd PRIVATE ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
-endif()
-
 if(ENABLE_SCALAPACK_MPI)
     target_link_libraries(mbd PRIVATE ${MPI_Fortran_LINK_FLAGS} ${MPI_Fortran_LIBRARIES})
     target_include_directories(mbd PRIVATE ${MPI_Fortran_INCLUDE_PATH})
@@ -58,6 +62,12 @@ if(ENABLE_SCALAPACK_MPI)
         target_link_libraries(mbd PRIVATE scalapack)
     endif()
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
+endif()
+
+if(DEFINED MKL_LIBRARIES)
+    target_link_libraries(mbd PRIVATE ${MKL_LIBRARIES})
+else()
+    target_link_libraries(mbd PRIVATE ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
 endif()
 
 if(ENABLE_ELSI)

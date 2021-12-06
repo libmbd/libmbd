@@ -11,7 +11,6 @@ if LIBMBD_PREFIX == '':
     def build(setup_kwargs):
         pass
 
-
 else:
 
     # some Conda environments do not add their include dir into default includes

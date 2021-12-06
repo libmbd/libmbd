@@ -43,7 +43,7 @@ flake8-bugbear = "^21"
 flake8-comprehensions = "^3"
 flake8-quotes = "^3"
 pep8-naming = "^0.12"
-black = ">=20-beta.0"
+black = { version = ">=20-beta.0", python = "^3.7" }
 pydocstyle = "^5"
 isort = "^5"
 fprettify = { git = "https://github.com/jhrmnn/fprettify.git", rev = "fix-config-search" }

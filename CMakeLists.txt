@@ -30,27 +30,31 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "${DEFAULT_BUILD_TYPE}")
 endif()
 
-find_package(LAPACK REQUIRED)
-if(CMAKE_VERSION VERSION_LESS 3.18)
-    add_library(LAPACK::LAPACK INTERFACE IMPORTED)
-    target_link_libraries(scalapack INTERFACE "${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES}")
+if(NOT TARGET LAPACK::LAPACK)
+    find_package(LAPACK REQUIRED)
+    if(CMAKE_VERSION VERSION_LESS 3.18)
+        add_library(LAPACK::LAPACK INTERFACE IMPORTED)
+        target_link_libraries(scalapack INTERFACE "${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES}")
+    endif()
 endif()
 
 if(ENABLE_SCALAPACK_MPI)
-    find_package(MPI REQUIRED)
-    if(APPLE)
-        # -flat_namespace (Darwin-specific) is causing a crash (seg fault) when the
-        # Fortran library is called from Python and one writes into a character
-        # variable, but only when the kind is the default one. It causes the
-        # written to variable to appear as being four times shorter than it is.
-        # Only mention of anything possibly related I could find is at
-        #
-        #   https://trac.mpich.org/projects/mpich/ticket/1590
-        get_target_property(_VALUE MPI::MPI_Fortran INTERFACE_LINK_OPTIONS)
-        string(REGEX REPLACE "-Wl\\$<COMMA>-flat_namespace ?" "" _VALUE "${_VALUE}")
-        set_target_properties(MPI::MPI_Fortran PROPERTIES INTERFACE_LINK_OPTIONS "${_VALUE}")
+    if(NOT TARGET MPI::MPI_Fortran)
+        find_package(MPI REQUIRED)
+        if(APPLE)
+            # -flat_namespace (Darwin-specific) is causing a crash (seg fault) when the
+            # Fortran library is called from Python and one writes into a character
+            # variable, but only when the kind is the default one. It causes the
+            # written to variable to appear as being four times shorter than it is.
+            # Only mention of anything possibly related I could find is at
+            #
+            #   https://trac.mpich.org/projects/mpich/ticket/1590
+            get_target_property(_VALUE MPI::MPI_Fortran INTERFACE_LINK_OPTIONS)
+            string(REGEX REPLACE "-Wl\\$<COMMA>-flat_namespace ?" "" _VALUE "${_VALUE}")
+            set_target_properties(MPI::MPI_Fortran PROPERTIES INTERFACE_LINK_OPTIONS "${_VALUE}")
+        endif()
     endif()
-    if(NOT DEFINED SCALAPACK_LIBRARY)
+    if(NOT TARGET scalapack AND NOT DEFINED SCALAPACK_LIBRARY)
         find_package(scalapack QUIET)
         if(scalapack_FOUND)
             message(STATUS "ScaLAPACK CMake package found in ${scalapack_DIR}")
@@ -70,13 +74,13 @@ if(ENABLE_SCALAPACK_MPI)
 specify custom installation with SCALAPACK_LIBRARY")
         endif()
     endif()
-    if(DEFINED SCALAPACK_LIBRARY)
+    if(NOT TARGET scalapack AND DEFINED SCALAPACK_LIBRARY)
         add_library(scalapack INTERFACE IMPORTED)
         target_link_libraries(scalapack INTERFACE "${SCALAPACK_LIBRARY}")
     endif()
 endif()
 
-if(ENABLE_ELSI)
+if(ENABLE_ELSI AND NOT TARGET elsi::elsi)
     find_package(elsi 2.0 QUIET)
     if(elsi_FOUND)
         message(STATUS "ELSI CMake package found in ${elsi_DIR}")

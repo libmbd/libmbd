@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Honoring existing dependency targets when part of a host build
 - `--repeat` to `pymbd.benchmark`
 - pkg-config support for ELSI
 

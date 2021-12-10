@@ -34,7 +34,7 @@ if(NOT TARGET LAPACK::LAPACK)
     find_package(LAPACK REQUIRED)
     if(CMAKE_VERSION VERSION_LESS 3.18)
         add_library(LAPACK::LAPACK INTERFACE IMPORTED)
-        target_link_libraries(scalapack INTERFACE "${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES}")
+        target_link_libraries(LAPACK::LAPACK INTERFACE ${LAPACK_LINKER_FLAGS} ${LAPACK_LIBRARIES})
     endif()
 endif()
 

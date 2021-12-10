@@ -47,12 +47,16 @@ if(ENABLE_C_API)
     target_sources(mbd PRIVATE mbd_c_api.F90)
 endif()
 
+set(moduledir "${CMAKE_CURRENT_BINARY_DIR}/modules")
+set(includedir "${CMAKE_INSTALL_INCLUDEDIR}/mbd")
+set_target_properties(mbd PROPERTIES Fortran_MODULE_DIRECTORY "${moduledir}")
+
 target_include_directories(mbd
     PRIVATE
-        ${CMAKE_CURRENT_BINARY_DIR}
+        ${moduledir}
     INTERFACE
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<BUILD_INTERFACE:${moduledir}>
+        $<INSTALL_INTERFACE:${includedir}>
 )
 
 if(ENABLE_SCALAPACK_MPI)
@@ -67,24 +71,18 @@ if(ENABLE_ELSI)
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_ELSI)
 endif()
 
-if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
-    set(MOD_FILE MBD.mod)
-else()
-    set(MOD_FILE mbd.mod)
-endif()
-set_property(TARGET mbd PROPERTY PUBLIC_HEADER "${CMAKE_CURRENT_BINARY_DIR}/${MOD_FILE}")
 if(ENABLE_C_API)
-    set_property(TARGET mbd APPEND PROPERTY PUBLIC_HEADER mbd.h)
+    set_property(TARGET mbd PROPERTY PUBLIC_HEADER mbd.h)
 endif()
 
 if(CMAKE_INSTALL_LIBDIR)
-    install(TARGETS mbd EXPORT MbdConfig
-        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        PUBLIC_HEADER DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    )
     add_library(Mbd INTERFACE)
     target_link_libraries(Mbd INTERFACE mbd)
-    install(TARGETS Mbd EXPORT MbdConfig)
+    install(TARGETS mbd Mbd EXPORT MbdConfig
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        PUBLIC_HEADER DESTINATION "${includedir}"
+    )
+    install(DIRECTORY "${moduledir}/" DESTINATION "${includedir}")
     install(EXPORT MbdConfig NAMESPACE Mbd:: DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mbd")
 endif()

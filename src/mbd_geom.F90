@@ -73,7 +73,11 @@ type, public :: geom_t
     type(logger_t) :: log
         !! Used for logging
 #ifdef WITH_MPI
+#   ifdef WITH_MPIF08
+    type(MPI_Comm) :: mpi_comm = MPI_COMM_WORLD
+#   else
     integer :: mpi_comm = MPI_COMM_WORLD
+#   endif
         !! MPI communicator
 #endif
 #ifdef WITH_SCALAPACK
@@ -164,7 +168,11 @@ subroutine geom_init(this)
     this%idx%parallel = .false.
     if (this%parallel_mode == 'auto' .or. this%parallel_mode == 'atoms') then
 #   ifdef WITH_MPI
+#       ifdef WITH_MPIF08
+        call this%blacs_grid%init(this%mpi_comm%mpi_val)
+#       else
         call this%blacs_grid%init(this%mpi_comm)
+#       endif
 #   else
         call this%blacs_grid%init()
 #   endif

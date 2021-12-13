@@ -5,7 +5,11 @@ module mbd_mpi
 
 use mbd_constants, only: dp
 #ifndef WITH_MPIFH
+#   ifndef WITH_MPIF08
 use mpi
+#   else
+use mpi_f08
+#   endif
 #endif
 
 implicit none
@@ -26,7 +30,11 @@ contains
 
 subroutine mpi_all_reduce_real_0d(x, comm)
     real(dp), intent(inout) :: x
+#ifdef WITH_MPIF08
+    type(MPI_Comm), intent(in) :: comm
+#else
     integer, intent(in) :: comm
+#endif
 
     real(dp) :: x_arr(1), x_buffer(1)
     integer :: ierr
@@ -38,7 +46,11 @@ end subroutine
 
 subroutine mpi_all_reduce_real_1d(x, comm)
     real(dp), intent(inout) :: x(:)
+#ifdef WITH_MPIF08
+    type(MPI_Comm), intent(in) :: comm
+#else
     integer, intent(in) :: comm
+#endif
 
     real(dp), allocatable :: x_buffer(:)
     integer :: ierr
@@ -50,7 +62,11 @@ end subroutine
 
 subroutine mpi_all_reduce_real_2d(x, comm)
     real(dp), contiguous, target, intent(inout) :: x(:, :)
+#ifdef WITH_MPIF08
+    type(MPI_Comm), intent(in) :: comm
+#else
     integer, intent(in) :: comm
+#endif
 
     real(dp), pointer :: x_p(:)
 

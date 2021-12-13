@@ -71,7 +71,7 @@ interface
         double precision :: A(*)
     end
     subroutine ZGSUM2D(ICONTXT, SCOPE, TOP, M, N, A, LDA, RDEST, CDEST)
-        use mbd_constants, only: dp
+        import :: dp
         integer :: ICONTXT, RDEST, CDEST, M, N, LDA
         character :: SCOPE, TOP
         complex(dp) :: A(*)

@@ -43,7 +43,7 @@ interface
     END
     SUBROUTINE PZHEEV(JOBZ, UPLO, N, A, IA, JA, DESCA, W, Z, IZ, JZ, DESCZ, WORK, &
             LWORK, RWORK, LRWORK, INFO)
-    use mbd_constants, only: dp
+    import :: dp
     CHARACTER JOBZ, UPLO
     INTEGER IA, INFO, IZ, JA, JZ, LRWORK, LWORK, N
     INTEGER DESCA(*), DESCZ(*)
@@ -70,7 +70,7 @@ interface
     end
     subroutine PZGEMM(transa, transb, m, n, k, alpha, a, ia, ja, desc_a, b, &
             ib, jb, desc_b, beta, c, ic, jc, desc_c)
-        use mbd_constants, only: dp
+        import :: dp
         character :: transa, transb
         integer :: m, n, k, ia, ja, desc_a(*), ib, jb, desc_b(*), ic, jc, desc_c(*)
         complex(dp) :: alpha, a(*), b(*), beta, c(*)

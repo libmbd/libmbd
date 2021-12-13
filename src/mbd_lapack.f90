@@ -45,7 +45,7 @@ interface
     ! The followinbg interfaces were taken straight from the LAPACK codebase,
     ! replacing COMPLEX*16 for COMPLEX(dp)
     SUBROUTINE ZHEEV(JOBZ, UPLO, N, A, LDA, W, WORK, LWORK, RWORK, INFO)
-    use mbd_constants, only: dp
+    import :: dp
     CHARACTER JOBZ, UPLO
     INTEGER INFO, LDA, LWORK, N
     DOUBLE PRECISION RWORK(*), W(*)
@@ -77,19 +77,19 @@ interface
     DOUBLE PRECISION A(LDA, *), B(LDB, *)
     END
     SUBROUTINE ZGETRF(M, N, A, LDA, IPIV, INFO)
-    use mbd_constants, only: dp
+    import :: dp
     INTEGER INFO, LDA, M, N
     INTEGER IPIV(*)
     COMPLEX(dp) A(LDA, *)
     END
     SUBROUTINE ZGETRI(N, A, LDA, IPIV, WORK, LWORK, INFO)
-    use mbd_constants, only: dp
+    import :: dp
     INTEGER INFO, LDA, LWORK, N
     INTEGER IPIV(*)
     COMPLEX(dp) A(LDA, *), WORK(*)
     END
     SUBROUTINE ZGEEV(JOBVL, JOBVR, N, A, LDA, W, VL, LDVL, VR, LDVR, WORK, LWORK, RWORK, INFO)
-    use mbd_constants, only: dp
+    import :: dp
     CHARACTER JOBVL, JOBVR
     INTEGER INFO, LDA, LDVL, LDVR, LWORK, N
     DOUBLE PRECISION RWORK(*)
@@ -114,7 +114,7 @@ interface
     DOUBLE PRECISION A(LDA, *), B(LDB, *), C(LDC, *)
     END
     SUBROUTINE ZGEMM(TRANSA, TRANSB, M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC)
-    use mbd_constants, only: dp
+    import :: dp
     COMPLEX(dp) ALPHA, BETA
     INTEGER K, LDA, LDB, LDC, M, N
     CHARACTER TRANSA, TRANSB

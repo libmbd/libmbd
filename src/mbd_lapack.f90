@@ -7,7 +7,6 @@ use mbd_constants
 use mbd_utils, only: exception_t, tostr
 
 implicit none
-
 private
 public :: mmul, inv, invh, inverse, eig, eigh, eigvals, eigvalsh, det, mode
 
@@ -42,8 +41,86 @@ interface eigvalsh
     module procedure eigvalsh_complex
 end interface
 
-external :: ZHEEV, DGEEV, DSYEV, DGETRF, DGETRI, DGESV, ZGETRF, ZGETRI, &
-    ZGEEV, DSYTRI, DSYTRF, DGEMM, ZGEMM
+interface
+    ! The followinbg interfaces were taken straight from the LAPACK codebase,
+    ! replacing COMPLEX*16 for COMPLEX(dp)
+    SUBROUTINE ZHEEV(JOBZ, UPLO, N, A, LDA, W, WORK, LWORK, RWORK, INFO)
+    use mbd_constants, only: dp
+    CHARACTER JOBZ, UPLO
+    INTEGER INFO, LDA, LWORK, N
+    DOUBLE PRECISION RWORK(*), W(*)
+    COMPLEX(dp) A(LDA, *), WORK(*)
+    END
+    SUBROUTINE DGEEV(JOBVL, JOBVR, N, A, LDA, WR, WI, VL, LDVL, VR, LDVR, WORK, LWORK, INFO)
+    CHARACTER JOBVL, JOBVR
+    INTEGER INFO, LDA, LDVL, LDVR, LWORK, N
+    DOUBLE PRECISION A(LDA, *), VL(LDVL, *), VR(LDVR, *), WI(*), WORK(*), WR(*)
+    END
+    SUBROUTINE DSYEV(JOBZ, UPLO, N, A, LDA, W, WORK, LWORK, INFO)
+    CHARACTER JOBZ, UPLO
+    INTEGER INFO, LDA, LWORK, N
+    DOUBLE PRECISION A(LDA, *), W(*), WORK(*)
+    END
+    SUBROUTINE DGETRF(M, N, A, LDA, IPIV, INFO)
+    INTEGER INFO, LDA, M, N
+    INTEGER IPIV(*)
+    DOUBLE PRECISION A(LDA, *)
+    END
+    SUBROUTINE DGETRI(N, A, LDA, IPIV, WORK, LWORK, INFO)
+    INTEGER INFO, LDA, LWORK, N
+    INTEGER IPIV(*)
+    DOUBLE PRECISION A(LDA, *), WORK(*)
+    END
+    SUBROUTINE DGESV(N, NRHS, A, LDA, IPIV, B, LDB, INFO)
+    INTEGER INFO, LDA, LDB, N, NRHS
+    INTEGER IPIV(*)
+    DOUBLE PRECISION A(LDA, *), B(LDB, *)
+    END
+    SUBROUTINE ZGETRF(M, N, A, LDA, IPIV, INFO)
+    use mbd_constants, only: dp
+    INTEGER INFO, LDA, M, N
+    INTEGER IPIV(*)
+    COMPLEX(dp) A(LDA, *)
+    END
+    SUBROUTINE ZGETRI(N, A, LDA, IPIV, WORK, LWORK, INFO)
+    use mbd_constants, only: dp
+    INTEGER INFO, LDA, LWORK, N
+    INTEGER IPIV(*)
+    COMPLEX(dp) A(LDA, *), WORK(*)
+    END
+    SUBROUTINE ZGEEV(JOBVL, JOBVR, N, A, LDA, W, VL, LDVL, VR, LDVR, WORK, LWORK, RWORK, INFO)
+    use mbd_constants, only: dp
+    CHARACTER JOBVL, JOBVR
+    INTEGER INFO, LDA, LDVL, LDVR, LWORK, N
+    DOUBLE PRECISION RWORK(*)
+    COMPLEX(dp) A(LDA, *), VL(LDVL, *), VR(LDVR, *), W(*), WORK(*)
+    END
+    SUBROUTINE DSYTRI(UPLO, N, A, LDA, IPIV, WORK, INFO)
+    CHARACTER UPLO
+    INTEGER INFO, LDA, N
+    INTEGER IPIV(*)
+    DOUBLE PRECISION A(LDA, *), WORK(*)
+    END
+    SUBROUTINE DSYTRF(UPLO, N, A, LDA, IPIV, WORK, LWORK, INFO)
+    CHARACTER UPLO
+    INTEGER INFO, LDA, LWORK, N
+    INTEGER IPIV(*)
+    DOUBLE PRECISION A(LDA, *), WORK(*)
+    END
+    SUBROUTINE DGEMM(TRANSA, TRANSB, M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC)
+    DOUBLE PRECISION ALPHA, BETA
+    INTEGER K, LDA, LDB, LDC, M, N
+    CHARACTER TRANSA, TRANSB
+    DOUBLE PRECISION A(LDA, *), B(LDB, *), C(LDC, *)
+    END
+    SUBROUTINE ZGEMM(TRANSA, TRANSB, M, N, K, ALPHA, A, LDA, B, LDB, BETA, C, LDC)
+    use mbd_constants, only: dp
+    COMPLEX(dp) ALPHA, BETA
+    INTEGER K, LDA, LDB, LDC, M, N
+    CHARACTER TRANSA, TRANSB
+    COMPLEX(dp) A(LDA, *), B(LDB, *), C(LDC, *)
+    END
+end interface
 
 contains
 
@@ -161,7 +238,7 @@ subroutine inv_real(A, exc, src)
     real(dp), allocatable :: work_arr(:)
     integer, allocatable :: i_pivot(:)
     integer :: n, n_work_arr, error_flag
-    real(dp) :: n_work_arr_optim
+    real(dp) :: n_work_arr_optim(1)
 
     n = size(A, 1)
     if (n == 0) return
@@ -177,7 +254,7 @@ subroutine inv_real(A, exc, src)
         return
     end if
     call DGETRI(n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
-    n_work_arr = nint(n_work_arr_optim)
+    n_work_arr = nint(n_work_arr_optim(1))
     allocate (work_arr(n_work_arr))
     call DGETRI(n, A, n, i_pivot, work_arr(1), n_work_arr, error_flag)
     if (error_flag /= 0) then
@@ -198,14 +275,14 @@ subroutine invh_real(A, exc, src)
     integer, allocatable :: i_pivot(:)
     real(dp), allocatable :: work_arr(:)
     integer :: n, n_work_arr, error_flag
-    real(dp) :: n_work_arr_optim
+    real(dp) :: n_work_arr_optim(1)
 
     n = size(A, 1)
     if (n == 0) return
     if (present(src)) A = src
     allocate (i_pivot(n))
     call DSYTRF('U', n, A, n, i_pivot, n_work_arr_optim, -1, error_flag)
-    n_work_arr = nint(n_work_arr_optim)
+    n_work_arr = nint(n_work_arr_optim(1))
     allocate (work_arr(n_work_arr))
     call DSYTRF('U', n, A, n, i_pivot, work_arr(1), n_work_arr, error_flag)
     if (error_flag /= 0) then
@@ -238,13 +315,13 @@ subroutine eigh_real(A, eigs, exc, src, vals_only)
     logical, intent(in), optional :: vals_only
 
     real(dp), allocatable :: work_arr(:)
-    real(dp) :: n_work_arr
+    real(dp) :: n_work_arr(1)
     integer :: error_flag, n
 
     n = size(A, 1)
     if (present(src)) A = src
     call DSYEV(mode(vals_only), 'U', n, A, n, eigs, n_work_arr, -1, error_flag)
-    allocate (work_arr(nint(n_work_arr)))
+    allocate (work_arr(nint(n_work_arr(1))))
     call DSYEV(mode(vals_only), 'U', n, A, n, eigs, work_arr(1), size(work_arr), error_flag)
     if (error_flag /= 0) then
         if (present(exc)) then
@@ -263,7 +340,7 @@ subroutine eig_real(A, eigs, exc, src, vals_only)
     real(dp), intent(in), optional :: src(:, :)
     logical, intent(in), optional :: vals_only
 
-    real(dp) :: n_work_arr, dummy
+    real(dp) :: n_work_arr(1), dummy(1)
     integer :: error_flag, n
     real(dp), allocatable :: eigs_r(:), eigs_i(:), vectors(:, :), work_arr(:)
 
@@ -279,7 +356,7 @@ subroutine eig_real(A, eigs, exc, src, vals_only)
         'N', mode(vals_only), n, A, n, eigs_r, eigs_i, dummy, 1, &
         vectors, n, n_work_arr, -1, error_flag &
     )
-    allocate (work_arr(nint(n_work_arr)))
+    allocate (work_arr(nint(n_work_arr(1))))
     call DGEEV( &
         'N', mode(vals_only), n, A, n, eigs_r, eigs_i, dummy, 1, &
         vectors, n, work_arr(1), size(work_arr), error_flag &
@@ -304,7 +381,7 @@ subroutine eigh_complex(A, eigs, exc, src, vals_only)
     logical, intent(in), optional :: vals_only
 
     complex(dp), allocatable :: work(:)
-    complex(dp) :: lwork_cmplx
+    complex(dp) :: lwork_cmplx(1)
     real(dp), allocatable :: rwork(:)
     integer :: n, lwork, error_flag
 
@@ -312,7 +389,7 @@ subroutine eigh_complex(A, eigs, exc, src, vals_only)
     if (present(src)) A = src
     allocate (rwork(max(1, 3 * n - 2)))
     call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, lwork_cmplx, -1, rwork, error_flag)
-    lwork = nint(dble(lwork_cmplx))
+    lwork = nint(dble(lwork_cmplx(1)))
     allocate (work(lwork))
     call ZHEEV(mode(vals_only), 'U', n, A, n, eigs, work(1), lwork, rwork, error_flag)
     if (error_flag /= 0) then

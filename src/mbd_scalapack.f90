@@ -32,7 +32,50 @@ interface peigvalsh
     module procedure peigvalsh_complex
 end interface
 
-external :: PDSYEV, PZHEEV, PDGETRF, PDGETRI, PDGEMM, PZGEMM
+interface
+    ! The following interfaces were taken straight from the ScaLAPACK codebase,
+    ! replacing COMPLEX*16 for COMPLEX(dp)
+    SUBROUTINE PDSYEV(JOBZ, UPLO, N, A, IA, JA, DESCA, W, Z, IZ, JZ, DESCZ, WORK, LWORK, INFO)
+    CHARACTER JOBZ, UPLO
+    INTEGER IA, INFO, IZ, JA, JZ, LWORK, N
+    INTEGER DESCA(*), DESCZ(*)
+    DOUBLE PRECISION A(*), W(*), WORK(*), Z(*)
+    END
+    SUBROUTINE PZHEEV(JOBZ, UPLO, N, A, IA, JA, DESCA, W, Z, IZ, JZ, DESCZ, WORK, &
+            LWORK, RWORK, LRWORK, INFO)
+    use mbd_constants, only: dp
+    CHARACTER JOBZ, UPLO
+    INTEGER IA, INFO, IZ, JA, JZ, LRWORK, LWORK, N
+    INTEGER DESCA(*), DESCZ(*)
+    DOUBLE PRECISION RWORK(*), W(*)
+    COMPLEX(dp) A(*), WORK(*), Z(*)
+    END
+    SUBROUTINE PDGETRF(M, N, A, IA, JA, DESCA, IPIV, INFO)
+    INTEGER IA, INFO, JA, M, N
+    INTEGER DESCA(*), IPIV(*)
+    DOUBLE PRECISION A(*)
+    END
+    SUBROUTINE PDGETRI(N, A, IA, JA, DESCA, IPIV, WORK, LWORK, IWORK, LIWORK, INFO)
+    INTEGER IA, INFO, JA, LIWORK, LWORK, N
+    INTEGER DESCA(*), IPIV(*), IWORK(*)
+    DOUBLE PRECISION A(*), WORK(*)
+    END
+
+    ! The following interfaces were written by hand based on https://www.ibm.com/docs/
+    subroutine PDGEMM(transa, transb, m, n, k, alpha, a, ia, ja, desc_a, b, &
+            ib, jb, desc_b, beta, c, ic, jc, desc_c)
+        character :: transa, transb
+        integer :: m, n, k, ia, ja, desc_a(*), ib, jb, desc_b(*), ic, jc, desc_c(*)
+        double precision :: alpha, a(*), b(*), beta, c(*)
+    end
+    subroutine PZGEMM(transa, transb, m, n, k, alpha, a, ia, ja, desc_a, b, &
+            ib, jb, desc_b, beta, c, ic, jc, desc_c)
+        use mbd_constants, only: dp
+        character :: transa, transb
+        integer :: m, n, k, ia, ja, desc_a(*), ib, jb, desc_b(*), ic, jc, desc_c(*)
+        complex(dp) :: alpha, a(*), b(*), beta, c(*)
+    end
+end interface
 
 contains
 

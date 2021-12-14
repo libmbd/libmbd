@@ -7,56 +7,93 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            python-version: 3.6
-          - os: ubuntu-latest
-            python-version: 3.6
-            mpi-nodes: 1
-          - os: ubuntu-latest
-            python-version: 3.7
+          - type: ubuntu
             mpi-nodes: 2
-          - os: ubuntu-latest
-            python-version: 3.8
-            mpi-nodes: 4
-          - os: ubuntu-latest
+          - type: macos
+            mpi-nodes: 2
+          - type: conda
             python-version: 3.9
+            cmake-version: 3.21
+            gfortran-version: 11
+            mpi: openmpi
             mpi-nodes: 8
-          - os: macos-latest
-            python-version: 3.9
+            elsi: elsi
+          - type: conda
+            python-version: 3.6
+            cmake-version: 3.14
+            gfortran-version: 8
+            mpi: mpich
             mpi-nodes: 2
-    runs-on: ${{ matrix.os }}
-    env:
-      MPIEXEC_EXTRA_FLAGS: --oversubscribe
+            elsi: elsi
+          - type: conda
+            python-version: 3.9
+            cmake-version: 3.21
+            gfortran-version: 11
+            mpi: mpich
+            mpi-nodes: 2
+          - type: conda
+            python-version: 3.6
+            cmake-version: 3.14
+            gfortran-version: 8
+            mpi: openmpi
+            mpi-nodes: 8
+          - type: conda
+            python-version: 3.9
+            cmake-version: 3.21
+            gfortran-version: 11
+    runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
     steps:
+      - name: Set environment variables
+        run: |
+          case ${{ runner.os }} in
+            Linux) XDG_DATA_HOME=$HOME/.local/share ;;
+            macOS) XDG_DATA_HOME="$HOME/Library/Application Support" ;;
+          esac
+          echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
+          echo XDG_DATA_HOME="$XDG_DATA_HOME" >>$GITHUB_ENV
+          if [[ "${{ matrix.mpi }}" == "openmpi" ]]; then
+            echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
+          fi
       - run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
-        if: ${{ contains(matrix.os, 'ubuntu') }}
+        if: matrix.type == 'ubuntu'
       - run: brew install open-mpi scalapack
-        if: ${{ contains(matrix.os, 'macos') }}
-      - uses: actions/setup-python@v2
-        id: setup-python
+        if: matrix.type == 'macos'
+      - uses: actions/cache@v2
+        if: matrix.type == 'conda'
         with:
-          python-version: ${{ matrix.python-version }}
+          path: ~/pkgs
+          key: conda-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
+      - name: Create Conda environment
+        run: |
+          export CONDA_PKGS_DIRS=$HOME/pkgs
+          conda create -q -y -p $HOME/env -c conda-forge python=${{ matrix.python-version }} cmake=${{ matrix.cmake-version }} gfortran=${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
+          echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
+          echo $HOME/env/bin >>$GITHUB_PATH
+        if: matrix.type == 'conda'
       - name: Install Poetry
         run: |
-          curl -sSL https://install.python-poetry.org | python -
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            ROOT=$HOME/.local/share
-          elif [[ "${{ runner.os }}" == "macOS" ]]; then
-            ROOT="$HOME/Library/Application Support"
-          fi
-          "$ROOT"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
-          echo $HOME/.local/bin >>$GITHUB_PATH
+          curl -sSL https://install.python-poetry.org | python3 -
+          "$XDG_DATA_HOME"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
+          python3 -c 'import sysconfig; print(sysconfig.get_path("scripts", "posix_user"))' >>$GITHUB_PATH
+      - name: Create Python virtual environment
+        if: matrix.type != 'conda'
+        run: |
+          python3 -m venv $HOME/venv
+          echo VIRTUAL_ENV=$HOME/venv >>$GITHUB_ENV
+          echo $HOME/venv/bin >>$GITHUB_PATH
+          echo PYTHON_SITEDIR=$($HOME/venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))') >>$GITHUB_ENV
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Create Python virtual environment
-        run: |
-          python -m venv venv
-          echo VIRTUAL_ENV=$PWD/venv >>$GITHUB_ENV
-          echo $PWD/venv/bin >>$GITHUB_PATH
-          echo venv >>.git/info/exclude
-      - name: Set year/month
-        run: echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
+      - uses: actions/cache@v2
+        if: matrix.type != 'conda'
+        with:
+          path: |
+            ${{ env.VIRTUAL_ENV }}/bin
+            ${{ env.PYTHON_SITEDIR }}
+          key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-${{ env.YEAR_MONTH }}
+      - name: Install dependencies
+        run: pip install -U wheel cffi coverage
       - name: Report environment
         run: |
           type python
@@ -66,30 +103,32 @@ jobs:
           cmake --version
           pip --version
           git describe --tags --dirty=.dirty
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ${{ env.VIRTUAL_ENV }}/bin
-            ${{ env.VIRTUAL_ENV }}/lib/python${{ matrix.python-version }}/site-packages
-          key: ${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}-${{ env.YEAR_MONTH }}
-      - name: Install dependencies
-        run: pip install -U wheel cffi coverage
       - name: Set CMAKE_FLAGS
         run: |
-          CMAKE_FLAGS='-DCMAKE_Fortran_FLAGS="-fprofile-arcs -ftest-coverage"'
+          FFLAGS=('-fprofile-arcs' '-ftest-coverage')
+          if [[ "${{ matrix.mpi }}" == "mpich" && "${{ matrix.gfortran-version }}" -gt "9" ]]; then
+              FFLAGS+=('-fallow-argument-mismatch')
+          fi
+          CMAKE_FLAGS=()
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
-              CMAKE_FLAGS="$CMAKE_FLAGS"' -DENABLE_SCALAPACK_MPI=ON'
+              CMAKE_FLAGS+=('-DENABLE_SCALAPACK_MPI=ON')
           fi
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-              CMAKE_FLAGS="$CMAKE_FLAGS"' -DCMAKE_Fortran_COMPILER=gfortran-10'
+          if [[ "${{ matrix.elsi }}" == "elsi" ]]; then
+              CMAKE_FLAGS+=('-DENABLE_ELSI=ON')
           fi
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            CMAKE_FLAGS="$CMAKE_FLAGS"' -DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"'
+          if [[ "${{ matrix.type }}" == "macos" ]]; then
+              CMAKE_FLAGS+=('-DCMAKE_Fortran_COMPILER=gfortran-10')
           fi
-          echo CMAKE_FLAGS=$CMAKE_FLAGS
-          echo CMAKE_FLAGS=$CMAKE_FLAGS >>$GITHUB_ENV
+          if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
+            CMAKE_FLAGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')
+          fi
+          echo CMAKE_FLAGS=${CMAKE_FLAGS[@]}
+          echo CMAKE_FLAGS=${CMAKE_FLAGS[@]} >>$GITHUB_ENV
+          echo FFLAGS=${FFLAGS[@]}
+          echo FFLAGS=${FFLAGS[@]} >>$GITHUB_ENV
       - name: Cmake
         run: |
+          [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
           mkdir -p build
           cd -P build && cmake .. -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ${{ env.CMAKE_FLAGS }}
           echo LIBMBD_PREFIX=$VIRTUAL_ENV >>$GITHUB_ENV
@@ -101,7 +140,9 @@ jobs:
         run: |
           make -C build install
       - name: Build Pymbd
-        run: poetry build
+        run: |
+          [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
+          poetry build
       - name: Install Pymbd
         run: pip install -U pymbd[test,mpi] --pre -f ./dist
       - name: Report packages
@@ -111,9 +152,10 @@ jobs:
       - name: Test Pymbd
         run: |
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
-              RUN_CMD="env OMP_NUM_THREADS=1 mpiexec --oversubscribe -n ${{ matrix.mpi-nodes }}"
+              RUN_CMD="env OMP_NUM_THREADS=1 mpiexec $MPIEXEC_EXTRA_FLAGS -n ${{ matrix.mpi-nodes }}"
           fi
-          $RUN_CMD coverage run -m pytest -v --durations=3
+          $RUN_CMD coverage run -m pytest -v --durations=3 | tee output
+          ! grep failed output >/dev/null
       - name: Upload to Codecov
         run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
       - name: Uninstall Pymbd

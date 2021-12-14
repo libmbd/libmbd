@@ -44,4 +44,5 @@ doc:
 	touch doc/build/.nojekyll
 
 distclean:
-	rm -r $(BLDDIR)/*
+	-rm -r $(BLDDIR)/*
+	-rm src/pymbd/_libmbd.*.so

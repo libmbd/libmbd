@@ -27,8 +27,14 @@ classifiers = [
 
 [tool.poetry.dependencies]
 python = "^3.6"
-scipy = "^1"
-numpy = "^1"
+scipy = [
+    {version = "^1", python = "3.6" },
+    {version = "^1.6", python = ">=3.7,<3.11" },
+]
+numpy = [
+    {version = "^1", python = "3.6" },
+    {version = "^1.20", python = ">=3.7,<3.11" },
+]
 cffi = "^1"
 pytest = { version = "^6", optional = true }
 mpi4py = { version = "^3", optional = true }

@@ -12,35 +12,26 @@ jobs:
           - type: macos
             mpi-nodes: 2
           - type: conda
-            python-version: 3.9
-            cmake-version: 3.21
-            gfortran-version: 11
+          - type: conda
             mpi: openmpi
             mpi-nodes: 8
             elsi: elsi
           - type: conda
-            python-version: 3.6
-            cmake-version: 3.14
-            gfortran-version: 8
-            mpi: mpich
-            mpi-nodes: 2
-            elsi: elsi
-          - type: conda
-            python-version: 3.9
-            cmake-version: 3.21
-            gfortran-version: 11
             mpi: mpich
             mpi-nodes: 2
           - type: conda
-            python-version: 3.6
-            cmake-version: 3.14
-            gfortran-version: 8
+            python-version: =3.6
+            cmake-version: =3.14
+            gfortran-version: =8
             mpi: openmpi
             mpi-nodes: 8
           - type: conda
-            python-version: 3.9
-            cmake-version: 3.21
-            gfortran-version: 11
+            python-version: =3.6
+            cmake-version: =3.14
+            gfortran-version: =8
+            mpi: mpich
+            mpi-nodes: 2
+            elsi: elsi
     runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
     steps:
       - name: Set environment variables
@@ -66,7 +57,7 @@ jobs:
       - name: Create Conda environment
         run: |
           export CONDA_PKGS_DIRS=$HOME/pkgs
-          conda create -q -y -p $HOME/env -c conda-forge python=${{ matrix.python-version }} cmake=${{ matrix.cmake-version }} gfortran=${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
+          conda create -q -y -p $HOME/env -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH
         if: matrix.type == 'conda'
@@ -106,9 +97,6 @@ jobs:
       - name: Set CMAKE_FLAGS
         run: |
           FFLAGS=('-fprofile-arcs' '-ftest-coverage')
-          if [[ "${{ matrix.mpi }}" == "mpich" && "${{ matrix.gfortran-version }}" -gt "9" ]]; then
-              FFLAGS+=('-fallow-argument-mismatch')
-          fi
           CMAKE_FLAGS=()
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               CMAKE_FLAGS+=('-DENABLE_SCALAPACK_MPI=ON')

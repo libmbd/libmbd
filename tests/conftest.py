@@ -19,17 +19,17 @@ if with_mpi:
 if with_mpi:
     from functools import wraps
 
-    import py._io.terminalwriter
+    import _pytest._io.terminalwriter
 
     rank = MPI.COMM_WORLD.Get_rank()
-    _write_out = py._io.terminalwriter.write_out
+    _write_out = _pytest._io.terminalwriter.TerminalWriter.write
 
     @wraps(_write_out)
-    def write_out_wrapper(*args, **kwargs):
+    def write_wrapper(*args, **kwargs):
         if rank == 0:
             _write_out(*args, **kwargs)
 
-    py._io.terminalwriter.write_out = write_out_wrapper
+    _pytest._io.terminalwriter.TerminalWriter.write = write_wrapper
 
 
 # fmt: off

@@ -41,35 +41,43 @@ jobs:
       - name: Set environment variables
         run: |
           case ${{ runner.os }} in
-            Linux) XDG_DATA_HOME=$HOME/.local/share ;;
-            macOS) XDG_DATA_HOME="$HOME/Library/Application Support" ;;
+            Linux)
+              XDG_DATA_HOME=$HOME/.local/share
+              XDG_CACHE_HOME=$HOME/.cache
+              ;;
+            macOS)
+              XDG_DATA_HOME="$HOME/Library/Application Support"
+              XDG_CACHE_HOME=$HOME/Library/Caches
+              ;;
           esac
           echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
           echo XDG_DATA_HOME="$XDG_DATA_HOME" >>$GITHUB_ENV
+          echo XDG_CACHE_HOME="$XDG_CACHE_HOME" >>$GITHUB_ENV
           if [[ "${{ matrix.mpi }}" == "openmpi" ]]; then
             echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
           fi
-      - run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
-        if: matrix.type == 'ubuntu'
-      - run: brew install open-mpi scalapack
-        if: matrix.type == 'macos'
-      - uses: actions/cache@v2
-        if: matrix.type == 'conda'
+      - uses: actions/checkout@v2
         with:
-          path: ~/pkgs
-          key: conda-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
+          fetch-depth: 0
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ${{ env.XDG_CACHE_HOME }}/conda/pkgs
+            ${{ env.XDG_CACHE_HOME }}/pip
+          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
+      - name: Install Libmbd dependencies
+        run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
+        if: matrix.type == 'ubuntu'
+      - name: Install Libmbd dependencies
+        run: brew install open-mpi scalapack
+        if: matrix.type == 'macos'
       - name: Create Conda environment
         run: |
-          export CONDA_PKGS_DIRS=$HOME/pkgs
+          export CONDA_PKGS_DIRS=$XDG_CACHE_HOME/conda/pkgs
           conda create -q -y -p $HOME/env -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH
         if: matrix.type == 'conda'
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          "$XDG_DATA_HOME"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
-          python3 -c 'import sysconfig; print(sysconfig.get_path("scripts", "posix_user"))' >>$GITHUB_PATH
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |
@@ -77,17 +85,12 @@ jobs:
           echo VIRTUAL_ENV=$HOME/venv >>$GITHUB_ENV
           echo $HOME/venv/bin >>$GITHUB_PATH
           echo PYTHON_SITEDIR=$($HOME/venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))') >>$GITHUB_ENV
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - uses: actions/cache@v2
-        if: matrix.type != 'conda'
-        with:
-          path: |
-            ${{ env.VIRTUAL_ENV }}/bin
-            ${{ env.PYTHON_SITEDIR }}
-          key: ${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-${{ env.YEAR_MONTH }}
-      - name: Install dependencies
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python -
+          "$XDG_DATA_HOME"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
+          python -c 'import sysconfig; print(sysconfig.get_path("scripts", "posix_user"))' >>$GITHUB_PATH
+      - name: Install Pymbd build dependencies
         run: pip install -U wheel cffi coverage
       - name: Report environment
         run: |
@@ -137,7 +140,7 @@ jobs:
           poetry build
       - name: Install Pymbd
         run: pip install -U pymbd[test,mpi] --pre -f ./dist
-      - name: Report packages
+      - name: Report Python packages
         run: pip list
       - name: Test Libmbd
         run: "cd build && ctest --output-on-failure"
@@ -150,5 +153,3 @@ jobs:
           ! grep failed output >/dev/null
       - name: Upload to Codecov
         run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
-      - name: Uninstall Pymbd
-        run: pip uninstall -y pymbd

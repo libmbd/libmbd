@@ -101,31 +101,30 @@ jobs:
           cmake --version
           pip --version
           git describe --tags --dirty=.dirty
-      - name: Set CMAKE_FLAGS
+      - name: Set CMAKE_ARGS
         run: |
           FFLAGS=('-fprofile-arcs' '-ftest-coverage')
-          CMAKE_FLAGS=()
+          CMAKE_ARGS=()
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
-              CMAKE_FLAGS+=('-DENABLE_SCALAPACK_MPI=ON')
+              CMAKE_ARGS+=('-DENABLE_SCALAPACK_MPI=ON')
           fi
           if [[ "${{ matrix.elsi }}" == "elsi" ]]; then
-              CMAKE_FLAGS+=('-DENABLE_ELSI=ON')
+              CMAKE_ARGS+=('-DENABLE_ELSI=ON')
           fi
           if [[ "${{ matrix.type }}" == "macos" ]]; then
-              CMAKE_FLAGS+=('-DCMAKE_Fortran_COMPILER=gfortran-10')
+              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-10')
           fi
           if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
-            CMAKE_FLAGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')
+            CMAKE_ARGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')
           fi
-          echo CMAKE_FLAGS=${CMAKE_FLAGS[@]}
-          echo CMAKE_FLAGS=${CMAKE_FLAGS[@]} >>$GITHUB_ENV
+          echo CMAKE_ARGS=${CMAKE_ARGS[@]}
+          echo CMAKE_ARGS=${CMAKE_ARGS[@]} >>$GITHUB_ENV
           echo FFLAGS=${FFLAGS[@]}
           echo FFLAGS=${FFLAGS[@]} >>$GITHUB_ENV
       - name: Cmake
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
-          mkdir -p build
-          cd -P build && cmake .. -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ${{ env.CMAKE_FLAGS }}
+          cmake -S . -B build .. -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ${{ env.CMAKE_ARGS }}
           echo LIBMBD_PREFIX=$VIRTUAL_ENV >>$GITHUB_ENV
         env:
           MPI_NODES: ${{ matrix.mpi-nodes }}
@@ -143,7 +142,7 @@ jobs:
       - name: Report Python packages
         run: pip list
       - name: Test Libmbd
-        run: "cd build && ctest --output-on-failure"
+        run: ctest --test-dir build --output-on-failure
       - name: Test Pymbd
         run: |
           if [[ "${{ matrix.mpi-nodes }}" ]]; then

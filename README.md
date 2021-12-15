@@ -65,11 +65,9 @@ brew install gcc [open-mpi scalapack]
 The compiling and installation can then proceed with
 
 ```
-mkdir build && cd build
-cmake .. [-DENABLE_SCALAPACK_MPI=ON]
-make
-make install
-[make test]
+cmake -S . -B build [-DENABLE_SCALAPACK_MPI=ON]
+make -C build install
+[ctest --test-dir build]
 ```
 
 This installs the Libmbd shared library, C API header file,  high-level Fortran API module file, and Cmake package files, and optionally runs tests.

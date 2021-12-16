@@ -53,6 +53,9 @@ jobs:
           echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
           echo XDG_DATA_HOME="$XDG_DATA_HOME" >>$GITHUB_ENV
           echo XDG_CACHE_HOME="$XDG_CACHE_HOME" >>$GITHUB_ENV
+          if [[ "${{ matrix.mpi-nodes }}" ]]; then
+            echo MPI_NODES=${{ matrix.mpi-nodes }} >>$GITHUB_ENV
+          fi
           if [[ "${{ matrix.mpi }}" == "openmpi" ]]; then
             echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
           fi
@@ -66,18 +69,18 @@ jobs:
             ${{ env.XDG_CACHE_HOME }}/pip
           key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
       - name: Install Libmbd dependencies
-        run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
         if: matrix.type == 'ubuntu'
+        run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
       - name: Install Libmbd dependencies
-        run: brew install open-mpi scalapack
         if: matrix.type == 'macos'
+        run: brew install open-mpi scalapack
       - name: Create Conda environment
+        if: matrix.type == 'conda'
         run: |
           export CONDA_PKGS_DIRS=$XDG_CACHE_HOME/conda/pkgs
           conda create -q -y -p $HOME/env -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH
-        if: matrix.type == 'conda'
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |
@@ -85,13 +88,13 @@ jobs:
           echo VIRTUAL_ENV=$HOME/venv >>$GITHUB_ENV
           echo $HOME/venv/bin >>$GITHUB_PATH
           echo PYTHON_SITEDIR=$($HOME/venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))') >>$GITHUB_ENV
+      - name: Install coverage Python package
+        run: pip install -U coverage
       - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python -
           "$XDG_DATA_HOME"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
           python -c 'import sysconfig; print(sysconfig.get_path("scripts", "posix_user"))' >>$GITHUB_PATH
-      - name: Install Pymbd build dependencies
-        run: pip install -U wheel cffi coverage
       - name: Report environment
         run: |
           type python
@@ -123,32 +126,25 @@ jobs:
           echo FFLAGS=${FFLAGS[@]} >>$GITHUB_ENV
       - name: Cmake
         run: |
-          [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
-          cmake -S . -B build .. -DCMAKE_INSTALL_PREFIX=$VIRTUAL_ENV ${{ env.CMAKE_ARGS }}
-          echo LIBMBD_PREFIX=$VIRTUAL_ENV >>$GITHUB_ENV
-        env:
-          MPI_NODES: ${{ matrix.mpi-nodes }}
+          [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env && export CMAKE_ARGS="$CONDA_BACKUP_CMAKE_ARGS"; }
+          make run_cmake
       - name: Build Libmbd
-        run: make -C build all
+        run: make build_libmbd -o run_cmake
       - name: Install Libmbd
-        run: |
-          make -C build install
+        run: make install_libmbd -o build_libmbd
       - name: Build Pymbd
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
-          poetry build
+          make build_pymbd -o install_libmbd
       - name: Install Pymbd
-        run: pip install -U pymbd[test,mpi] --pre -f ./dist
+        run: make install -o build_pymbd
       - name: Report Python packages
         run: pip list
       - name: Test Libmbd
-        run: ctest --test-dir build --output-on-failure
+        run: make test_libmbd
       - name: Test Pymbd
         run: |
-          if [[ "${{ matrix.mpi-nodes }}" ]]; then
-              RUN_CMD="env OMP_NUM_THREADS=1 mpiexec $MPIEXEC_EXTRA_FLAGS -n ${{ matrix.mpi-nodes }}"
-          fi
-          $RUN_CMD coverage run -m pytest -v --durations=3 | tee output
+          make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Upload to Codecov
         run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"

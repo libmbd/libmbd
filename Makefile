@@ -3,7 +3,6 @@ $(error Must be run inside a Python virtual environment)
 endif
 
 BLDDIR ?= $(CURDIR)/build
-SRCDIR = $(CURDIR)
 export LIBMBD_PREFIX = $(VIRTUAL_ENV)
 ifdef MPI_NODES
 override RUN_CMD := env OMP_NUM_THREADS=1 mpiexec $(MPIEXEC_EXTRA_FLAGS) -n $(MPI_NODES) $(RUN_CMD)
@@ -19,7 +18,7 @@ COMMA = ,
 all: install_editable test
 
 run_cmake:
-	cmake -S $(SRCDIR) -B $(BLDDIR) -DCMAKE_INSTALL_PREFIX=$(LIBMBD_PREFIX) $(CMAKE_ARGS)
+	cmake -B $(BLDDIR) -DCMAKE_INSTALL_PREFIX=$(LIBMBD_PREFIX) $(CMAKE_ARGS)
 
 build_libmbd: run_cmake
 	make -C $(BLDDIR) all

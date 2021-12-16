@@ -65,7 +65,7 @@ brew install gcc [open-mpi scalapack]
 The compiling and installation can then proceed with
 
 ```
-cmake -S . -B build [-DENABLE_SCALAPACK_MPI=ON]
+cmake -B build [-DENABLE_SCALAPACK_MPI=ON]
 make -C build install
 [ctest --test-dir build]
 ```

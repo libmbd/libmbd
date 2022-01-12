@@ -1,0 +1,60 @@
+name: Install
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+jobs:
+  all:
+    if: github.repository == 'libmbd/libmbd'
+    name: All
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        mpi: [nompi, openmpi, mpich]
+    runs-on: ${{ matrix.os }}
+    env:
+      CONDA_ALWAYS_YES: "true"
+      CONDA_QUIET: "true"
+    steps:
+      - name: Set environment variables
+        run: |
+          case ${{ runner.os }} in
+            Linux)
+              XDG_CACHE_HOME=$HOME/.cache
+              ;;
+            macOS)
+              XDG_CACHE_HOME=$HOME/Library/Caches
+              ;;
+          esac
+          if [[ "${{ matrix.mpi}}" == "nompi" ]]; then
+            CONDA_PKGS=libmbd
+            PIP_PKGS=pymbd
+            RUN_PREFIX=
+          else
+            CONDA_PKGS="libmbd='*=mpi_${{ matrix.mpi }}_*' mpi4py"
+            PIP_PKGS="pymbd[mpi]"
+            RUN_PREFIX="mpiexec -n 2"
+          fi
+          echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
+          echo XDG_CACHE_HOME="$XDG_CACHE_HOME" >>$GITHUB_ENV
+          echo CONDA_PKGS="$CONDA_PKGS" >>$GITHUB_ENV
+          echo PIP_PKGS="$PIP_PKGS" >>$GITHUB_ENV
+          echo RUN_PREFIX="$RUN_PREFIX" >>$GITHUB_ENV
+          echo CONDA_PREFIX=$HOME/env >>$GITHUB_ENV
+          echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ${{ env.XDG_CACHE_HOME }}/conda/pkgs
+            ${{ env.XDG_CACHE_HOME }}/pip
+          key: ${{ matrix.os }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
+      - name: Create Conda environment
+        run: |
+          conda create -p ${{ env.CONDA_PREFIX }} python
+          echo $CONDA_PREFIX/bin >>$GITHUB_PATH
+      - run: conda install -c conda-forge ${{ env.CONDA_PKGS }} numpy scipy
+      - name: Run pip install ${{ env.PIP_PKGS }}
+        run: |
+          source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env
+          pip install ${{ env.PIP_PKGS }}
+      - run: ${{ env.RUN_PREFIX }} python -m pymbd

@@ -6,16 +6,17 @@ import sys
 from pymbd import ang
 from pymbd.fortran import MBDGeom, with_mpi
 
-ene_expected = -0.0002462647623815428
-ene = MBDGeom([(0, 0, 0), (0, 0, 4 * ang)]).mbd_energy_species(
-    ['Ar', 'Ar'], [1, 1], 0.83
-)
 if with_mpi:
     from mpi4py import MPI
 
     rank = MPI.COMM_WORLD.Get_rank()
 else:
     rank = 0
+
+ene_expected = -0.0002462647623815428
+ene = MBDGeom([(0, 0, 0), (0, 0, 4 * ang)]).mbd_energy_species(
+    ['Ar', 'Ar'], [1, 1], 0.83
+)
 if rank == 0:
     print(f'Expected energy:   {ene_expected}')
     print(f'Calculated energy: {ene}')

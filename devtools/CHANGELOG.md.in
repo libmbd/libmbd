@@ -7,22 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.12.5] - 2022-01-18
-
-### Fixed
-
-- `python -m pymbd` when run under MPI
-
-## [0.12.4] - 2021-12-15
-
-### Added
-
-- Support for `mpi_f08`
-- Support for Python 3.10
-
-### Fixed
-
-- Compilation for CMake<3.18
+$changes
 
 ## [0.12.3] - 2021-12-06
 
@@ -219,29 +204,4 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.12.5...HEAD
-[0.12.5]: https://github.com/libmbd/libmbd/compare/0.12.4...0.12.5
-[0.12.4]: https://github.com/libmbd/libmbd/compare/0.12.3...0.12.4
-[0.12.3]: https://github.com/libmbd/libmbd/compare/0.12.2...0.12.3
-[0.12.2]: https://github.com/libmbd/libmbd/compare/0.12.1...0.12.2
-[0.12.1]: https://github.com/libmbd/libmbd/compare/0.12.0...0.12.1
-[0.12.0]: https://github.com/libmbd/libmbd/compare/0.11.0...0.12.0
-[0.11.0]: https://github.com/libmbd/libmbd/compare/0.10.4...0.11.0
-[0.10.4]: https://github.com/libmbd/libmbd/compare/0.10.3...0.10.4
-[0.10.3]: https://github.com/libmbd/libmbd/compare/0.10.2...0.10.3
-[0.10.2]: https://github.com/libmbd/libmbd/compare/0.10.1...0.10.2
-[0.10.1]: https://github.com/libmbd/libmbd/compare/0.10.0...0.10.1
-[0.10.0]: https://github.com/libmbd/libmbd/compare/0.9.3...0.10.0
-[0.9.3]: https://github.com/libmbd/libmbd/compare/0.9.2...0.9.3
-[0.9.2]: https://github.com/libmbd/libmbd/compare/0.9.1...0.9.2
-[0.9.1]: https://github.com/libmbd/libmbd/compare/0.9.0...0.9.1
-[0.9.0]: https://github.com/libmbd/libmbd/compare/0.8.0...0.9.0
-[0.8.0]: https://github.com/libmbd/libmbd/compare/0.7.1...0.8.0
-[0.7.1]: https://github.com/libmbd/libmbd/compare/0.7.0...0.7.1
-[0.7.0]: https://github.com/libmbd/libmbd/compare/0.6.0...0.7.0
-[0.6.0]: https://github.com/libmbd/libmbd/compare/0.5.0...0.6.0
-[0.5.0]: https://github.com/libmbd/libmbd/compare/0.4.3...0.5.0
-[0.4.3]: https://github.com/libmbd/libmbd/compare/0.4.2...0.4.3
-[0.4.2]: https://github.com/libmbd/libmbd/compare/0.4.1...0.4.2
-[0.4.1]: https://github.com/libmbd/libmbd/compare/0.4.0...0.4.1
-[0.4.0]: https://github.com/libmbd/libmbd/releases/tag/0.4.0
+$links

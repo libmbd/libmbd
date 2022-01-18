@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.5] - 2022-01-18
+
+### Fixed
+
+- `python -m pymbd` when run under MPI
+
 ## [0.12.4] - 2021-12-15
 
 ### Added
@@ -213,7 +219,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.12.4...HEAD
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.12.5...HEAD
+[0.12.5]: https://github.com/libmbd/libmbd/compare/0.12.4...0.12.5
 [0.12.4]: https://github.com/libmbd/libmbd/compare/0.12.3...0.12.4
 [0.12.3]: https://github.com/libmbd/libmbd/compare/0.12.2...0.12.3
 [0.12.2]: https://github.com/libmbd/libmbd/compare/0.12.1...0.12.2

@@ -27,14 +27,10 @@ install_libmbd: build_libmbd
 	make -C $(BLDDIR) install
 
 install_editable: install_libmbd
-	poetry install $(foreach ext,$(PYMBD_EXTRAS),-E $(ext))
+	pip install -e .[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))]
 
-build_pymbd: install_libmbd
-	pip install -U cffi
-	poetry build
-
-install: build_pymbd
-	pip install -U pymbd[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))] --pre -f ./dist
+install: install_libmbd
+	pip install .[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))]
 
 test_libmbd:
 	ctest --test-dir $(BLDDIR) --output-on-failure

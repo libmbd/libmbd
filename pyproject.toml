@@ -1,5 +1,10 @@
 [build-system]
-requires = ["poetry_core>=1", "poetry-dynamic-versioning>=0.12.3", "cffi", "setuptools"]
+requires = [
+    "poetry-core@https://github.com/python-poetry/poetry-core/archive/af08f1ce720da467c9bf3d43eed3d9ebaf4ad7fb.zip",
+    "poetry-dynamic-versioning>=0.12.3",
+    "cffi",
+    "setuptools",
+]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
@@ -12,8 +17,10 @@ packages = [{ include = "pymbd", from = "src" }]
 repository = "https://github.com/libmbd/libmbd"
 documentation = "https://libmbd.github.io/pymbd"
 license = "MPL-2.0"
-build = "build.py"
-include = ["src/mbd.h"]
+include = [
+    { path = "src/mbd.h" },
+    { path = "src/pymbd/*.so", format = "wheel" },
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -24,6 +31,10 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Chemistry",
     "Topic :: Scientific/Engineering :: Physics",
 ]
+
+[tool.poetry.build]
+script = "build.py"
+generate-setup-file = false
 
 [tool.poetry.dependencies]
 python = "^3.6"

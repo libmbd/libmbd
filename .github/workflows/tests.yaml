@@ -38,21 +38,21 @@ jobs:
             mpi-nodes: 2
             elsi: elsi
     runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
+    env:
+      CONDA_ALWAYS_YES: "true"
+      CONDA_QUIET: "true"
     steps:
       - name: Set environment variables
         run: |
           case ${{ runner.os }} in
             Linux)
-              XDG_DATA_HOME=$HOME/.local/share
               XDG_CACHE_HOME=$HOME/.cache
               ;;
             macOS)
-              XDG_DATA_HOME="$HOME/Library/Application Support"
               XDG_CACHE_HOME=$HOME/Library/Caches
               ;;
           esac
           echo YEAR_MONTH=$(date +"%Y-%m") >>$GITHUB_ENV
-          echo XDG_DATA_HOME="$XDG_DATA_HOME" >>$GITHUB_ENV
           echo XDG_CACHE_HOME="$XDG_CACHE_HOME" >>$GITHUB_ENV
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
             echo MPI_NODES=${{ matrix.mpi-nodes }} >>$GITHUB_ENV
@@ -60,6 +60,9 @@ jobs:
           if [[ "${{ matrix.mpi }}" == "openmpi" ]]; then
             echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
           fi
+          echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
+          echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
+          echo $HOME/env/bin >>$GITHUB_PATH
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
@@ -77,30 +80,18 @@ jobs:
         run: brew install open-mpi scalapack
       - name: Create Conda environment
         if: matrix.type == 'conda'
-        run: |
-          export CONDA_PKGS_DIRS=$XDG_CACHE_HOME/conda/pkgs
-          conda create -q -y -p $HOME/env -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
-          echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
-          echo $HOME/env/bin >>$GITHUB_PATH
+        run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |
-          python3 -m venv $HOME/venv
-          echo VIRTUAL_ENV=$HOME/venv >>$GITHUB_ENV
-          echo $HOME/venv/bin >>$GITHUB_PATH
-          echo PYTHON_SITEDIR=$($HOME/venv/bin/python -c 'import sysconfig; print(sysconfig.get_path("purelib"))') >>$GITHUB_ENV
+          python3 -m venv ${{ env.VIRTUAL_ENV }}
+          ${{ env.VIRTUAL_ENV }}/bin/pip install -U pip
       - name: Install coverage Python package
         run: pip install -U coverage
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python -
-          "$XDG_DATA_HOME"/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
-          python -c 'import sysconfig; print(sysconfig.get_path("scripts", "posix_user"))' >>$GITHUB_PATH
       - name: Report environment
         run: |
           type python
           type pip
-          type poetry
           python --version
           cmake --version
           pip --version
@@ -125,7 +116,7 @@ jobs:
           echo CMAKE_ARGS=${CMAKE_ARGS[@]} >>$GITHUB_ENV
           echo FFLAGS=${FFLAGS[@]}
           echo FFLAGS=${FFLAGS[@]} >>$GITHUB_ENV
-      - name: Cmake
+      - name: Run Cmake
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env && export CMAKE_ARGS="$CONDA_BACKUP_CMAKE_ARGS"; }
           make run_cmake
@@ -133,14 +124,11 @@ jobs:
         run: make build_libmbd -o run_cmake
       - name: Install Libmbd
         run: make install_libmbd -o build_libmbd
-      - name: Build Pymbd
+      - name: Build & install Pymbd
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
-          make build_pymbd -o install_libmbd
-      - name: Install Pymbd
-        run: make install -o build_pymbd
-      - name: Report Python packages
-        run: pip list
+          make install -o install_libmbd
+      - run: pip list
       - name: Test Libmbd
         run: make test_libmbd
       - name: Test Pymbd

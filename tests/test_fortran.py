@@ -231,9 +231,9 @@ def test_mbd_coulomb(peptide_meoh):
         _, eigs, C = geom.mbd_energy_species(species, vol_ratios, beta=0.83)
         omega_t = np.sqrt(eigs)
         alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
-        omega = 4 * C6 / (3 * alpha_0 ** 2)
+        omega = 4 * C6 / (3 * alpha_0**2)
         charges = np.ones_like(alpha_0)
-        masses = 1 / (alpha_0 * omega ** 2)
+        masses = 1 / (alpha_0 * omega**2)
         ecoul = geom.coulomb_energy(
             charges, masses, omega_t, 'fermi', R_vdw, beta, a, C
         )

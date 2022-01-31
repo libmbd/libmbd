@@ -49,7 +49,7 @@ class MBDEvaluator(object):
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, nfreq=15):
     freq, freq_w = freq_grid(nfreq)
-    omega = 4 / 3 * C6 / alpha_0 ** 2
+    omega = 4 / 3 * C6 / alpha_0**2
     alpha_dyn = [alpha_0 / (1 + (u / omega) ** 2) for u in freq]
     alpha_dyn_rsscs = []
     for a in alpha_dyn:
@@ -61,13 +61,13 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, nfreq=15):
         a_contr = sum(tf.reduce_sum(a_nlc[i::3, i::3], 1) for i in range(3)) / 3
         alpha_dyn_rsscs.append(a_contr)
     alpha_dyn_rsscs = tf.stack(alpha_dyn_rsscs)
-    C6_rsscs = 3 / pi * tf.reduce_sum(freq_w[:, None] * alpha_dyn_rsscs ** 2, 0)
+    C6_rsscs = 3 / pi * tf.reduce_sum(freq_w[:, None] * alpha_dyn_rsscs**2, 0)
     R_vdw_rsscs = R_vdw * (alpha_dyn_rsscs[0, :] / alpha_0) ** (1 / 3)
     omega_rsscs = 4 / 3 * C6_rsscs / alpha_dyn_rsscs[0, :] ** 2
     dipmat = dipole_matrix(coords, 'fermi,dip', R_vdw=R_vdw_rsscs, beta=beta)
     pre = _repeat(omega_rsscs * tf.sqrt(alpha_dyn_rsscs[0, :]), 3)
     eigs = tf.linalg.eigvalsh(
-        tf.diag(_repeat(omega_rsscs ** 2, 3)) + pre[:, None] * pre[None, :] * dipmat
+        tf.diag(_repeat(omega_rsscs**2, 3)) + pre[:, None] * pre[None, :] * dipmat
     )
     ene = tf.reduce_sum(tf.sqrt(eigs)) / 2 - 3 * tf.reduce_sum(omega_rsscs) / 2
     return ene
@@ -78,7 +78,7 @@ def dipole_matrix(coords, damping, beta=0.0, R_vdw=None, sigma=None, a=6.0):
     if R_vdw is not None:
         S_vdw = beta * (R_vdw[:, None] + R_vdw[None, :])
         # 1e10 rather than inf is necessary to avoid nan gradients
-        dists = tf.sqrt(_set_diag(tf.reduce_sum(Rs ** 2, -1), 1e10))
+        dists = tf.sqrt(_set_diag(tf.reduce_sum(Rs**2, -1), 1e10))
     if sigma is not None:
         sigmaij = tf.sqrt(sigma[:, None] ** 2 + sigma[None, :] ** 2)
     if damping == 'fermi,dip':
@@ -98,7 +98,7 @@ def damping_fermi(R, S_vdw, d):
 
 
 def T_bare(R):
-    R_2 = tf.reduce_sum(R ** 2, -1)
+    R_2 = tf.reduce_sum(R**2, -1)
     # 1e10 rather than inf is necessary to avoid nan gradients
     R_5 = tf.sqrt(_set_diag(R_2, 1e10)) ** 5
     return (
@@ -110,16 +110,16 @@ def T_bare(R):
 def T_erf_coulomb(R, sigma):
     bare = T_bare(R)
     # 1e-10 rather than 0 is necessary to avoid nan gradients from sqrt(0)
-    R_1 = tf.sqrt(_set_diag(tf.reduce_sum(R ** 2, -1), 1e-10))
+    R_1 = tf.sqrt(_set_diag(tf.reduce_sum(R**2, -1), 1e-10))
     # 1e10 rather than inf is necessary to avoid nan gradients
-    R_5 = _set_diag(R_1 ** 5, 1e10)
+    R_5 = _set_diag(R_1**5, 1e10)
     RR_R5 = R[:, :, :, None] * R[:, :, None, :] / R_5[:, :, None, None]
     zeta = R_1 / sigma
-    theta = 2 * zeta / tf.sqrt(pi) * tf.exp(-(zeta ** 2))
+    theta = 2 * zeta / tf.sqrt(pi) * tf.exp(-(zeta**2))
     erf_theta = tf.erf(zeta) - theta
     return (
         erf_theta[:, :, None, None] * bare
-        + (2 * (zeta ** 2) * theta)[:, :, None, None] * RR_R5
+        + (2 * (zeta**2) * theta)[:, :, None, None] * RR_R5
     )
 
 

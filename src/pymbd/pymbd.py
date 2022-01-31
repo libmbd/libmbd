@@ -33,7 +33,7 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
     :math:`R_\mathrm{vdw}` coefficients (a.u.).
     """
     freq, freq_w = freq_grid(nfreq)
-    omega = 4 / 3 * C6 / alpha_0 ** 2
+    omega = 4 / 3 * C6 / alpha_0**2
     alpha_dyn = [alpha_0 / (1 + (u / omega) ** 2) for u in freq]
     alpha_dyn_rsscs = []
     for a in alpha_dyn:
@@ -45,7 +45,7 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
         a_contr = sum(np.sum(a_nlc[i::3, i::3], 1) for i in range(3)) / 3
         alpha_dyn_rsscs.append(a_contr)
     alpha_dyn_rsscs = np.stack(alpha_dyn_rsscs)
-    C6_rsscs = 3 / np.pi * np.sum(freq_w[:, None] * alpha_dyn_rsscs ** 2, 0)
+    C6_rsscs = 3 / np.pi * np.sum(freq_w[:, None] * alpha_dyn_rsscs**2, 0)
     R_vdw_rsscs = R_vdw * (alpha_dyn_rsscs[0, :] / alpha_0) ** (1 / 3)
     return alpha_dyn_rsscs[0], C6_rsscs, R_vdw_rsscs
 
@@ -68,7 +68,7 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfre
     alpha_0_rsscs, C6_rsscs, R_vdw_rsscs = screening(
         coords, alpha_0, C6, R_vdw, beta, lattice=lattice, nfreq=15
     )
-    omega_rsscs = 4 / 3 * C6_rsscs / alpha_0_rsscs ** 2
+    omega_rsscs = 4 / 3 * C6_rsscs / alpha_0_rsscs**2
     pre = np.repeat(omega_rsscs * np.sqrt(alpha_0_rsscs), 3)
     if lattice is None:
         k_points = [None]
@@ -78,7 +78,7 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfre
     ene = 0.0
     for k_point in k_points:
         eigs = np.linalg.eigvalsh(
-            np.diag(np.repeat(omega_rsscs ** 2, 3))
+            np.diag(np.repeat(omega_rsscs**2, 3))
             + np.outer(pre, pre)
             * dipole_matrix(
                 coords,
@@ -128,7 +128,7 @@ def dipole_matrix(
     for idx_cell in product(*(range(-i, i + 1) for i in range_cell)):
         R_cell = lattice.T.dot(idx_cell) if lattice is not None else np.zeros(3)
         Rs = coords[:, None, :] - coords[None, :, :] + R_cell
-        dists = np.sqrt(np.sum(Rs ** 2, -1))
+        dists = np.sqrt(np.sum(Rs**2, -1))
         if damping == 'fermi,dip':
             T = damping_fermi(dists, S_vdw, a)[:, :, None, None] * T_bare(Rs)
         elif damping == 'fermi,dip,gg':
@@ -165,28 +165,28 @@ def dipole_matrix_ewald(coords, lattice, alpha, k_point=None):
             continue
         gvec = rlattice.T.dot(idx_gvec)
         k_total = k_point + gvec if k_point is not None else gvec
-        k_sq = sum(k_total ** 2)
+        k_sq = sum(k_total**2)
         if np.sqrt(k_sq) > rec_space_cutoff:
             continue
         k_prefactor = (
             4
             * np.pi
             / volume
-            * np.exp(-k_sq / (4 * alpha ** 2))
+            * np.exp(-k_sq / (4 * alpha**2))
             / k_sq
             * np.outer(k_total, k_total)
         )
         dipmat += k_prefactor * fourier_factor(np.sum(gvec * Rs, -1))[:, :, None, None]
     dipmat += -np.eye(len(Rs))[:, :, None, None] * np.diag(
-        np.repeat(4 * alpha ** 3 / (3 * np.sqrt(np.pi)), 3)
+        np.repeat(4 * alpha**3 / (3 * np.sqrt(np.pi)), 3)
     )
-    k_sq = np.sum(k_point ** 2) if k_point is not None else 0
+    k_sq = np.sum(k_point**2) if k_point is not None else 0
     if np.sqrt(k_sq) > 1e-15:
         dipmat += (
             4
             * np.pi
             / volume
-            * np.exp(-k_sq / (4 * alpha ** 2))
+            * np.exp(-k_sq / (4 * alpha**2))
             / k_sq
             * np.outer(k_point, k_point)
         )
@@ -197,7 +197,7 @@ def dipole_matrix_ewald(coords, lattice, alpha, k_point=None):
 
 def supercell_circum(latt, radius):
     rlatt = 2 * np.pi * np.linalg.inv(latt.T)
-    layer_sep = np.sum(latt * rlatt / np.sqrt(np.sum(rlatt ** 2, 1))[None, :], 0)
+    layer_sep = np.sum(latt * rlatt / np.sqrt(np.sum(rlatt**2, 1))[None, :], 0)
     return np.ceil(radius / layer_sep + 0.5).astype(int)
 
 
@@ -206,7 +206,7 @@ def damping_fermi(R, S_vdw, d):
 
 
 def T_bare(R):
-    R_2 = np.sum(R ** 2, -1)
+    R_2 = np.sum(R**2, -1)
     R_5 = np.where(R_2 > 0, np.sqrt(R_2) ** 5, np.inf)
     return (
         -3 * R[:, :, :, None] * R[:, :, None, :]
@@ -216,23 +216,23 @@ def T_bare(R):
 
 def T_erf_coulomb(R, sigma):
     bare = T_bare(R)
-    R_1 = np.sqrt(np.sum(R ** 2, -1))
-    R_5 = np.where(R_1 > 0, R_1 ** 5, np.inf)
+    R_1 = np.sqrt(np.sum(R**2, -1))
+    R_5 = np.where(R_1 > 0, R_1**5, np.inf)
     RR_R5 = R[:, :, :, None] * R[:, :, None, :] / R_5[:, :, None, None]
     zeta = R_1 / sigma
-    theta = 2 * zeta / np.sqrt(np.pi) * np.exp(-(zeta ** 2))
+    theta = 2 * zeta / np.sqrt(np.pi) * np.exp(-(zeta**2))
     erf_theta = erf(zeta) - theta
     return (
         erf_theta[:, :, None, None] * bare
-        + (2 * (zeta ** 2) * theta)[:, :, None, None] * RR_R5
+        + (2 * (zeta**2) * theta)[:, :, None, None] * RR_R5
     )
 
 
 def T_erfc(R, a):
-    R_2 = np.sum(R ** 2, -1)
+    R_2 = np.sum(R**2, -1)
     R_1 = np.sqrt(R_2)
-    R_3 = np.where(R_1 > 0, R_1 ** 3, np.inf)
-    R_5 = np.where(R_1 > 0, R_1 ** 5, np.inf)
+    R_3 = np.where(R_1 > 0, R_1**3, np.inf)
+    R_5 = np.where(R_1 > 0, R_1**5, np.inf)
     B = (
         erfc(a * R_1) + (2 * a * R_1 / np.sqrt(np.pi)) * np.exp(-((a * R_1) ** 2))
     ) / R_3
@@ -273,7 +273,7 @@ def from_volumes(species, volumes, kind='TS'):
         raise ValueError(f'Unkonwn vdW parameter kind: {kind}')
     volumes = np.array(volumes)
     alpha_0 *= volumes
-    C6 *= volumes ** 2
+    C6 *= volumes**2
     R_vdw *= volumes ** (1 / 3)
     return alpha_0, C6, R_vdw
 

@@ -1,6 +1,12 @@
 ! This Source Code Form is subject to the terms of the Mozilla Public
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+! Workaround bad OpenMP ifort: github.com/libmbd/libmbd/issues/39
+#ifndef IS_BAD_OPENMP_IFORT
+#define IS_BAD_OPENMP_IFORT defined(__INTEL_COMPILER) && (__INTEL_COMPILER > 1700) && (__INTEL_COMPILER <= 2021)
+#endif
+
 #ifndef DO_COMPLEX_TYPE
 
 module mbd_dipole
@@ -237,7 +243,11 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                 exp_qR = exp(-IMI * (dot_product(q, Rnij)))
                 Tij = T * exp_qR
                 if (grad_ij%dcoords) then
+#if IS_BAD_OPENMP_IFORT
                     do i=1, 3
+#else
+                    do concurrent(i=1:3)
+#endif
                         dTij%dr(:, :, i) = dT%dr(:, :, i) * exp_qR - IMI * q(i) * Tij
                     end do
                 end if
@@ -621,12 +631,20 @@ function T_erfc(r, gamm, dT, grad) result(T)
         r_7 = r_1**7
         r_4 = r_2**2
         r_6 = r_4 * r_2
+#if IS_BAD_OPENMP_IFORT
         do c= 1, 3
+#else
+        do concurrent(c=1:3)
+#endif
             dT%dr(c, c, c) = &
                 -(2 * r(c) / r_5 - 5 * r(c)**3 / r_7) * C_ew - 3 * r(c) / r_5 * B_ew &
                 - r(c)**3 / r_6 * dC%dr_1 + r(c) / r_4 * dB%dr_1
+#if IS_BAD_OPENMP_IFORT
             do a=1, 3
                 IF (a .eq. c) cycle
+#else
+            do concurrent(a=1:3, a /= c)
+#endif
                 dT%dr(a, c, c) = &
                     -(r(a) / r_5 - 5 * r(a) * r(c)**2 / r_7) * C_ew &
                     - r(a) * r(c)**2 / r_6 * dC%dr_1
@@ -634,9 +652,12 @@ function T_erfc(r, gamm, dT, grad) result(T)
                 dT%dr(a, a, c) = &
                     5 * r(a)**2 * r(c) / r_7 * C_ew - 3 * r(c) / r_5 * B_ew &
                     - r(a)**2 * r(c) / r_6 * dC%dr_1 + r(c) / r_4 * dB%dr_1
+#if IS_BAD_OPENMP_IFORT
                 do b=a + 1, 3
-                    IF (b > 3) exit
                     IF (b .eq. c) cycle
+#else
+                do concurrent(b=a + 1:3, b /= c)
+#endif
                     dT%dr(a, b, c) = &
                         5 * r(a) * r(b) * r(c) / r_7 * C_ew - r(a) * r(b) * r(c) / r_6 * dC%dr_1
                     dT%dr(b, a, c) = dT%dr(a, b, c)

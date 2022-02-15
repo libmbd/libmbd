@@ -70,8 +70,10 @@ subroutine test_T_bare_deriv()
             r_diff(c) = r_diff(c) + i_step * delta
             T_diff_num(:, :, i_step) = T_bare(r_diff)
         end do
-        do concurrent(a=1:3, b=1:3)
-            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+        do a=1, 3
+            do b=1, 3
+                T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+            end do
         end do
         diff = max(diff, abs(T_diff_num(:, :, 0) - dT%dr(:, :, c)) / T_diff_num(:, :, 0))
     end do
@@ -96,8 +98,10 @@ subroutine test_T_GG_deriv_expl()
             r_diff(c) = r_diff(c) + i_step * delta
             T_diff_num(:, :, i_step) = T_erf_coulomb(r_diff, sigma)
         end do
-        do concurrent(a=1:3, b=1:3)
-            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+        do a=1, 3
+            do b=1, 3
+                T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+            end do
         end do
         diff = max(diff, abs(T_diff_num(:, :, 0) - dT%dr(:, :, c)) / T_diff_num(:, :, 0))
     end do
@@ -119,8 +123,10 @@ subroutine test_T_GG_deriv_impl()
         sigma_diff = sigma + i_step * delta
         T_diff_num(:, :, i_step) = T_erf_coulomb(r, sigma_diff)
     end do
-    do concurrent(a=1:3, b=1:3)
-        T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+    do a=1, 3
+        do b=1, 3
+            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+        end do
     end do
     diff = (T_diff_num(:, :, 0) - dT%dsigma) / T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
@@ -146,8 +152,10 @@ subroutine test_T_fermi_deriv_impl()
         rvdw_diff = rvdw + i_step * delta
         T_diff_num(:, :, i_step) = damping_fermi(r, rvdw_diff, 6d0) * T_bare(r)
     end do
-    do concurrent(a=1:3, b=1:3)
-        T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+    do a=1, 3
+        do b=1, 3
+            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+        end do
     end do
     diff = (T_diff_num(:, :, 0) - dT%dvdw) / T_diff_num(:, :, 0)
     if (failed(maxval(abs(diff)), 1d-10)) then
@@ -172,8 +180,10 @@ subroutine test_T_erfc_deriv_expl()
             r_diff(c) = r_diff(c) + i_step * delta
             T_diff_num(:, :, i_step) = T_erfc(r_diff, gamm)
         end do
-        do concurrent(a=1:3, b=1:3)
-            T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+        do a=1, 3
+            do b=1, 3
+                T_diff_num(a, b, 0) = diff7(T_diff_num(a, b, :), delta)
+            end do
         end do
         diff = max(diff, abs(T_diff_num(:, :, 0) - dT%dr(:, :, c)) / T_diff_num(:, :, 0))
     end do

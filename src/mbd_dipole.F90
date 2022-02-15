@@ -2,7 +2,7 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-! Workaround bad OpenMP ifort: github.com/libmbd/libmbd/issues/39
+! Workaround for bad OpenMP ifort: github.com/libmbd/libmbd/issues/39
 #ifndef IS_BAD_OPENMP_IFORT
 #define IS_BAD_OPENMP_IFORT defined(__INTEL_COMPILER) && (__INTEL_COMPILER > 1700) && (__INTEL_COMPILER <= 2021)
 #endif

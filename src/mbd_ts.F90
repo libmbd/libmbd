@@ -2,11 +2,6 @@
 ! License, v. 2.0. If a copy of the MPL was not distributed with this
 ! file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-! Workaround for bad OpenMP ifort: github.com/libmbd/libmbd/issues/39
-#ifndef IS_BAD_OPENMP_IFORT
-#define IS_BAD_OPENMP_IFORT defined(__INTEL_COMPILER) && (__INTEL_COMPILER > 1700) && (__INTEL_COMPILER <= 2021)
-#endif
-
 module mbd_ts
 !! Obtaining TS energies.
 
@@ -191,24 +186,24 @@ subroutine add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
                     res%dE%dcoords(j_atom, :) = res%dE%dcoords(j_atom, :) + dene_ij%dr
                 end if
                 if (grad%dlattice) then
-#ifdef IS_BAD_OPENMP_IFORT
-                    do i_latt=1, 3
-                        do i_xyz=1, 3
-#else
+#ifndef WITHOUT_DO_CONCURRENT
                     do concurrent(i_latt=1:3, i_xyz=1:3)
+#else
+                    do i_latt = 1, 3
+                    do i_xyz = 1, 3
 #endif
-                            dkdA = -latt_inv(i_latt, :) * k(i_xyz)
-                            if (k_norm > 0d0) then
-                                dkdAk_proj = dot_product(dkdA, k) / k_norm
-                            else
-                                dkdAk_proj = 0d0
-                            end if
-                            res%dE%dlattice(i_latt, i_xyz) = res%dE%dlattice(i_latt, i_xyz) &
-                                - ene_ij * latt_inv(i_latt, i_xyz) &
-                                - ene_ij / exp_kR * sin(k_Rij) * dot_product(dkdA, Rij) &
-                                + ene_ij / phi * dphi%dk_1 * dkdAk_proj
-#ifdef IS_BAD_OPENMP_IFORT
-                        end do ! i_xyz loop
+                        dkdA = -latt_inv(i_latt, :) * k(i_xyz)
+                        if (k_norm > 0d0) then
+                            dkdAk_proj = dot_product(dkdA, k) / k_norm
+                        else
+                            dkdAk_proj = 0d0
+                        end if
+                        res%dE%dlattice(i_latt, i_xyz) = res%dE%dlattice(i_latt, i_xyz) &
+                            - ene_ij * latt_inv(i_latt, i_xyz) &
+                            - ene_ij / exp_kR * sin(k_Rij) * dot_product(dkdA, Rij) &
+                            + ene_ij / phi * dphi%dk_1 * dkdAk_proj
+#ifdef WITHOUT_DO_CONCURRENT
+                    end do
 #endif
                     end do
                 end if

@@ -186,7 +186,12 @@ subroutine add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
                     res%dE%dcoords(j_atom, :) = res%dE%dcoords(j_atom, :) + dene_ij%dr
                 end if
                 if (grad%dlattice) then
+#ifndef WITHOUT_DO_CONCURRENT
                     do concurrent(i_latt=1:3, i_xyz=1:3)
+#else
+                    do i_latt = 1, 3
+                    do i_xyz = 1, 3
+#endif
                         dkdA = -latt_inv(i_latt, :) * k(i_xyz)
                         if (k_norm > 0d0) then
                             dkdAk_proj = dot_product(dkdA, k) / k_norm
@@ -197,6 +202,9 @@ subroutine add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
                             - ene_ij * latt_inv(i_latt, i_xyz) &
                             - ene_ij / exp_kR * sin(k_Rij) * dot_product(dkdA, Rij) &
                             + ene_ij / phi * dphi%dk_1 * dkdAk_proj
+#ifdef WITHOUT_DO_CONCURRENT
+                    end do
+#endif
                     end do
                 end if
                 if (grad%dC6) then

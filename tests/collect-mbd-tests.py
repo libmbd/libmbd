@@ -2,7 +2,7 @@
 import re
 
 tests = []
-with open('tests/mbd_grad_test_cases.f90') as f:
+with open('tests/mbd_grad_test_cases.F90') as f:
     for l in f:
         m = re.match(r' *subroutine *test_(\w+) *\(', l)
         if m:

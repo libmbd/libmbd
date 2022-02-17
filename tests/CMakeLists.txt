@@ -1,4 +1,4 @@
-add_executable(mbd_grad_tests mbd_grad_tests.F90 mbd_grad_test_cases.f90)
+add_executable(mbd_grad_tests mbd_grad_tests.F90 mbd_grad_test_cases.F90)
 add_executable(mbd_api_tests mbd_api_tests.F90)
 foreach(TEST_APP mbd_grad_tests mbd_api_tests)
     target_include_directories(${TEST_APP} PRIVATE $<TARGET_FILE_DIR:mbd>)

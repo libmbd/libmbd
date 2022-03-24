@@ -2,30 +2,11 @@ import datetime
 import os
 import subprocess
 import sys
-from unittest.mock import MagicMock
 
 import toml
 
 sys.path.insert(0, os.path.abspath('../src'))
 
-
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-        return MagicMock()
-
-
-MOCK_MODULES = [
-    'numpy',
-    'numpy.linalg',
-    'numpy.polynomial',
-    'numpy.polynomial.legendre',
-    'scipy',
-    'scipy.special',
-    'pymbd._libmbd',
-    'mpi4py',
-]
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
 with open('../pyproject.toml') as f:
     metadata = toml.load(f)['tool']['poetry']
@@ -44,7 +25,11 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
 ]
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+}
 source_suffix = '.rst'
 master_doc = 'index'
 copyright = f'2018-{datetime.date.today().year}, {author}'
@@ -64,7 +49,15 @@ html_theme_options = {
 html_sidebars = {
     '**': ['about.html', 'navigation.html', 'relations.html', 'searchbox.html']
 }
-htmlhelp_basename = f'{project}doc'
+
+autodoc_default_options = {'members': True}
+autodoc_inherit_docstrings = False
+autodoc_mock_imports = [
+    'numpy',
+    'scipy',
+    'pymbd._libmbd',
+    'mpi4py',
+]
 
 
 def skip_namedtuples(app, what, name, obj, skip, options):

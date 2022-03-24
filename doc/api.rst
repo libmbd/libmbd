@@ -5,7 +5,6 @@ Pure-Python implementation
 --------------------------
 
 .. automodule:: pymbd
-    :members:
 
 .. autodata:: pymbd.pymbd.ang
 
@@ -15,7 +14,6 @@ Fortran bindings
 ----------------
 
 .. automodule:: pymbd.fortran
-    :members:
 
 .. autodata:: with_mpi
    :annotation:

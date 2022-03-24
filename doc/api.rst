@@ -20,3 +20,8 @@ Fortran bindings
 
 .. autodata:: with_scalapack
    :annotation:
+
+ASE interface
+-------------
+
+.. automodule:: pymbd.ase

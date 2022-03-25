@@ -14,41 +14,31 @@ class MBD(Calculator):
     name = 'MBD'
     implemented_properties = ['energy', 'forces', 'stress', 'free_energy']
 
-    def __init__(self, restart=None, label=os.curdir, atoms=None, **kwargs):
-        # default parameters
-        default_parameters = dict(  # noqa: C408
-            k_grid=None,
-            scheme='VDW',  # 'VDWw' or 'MBD', default is VDW'
-            params='TS',  # either TS or TSSURF
-            nfreq=15,
-            beta=0.83,  # PBE default value
-            ts_sr=0.94,  # PBE default value
-            do_rpa=False,
-        )
-
-        # pound sign designates non-defaulting parameters
-        valid_args = ('k_grid', 'scheme', 'params', 'nfreq', 'beta', 'ts_sr', 'do_rpa')
-
-        for arg, val in default_parameters.items():
-            setattr(self, arg, val)
-
-        # set any additional keyword arguments and overwrite defaults
-        # for arg, val in self.parameters.iteritems():
-        for arg, val in kwargs.items():
-            if arg in valid_args:
-                if arg == 'params' or arg == 'scheme':
-                    val = val.upper()
-                    if val == 'TSSURF':
-                        val = 'TSsurf'
-                setattr(self, arg, val)
-            else:
-                raise RuntimeError(
-                    'unknown keyword arg "%s" : not in %s' % (arg, valid_args)
-                )
-
+    def __init__(
+        self,
+        restart=None,
+        label=os.curdir,
+        atoms=None,
+        k_grid=None,
+        scheme='VDW',  # 'VDWw' or 'MBD', default is VDW'
+        params='TS',  # either TS or TSSURF
+        nfreq=15,
+        beta=0.83,  # PBE default value
+        ts_sr=0.94,  # PBE default value
+        do_rpa=False,
+        **kwargs,
+    ):
+        self.k_grid = k_grid
+        self.scheme = scheme.upper()
+        self.params = params.upper()
+        self.nfreq = nfreq
+        self.beta = beta
+        self.ts_sr = ts_sr
+        self.do_rpa = do_rpa
+        if self.params == 'TSSURF':
+            self.params = 'TSsurf'
         self.hirshvolrat_is_set = False
         self.hirsh_volrat = None
-
         Calculator.__init__(self, restart, label, atoms, **kwargs)
 
     def calculate(self, atoms, properties=('energy',), system_changes=all_changes):

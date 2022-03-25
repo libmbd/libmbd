@@ -10,6 +10,8 @@ class DispersionCorrectionCalculator(Calculator):
     This :class:`~ase.calculators.calculator.Calculator` hosts several
     calculators and simply adds energy, force, stress contributions. Has special
     features for intercalc communication for dispersion corrections.
+
+    TODO: short-range has to implement hirsh_volrat property
     """
 
     implemented_properties = ['energy', 'forces', 'stress']

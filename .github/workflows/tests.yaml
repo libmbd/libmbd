@@ -80,7 +80,7 @@ jobs:
         run: brew install open-mpi scalapack
       - name: Create Conda environment
         if: matrix.type == 'conda'
-        run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
+        run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |

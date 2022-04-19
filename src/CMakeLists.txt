@@ -80,9 +80,9 @@ if(ENABLE_C_API)
     set_property(TARGET mbd PROPERTY PUBLIC_HEADER mbd.h)
 endif()
 
+add_library(Mbd INTERFACE)
+target_link_libraries(Mbd INTERFACE mbd)
 if(CMAKE_INSTALL_LIBDIR)
-    add_library(Mbd INTERFACE)
-    target_link_libraries(Mbd INTERFACE mbd)
     install(TARGETS mbd Mbd EXPORT MbdConfig
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

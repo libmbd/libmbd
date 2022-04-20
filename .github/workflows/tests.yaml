@@ -18,7 +18,7 @@ jobs:
             mpi-nodes: 2
           - type: conda
           - type: conda
-            mpi: openmpi
+            mpi: openmpi\<4.1.3  # wait for https://github.com/conda-forge/openmpi-feedstock/issues/94
             mpi-nodes: 8
             elsi: elsi
           - type: conda
@@ -28,7 +28,7 @@ jobs:
             python-version: =3.6
             cmake-version: =3.14
             gfortran-version: =8
-            mpi: openmpi
+            mpi: openmpi\<4.1.3
             mpi-nodes: 8
           - type: conda
             python-version: =3.6
@@ -57,7 +57,7 @@ jobs:
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
             echo MPI_NODES=${{ matrix.mpi-nodes }} >>$GITHUB_ENV
           fi
-          if [[ "${{ matrix.mpi }}" == "openmpi" ]]; then
+          if [[ "${{ matrix.mpi }}" == *"openmpi"* ]]; then
             echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
           fi
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV

@@ -135,7 +135,7 @@ class DispersionCorrectionCalculator(Calculator):
             if 'stress' in properties and all(qm_atoms.get_pbc()):
                 mm_stress = mm_atoms.get_stress()
 
-            self.results['energy'] = qm_energy + mm_energy
+            self.results['energy'] = self.results['free_energy'] = qm_energy + mm_energy
             if 'forces' in properties:
                 self.results['forces'] = qm_forces + mm_forces
             if 'stress' in properties and all(self.atoms.get_pbc()):

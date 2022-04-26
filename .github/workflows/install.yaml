@@ -50,9 +50,8 @@ jobs:
           key: ${{ matrix.os }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
       - name: Create Conda environment
         run: |
-          conda create -p ${{ env.CONDA_PREFIX }} python
+          conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python numpy scipy
           echo $CONDA_PREFIX/bin >>$GITHUB_PATH
-      - run: conda install -c conda-forge ${{ env.CONDA_PKGS }} numpy scipy
       - name: Run pip install ${{ env.PIP_PKGS }}
         run: |
           source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env

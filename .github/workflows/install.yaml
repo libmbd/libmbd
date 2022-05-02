@@ -2,9 +2,12 @@ name: Install
 on:
   schedule:
     - cron: '0 6 * * 1'
+  push:
+    paths:
+      - '.github/workflows/install.yaml'
 jobs:
   all:
-    if: github.repository == 'libmbd/libmbd'
+    if: github.repository == 'libmbd/libmbd' || github.event_name == 'push'
     name: All
     strategy:
       fail-fast: false
@@ -50,7 +53,7 @@ jobs:
           key: ${{ matrix.os }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
       - name: Create Conda environment
         run: |
-          conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python numpy scipy
+          conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python ${{ env.CONDA_PKGS }} numpy scipy
           echo $CONDA_PREFIX/bin >>$GITHUB_PATH
       - name: Run pip install ${{ env.PIP_PKGS }}
         run: |

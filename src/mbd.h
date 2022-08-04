@@ -19,7 +19,8 @@ struct geom_t* cmbd_init_geom(
     _Bool get_spectrum,
     _Bool get_rpa_orders,
     _Bool rpa_rescale_eigs,
-    int max_atoms_per_block
+    int max_atoms_per_block,
+    double ewald_cutoff_scaling[2]
 );
 
 void cmbd_update_coords(struct geom_t* geom, double* coords);

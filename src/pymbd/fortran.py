@@ -194,7 +194,7 @@ class MBDGeom(object):
             gradients = np.zeros((n_atoms, 3))
             if self.has_lattice():
                 lattice_gradients = np.zeros((3, 3))
-        results = ene, gradients, lattice_gradients, None, None, None, None, None
+        results = (ene, gradients, lattice_gradients, *(7 * [None]))
         _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
         _lib.cmbd_destroy_result(res_f)
         ene = ene.item()
@@ -205,7 +205,7 @@ class MBDGeom(object):
         return ene
 
     @_auto_context
-    def mbd_energy(
+    def mbd_energy(  # noqa: C901
         self,
         alpha_0,
         C6,
@@ -216,6 +216,7 @@ class MBDGeom(object):
         damping='fermi,dip',
         variant='rsscs',
         force=False,
+        intermediates=False,
     ):
         r"""Calculate an MBD energy.
 
@@ -255,11 +256,14 @@ class MBDGeom(object):
         self._check_exc()
         ene = np.empty(1)  # for some reason np.array(0) doesn't work
         gradients, lattice_gradients = 2 * [None]
+        alpha_0_scs, C6_scs = 2 * [None]
         eigs, modes, rpa_orders, eigs_k, modes_k = 5 * [None]
         if force:
             gradients = np.zeros((n_atoms, 3))
             if self.has_lattice():
                 lattice_gradients = np.zeros((3, 3))
+        if intermediates:
+            alpha_0_scs, C6_scs = np.zeros(n_atoms), np.zeros(n_atoms)
         if self._get_spectrum:
             if self.has_lattice():
                 n_kpts = (
@@ -285,6 +289,8 @@ class MBDGeom(object):
             rpa_orders,
             eigs_k,
             modes_k,
+            alpha_0_scs,
+            C6_scs,
         )
         _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
         _lib.cmbd_destroy_result(res_f)
@@ -295,10 +301,14 @@ class MBDGeom(object):
             ene = ene, eigs, modes
         elif self._get_rpa_orders:
             ene = ene, rpa_orders
+        if force or intermediates:
+            ene = (ene,)
         if force:
-            ene = (ene, gradients)
+            ene += (gradients,)
             if self.has_lattice():
                 ene += (lattice_gradients,)
+        if intermediates:
+            ene += (alpha_0_scs, C6_scs)
         return ene
 
     @_auto_context

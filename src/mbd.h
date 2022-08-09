@@ -83,7 +83,9 @@ void cmbd_get_results(
     double* eigvecs,
     double* rpa_orders,
     double* eigvals_k,  // is actually complex double
-    double* eigvecs_k  // is actually complex double
+    double* eigvecs_k,  // is actually complex double
+    double* alpha_0,
+    double* C6
 );
 
 void cmbd_destroy_result(struct result_t* result);

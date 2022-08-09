@@ -222,6 +222,8 @@ type(result_t) function get_mbd_scs_energy(geom, variant, alpha_0, C6, damp, gra
             dalpha=grad%any(), dC6=grad%any(), dr_vdw=grad%any() &
         ) &
     )
+    res%alpha_0 = alpha_dyn_scs(:, 0)
+    res%C6 = C6_scs
     call geom%clock(-90)
     if (geom%has_exc()) return
     if (.not. grad%any()) return

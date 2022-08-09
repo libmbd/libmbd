@@ -10,6 +10,7 @@ use mbd_version
 use mbd_coulomb, only: dipole_energy, coulomb_energy
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
+use mbd_density, only: eval_mbd_nonint_density, eval_mbd_int_density
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_request_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
@@ -250,7 +251,7 @@ end function
 
 subroutine cmbd_get_results( &
     res_c, energy, gradients_c, lattice_gradients_c, eigvals_c, eigvecs_c, rpa_orders_c, &
-    eigvals_k_c, eigvecs_k_c &
+    eigvals_k_c, eigvecs_k_c, alpha_0_c, C6_c &
 ) bind(c)
     type(c_ptr), value, intent(in) :: res_c
     real(c_double), intent(out) :: energy
@@ -261,6 +262,8 @@ subroutine cmbd_get_results( &
     type(c_ptr), value, intent(in) :: rpa_orders_c
     type(c_ptr), value, intent(in) :: eigvals_k_c
     type(c_ptr), value, intent(in) :: eigvecs_k_c
+    type(c_ptr), value, intent(in) :: alpha_0_c
+    type(c_ptr), value, intent(in) :: C6_c
 
     type(result_t), pointer :: res
     real(c_double), pointer :: gradients(:, :)
@@ -270,6 +273,8 @@ subroutine cmbd_get_results( &
     real(c_double), pointer :: rpa_orders(:)
     real(c_double), pointer :: eigvals_k(:, :)
     complex(c_double_complex), pointer :: eigvecs_k(:, :, :)
+    real(c_double), pointer :: alpha_0(:)
+    real(c_double), pointer :: C6(:)
 
     call c_f_pointer(res_c, res)
     energy = res%energy
@@ -306,6 +311,14 @@ subroutine cmbd_get_results( &
             [size(res%modes_k, 1), size(res%modes_k, 2), size(res%modes_k, 3)] &
         )
         eigvecs_k = res%modes_k
+    end if
+    if (c_associated(alpha_0_c) .and. allocated(res%alpha_0)) then
+        call c_f_pointer(alpha_0_c, alpha_0, [size(res%alpha_0)])
+        alpha_0 = res%alpha_0
+    end if
+    if (c_associated(C6_c) .and. allocated(res%C6)) then
+        call c_f_pointer(C6_c, C6, [size(res%C6)])
+        C6 = res%C6
     end if
 end subroutine
 

@@ -63,6 +63,8 @@ type, public :: result_t
     complex(dp), allocatable :: modes_k(:, :, :)
     complex(dp), allocatable :: modes_k_single(:, :)
     real(dp), allocatable :: rpa_orders_k(:, :)
+    real(dp), allocatable :: alpha_0(:)
+    real(dp), allocatable :: C6(:)
 end type
 
 type, public :: atom_index_t

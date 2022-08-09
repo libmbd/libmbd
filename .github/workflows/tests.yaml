@@ -57,7 +57,7 @@ jobs:
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
             echo MPI_NODES=${{ matrix.mpi-nodes }} >>$GITHUB_ENV
           fi
-          if [[ "${{ matrix.mpi }}" == "openmpi" ]]; then
+          if [[ "${{ matrix.mpi }}" == "openmpi" || "${{ matrix.type }}" == "ubuntu" ]]; then
             echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
           fi
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV

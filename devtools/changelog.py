@@ -31,5 +31,5 @@ links = [
     ),
     link.format(vs[-1], f'releases/tag/{vs[-1]}'),
 ]
-with open('CHANGELOG.md', 'w') as f:
+with open('wiki/Changelog.md', 'w') as f:
     f.write(t.substitute({'changes': '\n\n'.join(changes), 'links': '\n'.join(links)}))

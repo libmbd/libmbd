@@ -385,6 +385,43 @@ class MBDGeom(object):
         self._check_exc()
         return res
 
+    @_auto_context
+    def nonint_density(self, pts, q, m, w):  # noqa: D102
+        n_pts = len(pts)
+        n_atoms = len(self)
+        rho = np.empty(n_pts)
+        _lib.cmbd_nonint_density(
+            self._geom_f,
+            n_atoms,
+            n_pts,
+            _cast('double*', pts),
+            _cast('double*', q),
+            _cast('double*', m),
+            _cast('double*', w),
+            _cast('double*', rho),
+        )
+        self._check_exc()
+        return rho
+
+    @_auto_context
+    def int_density(self, pts, q, m, w_t, modes):  # noqa: D102
+        n_pts = len(pts)
+        n_atoms = len(self)
+        rho = np.empty(n_pts)
+        _lib.cmbd_int_density(
+            self._geom_f,
+            n_atoms,
+            n_pts,
+            _cast('double*', pts),
+            _cast('double*', q),
+            _cast('double*', m),
+            _cast('double*', w_t),
+            _cast('double*', modes),
+            _cast('double*', rho),
+        )
+        self._check_exc()
+        return rho
+
 
 def _ndarray(ptr, shape=None, dtype='float'):
     buffer_size = (np.prod(shape) if shape else 1) * np.dtype(dtype).itemsize

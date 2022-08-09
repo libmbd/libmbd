@@ -395,6 +395,32 @@ real(c_double) function cmbd_dipole_energy( &
     cmbd_dipole_energy = dipole_energy(geom, a0, w, w_t, C, damp)
 end function
 
+subroutine cmbd_nonint_density(geom_c, n_atoms, n_pts, pts, charges, masses, omegas, rho) bind(c)
+    type(c_ptr), value :: geom_c
+    integer(c_int), value, intent(in) :: n_atoms, n_pts
+    real(c_double), intent(in) :: pts(3, n_pts), charges(n_atoms), masses(n_atoms), omegas(n_atoms)
+    real(c_double), intent(out) :: rho(n_pts)
+
+    type(geom_t), pointer :: geom
+
+    call c_f_pointer(geom_c, geom)
+    rho = eval_mbd_nonint_density(geom, pts, charges, masses, omegas)
+end subroutine
+
+subroutine cmbd_int_density(geom_c, n_atoms, n_pts, pts, charges, masses, omegas, modes, rho) bind(c)
+    type(c_ptr), value :: geom_c
+    integer(c_int), value, intent(in) :: n_atoms, n_pts
+    real(c_double), intent(in) :: &
+        pts(3, n_pts), charges(n_atoms), masses(n_atoms), &
+        omegas(3 * n_atoms), modes(3 * n_atoms, 3 * n_atoms)
+    real(c_double), intent(out) :: rho(n_pts)
+
+    type(geom_t), pointer :: geom
+
+    call c_f_pointer(geom_c, geom)
+    rho = eval_mbd_int_density(geom, pts, charges, masses, omegas, modes)
+end subroutine
+
 function f_string(str_c) result(str_f)
     character(kind=c_char), intent(in) :: str_c(*)
     character(len=:), allocatable :: str_f

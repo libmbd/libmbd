@@ -107,7 +107,7 @@ jobs:
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')
           fi
           if [[ "${{ matrix.type }}" == "macos" ]]; then
-              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-10')
+              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-12')
           fi
           if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
             CMAKE_ARGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')

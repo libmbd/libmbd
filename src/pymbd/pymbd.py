@@ -12,7 +12,8 @@ from numpy.polynomial.legendre import leggauss
 from pkg_resources import resource_string
 from scipy.special import erf, erfc
 
-__all__ = ['mbd_energy', 'mbd_energy_species', 'screening', 'ang']
+__all__ = ['mbd_energy', 'mbd_energy_species', 'screening', 'ang',
+           'from_volumes', 'atomic_polarizability_tensors', 'molecular_polarizability_tensor']
 
 ang = 1 / 0.529177249
 """(a.u.) angstrom"""
@@ -73,6 +74,31 @@ def atomic_polarizability_tensors(coords, alpha_0, R_vdw, beta, lattice=None):
                     .sum(axis=1))
     # alpha_a has shape (na, 3, 3)
     return alpha_a
+
+
+def molecular_polarizability_tensor(coords, alpha_0, R_vdw, beta):
+    r"""Print molecular polarizability tensor.
+
+    :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like alpha_0: (a.u.) atomic polarizabilities
+    :param array-like R_vdw: (a.u.) atomic vdW radii
+    :param float beta: MBD damping parameter :math:`\beta`
+
+    Returns static polarizability tensor for molecules or non-periodic structures (a.u.).
+    """
+    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
+    dipmat = dipole_matrix(
+        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=None
+    )
+    a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
+    # contract a_nlc in two dimensions to get molecular polarizability tensor
+    na = len(alpha_0)
+    alpha = (a_nlc.reshape(na, 3, na, 3)
+              .swapaxes(1, 2)
+              .reshape(na**2, 3, 3)
+              .sum(axis=0))
+    # alpha has shape (3, 3)
+    return alpha
 
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):

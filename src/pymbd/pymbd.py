@@ -50,6 +50,31 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
     return alpha_dyn_rsscs[0], C6_rsscs, R_vdw_rsscs
 
 
+def atomic_polarizability_tensors(coords, alpha_0, R_vdw, beta, lattice=None):
+    r"""Print atomic polarizability tensors.
+
+    :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like alpha_0: (a.u.) atomic polarizabilities
+    :param array-like R_vdw: (a.u.) atomic vdW radii
+    :param float beta: MBD damping parameter :math:`\beta`
+    :param array-like lattice: (a.u.) lattice vectors in rows
+
+    Returns static atomic polarizability tensors (a.u.).
+    """
+    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
+    dipmat = dipole_matrix(
+        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=lattice
+    )
+    a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
+    # contract a_nlc in one dimension to get atomic polarizability tensors
+    na = len(alpha_0)
+    alpha_a = (a_nlc.reshape(na, 3, na, 3)
+                    .swapaxes(1, 2)
+                    .sum(axis=1))
+    # alpha_a has shape (na, 3, 3)
+    return alpha_a
+
+
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):
     r"""Calculate an MBD energy.
 

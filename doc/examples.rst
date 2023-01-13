@@ -7,6 +7,8 @@ Pymbd with ASE and GPAW
 Example of how to calculate the polarizability of a nitrogen molecule
 and how to calculate many-body dispersion corrections with Pymbd.
 
+
+.. code:: python
     from ase.build import molecule
     from ase.units import Bohr, Ha
     from gpaw import GPAW, FermiDirac

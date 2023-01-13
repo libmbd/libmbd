@@ -9,9 +9,9 @@ and how to calculate many-body dispersion corrections with Pymbd.
 
 
 .. code:: python
-    from ase.build import molecule
-    from ase.units import Bohr, Ha
-    from gpaw import GPAW, FermiDirac
+from ase.build import molecule
+from ase.units import Bohr, Ha
+from gpaw import GPAW, FermiDirac
     from gpaw.cluster import Cluster
     from gpaw.analyse.hirshfeld import HirshfeldPartitioning
     from pymbd import molecular_polarizability

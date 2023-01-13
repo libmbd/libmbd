@@ -9,3 +9,4 @@ and how to calculate many-body dispersion corrections with Pymbd.
 
 
 .. literalinclude:: n2_example.py
+   :language: python

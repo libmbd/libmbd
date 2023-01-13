@@ -1,5 +1,6 @@
 from ase.build import molecule
 from ase.units import Bohr, Ha
+from ase.parallel import paropen
 from gpaw import GPAW, FermiDirac
 from gpaw.cluster import Cluster
 from gpaw.analyse.hirshfeld import HirshfeldPartitioning
@@ -46,3 +47,26 @@ mbd_forces *= Ha / Bohr
 # add dispersion correction to ground state energy to get total energy and forces
 total_energy = energy + mbd_energy
 total_forces = forces + mbd_forces
+
+f = paropen('n2_results', 'a')
+
+print('Results for nitrogen molecule', file=f)
+print('Molecular polarizability [Bohr**3]', file=f)
+print(alpha, file=f)
+
+print('Energy without dispersion correction [eV]', file=f)
+print(energy, file=f)
+print('Dispersion energy [eV]', file=f)
+print(mbd_energy, file=f)
+print('Total energy with dispersion correction [eV]', file=f)
+print(total_energy, file=f)
+
+print('Forces without dispersion correction [eV/Ang]', file=f)
+print(forces, file=f)
+print('Dispersion correction [eV/Ang]', file=f)
+print(mbd_forces, file=f)
+print('Total forces with dispersion correction [eV/Ang]', file=f)
+print(total_forces, file=f)
+
+f.close()
+

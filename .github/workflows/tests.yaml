@@ -17,13 +17,16 @@ jobs:
           - type: macos
             mpi-nodes: 2
           - type: conda
+            gfortran-version: >=12
           - type: conda
             mpi: openmpi
             mpi-nodes: 8
             elsi: elsi
+            gfortran-version: >=12
           - type: conda
             mpi: mpich
             mpi-nodes: 2
+            gfortran-version: >=12
           - type: conda
             python-version: =3.6
             cmake-version: =3.14

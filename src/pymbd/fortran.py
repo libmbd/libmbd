@@ -14,15 +14,15 @@ from .pymbd import _array, from_volumes
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
 except ImportError:
-    raise Exception('Pymbd C extension unimportable, cannot use Fortran') from None
+    raise Exception('pyMBD C extension unimportable, cannot use Fortran') from None
 
 __all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 
 with_mpi = _lib.cmbd_with_mpi
-"""Whether Libmbd was compiled with MPI"""
+"""Whether libMBD was compiled with MPI"""
 
 with_scalapack = _lib.cmbd_with_scalapack
-"""Whether Libmbd was compiled with Scalapack"""
+"""Whether libMBD was compiled with Scalapack"""
 
 LIBMBD_VERSION = (
     _lib.cmbd_version_major,
@@ -62,7 +62,7 @@ def _auto_context(method):
 
 
 class MBDGeom(object):
-    """Represents an initialized Libmbd `geom_t <../type/geom_t.html>`_ object.
+    """Represents an initialized libMBD `geom_t <../type/geom_t.html>`_ object.
 
     :param array-like coords: (a.u.) atomic coordinates as rows
     :param array-like lattice: (a.u.) lattice vectors as rows
@@ -159,7 +159,7 @@ class MBDGeom(object):
         return self._lattice is not None
 
     def print_timing(self):
-        """Print timing from Libmbd."""
+        """Print timing from libMBD."""
         _lib.cmbd_print_timing(self._geom_f)
 
     @_auto_context

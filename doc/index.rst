@@ -1,4 +1,4 @@
-Welcome to Pymbd
+Welcome to pyMBD
 ================
 
 Only incomplete API reference is available at the moment.

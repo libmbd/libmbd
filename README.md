@@ -1,4 +1,4 @@
-# Libmbd
+# libMBD
 
 ![checks](https://img.shields.io/github/checks-status/libmbd/libmbd/master.svg)
 [![coverage](https://img.shields.io/codecov/c/github/libmbd/libmbd.svg)](https://codecov.io/gh/libmbd/libmbd)
@@ -12,19 +12,19 @@
 [![chat](https://img.shields.io/gitter/room/libmbd/community)](https://gitter.im/libmbd/community)
 [![doi](https://img.shields.io/badge/doi-10%2Fg67f-blue)](http://doi.org/g67f)
 
-Libmbd implements the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
+libMBD implements the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
 
 - The Fortran implementation is the reference, most advanced implementation, with support for analytical gradients and distributed parallelism, and additional functionality beyond the MBD method itself. It provides a low-level and a high-level Fortran API, as well as a C API. Furthermore, Python bindings to the C API are provided.
 - The Python/Numpy implementation is intended for prototyping, and as a high-level language reference.
 - The Python/Tensorflow implementation is an experiment that should enable rapid prototyping of machine learning applications with MBD.
 
-The Python-based implementations as well as Python bindings to the Libmbd C API are accessible from the Python package called Pymbd.
+The Python-based implementations as well as Python bindings to the libMBD C API are accessible from the Python package called pyMBD.
 
-Libmbd is included in [FHI-aims](https://aimsclub.fhi-berlin.mpg.de), [Quantum Espresso](https://www.quantum-espresso.org), [DFTB+](https://dftbplus.org), and [ESL Bundle](https://esl.cecam.org/bundle/).
+libMBD is included in [FHI-aims](https://aimsclub.fhi-berlin.mpg.de), [Quantum Espresso](https://www.quantum-espresso.org), [DFTB+](https://dftbplus.org), and [ESL Bundle](https://esl.cecam.org/bundle/).
 
 ## Installing
 
-**TL;DR** Install prebuilt Libmbd binaries via [Conda-forge](https://conda-forge.org) and Pymbd with [Pip](https://pip.pypa.io/en/stable/quickstart/).
+**TL;DR** Install prebuilt libMBD binaries via [Conda-forge](https://conda-forge.org) and pyMBD with [Pip](https://pip.pypa.io/en/stable/quickstart/).
 
 ```
 conda install -c conda-forge libmbd
@@ -46,9 +46,9 @@ Expected energy:   -0.0002462647623815428
 Calculated energy: -0.0002462647623817456
 ```
 
-###  Libmbd
+### libMBD
 
-Libmbd uses CMake for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
+libMBD uses CMake for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
 
 On Ubuntu:
 
@@ -70,29 +70,29 @@ make -C build install
 [ctest --test-dir build]
 ```
 
-This installs the Libmbd shared library, C API header file,  high-level Fortran API module file, and Cmake package files, and optionally runs tests.
+This installs the libMBD shared library, C API header file,  high-level Fortran API module file, and Cmake package files, and optionally runs tests.
 
-### Pymbd
+### pyMBD
 
-Pymbd can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed Libmbd as a dependency (see above).
+pyMBD can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed libMBD as a dependency (see above).
 
 ```
 pip install pymbd
 ```
 
-To support Libmbd built with ScaLAPACK/MPI, the `mpi` extras is required, which installs `mpi4py` as an extra dependency. In this case one has to make sure that `mpi4py` is linked against the same MPI library as Libmbd (for instance by compiling both manually, or installing both via Conda-forge).
+To support libMBD built with ScaLAPACK/MPI, the `mpi` extras is required, which installs `mpi4py` as an extra dependency. In this case one has to make sure that `mpi4py` is linked against the same MPI library as libMBD (for instance by compiling both manually, or installing both via Conda-forge).
 
 ```
 pip install pymbd[mpi]
 ```
 
-If Libmbd is installed in a non-standard location, you can point Pymbd to it with
+If libMBD is installed in a non-standard location, you can point pyMBD to it with
 
 ```
-env LIBMBD_PREFIX=<path to Libmbd install prefix> pip install pymbd
+env LIBMBD_PREFIX=<path to libMBD install prefix> pip install pymbd
 ```
 
-If you don’t need the Fortran bindings in Pymbd, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable:
+If you don’t need the Fortran bindings in pyMBD, you can install it without the C extension, in which case `pymbd.fortran` becomes unimportable:
 
 ```
 env LIBMBD_PREFIX= pip install pymbd
@@ -139,12 +139,12 @@ call calc%destroy()
 
 ## Links
 
-- Libmbd documentation: https://libmbd.github.io
-- Pymbd documentation: https://libmbd.github.io/pymbd
+- libMBD documentation: https://libmbd.github.io
+- pyMBD documentation: https://libmbd.github.io/pymbd
 
 ## Developing
 
-For development, a top-level `Makefile` is included, which configures and compiles Libmbd, compiles the Pymbd C extension, and runs both Libmbd and Pymbd tests.
+For development, a top-level `Makefile` is included, which configures and compiles libMBD, compiles the pyMBD C extension, and runs both libMBD and pyMBD tests.
 
 ```
 git clone https://github.com/libmbd/libmbd.git && cd libmbd

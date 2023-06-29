@@ -72,10 +72,10 @@ jobs:
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
           key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
-      - name: Install Libmbd dependencies
+      - name: Install libMBD dependencies
         if: matrix.type == 'ubuntu'
         run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
-      - name: Install Libmbd dependencies
+      - name: Install libMBD dependencies
         if: matrix.type == 'macos'
         run: brew install open-mpi scalapack
       - name: Create Conda environment
@@ -120,18 +120,18 @@ jobs:
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env && export CMAKE_ARGS="$CONDA_BACKUP_CMAKE_ARGS"; }
           make run_cmake
-      - name: Build Libmbd
+      - name: Build libMBD
         run: make build_libmbd -o run_cmake
-      - name: Install Libmbd
+      - name: Install libMBD
         run: make install_libmbd -o build_libmbd
-      - name: Build & install Pymbd
+      - name: Build & install pyMBD
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
           make install -o install_libmbd
       - run: pip list
-      - name: Test Libmbd
+      - name: Test libMBD
         run: make test_libmbd
-      - name: Test Pymbd
+      - name: Test pyMBD
         run: |
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null

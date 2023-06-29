@@ -5,12 +5,12 @@ cmake_policy(SET CMP0077 NEW)
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
-project(Libmbd
+project(libMBD
     DESCRIPTION "Many-body dispersion library"
     LANGUAGES Fortran C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(LibmbdVersion)
+include(libMBDVersion)
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 include(CTest)

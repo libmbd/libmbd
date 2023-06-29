@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath('../src'))
 with open('../pyproject.toml') as f:
     metadata = toml.load(f)['tool']['poetry']
 
-project = 'Libmbd'
+project = 'libMBD'
 release = version = (
     subprocess.run(['poetry', 'version'], capture_output=True, cwd='..')
     .stdout.decode()

@@ -104,8 +104,8 @@ def run(supercell, k_grid, finite, force, method, early_return, repeat):
     _print('--------------')
     coords, lattice, species, vol_ratios = make_supercell(*unit_cell, supercell)
     _print('number of atoms:', len(coords))
-    _print('Pymbd version:', '.'.join(map(str, _version)))
-    _print('Libmbd version:', '{}.{}.{}-{}'.format(*LIBMBD_VERSION))
+    _print('pyMBD version:', '.'.join(map(str, _version)))
+    _print('libMBD version:', '{}.{}.{}-{}'.format(*LIBMBD_VERSION))
     _print('--------------')
     if early_return:
         return

@@ -2,7 +2,7 @@
 
 set -ev
 VERSION=$(git describe --tags --dirty=.dirty)
-VERSION_FILE=cmake/LibmbdVersionTag.cmake
+VERSION_FILE=cmake/libMBDVersionTag.cmake
 SLUG=libmbd-${VERSION}
 echo "set(VERSION_TAG ${VERSION})">${VERSION_FILE}
 mkdir -p dist

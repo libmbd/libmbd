@@ -33,7 +33,7 @@ install: install_libmbd
 	pip install .[$(subst $(SPACE),$(COMMA),$(PYMBD_EXTRAS))]
 
 test_libmbd:
-    python tests/collect-mbd-tests.py
+	python tests/collect-mbd-tests.py
 	ctest --test-dir $(BLDDIR) --output-on-failure
 
 test: test_libmbd

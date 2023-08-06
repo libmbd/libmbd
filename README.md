@@ -115,10 +115,11 @@ energy = MBDGeom([(0, 0, 0), (0, 0, 7.5)]).mbd_energy_species(
 
 ```fortran
 use mbd, only: mbd_input_t, mbd_calc_t
+from iso_fortran_env, only: real64
 
 type(mbd_input_t) :: inp
 type(mbd_calc_t) :: calc
-real(8) :: energy, gradients(3, 2)
+real(real64) :: energy, gradients(3, 2)
 integer :: code
 character(200) :: origin, msg
 

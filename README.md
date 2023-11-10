@@ -10,7 +10,9 @@
 [![license](https://img.shields.io/github/license/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/blob/master/LICENSE)
 [![code style](https://img.shields.io/badge/code%20style-black-202020.svg)](https://github.com/ambv/black)
 [![chat](https://img.shields.io/gitter/room/libmbd/community)](https://gitter.im/libmbd/community)
-[![doi](https://img.shields.io/badge/doi-10%2Fg67f-blue)](http://doi.org/g67f)
+[![doi](https://img.shields.io/badge/doi-10%2Fk4bm-blue)](http://doi.org/k4bm)
+
+> libMBD: A general-purpose package for scalable quantum many-body dispersion calculations. [J. Hermann](https://github.com/jhrmnn), [M. Stöhr](https://github.com/martin-stoehr), S. Góger, [S. Chaudhuri](https://github.com/shaychaudhuri), [B. Aradi](https://github.com/aradi), [R. J. Maurer](https://github.com/reinimaurer1) & A. Tkatchenko. [*J. Chem. Phys.* **159**, 174802](http://doi.org/k4bm) (2023)
 
 libMBD implements the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104) (MBD) method in several programming languages and frameworks:
 

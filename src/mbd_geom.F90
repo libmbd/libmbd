@@ -244,7 +244,7 @@ end function
 
 #ifdef WITH_MPI
 subroutine geom_sync_exc(this)
-    class(geom_t), intent(in) :: this
+    class(geom_t), intent(inout) :: this
 
     integer, allocatable :: codes(:)
     integer :: err, rank

@@ -1,11 +1,11 @@
 [build-system]
 requires = [
-    "poetry-core@https://github.com/python-poetry/poetry-core/archive/af08f1ce720da467c9bf3d43eed3d9ebaf4ad7fb.zip",
-    "poetry-dynamic-versioning>=0.12.3",
+    "poetry-core>=1.0.0",
+    "poetry-dynamic-versioning",
     "cffi",
     "setuptools",
 ]
-build-backend = "poetry.core.masonry.api"
+build-backend = "poetry_dynamic_versioning.backend"
 
 [tool.poetry]
 name = "pymbd"
@@ -37,15 +37,9 @@ script = "build.py"
 generate-setup-file = false
 
 [tool.poetry.dependencies]
-python = "^3.6"
-scipy = [
-    {version = "^1", python = "3.6" },
-    {version = "^1.6", python = ">=3.7,<3.11" },
-]
-numpy = [
-    {version = "^1", python = "3.6" },
-    {version = "^1.20", python = ">=3.7,<3.11" },
-]
+python = "^3.7"
+scipy = "^1.6"
+numpy = "^1.20"
 cffi = "^1"
 pytest = { version = "^6", optional = true }
 mpi4py = { version = "^3", optional = true }
@@ -60,7 +54,7 @@ flake8-bugbear = "^21"
 flake8-comprehensions = "^3"
 flake8-quotes = "^3"
 pep8-naming = "^0.12"
-black = { version = ">=22", python = "^3.7" }
+black = ">=22"
 pydocstyle = "^5"
 isort = "^5"
 fprettify = { git = "https://github.com/jhrmnn/fprettify.git", rev = "fix-config-search" }
@@ -71,5 +65,5 @@ dirty = true
 pattern = '^(?P<base>\d+\.\d+\.\d+)$'
 
 [tool.black]
-target-version = ["py36"]
+target-version = ["py37"]
 skip-string-normalization = true

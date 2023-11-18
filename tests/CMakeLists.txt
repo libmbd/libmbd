@@ -18,6 +18,7 @@ execute_process(
     OUTPUT_VARIABLE TESTS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+message("${TESTS}")
 if(ENABLE_SCALAPACK_MPI)
     set(MPI_NODES $ENV{MPI_NODES})
     if(NOT "${MPI_NODES}")
@@ -26,9 +27,12 @@ if(ENABLE_SCALAPACK_MPI)
     set(MPIEXEC_EXTRA_FLAGS $ENV{MPIEXEC_EXTRA_FLAGS})
 endif()
 foreach(TEST ${TESTS})
+    message("${TEST}")
     string(REPLACE "/" ";" TEST_APP_CASE ${TEST})
+    message("${TEST}")
     list(GET TEST_APP_CASE 0 TEST_APP)
     list(GET TEST_APP_CASE 1 TEST_CASE)
+    message("${TEST_APP} ${TEST_APP}")
     add_test(NAME "${TEST_APP}/${TEST_CASE}" COMMAND
         ${MPIEXEC_EXECUTABLE}
         ${MPIEXEC_EXTRA_FLAGS}

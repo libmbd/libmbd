@@ -25,18 +25,11 @@ jobs:
             mpi: mpich
             mpi-nodes: 2
           - type: conda
-            python-version: =3.6
+            python-version: =3.7
             cmake-version: =3.14
             gfortran-version: =8
             mpi: openmpi
             mpi-nodes: 8
-          - type: conda
-            python-version: =3.6
-            cmake-version: =3.14
-            gfortran-version: =8
-            mpi: mpich=3.4.3=\*_100
-            mpi-nodes: 2
-            elsi: elsi
     runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
     env:
       CONDA_ALWAYS_YES: "true"
@@ -133,6 +126,7 @@ jobs:
         run: make test_libmbd
       - name: Test pyMBD
         run: |
+          set -o pipefail
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Upload to Codecov

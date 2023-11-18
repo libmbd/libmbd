@@ -29,6 +29,7 @@ extensions = [
 ]
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
+    'ase': ('https://wiki.fysik.dtu.dk/ase', None),
 }
 source_suffix = '.rst'
 master_doc = 'index'
@@ -57,6 +58,7 @@ autodoc_mock_imports = [
     'scipy',
     'pymbd._libmbd',
     'mpi4py',
+    'ase',
 ]
 
 

@@ -200,6 +200,9 @@ subroutine clock_init(this, n)
     class(clock_t), intent(inout) :: this
     integer, intent(in) :: n
 
+    if (allocated(this%timestamps)) deallocate (this%timestamps)
+    if (allocated(this%counts)) deallocate (this%counts)
+    if (allocated(this%levels)) deallocate (this%levels)
     allocate (this%timestamps(n), source=0_i8)
     allocate (this%counts(n), source=0_i8)
     allocate (this%levels(n), source=0)

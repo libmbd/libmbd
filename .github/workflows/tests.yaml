@@ -25,13 +25,13 @@ jobs:
             mpi: mpich
             mpi-nodes: 2
           - type: conda
-            python-version: =3.6
+            python-version: =3.8
             cmake-version: =3.14
             gfortran-version: =8
             mpi: openmpi
             mpi-nodes: 8
           - type: conda
-            python-version: =3.6
+            python-version: =3.8
             cmake-version: =3.14
             gfortran-version: =8
             mpi: mpich=3.4.3=\*_100

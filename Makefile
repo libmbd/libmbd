@@ -39,7 +39,11 @@ test: test_libmbd
 	$(RUN_CMD) pytest -v --durations=3
 
 build_doc:
-	pip install "Markdown<3.4" "sphinx<3" "Jinja2<3.1" toml git+https://github.com/libmbd/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
+	pip install "Markdown<3.4" "sphinx<3" "Jinja2<3.1" \
+	    "sphinxcontrib-applehelp<1.0.8" "sphinxcontrib-devhelp<1.0.6" \
+	    "sphinxcontrib-htmlhelp<2.0.5" "sphinxcontrib-serializinghtml<1.1.10" \
+	    "sphinxcontrib.qthelp<1.0.7" "alabaster<0.7.14" \
+	    toml git+https://github.com/libmbd/ford@7b44574da7ec20f4ab4b1842ec7561de2a601930
 	ford -I. doc/libmbd.md -o build
 	sphinx-build -W -d $(BLDDIR)/doctrees doc doc/build/pymbd
 	touch doc/build/.nojekyll

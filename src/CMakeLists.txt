@@ -1,4 +1,4 @@
-configure_file(mbd_version.f90.in "${CMAKE_CURRENT_BINARY_DIR}/mbd_version.f90")
+configure_file(version.h.in "${CMAKE_CURRENT_BINARY_DIR}/version.h")
 
 add_library(mbd
     mbd.F90
@@ -20,7 +20,7 @@ add_library(mbd
     mbd_scs.f90
     mbd_ts.F90
     mbd_utils.F90
-    "${CMAKE_CURRENT_BINARY_DIR}/mbd_version.f90"
+    mbd_version.f90
     mbd_vdw_param.f90
 )
 
@@ -52,10 +52,11 @@ endif()
 
 set(moduledir "${CMAKE_CURRENT_BINARY_DIR}/modules")
 set(includedir "${CMAKE_INSTALL_INCLUDEDIR}/mbd")
-set_target_properties(mbd PROPERTIES Fortran_MODULE_DIRECTORY "${moduledir}")
+set_target_properties(mbd PROPERTIES Fortran_MODULE_DIRECTORY "${moduledir}" Fortran_PREPROCESS ON)
 
 target_include_directories(mbd
     PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR} # for version.h
         ${moduledir}
     INTERFACE
         $<BUILD_INTERFACE:${moduledir}>

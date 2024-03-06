@@ -25,7 +25,7 @@ links = [
     *(
         link.format(
             vs[i - 1] if i else 'unreleased',
-            f'compare/{vs[i]}...{vs[i-1] if i else "HEAD"}',
+            f'compare/{vs[i]}...{vs[i - 1] if i else "HEAD"}',
         )
         for i in range(len(vs))
     ),

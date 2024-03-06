@@ -224,6 +224,7 @@ subroutine geom_destroy(this)
     deallocate (this%freq)
     deallocate (this%timer%timestamps)
     deallocate (this%timer%counts)
+    deallocate (this%timer%levels)
 end subroutine
 
 integer function geom_siz(this) result(siz)

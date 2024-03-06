@@ -4,7 +4,8 @@
 module mbd_c_api
 !! Implementation of C API.
 
-use iso_c_binding
+use iso_c_binding, only: c_int, c_double, c_bool, c_char, c_ptr, c_double_complex, &
+                         c_null_char, c_loc, c_f_pointer, c_associated
 use mbd_constants
 use mbd_version
 use mbd_coulomb, only: dipole_energy, coulomb_energy

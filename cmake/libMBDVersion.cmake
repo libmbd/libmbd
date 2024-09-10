@@ -1,6 +1,8 @@
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+    find_package(Git REQUIRED)
+
     execute_process(
-        COMMAND git describe --tags --dirty=.dirty
+        COMMAND git describe --tags --dirty=.dirty --always
         OUTPUT_VARIABLE VERSION_TAG
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         ERROR_QUIET

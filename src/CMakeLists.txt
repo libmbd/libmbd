@@ -52,6 +52,7 @@ endif()
 
 set(moduledir "${CMAKE_CURRENT_BINARY_DIR}/modules")
 set(includedir "${CMAKE_INSTALL_INCLUDEDIR}/mbd")
+set(install_moduledir "${CMAKE_INSTALL_MODULEDIR}/mbd")
 set_target_properties(mbd PROPERTIES Fortran_MODULE_DIRECTORY "${moduledir}")
 
 target_include_directories(mbd
@@ -60,6 +61,7 @@ target_include_directories(mbd
     INTERFACE
         $<BUILD_INTERFACE:${moduledir}>
         $<INSTALL_INTERFACE:${includedir}>
+        $<INSTALL_INTERFACE:${install_moduledir}>
 )
 
 if(ENABLE_SCALAPACK_MPI)
@@ -89,6 +91,6 @@ if(CMAKE_INSTALL_LIBDIR)
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         PUBLIC_HEADER DESTINATION "${includedir}"
     )
-    install(DIRECTORY "${moduledir}/" DESTINATION "${includedir}")
+    install(DIRECTORY "${moduledir}/" DESTINATION "${install_moduledir}")
     install(EXPORT MbdConfig NAMESPACE Mbd:: DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/mbd")
 endif()

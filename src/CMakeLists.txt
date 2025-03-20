@@ -24,6 +24,11 @@ add_library(mbd
     mbd_vdw_param.f90
 )
 
+set_target_properties(mbd PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+)
+
 if(ENABLE_SCALAPACK_MPI)
     target_sources(mbd PRIVATE mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
     if(NOT MPI_Fortran_HAVE_F08_MODULE OR ENABLE_MPIFH)

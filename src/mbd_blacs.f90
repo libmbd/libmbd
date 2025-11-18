@@ -87,23 +87,29 @@ end interface
 contains
 
 subroutine blacs_grid_init(this, comm)
+    use mpi
     class(blacs_grid_t), intent(inout) :: this
     integer, intent(in), optional :: comm
 
     integer :: my_task, n_tasks, nprows
+    integer :: ierr
 
-    call BLACS_PINFO(my_task, n_tasks)
+    if (present(comm)) then
+        call MPI_Comm_rank(comm, my_task, ierr)
+        call MPI_Comm_size(comm, n_tasks, ierr)
+        this%comm = comm
+        this%ctx = comm
+    else
+        call BLACS_PINFO(my_task, n_tasks)
+        this%comm = MPI_COMM_WORLD
+        call BLACS_GET(0, 0, this%ctx)
+    end if
+
     do nprows = int(sqrt(dble(n_tasks))), 1, -1
         if (mod(n_tasks, nprows) == 0) exit
     end do
     this%nprows = nprows
     this%npcols = n_tasks / this%nprows
-    if (present(comm)) then
-        this%ctx = comm
-        this%comm = comm
-    else
-        call BLACS_GET(0, 0, this%ctx)
-    end if
     call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &

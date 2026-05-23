@@ -15,7 +15,7 @@ if [ ! -d "$VENV" ]; then
     python3 -m venv "$VENV"
 fi
 source "$VENV/bin/activate"
-pip install -U pip --quiet
+pip install -U pip setuptools --quiet
 
 # Build and install libMBD (Fortran) + pyMBD (Python bindings + test deps)
 cd "$CLAUDE_PROJECT_DIR"

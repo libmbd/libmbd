@@ -1,10 +1,14 @@
 name: Tests
 on:
   push:
+    branches: [master]
   pull_request:
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   all:
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
@@ -18,24 +22,27 @@ jobs:
           - type: macos
             mpi-nodes: 2
           - type: conda
+            python-version: =3.13
           - type: conda
+            python-version: =3.13
             mpi: openmpi
             mpi-nodes: 8
             elsi: elsi
           - type: conda
+            python-version: =3.13
             mpi: mpich
             mpi-nodes: 2
           - type: conda
-            python-version: =3.8
-            cmake-version: =3.14
-            gfortran-version: =8
+            python-version: =3.10
+            cmake-version: =3.22
+            gfortran-version: =11
             mpi: openmpi
             mpi-nodes: 8
           - type: conda
-            python-version: =3.8
-            cmake-version: =3.14
-            gfortran-version: =8
-            mpi: mpich=3.4.3=\*_100
+            python-version: =3.10
+            cmake-version: =3.22
+            gfortran-version: =11
+            mpi: mpich=4
             mpi-nodes: 2
             elsi: elsi
     runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
@@ -64,10 +71,10 @@ jobs:
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         with:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
@@ -108,7 +115,7 @@ jobs:
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')
           fi
           if [[ "${{ matrix.type }}" == "macos" ]]; then
-              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-12')
+              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-14')
           fi
           if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
             CMAKE_ARGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')
@@ -137,4 +144,6 @@ jobs:
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Upload to Codecov
-        run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}

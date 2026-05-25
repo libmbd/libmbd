@@ -1,68 +1,68 @@
 name: Lint
 on:
   push:
+    branches: [master]
   pull_request:
   schedule:
     - cron: '0 6 * * 1'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   flake8:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.x
       - name: Install dependencies
         run: pip install flake8 flake8-bugbear flake8-comprehensions flake8-quotes pep8-naming
-      - uses: actions/checkout@v2
       - run: flake8
   black:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.x
       - name: Install dependencies
         run: pip install black
-      - uses: actions/checkout@v2
       - run: black . --check
   isort:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.x
       - name: Install dependencies
         run: pip install isort
-      - uses: actions/checkout@v2
       - run: isort . --check
   pydocstyle:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.x
       - name: Install dependencies
         run: pip install pydocstyle
-      - uses: actions/checkout@v2
       - run: pydocstyle src
   fprettify:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: 3.x
       - name: Install dependencies
         run: pip install fprettify
-      - uses: actions/checkout@v2
       - name: Run fprettify
         run: |
           fprettify -d -r . | tee diff

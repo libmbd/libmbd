@@ -65,7 +65,7 @@ target_include_directories(mbd
 if(ENABLE_SCALAPACK_MPI)
     target_link_libraries(mbd PRIVATE MPI::MPI_Fortran scalapack)
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
-    if(MPI_Fortran_HAVE_F08_MODULE)
+    if(MPI_Fortran_HAVE_F08_MODULE AND NOT FORCE_NO_MPIF08)
         set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPIF08)
     endif()
 endif()

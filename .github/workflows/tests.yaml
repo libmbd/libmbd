@@ -87,8 +87,10 @@ jobs:
         if: matrix.type == 'macos'
         run: |
           brew install open-mpi scalapack
-          # open-mpi's mpi.mod must be read by the same major gfortran it was built with
-          GFORTRAN=$(mpifort -show | awk '{print $1}')
+          # open-mpi's mpi.mod must be read by the same major gfortran it was built with;
+          # brew open-mpi depends on the current `gcc` formula, so the highest-numbered
+          # gfortran-* in brew's bindir is the one we want
+          GFORTRAN=$(ls /opt/homebrew/bin/gfortran-[0-9]* 2>/dev/null | sort -V | tail -1)
           echo "MACOS_GFORTRAN=$GFORTRAN" >>$GITHUB_ENV
       - name: Create Conda environment
         if: matrix.type == 'conda'

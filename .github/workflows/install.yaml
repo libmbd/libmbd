@@ -51,6 +51,11 @@ jobs:
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
           key: ${{ matrix.os }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
+      - name: Install miniforge on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask miniforge
+          echo "CONDA=/opt/homebrew/Caskroom/miniforge/base" >>$GITHUB_ENV
       - name: Create Conda environment
         run: |
           $CONDA/bin/conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge "python<3.12" pip "setuptools<81" ${{ env.CONDA_PKGS }} numpy scipy

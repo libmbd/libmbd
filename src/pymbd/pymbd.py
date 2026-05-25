@@ -12,7 +12,9 @@ from numpy.polynomial.legendre import leggauss
 from pkg_resources import resource_string
 from scipy.special import erf, erfc
 
-__all__ = ['mbd_energy', 'mbd_energy_species', 'screening', 'ang']
+__all__ = ['mbd_energy', 'mbd_energy_species', 'screening',
+           'from_volumes', 'atomic_polarizabilities',
+           'molecular_polarizability', 'ang']
 
 ang = 1 / 0.529177249
 """(a.u.) angstrom"""
@@ -50,10 +52,64 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
     return alpha_dyn_rsscs[0], C6_rsscs, R_vdw_rsscs
 
 
-def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):
-    r"""Calculate an MBD energy.
+def atomic_polarizabilities(coords, species, volumes, beta, lattice=None, kind='TS'):
+    r"""Atomic polarizability tensors.
 
     :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like species: atom types (elements)
+    :param array-like volumes: ratios of Hirshfeld volumes in molecule and vacuum
+    :param float beta: MBD damping parameter :math:`\beta` (see J. Chem. Phys. 140, 18A508 (2014))
+    :param array-like lattice: (a.u.) lattice vectors in rows
+    :param str kind: one of 'TS', 'BG' or 'TSsurf'
+
+    Returns static atomic polarizability tensors (a.u.).
+    """
+    alpha_0, C6, R_vdw = from_volumes(species, volumes, kind=kind)
+    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
+    dipmat = dipole_matrix(
+        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=lattice
+    )
+    a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
+    # contract a_nlc in one dimension to get atomic polarizability tensors
+    na = len(alpha_0)
+    alpha_a = (a_nlc.reshape(na, 3, na, 3)
+                    .swapaxes(1, 2)
+                    .sum(axis=1))
+    # alpha_a has shape (na, 3, 3)
+    return alpha_a
+
+
+def molecular_polarizability(coords, species, volumes, beta):
+    r"""Calculate the static polarizability of molecules.
+
+    :param array-like coords: (a.u.) atomic coordinates in rows
+    :param array-like species: atom types (elements)
+    :param array-like volumes: ratios of Hirshfeld volumes in molecule and vacuum
+    :param float beta: MBD damping parameter :math:`\beta` (see J. Chem. Phys. 140, 18A508 (2014))
+
+    Returns static polarizability tensor in (a.u.).
+    """
+    alpha_0, C6, R_vdw = from_volumes(species, volumes, kind='TS')
+    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
+    dipmat = dipole_matrix(
+        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=None
+    )
+    a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
+    # contract a_nlc in two dimensions to get molecular polarizability tensor
+    na = len(alpha_0)
+    alpha_molecule = (a_nlc.reshape(na, 3, na, 3)
+                     .swapaxes(1, 2)
+                     .reshape(na**2, 3, 3)
+                     .sum(axis=0))
+    # molecular polarizability is a (3, 3) tensor
+    return alpha_molecule
+
+
+def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):
+    r"""Calculate an MBD energy. Use with Hirshfeld-partitioned atomic polarizabilities,
+    C6 coefficients and van der Waal radii. Otherwise use mbd_energy_species().
+
+    :param array-like coords: (a.u.) atomic coordinates in rows
     :param array-like alpha_0: (a.u.) atomic polarizabilities
     :param array-like C6: (a.u.) atomic :math:`C_6` coefficients
     :param array-like R_vdw: (a.u.) atomic vdW radii
@@ -95,12 +151,12 @@ def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfre
 
 
 def mbd_energy_species(coords, species, volume_ratios, beta, **kwargs):
-    r"""Calculate an MBD energy from atom types and Hirshfed-volume ratios.
+    r"""Calculate an MBD energy from atom types and Hirshfeld-volume ratios.
 
     :param array-like coords: (a.u.) atom coordinates in rows
     :param array-like species: atom types (elements)
     :param array-like volume_ratios: ratios of Hirshfeld volumes in molecule and vacuum
-    :param float beta: MBD damping parameter :math:`\beta`
+    :param float beta: MBD damping parameter :math:`\beta` (use :math:'\beta = 0.83' for PBE xc-functional)
     :param kwargs: see :func:`mbd_energy`
     """
     alpha_0, C6, R_vdw = from_volumes(species, volume_ratios)
@@ -248,6 +304,16 @@ def T_erfc(R, a):
 
 
 def from_volumes(species, volumes, kind='TS'):
+    r"""Scale the free atomic polarizabilities, C6 coefficients and
+    van der Waal radii by the volume ratios.
+
+    :param array-like species: atom types (elements)
+    :param array-like volumes: ratios of Hirshfeld volumes in molecule and vacuum
+    :param str kind: one of 'TS', 'BG' or 'TSsurf'
+
+    Returns partitioned atomic polarizabilities, :math:`C_6` coefficients, and
+    :math:`R_\mathrm{vdw}` coefficients (a.u.).
+    """
     if kind == 'TS':
         alpha_0, C6, R_vdw = (
             np.array([vdw_params[sp][param] for sp in species])

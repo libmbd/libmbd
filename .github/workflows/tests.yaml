@@ -85,7 +85,11 @@ jobs:
         run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
       - name: Install libMBD dependencies
         if: matrix.type == 'macos'
-        run: brew install open-mpi scalapack
+        run: |
+          brew install open-mpi scalapack
+          # open-mpi's mpi.mod must be read by the same major gfortran it was built with
+          GFORTRAN=$(mpifort -show | awk '{print $1}')
+          echo "MACOS_GFORTRAN=$GFORTRAN" >>$GITHUB_ENV
       - name: Create Conda environment
         if: matrix.type == 'conda'
         run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} pip cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
@@ -115,7 +119,7 @@ jobs:
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')
           fi
           if [[ "${{ matrix.type }}" == "macos" ]]; then
-              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-14')
+              CMAKE_ARGS+=("-DCMAKE_Fortran_COMPILER=$MACOS_GFORTRAN")
           fi
           if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
             CMAKE_ARGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')

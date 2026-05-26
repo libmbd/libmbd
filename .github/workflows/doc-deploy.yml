@@ -2,6 +2,7 @@ name: Deploy Documentation
 on:
   workflow_call:
 permissions:
+  contents: read
   pages: write
   id-token: write
 concurrency:

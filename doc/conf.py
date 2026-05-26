@@ -25,15 +25,11 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'sphinx.ext.intersphinx',
 ]
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-}
 source_suffix = '.rst'
 master_doc = 'index'
 copyright = f'2018-{datetime.date.today().year}, {author}'
-language = None
+language = 'en'
 exclude_patterns = ['build', '.DS_Store']
 pygments_style = 'sphinx'
 todo_include_todos = True
@@ -43,8 +39,6 @@ html_theme_options = {
     'github_button': True,
     'github_user': 'libmbd',
     'github_repo': 'libmbd',
-    'badge_branch': 'master',
-    'codecov_button': True,
 }
 html_sidebars = {
     '**': ['about.html', 'navigation.html', 'relations.html', 'searchbox.html']

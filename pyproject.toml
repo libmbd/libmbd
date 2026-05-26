@@ -32,12 +32,12 @@ script = "build.py"
 generate-setup-file = false
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 scipy = "^1.6"
 numpy = "^1.20"
 cffi = "^1"
 pytest = { version = "^6", optional = true }
-mpi4py = { version = "^3", optional = true }
+mpi4py = { version = "^3 || ^4", optional = true }
 
 [tool.poetry.extras]
 mpi = ["mpi4py"]
@@ -60,5 +60,5 @@ dirty = true
 pattern = '^(?P<base>\d+\.\d+\.\d+)$'
 
 [tool.black]
-target-version = ["py38"]
+target-version = ["py310"]
 skip-string-normalization = true

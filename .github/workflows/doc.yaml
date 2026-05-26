@@ -1,23 +1,26 @@
 name: Documentation
 on:
   push:
+    branches: [master]
   pull_request:
   schedule:
     - cron: '0 6 * * 1'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: 3.x
+          python-version: "3.12"
       - name: Install Poetry
         run: |
-          curl -sSL https://install.python-poetry.org | python -
-          $HOME/.local/share/pypoetry/venv/bin/pip install -U poetry-dynamic-versioning
-          echo $HOME/.local/bin >>$GITHUB_PATH
-      - uses: actions/checkout@v2
+          pipx install poetry
+          pipx inject poetry poetry-dynamic-versioning
       - name: Build documentation
         run: make build_doc VIRTUAL_ENV=none

@@ -39,7 +39,7 @@ test: test_libmbd
 	$(RUN_CMD) pytest -v --durations=3
 
 build_doc:
-	pip install "Markdown<3.4" "sphinx<3" "Jinja2<3.1" \
+	pip install "setuptools<81" "Markdown<3.4" "sphinx<3" "Jinja2<3.1" \
 	    "sphinxcontrib-applehelp<1.0.8" "sphinxcontrib-devhelp<1.0.6" \
 	    "sphinxcontrib-htmlhelp<2.0.5" "sphinxcontrib-serializinghtml<1.1.10" \
 	    "sphinxcontrib.qthelp<1.0.7" "alabaster<0.7.14" \

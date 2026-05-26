@@ -39,7 +39,7 @@ test: test_libmbd
 	$(RUN_CMD) pytest -v --durations=3
 
 build_doc:
-	pip install -U "sphinx>=8,<9" alabaster "ford>=7"
+	pip install -U "sphinx>=8,<9" alabaster toml "ford>=7"
 	ford -I. doc/libmbd.md -o $(CURDIR)/doc/build
 	sphinx-build -W -d $(BLDDIR)/doctrees doc doc/build/pymbd
 	touch doc/build/.nojekyll

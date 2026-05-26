@@ -2,13 +2,13 @@ import datetime
 import os
 import subprocess
 import sys
-import tomllib
+import toml
 
 sys.path.insert(0, os.path.abspath('../src'))
 
 
-with open('../pyproject.toml', 'rb') as f:
-    metadata = tomllib.load(f)['tool']['poetry']
+with open('../pyproject.toml') as f:
+    metadata = toml.load(f)['tool']['poetry']
 
 project = 'libMBD'
 release = version = (

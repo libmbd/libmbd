@@ -89,8 +89,14 @@ jobs:
           brew install open-mpi scalapack
           # open-mpi's mpi.mod must be read by the same major gfortran it was built with;
           # brew open-mpi depends on the current `gcc` formula, so the highest-numbered
-          # gfortran-* in brew's bindir is the one we want
-          GFORTRAN=$(ls /opt/homebrew/bin/gfortran-[0-9]* 2>/dev/null | sort -V | tail -1)
+          # gfortran-* in brew's bindir is the one we want.
+          # Use `brew --prefix` so this works on both Intel (/usr/local) and Apple Silicon (/opt/homebrew).
+          HOMEBREW_PREFIX=$(brew --prefix)
+          GFORTRAN=$(ls "$HOMEBREW_PREFIX/bin/gfortran-"[0-9]* 2>/dev/null | sort -V | tail -1)
+          if [[ -z "$GFORTRAN" ]]; then
+            echo "::error::No versioned gfortran found in $HOMEBREW_PREFIX/bin" >&2
+            exit 1
+          fi
           echo "MACOS_GFORTRAN=$GFORTRAN" >>$GITHUB_ENV
       - name: Create Conda environment
         if: matrix.type == 'conda'
@@ -120,7 +126,7 @@ jobs:
           if [[ "${{ matrix.elsi }}" == "elsi" ]]; then
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')
           fi
-          if [[ "${{ matrix.type }}" == "macos" ]]; then
+          if [[ "${{ matrix.type }}" == "macos" && -n "$MACOS_GFORTRAN" ]]; then
               CMAKE_ARGS+=("-DCMAKE_Fortran_COMPILER=$MACOS_GFORTRAN")
           fi
           if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
@@ -151,5 +157,6 @@ jobs:
           ! grep failed output >/dev/null
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

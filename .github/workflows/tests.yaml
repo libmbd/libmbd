@@ -22,7 +22,7 @@ jobs:
           - type: macos
             mpi-nodes: 2
           - type: nvhpc
-            nvhpc-version: "25.9"
+            nvhpc-version: "26.3"
           - type: conda
             python-version: =3.13
           - type: conda

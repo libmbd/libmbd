@@ -21,6 +21,8 @@ jobs:
             mpi-nodes: 2
           - type: macos
             mpi-nodes: 2
+          - type: nvhpc
+            nvhpc-version: "25.9"
           - type: conda
             python-version: =3.13
           - type: conda
@@ -45,7 +47,7 @@ jobs:
             mpi: mpich=4
             mpi-nodes: 2
             elsi: elsi
-    runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
+    runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest","nvhpc":"ubuntu-latest"}')[matrix.type] }}
     env:
       CONDA_ALWAYS_YES: "true"
       CONDA_QUIET: "true"
@@ -98,6 +100,34 @@ jobs:
             exit 1
           fi
           echo "MACOS_GFORTRAN=$GFORTRAN" >>$GITHUB_ENV
+      - name: Cache NVIDIA HPC SDK packages
+        if: matrix.type == 'nvhpc'
+        uses: actions/cache@v4
+        with:
+          path: ~/nvhpc-debs
+          key: nvhpc-debs-${{ matrix.nvhpc-version }}
+      - name: Install NVIDIA HPC SDK
+        if: matrix.type == 'nvhpc'
+        run: |
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends libblas-dev liblapack-dev
+          curl -fsSL https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK \
+            | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' \
+            | sudo tee /etc/apt/sources.list.d/nvhpc.list
+          sudo apt-get update -yq
+          # Restore previously downloaded packages so a warm cache skips the multi-GB download.
+          if ls ~/nvhpc-debs/*.deb >/dev/null 2>&1; then
+            sudo cp ~/nvhpc-debs/*.deb /var/cache/apt/archives/
+          fi
+          pkg="nvhpc-$(echo '${{ matrix.nvhpc-version }}' | tr '.' '-')"
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends "$pkg"
+          # Stash the downloaded .deb files in a user-owned dir for actions/cache to persist.
+          mkdir -p ~/nvhpc-debs
+          sudo cp /var/cache/apt/archives/*.deb ~/nvhpc-debs/ 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" ~/nvhpc-debs
+          nvroot=$(ls -d /opt/nvidia/hpc_sdk/Linux_x86_64/*/compilers | sort -V | tail -1)
+          echo "$nvroot/bin" >>$GITHUB_PATH
+          echo "LD_LIBRARY_PATH=$nvroot/lib:$LD_LIBRARY_PATH" >>$GITHUB_ENV
       - name: Create Conda environment
         if: matrix.type == 'conda'
         run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} pip cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
@@ -118,8 +148,14 @@ jobs:
           git describe --tags --dirty=.dirty
       - name: Set CMAKE_ARGS
         run: |
-          FFLAGS=('-fprofile-arcs' '-ftest-coverage')
           CMAKE_ARGS=()
+          if [[ "${{ matrix.type }}" == "nvhpc" ]]; then
+              # nvfortran has no gcov-style coverage flags; build without coverage.
+              FFLAGS=()
+              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=nvfortran')
+          else
+              FFLAGS=('-fprofile-arcs' '-ftest-coverage')
+          fi
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               CMAKE_ARGS+=('-DENABLE_SCALAPACK_MPI=ON')
           fi
@@ -157,6 +193,6 @@ jobs:
           ! grep failed output >/dev/null
       - name: Upload to Codecov
         uses: codecov/codecov-action@v5
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

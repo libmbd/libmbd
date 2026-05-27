@@ -51,6 +51,7 @@ autodoc_mock_imports = [
     'scipy',
     'pymbd._libmbd',
     'mpi4py',
+    'ase',
 ]
 
 

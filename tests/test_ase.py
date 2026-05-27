@@ -81,6 +81,5 @@ def test_lattgrad(argon_crystal):
     atoms.set_calculator(calc)
     stress = atoms.get_stress(voigt=False)
     stress_num = atoms.calc.calculate_numerical_stress(atoms, d=1e-3, voigt=False)
-    print(stress / stress_num)
-    for i in range(len(atoms.positions)):
+    for i in range(3):
         assert stress[i] == approx(stress_num[i], rel=1e-7, abs=1e-7)

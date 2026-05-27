@@ -8,7 +8,7 @@
 [![commits since](https://img.shields.io/github/commits-since/libmbd/libmbd/latest.svg)](https://github.com/libmbd/libmbd/releases)
 [![last commit](https://img.shields.io/github/last-commit/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/commits/master)
 [![license](https://img.shields.io/github/license/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/blob/master/LICENSE)
-[![code style](https://img.shields.io/badge/code%20style-black-202020.svg)](https://github.com/ambv/black)
+[![ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![chat](https://img.shields.io/gitter/room/libmbd/community)](https://gitter.im/libmbd/community)
 [![doi](https://img.shields.io/badge/doi-10%2Fk4bm-blue)](http://doi.org/k4bm)
 

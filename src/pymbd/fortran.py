@@ -312,9 +312,9 @@ class MBDGeom(object):
         return ene
 
     @_auto_context
-    def dipole_matrix(
+    def dipole_matrix(  # noqa: D102
         self, damping, beta=0.0, k_point=None, R_vdw=None, sigma=None, a=6.0
-    ):  # noqa: D102
+    ):
         R_vdw, sigma, k_point = map(_array, (R_vdw, sigma, k_point))
         n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(

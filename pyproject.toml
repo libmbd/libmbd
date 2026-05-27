@@ -44,14 +44,7 @@ mpi = ["mpi4py"]
 test = ["pytest"]
 
 [tool.poetry.dev-dependencies]
-flake8 = "^4"
-flake8-bugbear = "^21"
-flake8-comprehensions = "^3"
-flake8-quotes = "^3"
-pep8-naming = "^0.12"
-black = ">=22"
-pydocstyle = "^5"
-isort = "^5"
+ruff = ">=0.10"
 fprettify = { git = "https://github.com/jhrmnn/fprettify.git", rev = "fix-config-search" }
 
 [tool.poetry-dynamic-versioning]
@@ -59,6 +52,58 @@ enable = true
 dirty = true
 pattern = '^(?P<base>\d+\.\d+\.\d+)$'
 
-[tool.black]
-target-version = ["py310"]
-skip-string-normalization = true
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "N", "B", "C4", "C90", "Q", "I", "D"]
+ignore = [
+    "E501",
+    "E741",
+    "N802",
+    "N803",
+    "N806",
+    "N812",
+    "B905",
+    "D100",
+    "D104",
+    "D105",
+    "D107",
+    "D202",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "single"
+multiline-quotes = "double"
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+no-lines-before = ["typing"]
+section-order = [
+    "future",
+    "standard-library",
+    "typing",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+
+[tool.ruff.lint.isort.sections]
+typing = ["typing", "typing_extensions"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+"devtools/**" = ["D"]
+"doc/**" = ["D"]
+"build.py" = ["D"]
+
+[tool.ruff.format]
+quote-style = "preserve"

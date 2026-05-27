@@ -45,7 +45,7 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
 
 class MBDFortranError(Exception):
     def __init__(self, code, origin, msg):
-        super(MBDFortranError, self).__init__(msg)
+        super(MBDFortranError, self).__init__(code, origin, msg)
         self.code = code
         self.origin = origin
 

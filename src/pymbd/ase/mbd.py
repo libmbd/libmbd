@@ -52,7 +52,7 @@ class MBD(Calculator):
         hirsh_volrat = (
             self.hirsh_volrat
             if self.hirsh_volrat is not None
-            else np.ones(len(atoms), dtype=np.float)
+            else np.ones(len(atoms), dtype=float)
         )
         alpha_0, C6, R_vdw = from_volumes(
             atoms.get_chemical_symbols(), hirsh_volrat, kind=self.params
@@ -82,10 +82,10 @@ class MBD(Calculator):
             self.results['forces'] = -gradients
             if 'stress' in properties and all(self.atoms.get_pbc()):
                 latt_gradients = result[2] * units.Hartree / units.Bohr
-                stress = np.dot(atoms.get_cell(), latt_gradients.transpose()) + np.dot(
-                    atoms.get_positions().transpose(), gradients
-                )
-                stress = stress / (atoms.get_volume())
+                cell = np.array(atoms.get_cell())
+                stress = (
+                    latt_gradients.T @ cell + gradients.T @ atoms.get_positions()
+                ) / atoms.get_volume()
                 self.results['stress'] = stress
 
     def set_hirshfeld(self, hirsh_volrat):

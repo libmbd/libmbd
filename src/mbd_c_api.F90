@@ -41,11 +41,11 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .true.
 logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 #endif
 
-integer :: i
 integer(c_int), bind(c) :: cmbd_version_major = mbd_version_major
 integer(c_int), bind(c) :: cmbd_version_minor = mbd_version_minor
 integer(c_int), bind(c) :: cmbd_version_patch = mbd_version_patch
-character(c_char), bind(c) :: cmbd_version_suffix(30) = [(mbd_version_suffix(i:i), i=1, 30)]
+character(c_char), bind(c) :: cmbd_version_suffix(30) = &
+    transfer(mbd_version_suffix, [character(kind=c_char) ::], 30)
 
 contains
 

@@ -100,6 +100,15 @@ jobs:
             exit 1
           fi
           echo "MACOS_GFORTRAN=$GFORTRAN" >>$GITHUB_ENV
+      - name: Free disk space
+        if: matrix.type == 'nvhpc'
+        run: |
+          # The NVIDIA HPC SDK is ~13 GB installed plus several GB of packages;
+          # reclaim space from preinstalled toolchains we don't use so the
+          # runner's root disk doesn't fill up.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
       - name: Cache NVIDIA HPC SDK packages
         if: matrix.type == 'nvhpc'
         uses: actions/cache@v4
@@ -125,6 +134,8 @@ jobs:
           mkdir -p ~/nvhpc-debs
           sudo cp /var/cache/apt/archives/*.deb ~/nvhpc-debs/ 2>/dev/null || true
           sudo chown -R "$(id -u):$(id -g)" ~/nvhpc-debs
+          # Drop the apt archive copy now that the packages are stashed for caching.
+          sudo apt-get clean
           nvroot=$(ls -d /opt/nvidia/hpc_sdk/Linux_x86_64/*/compilers | sort -V | tail -1)
           echo "$nvroot/bin" >>$GITHUB_PATH
           echo "LD_LIBRARY_PATH=$nvroot/lib:$LD_LIBRARY_PATH" >>$GITHUB_ENV

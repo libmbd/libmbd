@@ -7,5 +7,5 @@ elseif(CMAKE_Fortran_COMPILER_ID MATCHES "^Intel")
     # Covers both ifort ("Intel") and ifx ("IntelLLVM")
     set(CMAKE_Fortran_FLAGS_INIT "-warn all")
     set(CMAKE_Fortran_FLAGS_DEBUG_INIT
-        "-g -traceback -check all,noarg_temp_created")
+        "-O0 -g -traceback -check all,noarg_temp_created")
 endif()

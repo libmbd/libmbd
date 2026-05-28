@@ -189,7 +189,7 @@ jobs:
           # setup-fortran already sourced setvars.sh (SETVARS_COMPLETED=1), so a
           # plain re-source returns exit 3; --force re-runs it and also picks up
           # the MKL component installed above.
-          source /opt/intel/oneapi/setvars.sh --force || true
+          source /opt/intel/oneapi/setvars.sh --force
           test -n "${MKLROOT:-}" || { echo "::error::MKLROOT unset after sourcing setvars.sh"; exit 1; }
           for v in MKLROOT LD_LIBRARY_PATH LIBRARY_PATH CPATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH NLSPATH; do
             echo "$v=${!v}" >>"$GITHUB_ENV"

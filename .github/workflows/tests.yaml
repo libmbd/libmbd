@@ -211,3 +211,66 @@ jobs:
         if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+  intel:
+    if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
+    name: Intel (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # intel -> ifx + icx (LLVM-based), intel-classic -> ifort (last release)
+        toolchain: [intel, intel-classic]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/env
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Intel Fortran/C compiler
+        id: setup-fortran
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: ${{ matrix.toolchain }}
+      - name: Install Intel MKL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends intel-oneapi-mkl-devel
+      - name: Set up oneAPI environment
+        run: |
+          # setup-fortran already sourced setvars.sh (SETVARS_COMPLETED=1), so a
+          # plain re-source returns exit 3; --force re-runs it and also picks up
+          # the MKL component installed above.
+          source /opt/intel/oneapi/setvars.sh --force
+          test -n "${MKLROOT:-}" || { echo "::error::MKLROOT unset after sourcing setvars.sh"; exit 1; }
+          for v in MKLROOT LD_LIBRARY_PATH LIBRARY_PATH CPATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH NLSPATH; do
+            echo "$v=${!v}" >>"$GITHUB_ENV"
+          done
+      - name: Create Python virtual environment
+        run: |
+          python3 -m venv "$VIRTUAL_ENV"
+          "$VIRTUAL_ENV/bin/pip" install -U pip
+          echo "$VIRTUAL_ENV/bin" >>"$GITHUB_PATH"
+      - name: Set CMAKE_ARGS
+        run: |
+          FC="${{ steps.setup-fortran.outputs.fc }}"
+          CC="${{ steps.setup-fortran.outputs.cc }}"
+          echo "CMAKE_ARGS=-DCMAKE_Fortran_COMPILER=$FC -DCMAKE_C_COMPILER=${CC:-gcc} -DBLA_VENDOR=Intel10_64lp_seq" >>"$GITHUB_ENV"
+      - name: Report environment
+        run: |
+          "${{ steps.setup-fortran.outputs.fc }}" --version
+          cmake --version
+          echo "MKLROOT=$MKLROOT"
+          git describe --tags --dirty=.dirty
+      - name: Build libMBD
+        run: make build_libmbd
+      - name: Install libMBD
+        run: make install_libmbd -o build_libmbd
+      - name: Build & install pyMBD
+        run: make install -o install_libmbd
+      - run: pip list
+      - name: Test libMBD
+        run: make test_libmbd
+      - name: Test pyMBD
+        run: |
+          make test -o test_libmbd | tee output
+          ! grep failed output >/dev/null

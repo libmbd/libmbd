@@ -162,7 +162,11 @@ jobs:
           CMAKE_ARGS=()
           if [[ "${{ matrix.type }}" == "nvhpc" ]]; then
               # nvfortran has no gcov-style coverage flags; build without coverage.
-              FFLAGS=()
+              # Target a portable x86-64 baseline -- GitHub-hosted runners use a
+              # heterogeneous CPU fleet, and nvfortran's default host-detected
+              # target can emit instructions some runners don't actually execute,
+              # producing SIGILL at runtime in math-heavy paths.
+              FFLAGS=('-tp' 'px')
               CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=nvfortran')
           else
               FFLAGS=('-fprofile-arcs' '-ftest-coverage')

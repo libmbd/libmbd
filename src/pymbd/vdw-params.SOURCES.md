@@ -57,10 +57,10 @@ DOI: [10.1103/PhysRevLett.108.146103](https://doi.org/10.1103/PhysRevLett.108.14
 
 Zn (and consistent extensions):
 
-Reinhard J. Maurer, Victor G. Ruiz, Javier Camarillo-Cisneros, Wei Liu,
-Nicola Ferri, Karsten Reuter and Alexandre Tkatchenko,
-*"Adsorption structures and energetics of molecules on metal surfaces:
-Benchmarking DFT-based vdW methods"*,
+Victor G. Ruiz, Wei Liu and Alexandre Tkatchenko,
+*"Density-functional theory with screened van der Waals interactions
+applied to atomic and molecular adsorbates on close-packed and
+non-close-packed surfaces"*,
 **Phys. Rev. B** 93, 035118 (2016).
 DOI: [10.1103/PhysRevB.93.035118](https://doi.org/10.1103/PhysRevB.93.035118)
 

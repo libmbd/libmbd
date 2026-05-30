@@ -73,10 +73,10 @@ jobs:
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
@@ -111,7 +111,7 @@ jobs:
           df -h /
       - name: Cache NVIDIA HPC SDK packages
         if: matrix.type == 'nvhpc'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/nvhpc-debs
           key: nvhpc-debs-${{ matrix.nvhpc-version }}
@@ -207,7 +207,7 @@ jobs:
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -223,7 +223,7 @@ jobs:
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/env
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Intel Fortran/C compiler

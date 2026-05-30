@@ -11,8 +11,10 @@
 # Root cause is NOT in libMBD. It is a big-endian bug in MPICH's ch4 POSIX
 # shared-memory broadcast ("release_gather"), which mis-handles the strided
 # vector datatype that ScaLAPACK (PDGETRF/PDGETRI, used by libMBD's distributed
-# matrix inverse) broadcasts during the rSSCS derivative tests. See the notes in
-# devtools/issue-76-notes.md for the full analysis and the run-time workaround.
+# matrix inverse) broadcasts during the rSSCS derivative tests. This was fixed
+# upstream in MPICH 5.0.1 ("Fix bad cast in release-gather collectives that
+# caused data loss issues on Big-Endian 64b arches (s390x)"); the CVAR below is
+# only needed on older MPICH. See devtools/issue-76-notes.md for full details.
 #
 # This script reproduces the crash inside an emulated big-endian s390x container.
 # It needs Docker with QEMU/binfmt set up for foreign architectures:

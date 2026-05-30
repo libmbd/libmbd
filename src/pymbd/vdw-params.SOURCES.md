@@ -21,28 +21,33 @@ These values were added to libMBD in commit
 [`471020e`](https://github.com/libmbd/libmbd/commit/471020e882a775d5164315cce62ef70cb7d53bd5)
 ("add vdw parameters from gould-bucko").
 
-## `alpha_0(TS)`, `C6(TS)`, `R_vdw(TS)` for Z = 1–86 (excluding lanthanides)
+## `alpha_0(TS)`, `C6(TS)`, `R_vdw(TS)`
 
-Original TS reference values as established in
+Compiled values for the Tkatchenko–Scheffler (TS) method, as tabulated
+in Table A.1 of
+
+Vivekanand V. Gobre,
+*"Efficient modelling of linear electronic polarization in materials
+using atomic response functions"*,
+PhD thesis, Technische Universität Berlin, 2016.
+<https://depositonce.tu-berlin.de/items/40bff578-b71a-4ed6-b7c6-667226e7af5c>
+
+which is itself a compilation drawing on several primary sources
+(reported therein). The TS method itself is defined in
 
 Alexandre Tkatchenko and Matthias Scheffler,
-*"Accurate Molecular Van Der Waals Interactions from Ground-State Electron
-Density and Free-Atom Reference Data"*,
+*"Accurate Molecular Van Der Waals Interactions from Ground-State
+Electron Density and Free-Atom Reference Data"*,
 **Phys. Rev. Lett.** 102, 073005 (2009).
 DOI: [10.1103/PhysRevLett.102.073005](https://doi.org/10.1103/PhysRevLett.102.073005)
 
-These values were inherited from the original `pymbd/vdw_param.py` table
-(public-domain via CC0-1.0) when the file was reorganised into CSV form in
-commit
+Values for Z = 1–86 (excluding the lanthanides) were inherited from
+the original `pymbd/vdw_param.py` table (public-domain via CC0-1.0)
+when the file was reorganised into CSV form in commit
 [`8c31758`](https://github.com/libmbd/libmbd/commit/8c31758fe79cdd60756aea0c9614eb200e31a67e).
-
-## `alpha_0(TS)`, `C6(TS)`, `R_vdw(TS)` for La–Lu and Fr–No
-
-Added in commit
+The La–Lu and Fr–No rows were filled in later from the Gobre
+tabulation in commit
 [`3c6900c`](https://github.com/libmbd/libmbd/commit/3c6900c058748cd7145a219dbb8e766fcddac2ca).
-Sourced from a comprehensive periodic-table-wide TS-style tabulation
-(Tomáš Bučko, habilitation thesis, TU Berlin, Table A.1;
-<https://depositonce.tu-berlin.de/items/40bff578-b71a-4ed6-b7c6-667226e7af5c>).
 
 ## `alpha_0(TSsurf)`, `C6(TSsurf)`, `R_vdw(TSsurf)`
 

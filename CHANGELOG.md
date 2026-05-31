@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Missing deallocation causing crash on mbd_calc_t reinitialization ([#59](https://github.com/libmbd/libmbd/pull/59))
-- Incorrect intent preventing compilation with Mpich>=4 ([#57](https://github.com/libmbd/libmbd/pull/57))
+- Compilation with the Intel ifx compiler ([#60](https://github.com/libmbd/libmbd/pull/60))
 
 ## [0.12.8] - 2024-02-09
 

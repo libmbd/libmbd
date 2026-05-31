@@ -25,13 +25,13 @@ jobs:
     if: github.repository == 'libmbd/libmbd' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # Both poetry-dynamic-versioning and devtools/source-dist.sh derive
           # the version from Git tags, so the full history (and tags) must be
           # available.
           fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
       - name: Install build tooling

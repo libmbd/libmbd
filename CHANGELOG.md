@@ -7,37 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Documented origin and CC0-1.0 license of the bundled vdW parameter data
-- Support for `mpi4py` 4.x
+- Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
+- Support for `mpi4py` 4.x ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Changed
 
-- Minimum required CMake version is now 3.22
+- Minimum required CMake version is now 3.22 ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Removed
 
-- Support for Python < 3.10
+- Support for Python < 3.10 ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Fixed
 
-- Library version determination from shallow Git clones
+- Library version determination from shallow Git clones ([#67](https://github.com/libmbd/libmbd/pull/67))
 
 ## [0.13.0] - 2024-03-07
 
 ### Removed
 
-- Support for Python<3.8
+- Support for Python<3.8 ([#61](https://github.com/libmbd/libmbd/pull/61))
 
 ### Fixed
 
-- Missing deallocation causing crash on mbd_calc_t reinitialization
-- Incorrect intent preventing compilation with Mpich>=4
+- Missing deallocation causing crash on mbd_calc_t reinitialization ([#59](https://github.com/libmbd/libmbd/pull/59))
+- Incorrect intent preventing compilation with Mpich>=4 ([#57](https://github.com/libmbd/libmbd/pull/57))
 
 ## [0.12.8] - 2024-02-09
 
 ### Fixed
 
-- Compatibility with MPICH 4.x
+- Compatibility with MPICH 4.x ([#57](https://github.com/libmbd/libmbd/pull/57))
 
 ## [0.12.7] - 2023-06-30
 

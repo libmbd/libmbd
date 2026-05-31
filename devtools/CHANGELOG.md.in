@@ -5,6 +5,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Documented origin and CC0-1.0 license of the bundled vdW parameter data
+- Support for `mpi4py` 4.x
+
+### Changed
+
+- Minimum required CMake version is now 3.22
+
+### Removed
+
+- Support for Python < 3.10
+
+### Fixed
+
+- Library version determination from shallow Git clones
+
 $changes
 
 ## [0.12.3] - 2021-12-06

@@ -156,3 +156,21 @@ make
 # development work...
 make
 ```
+
+### Releasing
+
+Releases are driven by Git tags and GitHub Releases:
+
+1. Tag the release commit with the bare version number (e.g. `0.13.0`, matching
+   the `poetry-dynamic-versioning` pattern) and publish a GitHub Release for it.
+2. The `Publish` workflow then builds the pyMBD source distribution and uploads
+   it to [PyPI](https://pypi.org/project/pymbd/) via [trusted publishing](https://docs.pypi.org/trusted-publishers/)
+   (no API token needed; the `pymbd` project is configured to trust this
+   repository's `publish.yaml` workflow under the `pypi` environment).
+3. Conda-forge's autotick bot picks up the new release and opens a version-bump
+   PR on the [`libmbd-feedstock`](https://github.com/conda-forge/libmbd-feedstock),
+   which builds and publishes the `libmbd` conda package once merged.
+
+Only the source distribution is published to PyPI: pyMBD's C extension is
+compiled against an external libMBD at install time, so a binary wheel cannot be
+shipped.

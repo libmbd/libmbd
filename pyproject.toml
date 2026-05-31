@@ -28,7 +28,7 @@ classifiers = [
 ]
 
 [tool.poetry.build]
-script = "build.py"
+script = "cffi_build.py"
 generate-setup-file = false
 
 [tool.poetry.dependencies]
@@ -103,7 +103,7 @@ convention = "pep257"
 "tests/**" = ["D"]
 "devtools/**" = ["D"]
 "doc/**" = ["D"]
-"build.py" = ["D"]
+"cffi_build.py" = ["D"]
 
 [tool.ruff.format]
 quote-style = "preserve"

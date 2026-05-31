@@ -37,8 +37,14 @@ jobs:
           path: dist
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      # PyPI uploads are immutable, but the GitHub Release asset step below can
+      # still fail transiently. skip-existing keeps the whole workflow safely
+      # re-runnable: a re-run no-ops the already-published files instead of
+      # erroring, so it can get through to (re)attach the release assets.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
       - name: Download libMBD source archive
         uses: actions/download-artifact@v4
         with:

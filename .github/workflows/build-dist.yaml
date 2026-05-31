@@ -7,11 +7,15 @@ on:
     paths:
       - '.github/workflows/build-dist.yaml'
       - 'devtools/source-dist.sh'
+      - 'pyproject.toml'
+      - 'cffi_build.py'
   push:
     branches: [master]
     paths:
       - '.github/workflows/build-dist.yaml'
       - 'devtools/source-dist.sh'
+      - 'pyproject.toml'
+      - 'cffi_build.py'
   release:
     types: [published]
   workflow_dispatch:

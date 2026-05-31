@@ -23,13 +23,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
       # pyMBD's C extension is built against an external libMBD at install time,
       # so PyPI only carries the source distribution -- a binary wheel would
       # bake in one libMBD build and break for everyone else.
       - name: Build sdist
-        run: pipx run build --sdist
+        run: python -m build --sdist
       - name: Check metadata
-        run: pipx run twine check --strict dist/*
+        run: twine check --strict dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: sdist

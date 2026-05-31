@@ -28,8 +28,13 @@ jobs:
       # pyMBD's C extension is built against an external libMBD at install time,
       # so PyPI only carries the source distribution -- a binary wheel would
       # bake in one libMBD build and break for everyone else.
+      #
+      # Use the `pyproject-build` console script rather than `python -m build`:
+      # the repo's top-level build.py would otherwise shadow the installed
+      # `build` package on `python -m build` and get run as the C-extension
+      # build script.
       - name: Build sdist
-        run: python -m build --sdist
+        run: pyproject-build --sdist
       - name: Check metadata
         run: twine check --strict dist/*
       - uses: actions/upload-artifact@v4

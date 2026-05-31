@@ -1,0 +1,59 @@
+name: Publish
+# Reacts to a completed "Build distributions" run rather than triggering on the
+# release directly. Like the doc-deploy trigger, workflow_run keeps this
+# privileged workflow off of pull requests entirely, so PRs never show skipped
+# publish checks. The job only acts when the build it is reacting to was for a
+# published GitHub Release that succeeded.
+on:
+  workflow_run:
+    workflows: [Build distributions]
+    types: [completed]
+jobs:
+  publish:
+    name: Publish to PyPI and GitHub Release
+    if: >-
+      github.repository == 'libmbd/libmbd' &&
+      github.event.workflow_run.event == 'release' &&
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pymbd/
+    permissions:
+      # Mint a short-lived OIDC token for PyPI trusted publishing; no API token
+      # secret is stored in the repository.
+      id-token: write
+      # Attach the source archives to the GitHub Release.
+      contents: write
+      # Download the build artifacts from the triggering workflow run.
+      actions: read
+    steps:
+      # Artifacts live in the triggering run, so they must be fetched by its id
+      # (workflow_run does not carry them across automatically).
+      - name: Download pyMBD sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: pymbd-sdist
+          path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Download libMBD source archive
+        uses: actions/download-artifact@v4
+        with:
+          name: libmbd-sdist
+          path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      # Mirror the historically hand-uploaded assets: the pyMBD sdist and the
+      # libMBD source archive, alongside GitHub's auto-generated source code
+      # archives. The release build ran on the tag, so the triggering run's
+      # head_branch is the release tag. GH_REPO lets gh find the repo without a
+      # checkout.
+      - name: Attach source archives to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: gh release upload "$TAG" dist/*.tar.gz --clobber

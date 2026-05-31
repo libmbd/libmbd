@@ -1,0 +1,59 @@
+name: Build distributions
+on:
+  # Validate packaging changes on PRs and master, and build the release
+  # artifacts when a GitHub Release is published. The Publish workflow reacts
+  # to a successful release build via workflow_run and uploads the result.
+  pull_request:
+    paths:
+      - '.github/workflows/build-dist.yaml'
+      - 'devtools/source-dist.sh'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/build-dist.yaml'
+      - 'devtools/source-dist.sh'
+  release:
+    types: [published]
+  workflow_dispatch:
+jobs:
+  build:
+    name: Build
+    if: github.repository == 'libmbd/libmbd' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Both poetry-dynamic-versioning and devtools/source-dist.sh derive
+          # the version from Git tags, so the full history (and tags) must be
+          # available.
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+      # pyMBD's C extension is built against an external libMBD at install time,
+      # so PyPI only carries the source distribution -- a binary wheel would
+      # bake in one libMBD build and break for everyone else.
+      - name: Build pyMBD sdist
+        run: python -m build --sdist --outdir pymbd-dist
+      - name: Check pyMBD metadata
+        run: twine check --strict pymbd-dist/*
+      # The libMBD source archive (Fortran/C sources + CMake) is what gets
+      # built into the `libmbd` conda package and downloaded by people who
+      # build the library by hand. It is bundled with the GitHub Release only,
+      # never uploaded to PyPI.
+      - name: Build libMBD source archive
+        run: |
+          bash devtools/source-dist.sh
+          mv dist/libmbd-*.tar.gz .
+      - name: Upload pyMBD sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: pymbd-sdist
+          path: pymbd-dist/*.tar.gz
+      - name: Upload libMBD source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: libmbd-sdist
+          path: libmbd-*.tar.gz

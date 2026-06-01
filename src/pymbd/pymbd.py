@@ -4,12 +4,11 @@
 from __future__ import division, print_function
 
 import csv
-import sys
+from importlib.resources import files
 from itertools import product
 
 import numpy as np
 from numpy.polynomial.legendre import leggauss
-from pkg_resources import resource_string
 from scipy.special import erf, erfc
 
 __all__ = ['mbd_energy', 'mbd_energy_species', 'screening', 'ang']
@@ -301,9 +300,7 @@ def _array(obj, *args, **kwargs):
 
 
 def _get_vdw_params():
-    csv_lines = resource_string(__name__, 'vdw-params.csv').split(b'\n')
-    if sys.version_info[0] > 2:
-        csv_lines = [l.decode() for l in csv_lines]
+    csv_lines = (files(__package__) / 'vdw-params.csv').read_text().split('\n')
     reader = csv.DictReader(csv_lines, quoting=csv.QUOTE_NONNUMERIC)
     vdw_params = {row.pop('symbol'): row for row in reader}
     return vdw_params

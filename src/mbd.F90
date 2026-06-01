@@ -40,7 +40,7 @@ type, public :: mbd_input_t
         !! MPI_COMM_WORLD communicator. The integer handle is accepted
         !! regardless of whether the library was built against the
         !! `mpi_f08` module; callers using `mpi_f08` should pass the
-        !! integer handle of their communicator (`comm%mpi_val`).
+        !! integer handle of their communicator (e.g. `mycomm%mpi_val`).
     integer :: max_atoms_per_block = MAX_ATOMS_PER_BLOCK
         !! Number of atoms per block in a BLACS grid.
     integer :: log_level = MBD_LOG_LVL_INFO

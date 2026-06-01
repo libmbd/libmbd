@@ -34,7 +34,7 @@ jobs:
             PIP_PKGS=pymbd
             RUN_PREFIX=
           else
-            CONDA_PKGS="libmbd='*=mpi_${{ matrix.mpi }}_*' mpi4py"
+            CONDA_PKGS="libmbd='*=mpi_${{ matrix.mpi }}_*' 'mpi4py<4'"
             PIP_PKGS="pymbd[mpi]"
             RUN_PREFIX="mpiexec -n 2"
           fi
@@ -58,7 +58,7 @@ jobs:
           echo "CONDA=/opt/homebrew/Caskroom/miniforge/base" >>$GITHUB_ENV
       - name: Create Conda environment
         run: |
-          $CONDA/bin/conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python pip ${{ env.CONDA_PKGS }} numpy scipy
+          $CONDA/bin/conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge "python<3.12" pip "setuptools<81" ${{ env.CONDA_PKGS }} numpy scipy
           echo $CONDA_PREFIX/bin >>$GITHUB_PATH
       - name: Run pip install ${{ env.PIP_PKGS }}
         run: |

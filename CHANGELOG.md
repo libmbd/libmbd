@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Runtime dependency on `pkg_resources`/`setuptools`; `pymbd` now uses `importlib.metadata` and `importlib.resources` ([#96](https://github.com/libmbd/libmbd/issues/96))
+- Runtime dependency on `pkg_resources`/`setuptools`; `pymbd` now uses `importlib.metadata` and `importlib.resources` ([#112](https://github.com/libmbd/libmbd/pull/112))
 - Support for Python < 3.10 ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Fixed

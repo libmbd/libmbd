@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking:** The `comm` field of `mbd_input_t` is now always a plain integer MPI handle, even when the library is built against the `mpi_f08` module. The `mpi_f08` module is still used internally; callers using `mpi_f08` should pass `comm%mpi_val`. This makes the public API usable from code based on `mpif.h`/the legacy `mpi` module (see [#79](https://github.com/libmbd/libmbd/pull/79))
 - Minimum required CMake version is now 3.22 ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Removed

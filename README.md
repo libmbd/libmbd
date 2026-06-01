@@ -50,7 +50,7 @@ Calculated energy: -0.0002462647623817456
 
 ### libMBD
 
-libMBD uses CMake for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
+libMBD uses CMake (≥ 3.22) for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
 
 On Ubuntu:
 
@@ -76,7 +76,7 @@ This installs the libMBD shared library, C API header file,  high-level Fortran 
 
 ### pyMBD
 
-pyMBD can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed libMBD as a dependency (see above).
+pyMBD requires Python ≥ 3.10 and can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed libMBD as a dependency (see above).
 
 ```
 pip install pymbd

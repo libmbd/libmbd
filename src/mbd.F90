@@ -12,9 +12,6 @@ use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_request_t, grad_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
-#ifdef WITH_MPIF08
-use mbd_mpi
-#endif
 use mbd_ts, only: get_ts_energy
 use mbd_utils, only: result_t, exception_t, printer_i
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
@@ -36,15 +33,14 @@ type, public :: mbd_input_t
         !! - `mbd-nl`: The MBD-NL method.
         !! - `ts`: The TS method.
         !! - `mbd`: Generic MBD method (without any screening).
-#ifdef WITH_MPIF08
-    type(MPI_Comm) :: comm = MPI_COMM_NULL
-#else
     integer :: comm = -1
-#endif
-        !! MPI communicator.
+        !! MPI communicator, as a plain integer handle.
         !!
         !! Only used when compiled with MPI. Leave as is to use the
-        !! MPI_COMM_WORLD communicator.
+        !! MPI_COMM_WORLD communicator. The integer handle is accepted
+        !! regardless of whether the library was built against the
+        !! `mpi_f08` module; callers using `mpi_f08` should pass the
+        !! integer handle of their communicator (e.g. `mycomm%mpi_val`).
     integer :: max_atoms_per_block = MAX_ATOMS_PER_BLOCK
         !! Number of atoms per block in a BLACS grid.
     integer :: log_level = MBD_LOG_LVL_INFO
@@ -154,12 +150,12 @@ subroutine mbd_calc_init(this, input)
         !! MBD input.
 
 #ifdef WITH_MPI
-#   ifdef WITH_MPIF08
-    if (input%comm /= MPI_COMM_NULL) then
-#   else
     if (input%comm /= -1) then
-#   endif
+#   ifdef WITH_MPIF08
+        this%geom%mpi_comm%mpi_val = input%comm
+#   else
         this%geom%mpi_comm = input%comm
+#   endif
     end if
 #endif
 #ifdef WITH_SCALAPACK

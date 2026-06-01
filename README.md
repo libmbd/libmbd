@@ -1,6 +1,6 @@
 # libMBD
 
-![checks](https://img.shields.io/github/checks-status/libmbd/libmbd/master.svg)
+[![tests](https://img.shields.io/github/actions/workflow/status/libmbd/libmbd/tests.yaml?branch=master&label=tests)](https://github.com/libmbd/libmbd/actions/workflows/tests.yaml)
 [![coverage](https://img.shields.io/codecov/c/github/libmbd/libmbd.svg)](https://codecov.io/gh/libmbd/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
 [![conda](https://img.shields.io/conda/vn/conda-forge/libmbd.svg)](https://anaconda.org/conda-forge/libmbd)
@@ -9,7 +9,6 @@
 [![last commit](https://img.shields.io/github/last-commit/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/commits/master)
 [![license](https://img.shields.io/github/license/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/blob/master/LICENSE)
 [![ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![chat](https://img.shields.io/gitter/room/libmbd/community)](https://gitter.im/libmbd/community)
 [![doi](https://img.shields.io/badge/doi-10%2Fk4bm-blue)](http://doi.org/k4bm)
 
 > libMBD: A general-purpose package for scalable quantum many-body dispersion calculations. [J. Hermann](https://github.com/jhrmnn), [M. Stöhr](https://github.com/martin-stoehr), S. Góger, [S. Chaudhuri](https://github.com/shaychaudhuri), [B. Aradi](https://github.com/aradi), [R. J. Maurer](https://github.com/reinimaurer1) & A. Tkatchenko. [*J. Chem. Phys.* **159**, 174802](http://doi.org/k4bm) (2023)

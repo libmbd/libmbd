@@ -20,7 +20,7 @@ jobs:
           - type: ubuntu
             mpi-nodes: 2
           - type: ubuntu
-            mpi-nodes: 2
+            mpi-nodes: 4
             mpifh: mpifh
           - type: macos
             mpi-nodes: 2

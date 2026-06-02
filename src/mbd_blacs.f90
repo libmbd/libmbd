@@ -54,7 +54,7 @@ interface
         character :: ORDER
     end
     subroutine BLACS_GRIDINFO(ICONTXT, NPROW, NPCOL, MYPROW, MYPCOL)
-        integer :: ICONTXT, NPROW, NPCOL, MYPROW, MYPNUM
+        integer :: ICONTXT, NPROW, NPCOL, MYPROW, MYPCOL
     end
     subroutine BLACS_GRIDEXIT(ICONTXT)
         integer :: ICONTXT

@@ -5,6 +5,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-06-02
+
 ### Added
 
 - Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
@@ -270,7 +272,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.13.0...HEAD
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.14.0...HEAD
+[0.14.0]: https://github.com/libmbd/libmbd/compare/0.13.0...0.14.0
 [0.13.0]: https://github.com/libmbd/libmbd/compare/0.12.8...0.13.0
 [0.12.8]: https://github.com/libmbd/libmbd/compare/0.12.7...0.12.8
 [0.12.7]: https://github.com/libmbd/libmbd/compare/0.12.6...0.12.7

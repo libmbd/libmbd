@@ -20,6 +20,11 @@ CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_
 CMAKE_DEPENDENT_OPTION(ENABLE_MPIFH "Build against legacy mpif.h MPI interface" OFF ENABLE_SCALAPACK_MPI OFF)
 option(ENABLE_C_API "Enable C API" ON)
 
+set(CMAKE_INSTALL_MODULEDIR ${CMAKE_INSTALL_INCLUDEDIR}
+    CACHE STRING
+    "Fortran module installation path (Not a cmake native variable)"
+)
+
 option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)
 
 set(DEFAULT_BUILD_TYPE "Release")

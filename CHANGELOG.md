@@ -9,27 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
+- `VERSION`/`SOVERSION` on the shared library ([#74](https://github.com/libmbd/libmbd/pull/74))
 - Support for `mpi4py` 4.x ([#84](https://github.com/libmbd/libmbd/pull/84))
-- `ENABLE_MPIFH` CMake option for building against the legacy `mpif.h` interface, with CI coverage.
-- `VERSION`/`SOVERSION` on the shared library. The `SOVERSION` (SONAME) is a manually maintained integer (`MBD_SOVERSION`) tracking C-ABI compatibility, decoupled from the `0.x` release version ([#74](https://github.com/libmbd/libmbd/pull/74))
+- `ENABLE_MPIFH` CMake option for building against the legacy `mpif.h` interface
+- Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
 
 ### Changed
 
-- **Breaking:** The `comm` field of `mbd_input_t` is now always a plain integer MPI handle, even when the library is built against the `mpi_f08` module. The `mpi_f08` module is still used internally; callers using `mpi_f08` should pass `comm%mpi_val`. This makes the public API usable from code based on `mpif.h`/the legacy `mpi` module (see [#79](https://github.com/libmbd/libmbd/pull/79))
+- **Breaking:** The `comm` field of `mbd_input_t` is now always a plain integer MPI handle ([#79](https://github.com/libmbd/libmbd/pull/79))
 - Minimum required CMake version is now 3.22 ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Removed
 
-- Runtime dependency on `pkg_resources`/`setuptools`; `pymbd` now uses `importlib.metadata` and `importlib.resources` ([#112](https://github.com/libmbd/libmbd/pull/112))
 - Support for Python < 3.10 ([#84](https://github.com/libmbd/libmbd/pull/84))
+- Runtime dependency on `pkg_resources`/`setuptools` ([#112](https://github.com/libmbd/libmbd/pull/112))
 
 ### Fixed
 
-- Library version determination from shallow Git clones ([#67](https://github.com/libmbd/libmbd/pull/67))
-- BLACS grid initialization now uses the actual communicator size and translates MPI communicators with `sys2blacs_handle`, fixing sub-communicator `BLACS_GRIDINIT` failures (original report [#80](https://github.com/libmbd/libmbd/issues/80)).
+- BLACS grid initialization now uses the actual communicator size and translates MPI communicators with `sys2blacs_handle` ([#80](https://github.com/libmbd/libmbd/issues/80))
 - Missing deallocation causing crash on mbd_calc_t reinitialization ([#59](https://github.com/libmbd/libmbd/pull/59))
 - Compilation with the Intel ifx compiler ([#60](https://github.com/libmbd/libmbd/pull/60))
+- Library version determination from shallow Git clones ([#67](https://github.com/libmbd/libmbd/pull/67))
 
 ## [0.12.8] - 2024-02-09
 

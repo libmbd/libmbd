@@ -86,30 +86,34 @@ end interface
 
 contains
 
-subroutine blacs_grid_init(this, comm)
-    use mpi
+subroutine blacs_grid_init(this, n_tasks, comm)
     class(blacs_grid_t), intent(inout) :: this
+    integer, intent(in), optional :: n_tasks
+        !! Number of processes to lay the grid over. When absent, the total
+        !! number of available BLACS processes is queried with BLACS_PINFO.
     integer, intent(in), optional :: comm
+        !! System context to build the grid on, e.g. an MPI communicator handle.
+        !! When absent, the default BLACS context is used.
 
-    integer :: my_task, n_tasks, nprows
-    integer :: ierr
+    integer :: my_task, nprocs, nprows
 
     if (present(comm)) then
-        call MPI_Comm_rank(comm, my_task, ierr)
-        call MPI_Comm_size(comm, n_tasks, ierr)
         this%comm = comm
         this%ctx = comm
     else
-        call BLACS_PINFO(my_task, n_tasks)
-        this%comm = MPI_COMM_WORLD
         call BLACS_GET(0, 0, this%ctx)
     end if
+    if (present(n_tasks)) then
+        nprocs = n_tasks
+    else
+        call BLACS_PINFO(my_task, nprocs)
+    end if
 
-    do nprows = int(sqrt(dble(n_tasks))), 1, -1
-        if (mod(n_tasks, nprows) == 0) exit
+    do nprows = int(sqrt(dble(nprocs))), 1, -1
+        if (mod(nprocs, nprows) == 0) exit
     end do
     this%nprows = nprows
-    this%npcols = n_tasks / this%nprows
+    this%npcols = nprocs / this%nprows
     call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- BLACS grid is now sized from the actual MPI communicator passed to the geometry rather than from `MPI_COMM_WORLD`, fixing a crash in `BLACS_GRIDINIT` when a communicator with a different number of ranks is used ([#80](https://github.com/libmbd/libmbd/pull/80))
 - Library version determination from shallow Git clones ([#67](https://github.com/libmbd/libmbd/pull/67))
 
 ## [0.13.0] - 2024-03-07

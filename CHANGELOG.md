@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
 - Support for `mpi4py` 4.x ([#84](https://github.com/libmbd/libmbd/pull/84))
 - `ENABLE_MPIFH` CMake option for building against the legacy `mpif.h` interface, with CI coverage.
+- `VERSION`/`SOVERSION` on the shared library. The `SOVERSION` (SONAME) is a manually maintained integer (`MBD_SOVERSION`) tracking C-ABI compatibility, decoupled from the `0.x` release version ([#74](https://github.com/libmbd/libmbd/pull/74))
 
 ### Changed
 

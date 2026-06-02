@@ -28,15 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Library version determination from shallow Git clones ([#67](https://github.com/libmbd/libmbd/pull/67))
 - BLACS grid initialization now uses the actual communicator size and translates MPI communicators with `sys2blacs_handle`, fixing sub-communicator `BLACS_GRIDINIT` failures (original report [#80](https://github.com/libmbd/libmbd/issues/80)).
-
-## [0.13.0] - 2024-03-07
-
-### Removed
-
-- Support for Python<3.8 ([#61](https://github.com/libmbd/libmbd/pull/61))
-
-### Fixed
-
 - Missing deallocation causing crash on mbd_calc_t reinitialization ([#59](https://github.com/libmbd/libmbd/pull/59))
 - Compilation with the Intel ifx compiler ([#60](https://github.com/libmbd/libmbd/pull/60))
 
@@ -273,8 +264,7 @@ Completely reworked.
 - Scalapack parallelization of all calculations.
 
 [unreleased]: https://github.com/libmbd/libmbd/compare/0.14.0...HEAD
-[0.14.0]: https://github.com/libmbd/libmbd/compare/0.13.0...0.14.0
-[0.13.0]: https://github.com/libmbd/libmbd/compare/0.12.8...0.13.0
+[0.14.0]: https://github.com/libmbd/libmbd/compare/0.12.8...0.14.0
 [0.12.8]: https://github.com/libmbd/libmbd/compare/0.12.7...0.12.8
 [0.12.7]: https://github.com/libmbd/libmbd/compare/0.12.6...0.12.7
 [0.12.6]: https://github.com/libmbd/libmbd/compare/0.12.5...0.12.6

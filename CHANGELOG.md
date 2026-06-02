@@ -17,11 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Breaking:** The `comm` field of `mbd_input_t` is now always a plain integer MPI handle ([#79](https://github.com/libmbd/libmbd/pull/79))
-- Minimum required CMake version is now 3.22 ([#84](https://github.com/libmbd/libmbd/pull/84))
 
 ### Removed
 
 - Support for Python < 3.10 ([#84](https://github.com/libmbd/libmbd/pull/84))
+- Support for CMake < 3.22 ([#84](https://github.com/libmbd/libmbd/pull/84))
 - Runtime dependency on `pkg_resources`/`setuptools` ([#112](https://github.com/libmbd/libmbd/pull/112))
 
 ### Fixed

@@ -8,7 +8,7 @@ use mbd_constants
 implicit none
 
 private
-public :: blacs_all_reduce, sys2blacs_handle, free_blacs_system_handle
+public :: blacs_all_reduce
 
 type, public :: blacs_grid_t
     integer :: ctx = -1
@@ -92,10 +92,10 @@ end interface
 
 contains
 
-subroutine blacs_grid_init(this, n_tasks, ctx)
+subroutine blacs_grid_init(this, n_tasks, comm)
     class(blacs_grid_t), intent(inout) :: this
     integer, intent(in), optional :: n_tasks
-    integer, intent(in), optional :: ctx
+    integer, intent(in), optional :: comm
 
     integer :: my_task, n_tasks_, nprows, icontxt
 
@@ -112,9 +112,9 @@ subroutine blacs_grid_init(this, n_tasks, ctx)
     ! icontxt starts as the system context and is replaced in place by
     ! BLACS_GRIDINIT with the grid context; sys_ctx retains the system handle
     ! (when we own one) so it can be freed in blacs_grid_destroy.
-    if (present(ctx)) then
-        icontxt = ctx
-        this%sys_ctx = ctx
+    if (present(comm)) then
+        this%sys_ctx = sys2blacs_handle(comm)
+        icontxt = this%sys_ctx
     else
         call BLACS_GET(0, 0, icontxt)
         this%sys_ctx = -1

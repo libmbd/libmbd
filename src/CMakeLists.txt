@@ -24,9 +24,20 @@ add_library(mbd
     mbd_vdw_param.f90
 )
 
+# Shared-library versioning. VERSION is informational and tracks the release
+# version (the full versioned library file). SOVERSION is the compatibility
+# version baked into the library identity (the SONAME on ELF, the
+# compatibility version on macOS) and must track the C-ABI (mbd.h)
+# compatibility only: bump MBD_SOVERSION by hand on every C-ABI break. It is
+# deliberately decoupled from the release version, which is 0.x and derived
+# from Git, so a major bump cannot be relied on to signal an ABI break. Note
+# this guards C consumers only; the Fortran .mod ABI is compiler-specific and
+# not covered by SOVERSION, so Fortran callers must rebuild against a matching
+# libMBD build regardless.
+set(MBD_SOVERSION 0)
 set_target_properties(mbd PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${PROJECT_VERSION_MAJOR}
+    VERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
+    SOVERSION ${MBD_SOVERSION}
 )
 
 if(ENABLE_SCALAPACK_MPI)

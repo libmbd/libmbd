@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
 - Support for `mpi4py` 4.x ([#84](https://github.com/libmbd/libmbd/pull/84))
+- `ENABLE_MPIFH` build option to compile against the legacy `mpif.h` MPI interface, now covered by CI ([#80](https://github.com/libmbd/libmbd/pull/80))
 
 ### Changed
 

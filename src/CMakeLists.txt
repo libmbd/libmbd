@@ -26,7 +26,7 @@ add_library(mbd
 
 if(ENABLE_SCALAPACK_MPI)
     target_sources(mbd PRIVATE mbd_mpi.F90 mbd_blacs.f90 mbd_scalapack.f90)
-    if(NOT MPI_Fortran_HAVE_F08_MODULE)
+    if(ENABLE_MPIFH OR NOT MPI_Fortran_HAVE_F08_MODULE)
         if("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "NAG")
             set(mismatch_flag "-mismatch")
         elseif("${CMAKE_Fortran_COMPILER_ID}" STREQUAL "GNU"
@@ -65,7 +65,9 @@ target_include_directories(mbd
 if(ENABLE_SCALAPACK_MPI)
     target_link_libraries(mbd PRIVATE MPI::MPI_Fortran scalapack)
     set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPI WITH_SCALAPACK)
-    if(MPI_Fortran_HAVE_F08_MODULE)
+    if(ENABLE_MPIFH)
+        set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPIFH)
+    elseif(MPI_Fortran_HAVE_F08_MODULE)
         set_property(TARGET mbd APPEND PROPERTY COMPILE_DEFINITIONS WITH_MPIF08)
     endif()
 endif()

@@ -19,6 +19,9 @@ jobs:
         include:
           - type: ubuntu
             mpi-nodes: 2
+          - type: ubuntu
+            mpi-nodes: 2
+            mpifh: mpifh
           - type: macos
             mpi-nodes: 2
           - type: nvhpc
@@ -173,6 +176,9 @@ jobs:
           fi
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               CMAKE_ARGS+=('-DENABLE_SCALAPACK_MPI=ON')
+          fi
+          if [[ "${{ matrix.mpifh }}" == "mpifh" ]]; then
+              CMAKE_ARGS+=('-DENABLE_MPIFH=ON')
           fi
           if [[ "${{ matrix.elsi }}" == "elsi" ]]; then
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')

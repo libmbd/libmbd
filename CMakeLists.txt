@@ -17,6 +17,9 @@ include(CTest)
 
 option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
 CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_MPI OFF)
+CMAKE_DEPENDENT_OPTION(ENABLE_MPIFH
+    "Use the legacy mpif.h MPI interface instead of the mpi/mpi_f08 Fortran module"
+    OFF ENABLE_SCALAPACK_MPI OFF)
 option(ENABLE_C_API "Enable C API" ON)
 
 option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)

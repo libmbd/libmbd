@@ -71,7 +71,10 @@ subroutine test(test_name)
         call MPI_COMM_SIZE(MPI_COMM_WORLD, mpi_size, err)
         call MPI_COMM_RANK(MPI_COMM_WORLD, mpi_rank, err)
         if (mpi_size > 1) then
-            if (mpi_rank < mpi_size - 1) then
+            ! Split the world into two halves so that each subcommunicator is a
+            ! strict subset of MPI_COMM_WORLD, exercising the communicator ->
+            ! BLACS context translation and grid sizing on a sub-communicator.
+            if (mpi_rank < mpi_size / 2) then
                 color = 0
             else
                 color = 1

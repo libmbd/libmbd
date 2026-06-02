@@ -97,7 +97,7 @@ subroutine blacs_grid_init(this, n_tasks, ctx)
     integer, intent(in), optional :: n_tasks
     integer, intent(in), optional :: ctx
 
-    integer :: my_task, n_tasks_, nprows
+    integer :: my_task, n_tasks_, nprows, grid_ctx
 
     if (present(n_tasks)) then
         n_tasks_ = n_tasks
@@ -109,14 +109,18 @@ subroutine blacs_grid_init(this, n_tasks, ctx)
     end do
     this%nprows = nprows
     this%npcols = n_tasks_ / this%nprows
+    ! grid_ctx starts as the system context and is replaced in place by
+    ! BLACS_GRIDINIT with the grid context; sys_ctx retains the system handle
+    ! (when we own one) so it can be freed in blacs_grid_destroy.
     if (present(ctx)) then
-        this%ctx = ctx
+        grid_ctx = ctx
         this%sys_ctx = ctx
     else
-        call BLACS_GET(0, 0, this%ctx)
+        call BLACS_GET(0, 0, grid_ctx)
         this%sys_ctx = -1
     end if
-    call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
+    call BLACS_GRIDINIT(grid_ctx, 'R', this%nprows, this%npcols)
+    this%ctx = grid_ctx
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &
     )

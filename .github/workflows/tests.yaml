@@ -1,9 +1,14 @@
 name: Tests
 on:
   push:
+    branches: [master]
   pull_request:
   schedule:
     - cron: '0 6 * * 1'
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   all:
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
@@ -14,30 +19,38 @@ jobs:
         include:
           - type: ubuntu
             mpi-nodes: 2
+          - type: ubuntu
+            mpi-nodes: 4
+            mpifh: mpifh
           - type: macos
             mpi-nodes: 2
+          - type: nvhpc
+            nvhpc-version: "26.3"
           - type: conda
+            python-version: =3.13
           - type: conda
+            python-version: =3.13
             mpi: openmpi
             mpi-nodes: 8
             elsi: elsi
           - type: conda
+            python-version: =3.13
             mpi: mpich
             mpi-nodes: 2
           - type: conda
-            python-version: =3.8
-            cmake-version: =3.14
-            gfortran-version: =8
+            python-version: =3.10
+            cmake-version: =3.22
+            gfortran-version: =11
             mpi: openmpi
             mpi-nodes: 8
           - type: conda
-            python-version: =3.8
-            cmake-version: =3.14
-            gfortran-version: =8
-            mpi: mpich=3.4.3=\*_100
+            python-version: =3.10
+            cmake-version: =3.22
+            gfortran-version: =11
+            mpi: mpich=4
             mpi-nodes: 2
             elsi: elsi
-    runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest"}')[matrix.type] }}
+    runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest","nvhpc":"ubuntu-latest"}')[matrix.type] }}
     env:
       CONDA_ALWAYS_YES: "true"
       CONDA_QUIET: "true"
@@ -63,24 +76,75 @@ jobs:
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: actions/cache@v2
+      - uses: actions/cache@v5
         with:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
-          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
+          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ matrix.mpifh }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
       - name: Install libMBD dependencies
         if: matrix.type == 'ubuntu'
         run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
       - name: Install libMBD dependencies
         if: matrix.type == 'macos'
-        run: brew install open-mpi scalapack
+        run: |
+          brew install open-mpi scalapack
+          # open-mpi's mpi.mod must be read by the same major gfortran it was built with;
+          # brew open-mpi depends on the current `gcc` formula, so the highest-numbered
+          # gfortran-* in brew's bindir is the one we want.
+          # Use `brew --prefix` so this works on both Intel (/usr/local) and Apple Silicon (/opt/homebrew).
+          HOMEBREW_PREFIX=$(brew --prefix)
+          GFORTRAN=$(ls "$HOMEBREW_PREFIX/bin/gfortran-"[0-9]* 2>/dev/null | sort -V | tail -1)
+          if [[ -z "$GFORTRAN" ]]; then
+            echo "::error::No versioned gfortran found in $HOMEBREW_PREFIX/bin" >&2
+            exit 1
+          fi
+          echo "MACOS_GFORTRAN=$GFORTRAN" >>$GITHUB_ENV
+      - name: Free disk space
+        if: matrix.type == 'nvhpc'
+        run: |
+          # The NVIDIA HPC SDK is ~13 GB installed plus several GB of packages;
+          # reclaim space from preinstalled toolchains we don't use so the
+          # runner's root disk doesn't fill up.
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h /
+      - name: Cache NVIDIA HPC SDK packages
+        if: matrix.type == 'nvhpc'
+        uses: actions/cache@v5
+        with:
+          path: ~/nvhpc-debs
+          key: nvhpc-debs-${{ matrix.nvhpc-version }}
+      - name: Install NVIDIA HPC SDK
+        if: matrix.type == 'nvhpc'
+        run: |
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends libblas-dev liblapack-dev
+          curl -fsSL https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK \
+            | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg
+          echo 'deb [signed-by=/usr/share/keyrings/nvidia-hpcsdk-archive-keyring.gpg] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /' \
+            | sudo tee /etc/apt/sources.list.d/nvhpc.list
+          sudo apt-get update -yq
+          # Restore previously downloaded packages so a warm cache skips the multi-GB download.
+          if ls ~/nvhpc-debs/*.deb >/dev/null 2>&1; then
+            sudo cp ~/nvhpc-debs/*.deb /var/cache/apt/archives/
+          fi
+          pkg="nvhpc-$(echo '${{ matrix.nvhpc-version }}' | tr '.' '-')"
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends "$pkg"
+          # Stash the downloaded .deb files in a user-owned dir for actions/cache to persist.
+          mkdir -p ~/nvhpc-debs
+          sudo cp /var/cache/apt/archives/*.deb ~/nvhpc-debs/ 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" ~/nvhpc-debs
+          # Drop the apt archive copy now that the packages are stashed for caching.
+          sudo apt-get clean
+          nvroot=$(ls -d /opt/nvidia/hpc_sdk/Linux_x86_64/*/compilers | sort -V | tail -1)
+          echo "$nvroot/bin" >>$GITHUB_PATH
+          echo "LD_LIBRARY_PATH=$nvroot/lib:$LD_LIBRARY_PATH" >>$GITHUB_ENV
       - name: Create Conda environment
         if: matrix.type == 'conda'
-        run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
+        run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} pip cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} openblas ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |
@@ -98,16 +162,29 @@ jobs:
           git describe --tags --dirty=.dirty
       - name: Set CMAKE_ARGS
         run: |
-          FFLAGS=('-fprofile-arcs' '-ftest-coverage')
           CMAKE_ARGS=()
+          if [[ "${{ matrix.type }}" == "nvhpc" ]]; then
+              # nvfortran has no gcov-style coverage flags; build without coverage.
+              # Target a portable x86-64 baseline -- GitHub-hosted runners use a
+              # heterogeneous CPU fleet, and nvfortran's default host-detected
+              # target can emit instructions some runners don't actually execute,
+              # producing SIGILL at runtime in math-heavy paths.
+              FFLAGS=('-tp' 'px')
+              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=nvfortran')
+          else
+              FFLAGS=('-fprofile-arcs' '-ftest-coverage')
+          fi
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               CMAKE_ARGS+=('-DENABLE_SCALAPACK_MPI=ON')
+          fi
+          if [[ "${{ matrix.mpifh }}" == "mpifh" ]]; then
+              CMAKE_ARGS+=('-DENABLE_MPIFH=ON')
           fi
           if [[ "${{ matrix.elsi }}" == "elsi" ]]; then
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')
           fi
-          if [[ "${{ matrix.type }}" == "macos" ]]; then
-              CMAKE_ARGS+=('-DCMAKE_Fortran_COMPILER=gfortran-12')
+          if [[ "${{ matrix.type }}" == "macos" && -n "$MACOS_GFORTRAN" ]]; then
+              CMAKE_ARGS+=("-DCMAKE_Fortran_COMPILER=$MACOS_GFORTRAN")
           fi
           if [[ "${{ matrix.type }}" == "ubuntu" ]]; then
             CMAKE_ARGS+=('-DCMAKE_IGNORE_PATH="/usr/lib/cmake/scalapack-2.1.0.openmpi;/lib/cmake/scalapack-2.1.0.openmpi"')
@@ -136,4 +213,70 @@ jobs:
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Upload to Codecov
-        run: bash <(curl -s https://codecov.io/bash) -f "!*#tests#*"
+        uses: codecov/codecov-action@v6
+        if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+  intel:
+    if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
+    name: Intel (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # intel -> ifx + icx (LLVM-based), intel-classic -> ifort (last release)
+        toolchain: [intel, intel-classic]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/env
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Set up Intel Fortran/C compiler
+        id: setup-fortran
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: ${{ matrix.toolchain }}
+      - name: Install Intel MKL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends intel-oneapi-mkl-devel
+      - name: Set up oneAPI environment
+        run: |
+          # setup-fortran already sourced setvars.sh (SETVARS_COMPLETED=1), so a
+          # plain re-source returns exit 3; --force re-runs it and also picks up
+          # the MKL component installed above.
+          source /opt/intel/oneapi/setvars.sh --force
+          test -n "${MKLROOT:-}" || { echo "::error::MKLROOT unset after sourcing setvars.sh"; exit 1; }
+          for v in MKLROOT LD_LIBRARY_PATH LIBRARY_PATH CPATH CMAKE_PREFIX_PATH PKG_CONFIG_PATH NLSPATH; do
+            echo "$v=${!v}" >>"$GITHUB_ENV"
+          done
+      - name: Create Python virtual environment
+        run: |
+          python3 -m venv "$VIRTUAL_ENV"
+          "$VIRTUAL_ENV/bin/pip" install -U pip
+          echo "$VIRTUAL_ENV/bin" >>"$GITHUB_PATH"
+      - name: Set CMAKE_ARGS
+        run: |
+          FC="${{ steps.setup-fortran.outputs.fc }}"
+          CC="${{ steps.setup-fortran.outputs.cc }}"
+          echo "CMAKE_ARGS=-DCMAKE_Fortran_COMPILER=$FC -DCMAKE_C_COMPILER=${CC:-gcc} -DBLA_VENDOR=Intel10_64lp_seq" >>"$GITHUB_ENV"
+      - name: Report environment
+        run: |
+          "${{ steps.setup-fortran.outputs.fc }}" --version
+          cmake --version
+          echo "MKLROOT=$MKLROOT"
+          git describe --tags --dirty=.dirty
+      - name: Build libMBD
+        run: make build_libmbd
+      - name: Install libMBD
+        run: make install_libmbd -o build_libmbd
+      - name: Build & install pyMBD
+        run: make install -o install_libmbd
+      - run: pip list
+      - name: Test libMBD
+        run: make test_libmbd
+      - name: Test pyMBD
+        run: |
+          make test -o test_libmbd | tee output
+          ! grep failed output >/dev/null

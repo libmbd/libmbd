@@ -45,7 +45,7 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
 
 class MBDFortranError(Exception):
     def __init__(self, code, origin, msg):
-        super(MBDFortranError, self).__init__(msg)
+        super(MBDFortranError, self).__init__(code, origin, msg)
         self.code = code
         self.origin = origin
 
@@ -312,9 +312,9 @@ class MBDGeom(object):
         return ene
 
     @_auto_context
-    def dipole_matrix(
+    def dipole_matrix(  # noqa: D102
         self, damping, beta=0.0, k_point=None, R_vdw=None, sigma=None, a=6.0
-    ):  # noqa: D102
+    ):
         R_vdw, sigma, k_point = map(_array, (R_vdw, sigma, k_point))
         n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(

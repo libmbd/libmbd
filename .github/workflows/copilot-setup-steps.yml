@@ -1,0 +1,65 @@
+name: "Copilot Setup Steps"
+
+# Automatically run the setup steps when they are changed to allow for easy
+# validation, and allow manual testing through the repository's "Actions" tab.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+      - .claude/hooks/session-start.sh
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+      - .claude/hooks/session-start.sh
+
+jobs:
+  # The job MUST be called `copilot-setup-steps` or it will not be picked up by Copilot.
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Run Claude session-start hook to install libMBD and pyMBD
+        env:
+          # The shared hook gates its work on this flag; enable it here so the
+          # same setup that Claude uses also runs for the Copilot cloud agent.
+          CLAUDE_CODE_REMOTE: "true"
+          CLAUDE_PROJECT_DIR: ${{ github.workspace }}
+          CLAUDE_ENV_FILE: ${{ runner.temp }}/claude-env
+        run: |
+          set -euo pipefail
+          : >"$CLAUDE_ENV_FILE"
+          bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+
+      - name: Export hook environment to subsequent steps
+        env:
+          CLAUDE_ENV_FILE: ${{ runner.temp }}/claude-env
+        run: |
+          set -euo pipefail
+          # Translate the `export KEY=VALUE` lines written by the hook into
+          # GitHub Actions' $GITHUB_ENV / $GITHUB_PATH so the venv and
+          # LIBMBD_PREFIX persist for any later steps the agent may run.
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            kv="${line#export }"
+            key="${kv%%=*}"
+            val="${kv#*=}"
+            # Expand variables like $PATH that the hook deferred.
+            val="$(eval printf '%s' \"$val\")"
+            if [ "$key" = "PATH" ]; then
+              # The hook writes PATH as "<prefix>:$PATH"; keep only the prefix.
+              prefix="${val%:$PATH}"
+              echo "$prefix" >> "$GITHUB_PATH"
+            else
+              echo "$key=$val" >> "$GITHUB_ENV"
+            fi
+          done < "$CLAUDE_ENV_FILE"

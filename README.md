@@ -1,6 +1,6 @@
 # libMBD
 
-![checks](https://img.shields.io/github/checks-status/libmbd/libmbd/master.svg)
+[![tests](https://img.shields.io/github/actions/workflow/status/libmbd/libmbd/tests.yaml?branch=master&label=tests)](https://github.com/libmbd/libmbd/actions/workflows/tests.yaml)
 [![coverage](https://img.shields.io/codecov/c/github/libmbd/libmbd.svg)](https://codecov.io/gh/libmbd/libmbd)
 ![python](https://img.shields.io/pypi/pyversions/pymbd.svg)
 [![conda](https://img.shields.io/conda/vn/conda-forge/libmbd.svg)](https://anaconda.org/conda-forge/libmbd)
@@ -8,8 +8,7 @@
 [![commits since](https://img.shields.io/github/commits-since/libmbd/libmbd/latest.svg)](https://github.com/libmbd/libmbd/releases)
 [![last commit](https://img.shields.io/github/last-commit/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/commits/master)
 [![license](https://img.shields.io/github/license/libmbd/libmbd.svg)](https://github.com/libmbd/libmbd/blob/master/LICENSE)
-[![code style](https://img.shields.io/badge/code%20style-black-202020.svg)](https://github.com/ambv/black)
-[![chat](https://img.shields.io/gitter/room/libmbd/community)](https://gitter.im/libmbd/community)
+[![ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![doi](https://img.shields.io/badge/doi-10%2Fk4bm-blue)](http://doi.org/k4bm)
 
 > libMBD: A general-purpose package for scalable quantum many-body dispersion calculations. [J. Hermann](https://github.com/jhrmnn), [M. Stöhr](https://github.com/martin-stoehr), S. Góger, [S. Chaudhuri](https://github.com/shaychaudhuri), [B. Aradi](https://github.com/aradi), [R. J. Maurer](https://github.com/reinimaurer1) & A. Tkatchenko. [*J. Chem. Phys.* **159**, 174802](http://doi.org/k4bm) (2023)
@@ -22,7 +21,7 @@ libMBD implements the [many-body dispersion](http://dx.doi.org/10.1063/1.4865104
 
 The Python-based implementations as well as Python bindings to the libMBD C API are accessible from the Python package called pyMBD.
 
-libMBD is included in [FHI-aims](https://aimsclub.fhi-berlin.mpg.de), [Quantum Espresso](https://www.quantum-espresso.org), [DFTB+](https://dftbplus.org), and [ESL Bundle](https://esl.cecam.org/bundle/).
+libMBD is included in [FHI-aims](https://aimsclub.fhi-berlin.mpg.de), [Quantum Espresso](https://www.quantum-espresso.org), [DFTB+](https://dftbplus.org), and [ESL Bundle](https://esl.cecam.org/en/bundle/).
 
 ## Installing
 
@@ -50,7 +49,7 @@ Calculated energy: -0.0002462647623817456
 
 ### libMBD
 
-libMBD uses CMake for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
+libMBD uses CMake (≥ 3.22) for compiling and installing, and requires a Fortran compiler, LAPACK, and optionally ScaLAPACK/MPI.
 
 On Ubuntu:
 
@@ -76,7 +75,7 @@ This installs the libMBD shared library, C API header file,  high-level Fortran 
 
 ### pyMBD
 
-pyMBD can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed libMBD as a dependency (see above).
+pyMBD requires Python ≥ 3.10 and can be installed and updated using [Pip](https://pip.pypa.io/en/stable/quickstart/), but requires installed libMBD as a dependency (see above).
 
 ```
 pip install pymbd

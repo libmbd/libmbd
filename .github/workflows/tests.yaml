@@ -19,6 +19,9 @@ jobs:
         include:
           - type: ubuntu
             mpi-nodes: 2
+          - type: ubuntu
+            mpi-nodes: 4
+            mpifh: mpifh
           - type: macos
             mpi-nodes: 2
           - type: nvhpc
@@ -81,7 +84,7 @@ jobs:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
-          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
+          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ matrix.mpifh }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
       - name: Install libMBD dependencies
         if: matrix.type == 'ubuntu'
         run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
@@ -173,6 +176,9 @@ jobs:
           fi
           if [[ "${{ matrix.mpi-nodes }}" ]]; then
               CMAKE_ARGS+=('-DENABLE_SCALAPACK_MPI=ON')
+          fi
+          if [[ "${{ matrix.mpifh }}" == "mpifh" ]]; then
+              CMAKE_ARGS+=('-DENABLE_MPIFH=ON')
           fi
           if [[ "${{ matrix.elsi }}" == "elsi" ]]; then
               CMAKE_ARGS+=('-DENABLE_ELSI=ON')

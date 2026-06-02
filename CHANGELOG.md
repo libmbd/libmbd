@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Documented origin and CC0-1.0 license of the bundled vdW parameter data ([#106](https://github.com/libmbd/libmbd/pull/106))
 - Support for `mpi4py` 4.x ([#84](https://github.com/libmbd/libmbd/pull/84))
+- `ENABLE_MPIFH` CMake option for building against the legacy `mpif.h` interface, with CI coverage.
 
 ### Changed
 
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Library version determination from shallow Git clones ([#67](https://github.com/libmbd/libmbd/pull/67))
+- BLACS grid initialization now uses the actual communicator size and translates MPI communicators with `sys2blacs_handle`, fixing sub-communicator `BLACS_GRIDINIT` failures (original report [#80](https://github.com/libmbd/libmbd/issues/80)).
 
 ## [0.13.0] - 2024-03-07
 

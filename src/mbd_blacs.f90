@@ -11,8 +11,8 @@ private
 public :: blacs_all_reduce
 
 type, public :: blacs_grid_t
-    integer :: ctx
-    integer :: comm
+    integer :: ctx = -1
+    integer :: sys_ctx = -1
     integer :: nprows
     integer :: npcols
     integer :: my_prow
@@ -54,7 +54,7 @@ interface
         character :: ORDER
     end
     subroutine BLACS_GRIDINFO(ICONTXT, NPROW, NPCOL, MYPROW, MYPCOL)
-        integer :: ICONTXT, NPROW, NPCOL, MYPROW, MYPNUM
+        integer :: ICONTXT, NPROW, NPCOL, MYPROW, MYPCOL
     end
     subroutine BLACS_GRIDEXIT(ICONTXT)
         integer :: ICONTXT
@@ -62,6 +62,12 @@ interface
     subroutine BLACS_GET(ICONTXT, WHAT, VAL)
         integer :: ICONTXT, WHAT, VAL
     end subroutine
+    integer function SYS2BLACS_HANDLE(COMM)
+        integer :: COMM
+    end
+    subroutine FREE_BLACS_SYSTEM_HANDLE(IHANDLE)
+        integer :: IHANDLE
+    end
     integer function NUMROC(n, nb, iproc, isrcproc, nprocs)
         integer :: n, nb, iproc, isrcproc, nprocs
     end
@@ -86,25 +92,35 @@ end interface
 
 contains
 
-subroutine blacs_grid_init(this, comm)
+subroutine blacs_grid_init(this, n_tasks, comm)
     class(blacs_grid_t), intent(inout) :: this
+    integer, intent(in), optional :: n_tasks
     integer, intent(in), optional :: comm
 
-    integer :: my_task, n_tasks, nprows
+    integer :: my_task, n_tasks_, nprows, icontxt
 
-    call BLACS_PINFO(my_task, n_tasks)
-    do nprows = int(sqrt(dble(n_tasks))), 1, -1
-        if (mod(n_tasks, nprows) == 0) exit
+    if (present(n_tasks)) then
+        n_tasks_ = n_tasks
+    else
+        call BLACS_PINFO(my_task, n_tasks_)
+    end if
+    do nprows = int(sqrt(dble(n_tasks_))), 1, -1
+        if (mod(n_tasks_, nprows) == 0) exit
     end do
     this%nprows = nprows
-    this%npcols = n_tasks / this%nprows
+    this%npcols = n_tasks_ / this%nprows
+    ! icontxt starts as the system context and is replaced in place by
+    ! BLACS_GRIDINIT with the grid context; sys_ctx retains the system handle
+    ! (when we own one) so it can be freed in blacs_grid_destroy.
     if (present(comm)) then
-        this%ctx = comm
-        this%comm = comm
+        this%sys_ctx = sys2blacs_handle(comm)
+        icontxt = this%sys_ctx
     else
-        call BLACS_GET(0, 0, this%ctx)
+        call BLACS_GET(0, 0, icontxt)
+        this%sys_ctx = -1
     end if
-    call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
+    call BLACS_GRIDINIT(icontxt, 'R', this%nprows, this%npcols)
+    this%ctx = icontxt
     call BLACS_GRIDINFO( &
         this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &
     )
@@ -115,6 +131,10 @@ subroutine blacs_grid_destroy(this)
     class(blacs_grid_t), intent(inout) :: this
 
     call BLACS_GRIDEXIT(this%ctx)
+    if (this%sys_ctx /= -1) then
+        call FREE_BLACS_SYSTEM_HANDLE(this%sys_ctx)
+        this%sys_ctx = -1
+    end if
 end subroutine
 
 subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
@@ -125,7 +145,6 @@ subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
 
     integer :: my_nratoms, my_ncatoms, ierr, atoms_per_block, n_proc
 
-    this%comm = grid%comm
     this%ctx = grid%ctx
     this%n_atoms = n_atoms
     n_proc = max(grid%nprows, grid%npcols)

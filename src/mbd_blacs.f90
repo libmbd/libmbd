@@ -8,11 +8,11 @@ use mbd_constants
 implicit none
 
 private
-public :: blacs_all_reduce
+public :: blacs_all_reduce, sys2blacs_handle, free_blacs_system_handle
 
 type, public :: blacs_grid_t
-    integer :: ctx
-    integer :: comm
+    integer :: ctx = -1
+    integer :: sys_ctx = -1
     integer :: nprows
     integer :: npcols
     integer :: my_prow
@@ -62,6 +62,12 @@ interface
     subroutine BLACS_GET(ICONTXT, WHAT, VAL)
         integer :: ICONTXT, WHAT, VAL
     end subroutine
+    integer function SYS2BLACS_HANDLE(COMM)
+        integer :: COMM
+    end
+    subroutine FREE_BLACS_SYSTEM_HANDLE(IHANDLE)
+        integer :: IHANDLE
+    end
     integer function NUMROC(n, nb, iproc, isrcproc, nprocs)
         integer :: n, nb, iproc, isrcproc, nprocs
     end
@@ -86,23 +92,29 @@ end interface
 
 contains
 
-subroutine blacs_grid_init(this, comm)
+subroutine blacs_grid_init(this, n_tasks, ctx)
     class(blacs_grid_t), intent(inout) :: this
-    integer, intent(in), optional :: comm
+    integer, intent(in), optional :: n_tasks
+    integer, intent(in), optional :: ctx
 
-    integer :: my_task, n_tasks, nprows
+    integer :: my_task, n_tasks_, nprows
 
-    call BLACS_PINFO(my_task, n_tasks)
-    do nprows = int(sqrt(dble(n_tasks))), 1, -1
-        if (mod(n_tasks, nprows) == 0) exit
+    if (present(n_tasks)) then
+        n_tasks_ = n_tasks
+    else
+        call BLACS_PINFO(my_task, n_tasks_)
+    end if
+    do nprows = int(sqrt(dble(n_tasks_))), 1, -1
+        if (mod(n_tasks_, nprows) == 0) exit
     end do
     this%nprows = nprows
-    this%npcols = n_tasks / this%nprows
-    if (present(comm)) then
-        this%ctx = comm
-        this%comm = comm
+    this%npcols = n_tasks_ / this%nprows
+    if (present(ctx)) then
+        this%ctx = ctx
+        this%sys_ctx = ctx
     else
         call BLACS_GET(0, 0, this%ctx)
+        this%sys_ctx = -1
     end if
     call BLACS_GRIDINIT(this%ctx, 'R', this%nprows, this%npcols)
     call BLACS_GRIDINFO( &
@@ -115,6 +127,10 @@ subroutine blacs_grid_destroy(this)
     class(blacs_grid_t), intent(inout) :: this
 
     call BLACS_GRIDEXIT(this%ctx)
+    if (this%sys_ctx /= -1) then
+        call FREE_BLACS_SYSTEM_HANDLE(this%sys_ctx)
+        this%sys_ctx = -1
+    end if
 end subroutine
 
 subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
@@ -125,7 +141,6 @@ subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
 
     integer :: my_nratoms, my_ncatoms, ierr, atoms_per_block, n_proc
 
-    this%comm = grid%comm
     this%ctx = grid%ctx
     this%n_atoms = n_atoms
     n_proc = max(grid%nprows, grid%npcols)

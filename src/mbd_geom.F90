@@ -18,7 +18,7 @@ use mbd_utils, only: &
     printer_i, logger_t
 use mbd_vdw_param, only: ts_vdw_params
 #ifdef WITH_SCALAPACK
-use mbd_blacs, only: blacs_desc_t, blacs_grid_t
+use mbd_blacs, only: blacs_desc_t, blacs_grid_t, sys2blacs_handle
 #endif
 #ifdef WITH_MPI
 use mbd_mpi
@@ -125,6 +125,9 @@ subroutine geom_init(this)
 #ifdef WITH_MPI
     logical :: can_parallel_kpts
     integer :: ierr, n_kpts
+#   ifdef WITH_SCALAPACK
+    integer :: ctx
+#   endif
 #endif
 
     if (.not. associated(this%log%printer)) this%log%printer => printer
@@ -169,14 +172,23 @@ subroutine geom_init(this)
     if (this%parallel_mode == 'auto' .or. this%parallel_mode == 'atoms') then
 #   ifdef WITH_MPI
 #       ifdef WITH_MPIF08
-        call this%blacs_grid%init(this%mpi_comm%mpi_val)
+        ctx = sys2blacs_handle(this%mpi_comm%mpi_val)
+        call this%blacs_grid%init(this%mpi_size, ctx)
 #       else
-        call this%blacs_grid%init(this%mpi_comm)
+        ctx = sys2blacs_handle(this%mpi_comm)
+        call this%blacs_grid%init(this%mpi_size, ctx)
 #       endif
 #   else
         call this%blacs_grid%init()
 #   endif
         call this%blacs%init(this%siz(), this%blacs_grid, this%max_atoms_per_block)
+#   ifdef WITH_MPI
+#       ifdef WITH_MPIF08
+        this%blacs%comm = this%mpi_comm%mpi_val
+#       else
+        this%blacs%comm = this%mpi_comm
+#       endif
+#   endif
         if (allocated(this%blacs%i_atom)) then
             this%parallel_mode = 'atoms'
             this%idx%parallel = .true.

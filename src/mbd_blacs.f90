@@ -11,7 +11,7 @@ private
 public :: blacs_all_reduce, sys2blacs_handle, free_blacs_system_handle
 
 type, public :: blacs_grid_t
-    integer :: grid_ctx = -1
+    integer :: ctx = -1
     integer :: sys_ctx = -1
     integer :: nprows
     integer :: npcols
@@ -27,7 +27,7 @@ type, public :: blacs_desc_t
     integer, allocatable :: j_atom(:)
     integer :: n_atoms
     integer :: desc(9)
-    integer :: grid_ctx
+    integer :: ctx
     integer :: blocksize
     integer :: comm = -1
 contains
@@ -120,9 +120,9 @@ subroutine blacs_grid_init(this, n_tasks, ctx)
         this%sys_ctx = -1
     end if
     call BLACS_GRIDINIT(icontxt, 'R', this%nprows, this%npcols)
-    this%grid_ctx = icontxt
+    this%ctx = icontxt
     call BLACS_GRIDINFO( &
-        this%grid_ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &
+        this%ctx, this%nprows, this%npcols, this%my_prow, this%my_pcol &
     )
 end subroutine
 
@@ -130,7 +130,7 @@ end subroutine
 subroutine blacs_grid_destroy(this)
     class(blacs_grid_t), intent(inout) :: this
 
-    call BLACS_GRIDEXIT(this%grid_ctx)
+    call BLACS_GRIDEXIT(this%ctx)
     if (this%sys_ctx /= -1) then
         call FREE_BLACS_SYSTEM_HANDLE(this%sys_ctx)
         this%sys_ctx = -1
@@ -145,7 +145,7 @@ subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
 
     integer :: my_nratoms, my_ncatoms, ierr, atoms_per_block, n_proc
 
-    this%grid_ctx = grid%grid_ctx
+    this%ctx = grid%ctx
     this%n_atoms = n_atoms
     n_proc = max(grid%nprows, grid%npcols)
     if (n_proc == 1) return
@@ -157,7 +157,7 @@ subroutine blacs_desc_init(this, n_atoms, grid, max_atoms_per_block)
     this%blocksize = 3 * atoms_per_block
     call DESCINIT( &
         this%desc, 3 * n_atoms, 3 * n_atoms, this%blocksize, this%blocksize, 0, 0, &
-        grid%grid_ctx, 3 * my_nratoms, ierr &
+        grid%ctx, 3 * my_nratoms, ierr &
     )
     this%i_atom = idx_map( &
         grid%my_prow, grid%nprows, n_atoms, atoms_per_block, my_nratoms &
@@ -196,7 +196,7 @@ subroutine all_reduce_real_scalar(x, blacs)
     real(dp), pointer :: x_arr(:, :)
 
     x_arr(1, 1) = x
-    call DGSUM2D(blacs%grid_ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)
+    call DGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)
     x = x_arr(1, 1)
 end subroutine
 
@@ -207,7 +207,7 @@ subroutine all_reduce_complex_scalar(x, blacs)
     complex(dp) :: x_arr(1, 1)
 
     x_arr(1, 1) = x
-    call ZGSUM2D(blacs%grid_ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)
+    call ZGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)
     x = x_arr(1, 1)
 end subroutine
 
@@ -218,7 +218,7 @@ subroutine all_reduce_real_1d(A, blacs)
     real(dp), pointer :: A_p(:, :)
 
     A_p(1:size(A), 1:1) => A
-    call DGSUM2D(blacs%grid_ctx, 'A', ' ', size(A), 1, A_p, size(A), -1, -1)
+    call DGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A_p, size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_real_2d(A, blacs)
@@ -226,7 +226,7 @@ subroutine all_reduce_real_2d(A, blacs)
     type(blacs_desc_t), intent(in) :: blacs
 
     call DGSUM2D( &
-        blacs%grid_ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
     )
 end subroutine
 
@@ -237,7 +237,7 @@ subroutine all_reduce_complex_1d(A, blacs)
     complex(dp), pointer :: A_p(:, :)
 
     A_p(1:size(A), 1:1) => A
-    call ZGSUM2D(blacs%grid_ctx, 'A', ' ', size(A), 1, A_p, size(A), -1, -1)
+    call ZGSUM2D(blacs%ctx, 'A', ' ', size(A), 1, A_p, size(A), -1, -1)
 end subroutine
 
 subroutine all_reduce_complex_2d(A, blacs)
@@ -245,7 +245,7 @@ subroutine all_reduce_complex_2d(A, blacs)
     type(blacs_desc_t), intent(in) :: blacs
 
     call ZGSUM2D( &
-        blacs%grid_ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
+        blacs%ctx, 'A', ' ', size(A, 1), size(A, 2), A, size(A, 1), -1, -1 &
     )
 end subroutine
 

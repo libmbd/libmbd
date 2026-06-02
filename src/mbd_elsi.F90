@@ -64,7 +64,7 @@ subroutine elsi_eigh_complex(A, blacs_desc, eigs, exc, src, vals_only)
     end if
     call elsi_init(handle, 1, 1, 0, n, 0d0, n_vecs)
     call elsi_set_mpi(handle, blacs_desc%comm)
-    call elsi_set_blacs(handle, blacs_desc%grid_ctx, blacs_desc%blocksize)
+    call elsi_set_blacs(handle, blacs_desc%ctx, blacs_desc%blocksize)
     call elsi_set_unit_ovlp(handle, 1)
     allocate (vecs(size(A, 1), size(A, 2)))
 #ifndef DO_COMPLEX_TYPE

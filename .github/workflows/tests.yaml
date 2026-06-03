@@ -193,6 +193,17 @@ jobs:
           echo CMAKE_ARGS=${CMAKE_ARGS[@]} >>$GITHUB_ENV
           echo FFLAGS=${FFLAGS[@]}
           echo FFLAGS=${FFLAGS[@]} >>$GITHUB_ENV
+          # Codecov flag for this leg's Fortran coverage. Each preprocessor
+          # configuration (serial/MPI/MPIFH/ELSI) compiles the *.F90 sources to a
+          # different line table, so it must be its own flag -- otherwise Codecov
+          # reconciles conflicting line tables for one file and under-counts it.
+          # Flags are combined (union) for the overall number.
+          COV_FLAG=fortran
+          [[ -n "${{ matrix.mpi-nodes }}" ]] && COV_FLAG=${COV_FLAG}_mpi
+          [[ "${{ matrix.mpifh }}" == "mpifh" ]] && COV_FLAG=${COV_FLAG}_mpifh
+          [[ "${{ matrix.elsi }}" == "elsi" ]] && COV_FLAG=${COV_FLAG}_elsi
+          echo COV_FLAG=$COV_FLAG
+          echo COV_FLAG=$COV_FLAG >>$GITHUB_ENV
       - name: Run Cmake
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env && export CMAKE_ARGS="$CONDA_BACKUP_CMAKE_ARGS"; }
@@ -212,11 +223,40 @@ jobs:
         run: |
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
-      - name: Upload to Codecov
+      - name: Generate coverage reports
+        if: matrix.type != 'nvhpc'
+        run: |
+          [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
+          # Python: turn the recorded coverage data into XML for upload.
+          coverage combine 2>/dev/null || true
+          coverage xml -o coverage.xml
+          # Fortran: generate .gcov ourselves (Codecov's own gcov mis-parses the
+          # preprocessed *.F90 -- see devtools/gen-fortran-coverage.sh). On macOS
+          # the build uses a versioned gfortran, so pass the matching gcov.
+          if [[ "${{ matrix.type }}" == "macos" && -n "$MACOS_GFORTRAN" ]]; then
+            export GCOV=$(printf '%s' "$MACOS_GFORTRAN" | sed -E 's#gfortran(-[0-9]+)?$#gcov\1#')
+          fi
+          ./devtools/gen-fortran-coverage.sh coverage-fortran
+      - name: Upload Python coverage to Codecov
         uses: codecov/codecov-action@v6
         if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: python
+          disable_search: true
+          # We hand Codecov ready-made reports; never let it run gcov itself.
+          plugins: noop
+          name: python-${{ matrix.type }}-${{ matrix.python-version }}
+      - name: Upload Fortran coverage to Codecov
+        uses: codecov/codecov-action@v6
+        if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: coverage-fortran
+          flags: ${{ env.COV_FLAG }}
+          plugins: noop
+          name: ${{ env.COV_FLAG }}-${{ matrix.type }}-${{ matrix.python-version }}
   intel:
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     name: Intel (${{ matrix.toolchain }})

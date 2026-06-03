@@ -32,7 +32,12 @@ command -v "$GCOV" >/dev/null 2>&1 || { echo "gcov executable '$GCOV' not found"
 # Only the library objects matter; the test-executable .gcda cover the test
 # sources, which are ignored in codecov.yml.
 absbld=$(cd "$BLDDIR" && pwd)
-mapfile -t gcda < <(find "$absbld" -path '*mbd.dir*' -name '*.gcda')
+# Collect into an array without `mapfile`, which the bash 3.2 shipped on macOS
+# does not provide.
+gcda=()
+while IFS= read -r f; do
+    gcda+=("$f")
+done < <(find "$absbld" -path '*mbd.dir*' -name '*.gcda')
 if [[ ${#gcda[@]} -eq 0 ]]; then
     echo "no .gcda coverage data found under $BLDDIR" >&2
     exit 1

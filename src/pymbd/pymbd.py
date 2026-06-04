@@ -110,7 +110,7 @@ def dipole_matrix(
     coords, damping, beta=0.0, lattice=None, k_point=None, R_vdw=None, sigma=None, a=6.0
 ):
     if lattice is not None:
-        volume = max(np.abs(np.product(np.linalg.eigvals(lattice))), 0.2)
+        volume = max(np.abs(np.prod(np.linalg.eigvals(lattice))), 0.2)
         ewald_alpha = 2.5 / volume ** (1 / 3)
         real_space_cutoff = 6 / ewald_alpha
         range_cell = supercell_circum(lattice, real_space_cutoff)
@@ -151,7 +151,7 @@ def dipole_matrix(
 def dipole_matrix_ewald(coords, lattice, alpha, k_point=None):
     Rs = coords[:, None, :] - coords[None, :, :]
     rlattice = 2 * np.pi * np.linalg.inv(lattice.T)
-    volume = abs(np.product(np.linalg.eigvals(lattice)))
+    volume = abs(np.prod(np.linalg.eigvals(lattice)))
     rec_space_cutoff = 10 * alpha
     range_G_vector = supercell_circum(rlattice, rec_space_cutoff)
     dtype = float if k_point is None else complex

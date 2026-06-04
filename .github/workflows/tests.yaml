@@ -249,7 +249,9 @@ jobs:
           disable_search: true
           # We hand Codecov ready-made reports; never let it run gcov itself.
           plugins: noop
-          name: python-${{ matrix.type }}-${{ matrix.python-version }}
+          # strategy.job-index keeps the name unique and non-empty (several
+          # legs don't set matrix.python-version).
+          name: python-${{ matrix.type }}-${{ strategy.job-index }}
       - name: Upload Fortran coverage to Codecov
         uses: codecov/codecov-action@v6
         if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
@@ -258,7 +260,7 @@ jobs:
           directory: coverage-fortran
           flags: ${{ env.COV_FLAG }}
           plugins: noop
-          name: ${{ env.COV_FLAG }}-${{ matrix.type }}-${{ matrix.python-version }}
+          name: ${{ env.COV_FLAG }}-${{ matrix.type }}-${{ strategy.job-index }}
   intel:
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     name: Intel (${{ matrix.toolchain }})

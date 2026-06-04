@@ -48,14 +48,24 @@ fi
 mkdir -p "$outdir"
 ( cd "$outdir" && "$GCOV" -p "${gcda[@]}" ) >/dev/null
 
+# nullglob so the loop/array is empty (not the literal pattern) when gcov
+# produced nothing, e.g. a gcov/compiler version mismatch.
+shopt -s nullglob
+gcovs=("$outdir"/*.gcov)
+shopt -u nullglob
+if [[ ${#gcovs[@]} -eq 0 ]]; then
+    echo "$GCOV produced no .gcov files (gcov/compiler version mismatch?)" >&2
+    exit 1
+fi
+
 # gfortran flags lines whose sub-blocks were not all taken with a trailing '*'
 # on the execution count (e.g. "1404*:"). gcov still counts these as executed,
 # but Codecov's .gcov parser treats '*' lines as not-hit, which roughly halves
 # the reported line coverage. Strip the marker so executed lines are plain hits
 # and Codecov matches gcov's own line-coverage numbers. (sed without -i for
 # BSD/GNU portability.)
-for g in "$outdir"/*.gcov; do
+for g in "${gcovs[@]}"; do
     sed -E 's/^( *[0-9]+)\*:/\1:/' "$g" > "$g.tmp" && mv "$g.tmp" "$g"
 done
 
-echo "generated $(find "$outdir" -name '*.gcov' | wc -l) .gcov file(s) in $outdir using $GCOV"
+echo "generated ${#gcovs[@]} .gcov file(s) in $outdir using $GCOV"

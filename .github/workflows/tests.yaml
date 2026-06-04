@@ -160,7 +160,9 @@ jobs:
         # pyMBD supports both numpy 1.x and 2.x; pre-install the requested major
         # so the subsequent pyMBD install keeps it (the dependency only sets a
         # lower bound). Without a pin pip would always resolve the latest (2.x).
-        if: matrix.numpy != '' && matrix.type != 'conda'
+        # `matrix.numpy` is null (falsy) on legs that don't set it, so the
+        # truthiness check skips them; only the ubuntu venv legs opt in.
+        if: matrix.numpy && matrix.type != 'conda'
         run: pip install "numpy==${{ matrix.numpy }}.*"
       - name: Report environment
         run: |

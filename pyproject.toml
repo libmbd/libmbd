@@ -107,3 +107,15 @@ convention = "pep257"
 
 [tool.ruff.format]
 quote-style = "preserve"
+
+[tool.coverage.run]
+branch = true
+source = ["pymbd"]
+parallel = true
+omit = ["*/pymbd/tensorflow.py", "*/pymbd/benchmark.py"]
+
+# Map the installed (non-editable) package back onto the source tree so the
+# combined report and coverage.xml use src/pymbd/... paths regardless of how
+# pyMBD was installed.
+[tool.coverage.paths]
+source = ["src/pymbd", "*/site-packages/pymbd", "*/pymbd"]

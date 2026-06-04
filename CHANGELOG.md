@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support for NumPy 2.x, with CI covering both NumPy 1.x and 2.x
+
 ## [0.14.0] - 2026-06-02
 
 ### Added

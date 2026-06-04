@@ -19,9 +19,11 @@ jobs:
         include:
           - type: ubuntu
             mpi-nodes: 2
+            numpy: "1"
           - type: ubuntu
             mpi-nodes: 4
             mpifh: mpifh
+            numpy: "2"
           - type: macos
             mpi-nodes: 2
           - type: nvhpc
@@ -84,7 +86,7 @@ jobs:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
-          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ matrix.mpifh }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
+          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ matrix.mpifh }}-${{ matrix.numpy }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
       - name: Install libMBD dependencies
         if: matrix.type == 'ubuntu'
         run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
@@ -154,6 +156,12 @@ jobs:
         # The [toml] extra pulls in tomli so coverage can read its config from
         # pyproject.toml on the Python 3.10 legs (stdlib tomllib is 3.11+).
         run: pip install -U 'coverage[toml]'
+      - name: Pin numpy major version
+        # pyMBD supports both numpy 1.x and 2.x; pre-install the requested major
+        # so the subsequent pyMBD install keeps it (the dependency only sets a
+        # lower bound). Without a pin pip would always resolve the latest (2.x).
+        if: matrix.numpy != '' && matrix.type != 'conda'
+        run: pip install "numpy==${{ matrix.numpy }}.*"
       - name: Report environment
         run: |
           type python

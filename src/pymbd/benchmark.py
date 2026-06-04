@@ -79,7 +79,7 @@ def parse(output):
 
 def make_supercell(coords, lattice, species, vol_ratios, sc):
     sc = np.array(sc)
-    n_uc = np.product(sc)
+    n_uc = np.prod(sc)
     c = np.stack(
         np.meshgrid(range(sc[0]), range(sc[1]), range(sc[2])), axis=-1
     ).reshape(-1, 3)

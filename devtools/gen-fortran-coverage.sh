@@ -44,7 +44,18 @@ if [[ ${#gcda[@]} -eq 0 ]]; then
 fi
 
 # gcov writes .gcov files into the current directory; -p keeps the full path in
-# the name and -b adds branch data. Collect everything in $outdir.
+# the name so the differently-instantiated *.F90 don't collide.
 mkdir -p "$outdir"
-( cd "$outdir" && "$GCOV" -pb "${gcda[@]}" ) >/dev/null
+( cd "$outdir" && "$GCOV" -p "${gcda[@]}" ) >/dev/null
+
+# gfortran flags lines whose sub-blocks were not all taken with a trailing '*'
+# on the execution count (e.g. "1404*:"). gcov still counts these as executed,
+# but Codecov's .gcov parser treats '*' lines as not-hit, which roughly halves
+# the reported line coverage. Strip the marker so executed lines are plain hits
+# and Codecov matches gcov's own line-coverage numbers. (sed without -i for
+# BSD/GNU portability.)
+for g in "$outdir"/*.gcov; do
+    sed -E 's/^( *[0-9]+)\*:/\1:/' "$g" > "$g.tmp" && mv "$g.tmp" "$g"
+done
+
 echo "generated $(find "$outdir" -name '*.gcov' | wc -l) .gcov file(s) in $outdir using $GCOV"

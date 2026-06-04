@@ -151,7 +151,9 @@ jobs:
           python3 -m venv ${{ env.VIRTUAL_ENV }}
           ${{ env.VIRTUAL_ENV }}/bin/pip install -U pip
       - name: Install coverage Python package
-        run: pip install -U coverage
+        # The [toml] extra pulls in tomli so coverage can read its config from
+        # pyproject.toml on the Python 3.10 legs (stdlib tomllib is 3.11+).
+        run: pip install -U 'coverage[toml]'
       - name: Report environment
         run: |
           type python

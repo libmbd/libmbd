@@ -31,20 +31,21 @@ ANG = 1 / 0.52917721092  # angstrom -> bohr
 
 
 def cu_fcc(a_ang):
-    """fcc Cu primitive cell (one atom) at lattice constant ``a_ang`` (angstrom)."""
+    """Build an fcc Cu primitive cell (one atom) at lattice constant ``a_ang`` (A)."""
     lattice = (a_ang / 2) * np.array([[0, 1, 1], [1, 0, 1], [1, 1, 0]]) * ANG
     coords = np.zeros((1, 3))
     return coords, lattice
 
 
-def mbd_energy(a_ang, volume_ratio, k_grid, zero_neg=False):
+def mbd_energy(a_ang, volume_ratio, k_grid):
+    """Evaluate the MBD@rsSCS energy of fcc Cu (beta = 0.83 for PBE, VASP IVDW=14)."""
     coords, lattice = cu_fcc(a_ang)
     geom = MBDGeom(coords, lattice=lattice, k_grid=k_grid)
-    # beta = 0.83 is the MBD@rsSCS damping parameter for PBE (VASP IVDW=14)
     return geom.mbd_energy_species(['Cu'], [volume_ratio], 0.83)
 
 
 def main():
+    """Show the MBD@rsSCS k-grid convergence failure for bulk Cu (issue #72)."""
     a = 3.615  # experimental fcc Cu lattice constant (angstrom)
     print(f'fcc Cu, a = {a} A, free-atom vdW params (volume ratio 1.0), beta = 0.83\n')
     print('Convergence of MBD@rsSCS energy with the k-point grid:')

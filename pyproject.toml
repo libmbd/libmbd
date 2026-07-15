@@ -35,7 +35,7 @@ generate-setup-file = false
 python = "^3.10"
 scipy = "^1.6"
 numpy = ">=1.20"
-cffi = "^1"
+cffi = ">=1"
 pytest = { version = "*", optional = true }
 mpi4py = { version = "^3 || ^4", optional = true }
 

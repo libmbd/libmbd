@@ -283,15 +283,26 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
 
     allocate (ones(size(ratios)), source=1d0)
     grad%dV = this%calculate_vdw_params_gradients
+    ! Alias free_values before slicing it into the scale_with_ratio calls.
+    ! Passing an array section of an allocatable rank-2 component of the
+    ! polymorphic `this` straight into an array-valued function makes gfortran 16
+    ! emit an -fcheck=bounds check that reads the component descriptor through a
+    ! null pointer -- a bogus bounds error at -O0, a segfault at -O1/-Og
+    ! (libmbd/libmbd#127; GCC PR<TBD>). Associating the component evaluates its
+    ! descriptor once and sidesteps the bad check; it is correct and idiomatic on
+    ! every compiler, so no version guard is needed. Do not fold the alias back
+    ! into `this%free_values(i, :)` while gfortran 16 is supported.
+    associate (free_values => this%free_values)
     this%alpha_0 = scale_with_ratio( &
-        this%free_values(1, :), ratios, ones, 1d0, this%dalpha_0, grad &
+        free_values(1, :), ratios, ones, 1d0, this%dalpha_0, grad &
     )
     this%C6 = scale_with_ratio( &
-        this%free_values(2, :), ratios, ones, 2d0, this%dC6, grad &
+        free_values(2, :), ratios, ones, 2d0, this%dC6, grad &
     )
     this%damp%r_vdw = scale_with_ratio( &
-        this%free_values(3, :), ratios, ones, 1d0 / 3, this%dr_vdw, grad &
+        free_values(3, :), ratios, ones, 1d0 / 3, this%dr_vdw, grad &
     )
+    end associate
     this%vdw_params_update = 'ratios'
 end subroutine
 

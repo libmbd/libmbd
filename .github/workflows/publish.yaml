@@ -1,9 +1,9 @@
 name: Publish
 # Reacts to a completed "Build distributions" run rather than triggering on the
-# release directly. Like the doc-deploy trigger, workflow_run keeps this
-# privileged workflow off of pull requests entirely, so PRs never show skipped
-# publish checks. The job only acts when the build it is reacting to was for a
-# published GitHub Release that succeeded.
+# release directly. The workflow_run trigger keeps this privileged workflow off
+# of pull requests entirely, so PRs never show skipped publish checks. The job
+# only acts when the build it is reacting to was for a published GitHub Release
+# that succeeded.
 on:
   workflow_run:
     workflows: [Build distributions]

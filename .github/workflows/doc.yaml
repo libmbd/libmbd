@@ -26,26 +26,8 @@ jobs:
           pipx inject poetry poetry-dynamic-versioning
       - name: Build documentation
         run: make build_doc VIRTUAL_ENV=none
-      - name: Upload Pages artifact
-        if: github.event_name == 'push' && github.repository == 'libmbd/libmbd'
-        uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
         with:
+          name: docs
           path: doc/build
-  deploy:
-    name: Deploy
-    needs: build
-    if: github.event_name == 'push' && github.repository == 'libmbd/libmbd'
-    runs-on: ubuntu-latest
-    permissions:
-      pages: write
-      id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/configure-pages@v6
-      - uses: actions/deploy-pages@v5
-        id: deployment

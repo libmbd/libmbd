@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for NumPy 2.x, with CI covering both NumPy 1.x and 2.x
 
+### Fixed
+
+- Fixed a segmentation fault in ScaLAPACK/MPI builds, where the scalar real `blacs_all_reduce` wrote through an unassociated pointer; it now uses a plain array like its complex counterpart
+
 ## [0.14.0] - 2026-06-02
 
 ### Added

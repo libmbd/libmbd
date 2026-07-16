@@ -193,7 +193,7 @@ subroutine all_reduce_real_scalar(x, blacs)
     real(dp), intent(inout) :: x
     type(blacs_desc_t), intent(in) :: blacs
 
-    real(dp), pointer :: x_arr(:, :)
+    real(dp) :: x_arr(1, 1)
 
     x_arr(1, 1) = x
     call DGSUM2D(blacs%ctx, 'A', ' ', 1, 1, x_arr, 1, -1, -1)

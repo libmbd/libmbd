@@ -141,8 +141,8 @@ call calc%destroy()
 
 ## Links
 
-- libMBD documentation: https://libmbd.github.io
-- pyMBD documentation: https://libmbd.github.io/pymbd
+- libMBD documentation: https://libmbd.nablapsi.science
+- pyMBD documentation: https://libmbd.nablapsi.science/pymbd
 
 ## Developing
 

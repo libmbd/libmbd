@@ -10,10 +10,12 @@ concurrency:
   group: doc-deploy-trigger
   cancel-in-progress: false
 jobs:
-  trigger:
-    name: Trigger deploy
+  gate:
+    name: Gate
     runs-on: ubuntu-latest
     if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.repository == 'libmbd/libmbd'
+    outputs:
+      ok: ${{ steps.gate.outputs.ok }}
     steps:
       - name: Check all CI passed
         id: gate
@@ -42,14 +44,12 @@ jobs:
               }
             }
             core.setOutput('ok', 'true');
-      - name: Trigger docs deployment
-        if: steps.gate.outputs.ok == 'true'
-        env:
-          DOC_DEPLOY_TRIGGER_TOKEN: ${{ secrets.DOC_DEPLOY_TRIGGER_TOKEN }}
-        run: |
-          curl -sS --fail-with-body -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: token $DOC_DEPLOY_TRIGGER_TOKEN" \
-            https://api.github.com/repos/libmbd/libmbd.github.io/actions/workflows/deploy.yml/dispatches \
-            -d '{"ref":"master"}'
+  deploy:
+    name: Deploy
+    needs: gate
+    if: needs.gate.outputs.ok == 'true'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/doc-deploy.yml

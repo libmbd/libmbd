@@ -23,6 +23,8 @@ jobs:
           pipx inject poetry poetry-dynamic-versioning
       - name: Build documentation
         run: make build_doc VIRTUAL_ENV=none
+      - name: Set custom domain
+        run: echo libmbd.nablapsi.science > doc/build/CNAME
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

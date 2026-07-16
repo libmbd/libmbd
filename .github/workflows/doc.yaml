@@ -17,6 +17,8 @@ jobs:
     if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v6
       - name: Install Poetry
         run: |
@@ -24,3 +26,8 @@ jobs:
           pipx inject poetry poetry-dynamic-versioning
       - name: Build documentation
         run: make build_doc VIRTUAL_ENV=none
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
+        with:
+          name: docs
+          path: doc/build

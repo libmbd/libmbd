@@ -1,19 +1,24 @@
-name: Trigger Docs Deploy
+name: Deploy Docs
 on:
   workflow_run:
     workflows: [Tests, Lint, Documentation]
     types: [completed]
 permissions:
   contents: read
+  pages: write
+  id-token: write
   actions: read
 concurrency:
-  group: doc-deploy-trigger
+  group: pages
   cancel-in-progress: false
 jobs:
-  trigger:
-    name: Trigger deploy
+  deploy:
+    name: Deploy
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'master' && github.repository == 'libmbd/libmbd'
+    if: github.repository == 'libmbd/libmbd'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check all CI passed
         id: gate
@@ -21,6 +26,11 @@ jobs:
         with:
           script: |
             const trigger = context.payload.workflow_run;
+            if (trigger.event !== 'push' || trigger.head_branch !== 'master') {
+              core.info(`event=${trigger.event} branch=${trigger.head_branch} - skipping`);
+              core.setOutput('ok', 'false');
+              return;
+            }
             const sha = trigger.head_sha;
             const required = ['Tests', 'Lint', 'Documentation'];
             const { data: { workflow_runs } } = await github.rest.actions
@@ -40,16 +50,23 @@ jobs:
                 core.setOutput('ok', 'false');
                 return;
               }
+              if (name === 'Documentation') core.setOutput('doc_run_id', run.id);
             }
             core.setOutput('ok', 'true');
-      - name: Trigger docs deployment
+      - name: Download docs artifact
         if: steps.gate.outputs.ok == 'true'
-        env:
-          DOC_DEPLOY_TRIGGER_TOKEN: ${{ secrets.DOC_DEPLOY_TRIGGER_TOKEN }}
-        run: |
-          curl -sS --fail-with-body -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: token $DOC_DEPLOY_TRIGGER_TOKEN" \
-            https://api.github.com/repos/libmbd/libmbd.github.io/actions/workflows/deploy.yml/dispatches \
-            -d '{"ref":"master"}'
+        uses: actions/download-artifact@v4
+        with:
+          name: docs
+          path: doc/build
+          run-id: ${{ steps.gate.outputs.doc_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload pages artifact
+        if: steps.gate.outputs.ok == 'true'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: doc/build
+      - name: Deploy
+        if: steps.gate.outputs.ok == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v5

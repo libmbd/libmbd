@@ -10,7 +10,7 @@ authors = ["Jan Hermann <dev@jan.hermann.name>"]
 readme = "README.md"
 packages = [{ include = "pymbd", from = "src" }]
 repository = "https://github.com/libmbd/libmbd"
-documentation = "https://libmbd.github.io/pymbd"
+documentation = "https://libmbd.nablapsi.science/pymbd"
 license = "MPL-2.0"
 include = [
     { path = "src/mbd.h" },

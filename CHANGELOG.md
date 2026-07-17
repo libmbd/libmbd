@@ -5,9 +5,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-07-17
+
 ### Added
 
-- Support for NumPy 2.x, with CI covering both NumPy 1.x and 2.x
+- Support for NumPy 2.x, with CI covering both NumPy 1.x and 2.x ([#124](https://github.com/libmbd/libmbd/pull/124))
+- Support for cffi 2.x ([#126](https://github.com/libmbd/libmbd/pull/126))
+
+### Fixed
+
+- Work around a gfortran 16 `-fcheck=bounds` codegen bug in the from-ratios vdW-parameter path ([#127](https://github.com/libmbd/libmbd/pull/127))
 
 ## [0.14.0] - 2026-06-02
 
@@ -267,7 +274,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.14.0...HEAD
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.14.1...HEAD
+[0.14.1]: https://github.com/libmbd/libmbd/compare/0.14.0...0.14.1
 [0.14.0]: https://github.com/libmbd/libmbd/compare/0.12.8...0.14.0
 [0.12.8]: https://github.com/libmbd/libmbd/compare/0.12.7...0.12.8
 [0.12.7]: https://github.com/libmbd/libmbd/compare/0.12.6...0.12.7

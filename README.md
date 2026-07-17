@@ -1,4 +1,9 @@
-# libMBD
+<h1 align="center">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="doc/_static/libmbd-lockup-dark.svg">
+  <img alt="libMBD" src="doc/_static/libmbd-lockup.svg" width="260">
+</picture>
+</h1>
 
 [![tests](https://img.shields.io/github/actions/workflow/status/libmbd/libmbd/tests.yaml?branch=master&label=tests)](https://github.com/libmbd/libmbd/actions/workflows/tests.yaml)
 [![coverage](https://img.shields.io/codecov/c/github/libmbd/libmbd.svg)](https://codecov.io/gh/libmbd/libmbd)

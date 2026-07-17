@@ -34,8 +34,12 @@ exclude_patterns = ['build', '.DS_Store']
 pygments_style = 'sphinx'
 todo_include_todos = True
 html_theme = 'alabaster'
+html_static_path = ['_static']
+html_favicon = '_static/favicon-32.png'
 html_theme_options = {
     'description': description,
+    'logo': 'libmbd-lockup.svg',
+    'logo_name': False,
     'github_button': True,
     'github_user': 'libmbd',
     'github_repo': 'libmbd',

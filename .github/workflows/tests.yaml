@@ -351,3 +351,20 @@ jobs:
         run: |
           make test -o test_libmbd | tee output
           ! grep failed output >/dev/null
+  pr-gate:
+    # Single stable check that branch protection can require on pull requests.
+    # It collapses the whole test matrix and both Intel legs into one job name,
+    # so the required-status-checks list never has to track individual matrix
+    # legs (which churn as the matrix changes). Only runs on pull_request
+    # events -- it exists purely to gate merges. `always()` makes it run even
+    # when a dependency fails so it can report that failure.
+    if: always() && github.event_name == 'pull_request'
+    name: PR gate
+    needs: [all, intel]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any test job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "One or more test jobs failed, were cancelled, or were skipped."
+          exit 1

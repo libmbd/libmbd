@@ -351,15 +351,15 @@ jobs:
         run: |
           make test -o test_libmbd | tee output
           ! grep failed output >/dev/null
-  gate:
-    # Single stable check that branch protection can require. It collapses the
-    # whole test matrix and both Intel legs into one job name, so the required-
-    # status-checks list never has to track individual matrix legs (which churn
-    # as the matrix changes). `always()` makes it run even when a dependency
-    # fails so it can report that failure; the guard mirrors the other jobs so
-    # it is skipped (not failed) on forks' scheduled runs.
-    if: always() && (github.event_name != 'schedule' || github.repository == 'libmbd/libmbd')
-    name: gate
+  pr-gate:
+    # Single stable check that branch protection can require on pull requests.
+    # It collapses the whole test matrix and both Intel legs into one job name,
+    # so the required-status-checks list never has to track individual matrix
+    # legs (which churn as the matrix changes). Only runs on pull_request
+    # events -- it exists purely to gate merges. `always()` makes it run even
+    # when a dependency fails so it can report that failure.
+    if: always() && github.event_name == 'pull_request'
+    name: PR gate
     needs: [all, intel]
     runs-on: ubuntu-latest
     steps:

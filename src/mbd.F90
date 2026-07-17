@@ -288,10 +288,17 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
     ! polymorphic `this` straight into an array-valued function makes gfortran 16
     ! emit an -fcheck=bounds check that reads the component descriptor through a
     ! null pointer -- a bogus bounds error at -O0, a segfault at -O1/-Og
-    ! (libmbd/libmbd#127; GCC PR<TBD>). Associating the component evaluates its
-    ! descriptor once and sidesteps the bad check; it is correct and idiomatic on
-    ! every compiler, so no version guard is needed. Do not fold the alias back
-    ! into `this%free_values(i, :)` while gfortran 16 is supported.
+    ! (libmbd/libmbd#127). Associating the component evaluates its descriptor
+    ! once and sidesteps the bad check; it is correct and idiomatic on every
+    ! compiler, so no version guard is needed. Do not fold the alias back into
+    ! `this%free_values(i, :)` while gfortran 16 is supported.
+    !
+    ! Scope of the bug: reproduced on the gfortran 16 series only -- 16.0 trunk
+    ! (r16-8100) and the 16.1.0 release (both x86-64 and aarch64). gfortran 13,
+    ! 14 and 15 are unaffected, and it is already fixed on the 17.0 trunk, so the
+    ! alias can be removed once gfortran 16 is no longer supported. No upstream
+    ! GCC bug was filed (it is fixed on trunk); a minimal standalone reproducer
+    ! is kept in the PR discussion for libmbd/libmbd#127.
     associate (free_values => this%free_values)
     this%alpha_0 = scale_with_ratio( &
         free_values(1, :), ratios, ones, 1d0, this%dalpha_0, grad &

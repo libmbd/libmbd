@@ -351,3 +351,20 @@ jobs:
         run: |
           make test -o test_libmbd | tee output
           ! grep failed output >/dev/null
+  gate:
+    # Single stable check that branch protection can require. It collapses the
+    # whole test matrix and both Intel legs into one job name, so the required-
+    # status-checks list never has to track individual matrix legs (which churn
+    # as the matrix changes). `always()` makes it run even when a dependency
+    # fails so it can report that failure; the guard mirrors the other jobs so
+    # it is skipped (not failed) on forks' scheduled runs.
+    if: always() && (github.event_name != 'schedule' || github.repository == 'libmbd/libmbd')
+    name: gate
+    needs: [all, intel]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any test job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: |
+          echo "One or more test jobs failed, were cancelled, or were skipped."
+          exit 1

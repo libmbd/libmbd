@@ -75,6 +75,16 @@ jobs:
           if [[ "${{ matrix.mpi }}" == "openmpi" || "${{ matrix.type }}" == "ubuntu" ]]; then
             echo MPIEXEC_EXTRA_FLAGS=--oversubscribe >>$GITHUB_ENV
           fi
+          # On the current GitHub-hosted (Azure) ubuntu runner image, conda
+          # MPICH (built on UCX) intermittently aborts at MPI_Init trying to
+          # open the Azure MANA (mana_0) RDMA/verbs device, and conda OpenMPI's
+          # vader BTL hits restrictive-ptrace CMA errors and then SIGSEGVs in
+          # heavy collectives. Every CI run is single-node, so pin both stacks
+          # to intra-node transports (shared memory + self) so they never touch
+          # the network device. Ignored by legs whose MPI does not use them.
+          echo UCX_TLS=sm,self >>$GITHUB_ENV
+          echo UCX_NET_DEVICES=lo >>$GITHUB_ENV
+          echo OMPI_MCA_btl_vader_single_copy_mechanism=none >>$GITHUB_ENV
           echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
           echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
           echo $HOME/env/bin >>$GITHUB_PATH

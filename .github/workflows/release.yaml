@@ -1,24 +1,26 @@
 name: Release
-# Cut a release when a PR labelled `release` is merged into master. The merged
-# PR is expected to have moved its entries from the CHANGELOG's [Unreleased]
-# section into a new "## [X.Y.Z]" section; that heading is the single source of
-# truth for the version. The workflow then:
+# Cut a release DRAFT when a PR labelled `release` is merged into master. The
+# merged PR is expected to have moved its entries from the CHANGELOG's
+# [Unreleased] section into a new "## [X.Y.Z]" section; that heading is the
+# single source of truth for the version. The workflow then:
 #
 #   prepare  read the version from the changelog, tag the merge commit
 #   build    reuse Build distributions to build the pyMBD sdist + libMBD archive
-#   publish  create a DRAFT GitHub Release, attach the archives, upload to PyPI,
-#            and only then publish the release
+#   draft    create a DRAFT GitHub Release with both archives attached
 #
-# Building the assets *before* the release is published is what makes this
+# The workflow stops at a draft on purpose: a maintainer reviews it and
+# publishes it by hand. Publishing then triggers the Publish workflow
+# (.github/workflows/publish.yaml), which uploads the sdist to PyPI.
+#
+# Attaching every asset to the draft *before* it is published is what makes this
 # compatible with GitHub immutable releases: an immutable release is frozen at
-# publish time, so every asset must already be attached to the draft. The old
-# flow (publish first, attach assets afterwards via `gh release upload`) cannot
-# satisfy that.
+# publish time, so every asset must already be in place. Nothing here modifies a
+# published release.
 on:
   pull_request:
     types: [closed]
-  # Manual escape hatch to re-run a release whose merge already landed (e.g. a
-  # transient PyPI failure). The changelog still supplies the version.
+  # Manual escape hatch to (re)build the draft for a release whose merge already
+  # landed. The changelog still supplies the version.
   workflow_dispatch:
 jobs:
   prepare:
@@ -89,43 +91,36 @@ jobs:
     uses: ./.github/workflows/build-dist.yaml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
-  publish:
-    name: Publish to PyPI and GitHub Release
+  draft:
+    name: Create draft GitHub Release
     needs: [prepare, build]
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/project/pymbd/
     permissions:
-      # Mint a short-lived OIDC token for PyPI trusted publishing; no API token
-      # secret is stored in the repository.
-      id-token: write
       # Create the release and attach the source archives.
       contents: write
     steps:
-      # pyMBD sdist and the libMBD source archive land in separate directories:
-      # only the sdist goes to PyPI, while both are attached to the GitHub
-      # Release. A binary wheel is deliberately never built or published -- the C
-      # extension links an external libMBD at install time.
+      # pyMBD sdist and the libMBD source archive are both attached to the
+      # Release; only the sdist later goes to PyPI (from the Publish workflow).
       - name: Download pyMBD sdist
         uses: actions/download-artifact@v4
         with:
           name: pymbd-sdist
-          path: pypi-dist
+          path: dist
       - name: Download libMBD source archive
         uses: actions/download-artifact@v4
         with:
           name: libmbd-sdist
-          path: gh-dist
+          path: dist
       - name: Download release notes
         uses: actions/download-artifact@v4
         with:
           name: release-notes
-      # Create the release as a DRAFT and attach both source archives while it is
-      # still mutable. GitHub adds its auto-generated source code archives on top.
-      # If a draft from an interrupted run already exists, re-attach the assets
-      # instead of failing (safe: the release is still a draft, hence mutable).
-      - name: Create draft GitHub Release
+      # Create the release as a DRAFT with both source archives attached while it
+      # is still mutable. GitHub adds its auto-generated source code archives on
+      # top. A maintainer reviews and publishes it by hand. If a draft from an
+      # interrupted run already exists, re-attach the assets instead of failing
+      # (safe: it is still a draft, hence mutable).
+      - name: Create or update draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -133,27 +128,21 @@ jobs:
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; re-attaching assets (resume)."
-            gh release upload "$TAG" pypi-dist/*.tar.gz gh-dist/*.tar.gz --clobber
+            gh release upload "$TAG" dist/*.tar.gz --clobber
           else
             gh release create "$TAG" \
               --draft \
               --title "$TAG" \
               --notes-file release-notes.md \
-              pypi-dist/*.tar.gz gh-dist/*.tar.gz
+              dist/*.tar.gz
           fi
-      # PyPI uploads are immutable; skip-existing keeps a manual re-run safe by
-      # no-opping already-published files instead of erroring. Only the pyMBD
-      # sdist is uploaded -- the libMBD source archive never goes to PyPI.
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          skip-existing: true
-          packages-dir: pypi-dist
-      # Flip the fully-populated draft to published. If immutable releases are
-      # enabled on the repo, the release is frozen here with all assets in place.
-      - name: Publish the GitHub Release
+      - name: Summary
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.prepare.outputs.tag }}
-        run: gh release edit "$TAG" --draft=false
+        run: |
+          {
+            echo "## Draft release $TAG created"
+            echo
+            echo "Review it and publish it by hand to upload $TAG to PyPI."
+            echo "https://github.com/${{ github.repository }}/releases"
+          } >>"$GITHUB_STEP_SUMMARY"

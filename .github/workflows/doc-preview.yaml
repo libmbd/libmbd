@@ -1,0 +1,112 @@
+name: Deploy Docs Preview
+# Publishes a Cloudflare Pages preview for every pull request and comments the
+# URL on the PR. The docs are built (without secrets) by the Documentation
+# workflow; this privileged workflow runs afterwards via workflow_run so that
+# the Cloudflare credentials are never exposed to untrusted PR code, including
+# pull requests from forks.
+#
+# Required repository secrets:
+#   CLOUDFLARE_API_TOKEN   - token with the "Cloudflare Pages: Edit" permission
+#   CLOUDFLARE_ACCOUNT_ID  - the Cloudflare account id owning the Pages project
+# The Cloudflare Pages project must already exist (direct-upload/"Wrangler"
+# type); its name is configured via the PROJECT_NAME env below.
+on:
+  workflow_run:
+    workflows: [Documentation]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write
+concurrency:
+  group: docs-preview-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+env:
+  PROJECT_NAME: libmbd-docs
+jobs:
+  preview:
+    name: Preview
+    runs-on: ubuntu-latest
+    if: >
+      github.repository == 'libmbd/libmbd' &&
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Resolve pull request
+        id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: prs } = await github.rest.repos
+              .listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.payload.workflow_run.head_sha,
+              });
+            const pr = prs.find(p => p.state === 'open');
+            if (!pr) {
+              core.info('No open PR for this commit - skipping');
+              core.setOutput('found', 'false');
+              return;
+            }
+            core.setOutput('found', 'true');
+            core.setOutput('number', pr.number);
+      - name: Download docs artifact
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: docs
+          path: doc/build
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy to Cloudflare Pages
+        if: steps.pr.outputs.found == 'true'
+        id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: >-
+            pages deploy doc/build
+            --project-name=${{ env.PROJECT_NAME }}
+            --branch=pr-${{ steps.pr.outputs.number }}
+      - name: Comment preview URL
+        if: steps.pr.outputs.found == 'true'
+        uses: actions/github-script@v9
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        with:
+          script: |
+            const url = process.env.DEPLOYMENT_URL;
+            const number = Number('${{ steps.pr.outputs.number }}');
+            const marker = '<!-- docs-preview -->';
+            const body = [
+              marker,
+              '📖 **Documentation preview** for this pull request:',
+              '',
+              `➡️ ${url}`,
+              '',
+              `_Updated for ${context.payload.workflow_run.head_sha.slice(0, 7)}._`,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: number,
+              per_page: 100,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: number,
+                body,
+              });
+            }

@@ -27,7 +27,7 @@ jobs:
       - name: Build documentation
         run: make build_doc VIRTUAL_ENV=none
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
         with:
           name: docs
           path: doc/build

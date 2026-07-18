@@ -1,0 +1,101 @@
+name: Release
+# On a merged `release`-labelled PR: tag the merge commit with the version from
+# the top of CHANGELOG.md, build on the tag, and create a draft GitHub Release
+# with the archives attached. A maintainer publishes the draft by hand.
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+jobs:
+  prepare:
+    name: Prepare tag
+    if: >-
+      github.repository == 'libmbd/libmbd' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.pull_request.merged == true &&
+        contains(github.event.pull_request.labels.*.name, 'release')))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The exact merge commit, not the ephemeral refs/pull/N/merge ref.
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
+          fetch-depth: 0
+      - name: Read version from changelog
+        id: version
+        run: echo "version=$(bash devtools/changelog.sh version)" >>"$GITHUB_OUTPUT"
+      - name: Extract release notes
+        run: bash devtools/changelog.sh notes "${{ steps.version.outputs.version }}" >release-notes.md
+      # A merge must not reuse an existing tag; workflow_dispatch may, to resume.
+      - name: Guard against re-releasing an existing tag
+        if: github.event_name == 'pull_request'
+        run: |
+          tag="${{ steps.version.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists. Add a new '## [X.Y.Z]' section to CHANGELOG.md before releasing." >&2
+            exit 1
+          fi
+      - name: Create and push tag
+        run: |
+          tag="${{ steps.version.outputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists; reusing it."
+          else
+            git tag "$tag"
+            git push origin "refs/tags/$tag"
+          fi
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
+  build:
+    name: Build
+    needs: prepare
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build-dist.yaml
+    with:
+      ref: ${{ needs.prepare.outputs.tag }}
+  draft:
+    name: Create draft GitHub Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download pyMBD sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: pymbd-sdist
+          path: dist
+      - name: Download libMBD source archive
+        uses: actions/download-artifact@v4
+        with:
+          name: libmbd-sdist
+          path: dist
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+      # Attach both archives to a draft; an existing draft is updated in place.
+      - name: Create or update draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.tar.gz --clobber
+          else
+            gh release create "$TAG" \
+              --draft \
+              --title "$TAG" \
+              --notes-file release-notes.md \
+              dist/*.tar.gz
+          fi

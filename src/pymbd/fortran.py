@@ -396,7 +396,32 @@ class MBDGeom(object):
         return res
 
     @_auto_context
-    def nonint_density(self, pts, q, m, w):  # noqa: D102
+    def nonint_density(self, pts, q, m, w):
+        r"""Evaluate the density of the non-interacting QDOs.
+
+        Returns the charge density of the quantum Drude oscillators (QDOs) in
+        the absence of the dipole coupling, that is a sum of independent
+        spherical Gaussians, one per atom,
+
+        .. math::
+            n(\mathbf r)=\sum_A q_A\left(\frac{m_A\omega_A}\pi\right)^\frac32
+            \exp\big(-m_A\omega_A|\mathbf r-\mathbf R_A|^2\big)
+
+        which integrates to :math:`\sum_A q_A`. The oscillator parameters are
+        related to the vdW parameters by
+        :math:`\omega_A=\tfrac43 C_{6,A}/\alpha_{0,A}^2` and
+        :math:`\alpha_{0,A}=q_A^2/(m_A\omega_A^2)`. The MBD convention is
+        :math:`m_A=1`, which gives :math:`q_A=\omega_A\sqrt{\alpha_{0,A}}`. See
+        :doc:`/densities` for a plotting example.
+
+        :param array-like pts: (a.u.) points at which to evaluate the density,
+            shape ``(n_pts, 3)``
+        :param array-like q: (a.u.) oscillator charges
+        :param array-like m: (a.u.) oscillator masses
+        :param array-like w: (a.u.) oscillator frequencies :math:`\omega`
+
+        :returns: (a.u.) density evaluated at ``pts``, shape ``(n_pts,)``
+        """
         n_pts = len(pts)
         n_atoms = len(self)
         rho = np.empty(n_pts)
@@ -414,7 +439,33 @@ class MBDGeom(object):
         return rho
 
     @_auto_context
-    def int_density(self, pts, q, m, w_t, modes):  # noqa: D102
+    def int_density(self, pts, q, m, w_t, modes):
+        r"""Evaluate the density of the interacting QDOs.
+
+        Returns the charge density of the quantum Drude oscillators (QDOs) with
+        the dipole coupling switched on. Unlike :meth:`nonint_density`, each
+        per-atom contribution is a general (anisotropic) Gaussian obtained by
+        integrating out the remaining oscillators from the coupled ground-state
+        wavefunction (see :doc:`/densities` for the derivation and a plotting
+        example). Like the non-interacting density, it integrates to
+        :math:`\sum_A q_A`.
+
+        The coupled frequencies ``w_t`` and eigenmodes ``modes`` are the MBD
+        normal modes, obtained from :meth:`mbd_energy` with a geometry
+        constructed with ``get_spectrum=True`` (``w_t`` are the square roots of
+        the returned eigenvalues).
+
+        :param array-like pts: (a.u.) points at which to evaluate the density,
+            shape ``(n_pts, 3)``
+        :param array-like q: (a.u.) oscillator charges
+        :param array-like m: (a.u.) oscillator masses
+        :param array-like w_t: (a.u.) coupled MBD frequencies
+            :math:`\tilde\omega`, shape ``(3 n_atoms,)``
+        :param array-like modes: MBD eigenmodes, shape
+            ``(3 n_atoms, 3 n_atoms)``
+
+        :returns: (a.u.) density evaluated at ``pts``, shape ``(n_pts,)``
+        """
         n_pts = len(pts)
         n_atoms = len(self)
         rho = np.empty(n_pts)

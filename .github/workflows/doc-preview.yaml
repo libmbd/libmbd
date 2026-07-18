@@ -51,8 +51,20 @@ jobs:
             }
             core.setOutput('found', 'true');
             core.setOutput('number', pr.number);
-      - name: Download docs artifact
+      - name: Check Cloudflare configuration
+        id: cfg
         if: steps.pr.outputs.found == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cloudflare secrets not set; skipping docs preview deploy."
+          fi
+      - name: Download docs artifact
+        if: steps.cfg.outputs.configured == 'true'
         uses: actions/download-artifact@v4
         with:
           name: docs
@@ -60,7 +72,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Deploy to Cloudflare Pages
-        if: steps.pr.outputs.found == 'true'
+        if: steps.cfg.outputs.configured == 'true'
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
@@ -71,7 +83,7 @@ jobs:
             --project-name=${{ env.PROJECT_NAME }}
             --branch=pr-${{ steps.pr.outputs.number }}
       - name: Comment preview URL
-        if: steps.pr.outputs.found == 'true'
+        if: steps.cfg.outputs.configured == 'true'
         uses: actions/github-script@v9
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}

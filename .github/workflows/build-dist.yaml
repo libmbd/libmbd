@@ -1,8 +1,8 @@
 name: Build distributions
 on:
-  # Validate packaging changes on PRs and master, and build the release
-  # artifacts when a GitHub Release is published. The Publish workflow reacts
-  # to a successful release build via workflow_run and uploads the result.
+  # Validate packaging changes on PRs and master. The Release workflow reuses
+  # this same build via workflow_call (passing the release tag as `ref`) so the
+  # artifacts it publishes are produced by the exact steps CI already exercises.
   pull_request:
     paths:
       - '.github/workflows/build-dist.yaml'
@@ -16,9 +16,16 @@ on:
       - 'devtools/source-dist.sh'
       - 'pyproject.toml'
       - 'cffi_build.py'
-  release:
-    types: [published]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: >-
+          Git ref to build. The Release workflow passes the freshly created
+          release tag so poetry-dynamic-versioning and source-dist.sh derive a
+          clean version. Empty (the default on PR/push) checks out the event ref.
+        type: string
+        default: ''
 jobs:
   build:
     name: Build
@@ -27,6 +34,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.ref }}
           # Both poetry-dynamic-versioning and devtools/source-dist.sh derive
           # the version from Git tags, so the full history (and tags) must be
           # available.

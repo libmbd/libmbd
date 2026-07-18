@@ -1,4 +1,4 @@
-Welcome to Pymbd
+Welcome to pyMBD
 ================
 
 Only incomplete API reference is available at the moment.
@@ -6,6 +6,14 @@ Only incomplete API reference is available at the moment.
 For installation, see the Readme_. For examples, see the Readme_ or the `tests <https://github.com/libmbd/libmbd/blob/master/pymbd/test_pymbd.py>`_.
 
 .. _Readme: https://github.com/libmbd/libmbd/blob/master/README.md
+
+Examples
+--------
+
+.. toctree::
+    :maxdepth: 2
+
+    densities
 
 API reference
 -------------

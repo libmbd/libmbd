@@ -4,12 +4,11 @@
 from __future__ import division, print_function
 
 import csv
-import sys
+from importlib.resources import files
 from itertools import product
 
 import numpy as np
 from numpy.polynomial.legendre import leggauss
-from pkg_resources import resource_string
 from scipy.special import erf, erfc
 
 __all__ = ['mbd_energy', 'mbd_energy_species', 'screening',
@@ -167,7 +166,7 @@ def dipole_matrix(
     coords, damping, beta=0.0, lattice=None, k_point=None, R_vdw=None, sigma=None, a=6.0
 ):
     if lattice is not None:
-        volume = max(np.abs(np.product(np.linalg.eigvals(lattice))), 0.2)
+        volume = max(np.abs(np.prod(np.linalg.eigvals(lattice))), 0.2)
         ewald_alpha = 2.5 / volume ** (1 / 3)
         real_space_cutoff = 6 / ewald_alpha
         range_cell = supercell_circum(lattice, real_space_cutoff)
@@ -208,7 +207,7 @@ def dipole_matrix(
 def dipole_matrix_ewald(coords, lattice, alpha, k_point=None):
     Rs = coords[:, None, :] - coords[None, :, :]
     rlattice = 2 * np.pi * np.linalg.inv(lattice.T)
-    volume = abs(np.product(np.linalg.eigvals(lattice)))
+    volume = abs(np.prod(np.linalg.eigvals(lattice)))
     rec_space_cutoff = 10 * alpha
     range_G_vector = supercell_circum(rlattice, rec_space_cutoff)
     dtype = float if k_point is None else complex
@@ -367,9 +366,7 @@ def _array(obj, *args, **kwargs):
 
 
 def _get_vdw_params():
-    csv_lines = resource_string(__name__, 'vdw-params.csv').split(b'\n')
-    if sys.version_info[0] > 2:
-        csv_lines = [l.decode() for l in csv_lines]
+    csv_lines = (files(__package__) / 'vdw-params.csv').read_text().split('\n')
     reader = csv.DictReader(csv_lines, quoting=csv.QUOTE_NONNUMERIC)
     vdw_params = {row.pop('symbol'): row for row in reader}
     return vdw_params

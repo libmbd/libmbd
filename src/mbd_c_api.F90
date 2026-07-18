@@ -4,7 +4,8 @@
 module mbd_c_api
 !! Implementation of C API.
 
-use iso_c_binding
+use iso_c_binding, only: c_int, c_double, c_bool, c_char, c_ptr, c_double_complex, &
+                         c_null_char, c_loc, c_f_pointer, c_associated
 use mbd_constants
 use mbd_version
 use mbd_coulomb, only: dipole_energy, coulomb_energy
@@ -40,11 +41,28 @@ logical(c_bool), bind(c) :: cmbd_with_scalapack = .true.
 logical(c_bool), bind(c) :: cmbd_with_scalapack = .false.
 #endif
 
-integer :: i
 integer(c_int), bind(c) :: cmbd_version_major = mbd_version_major
 integer(c_int), bind(c) :: cmbd_version_minor = mbd_version_minor
 integer(c_int), bind(c) :: cmbd_version_patch = mbd_version_patch
+#ifdef __NVCOMPILER
+! nvfortran (NVIDIA HPC SDK) ICEs on the array-constructor initializer used in
+! the standard branch below (see issue #64); an equivalent DATA statement
+! compiles cleanly.
+character(c_char), bind(c) :: cmbd_version_suffix(30)
+data cmbd_version_suffix/ &
+    mbd_version_suffix(1:1), mbd_version_suffix(2:2), mbd_version_suffix(3:3), mbd_version_suffix(4:4), &
+    mbd_version_suffix(5:5), mbd_version_suffix(6:6), mbd_version_suffix(7:7), mbd_version_suffix(8:8), &
+    mbd_version_suffix(9:9), mbd_version_suffix(10:10), mbd_version_suffix(11:11), mbd_version_suffix(12:12), &
+    mbd_version_suffix(13:13), mbd_version_suffix(14:14), mbd_version_suffix(15:15), mbd_version_suffix(16:16), &
+    mbd_version_suffix(17:17), mbd_version_suffix(18:18), mbd_version_suffix(19:19), mbd_version_suffix(20:20), &
+    mbd_version_suffix(21:21), mbd_version_suffix(22:22), mbd_version_suffix(23:23), mbd_version_suffix(24:24), &
+    mbd_version_suffix(25:25), mbd_version_suffix(26:26), mbd_version_suffix(27:27), mbd_version_suffix(28:28), &
+    mbd_version_suffix(29:29), mbd_version_suffix(30:30) &
+    /
+#else
+integer :: i
 character(c_char), bind(c) :: cmbd_version_suffix(30) = [(mbd_version_suffix(i:i), i=1, 30)]
+#endif
 
 contains
 

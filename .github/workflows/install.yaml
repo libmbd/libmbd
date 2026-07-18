@@ -3,6 +3,8 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   push:
+    branches:
+      - '**'
     paths:
       - '.github/workflows/install.yaml'
 jobs:
@@ -45,15 +47,20 @@ jobs:
           echo RUN_PREFIX="$RUN_PREFIX" >>$GITHUB_ENV
           echo CONDA_PREFIX=$HOME/env >>$GITHUB_ENV
           echo CONDA_PKGS_DIRS="$XDG_CACHE_HOME/conda/pkgs" >>$GITHUB_ENV
-      - uses: actions/cache@v2
+      - uses: actions/cache@v5
         with:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
           key: ${{ matrix.os }}-${{ matrix.mpi }}-${{ env.YEAR_MONTH }}
+      - name: Install miniforge on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask miniforge
+          echo "CONDA=/opt/homebrew/Caskroom/miniforge/base" >>$GITHUB_ENV
       - name: Create Conda environment
         run: |
-          conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python ${{ env.CONDA_PKGS }} numpy scipy
+          $CONDA/bin/conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python pip ${{ env.CONDA_PKGS }} numpy scipy
           echo $CONDA_PREFIX/bin >>$GITHUB_PATH
       - name: Run pip install ${{ env.PIP_PKGS }}
         run: |

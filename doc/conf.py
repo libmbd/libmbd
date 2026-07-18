@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath('../src'))
 with open('../pyproject.toml') as f:
     metadata = toml.load(f)['tool']['poetry']
 
-project = 'Libmbd'
+project = 'libMBD'
 release = version = (
     subprocess.run(['poetry', 'version'], capture_output=True, cwd='..')
     .stdout.decode()
@@ -25,26 +25,24 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    'sphinx.ext.intersphinx',
 ]
-intersphinx_mapping = {
-    'python': ('https://docs.python.org/3', None),
-}
 source_suffix = '.rst'
 master_doc = 'index'
 copyright = f'2018-{datetime.date.today().year}, {author}'
-language = None
+language = 'en'
 exclude_patterns = ['build', '.DS_Store']
 pygments_style = 'sphinx'
 todo_include_todos = True
 html_theme = 'alabaster'
+html_static_path = ['_static']
+html_favicon = '_static/favicon-32.png'
 html_theme_options = {
     'description': description,
+    'logo': 'libmbd-lockup.svg',
+    'logo_name': False,
     'github_button': True,
     'github_user': 'libmbd',
     'github_repo': 'libmbd',
-    'badge_branch': 'master',
-    'codecov_button': True,
 }
 html_sidebars = {
     '**': ['about.html', 'navigation.html', 'relations.html', 'searchbox.html']

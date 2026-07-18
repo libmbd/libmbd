@@ -39,7 +39,7 @@ if __name__ == '__main__':
         UnixCCompiler.runtime_library_dir_option = lambda self, dir: ['-rpath', dir]
 
     distribution = Distribution({'package_dir': {'': 'src'}})
-    cffi_modules(distribution, 'cffi_modules', ['build.py:ffibuilder'])
+    cffi_modules(distribution, 'cffi_modules', ['cffi_build.py:ffibuilder'])
     cmd = distribution.cmdclass['build_ext'](distribution)
     cmd.inplace = 1
     cmd.ensure_finalized()

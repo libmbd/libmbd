@@ -1,23 +1,29 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.22)
 cmake_policy(SET CMP0042 NEW)
 cmake_policy(SET CMP0077 NEW)
 
 set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fortran_flags_override.cmake")
 
-project(Libmbd
+project(libMBD
     DESCRIPTION "Many-body dispersion library"
     LANGUAGES Fortran C)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(LibmbdVersion)
+include(libMBDVersion)
 include(GNUInstallDirs)
 include(CMakeDependentOption)
 include(CTest)
 
 option(ENABLE_SCALAPACK_MPI "Enable parallelisation with ScaLAPACK/MPI")
 CMAKE_DEPENDENT_OPTION(ENABLE_ELSI "Enable ELSI interface" OFF ENABLE_SCALAPACK_MPI OFF)
+CMAKE_DEPENDENT_OPTION(ENABLE_MPIFH "Build against legacy mpif.h MPI interface" OFF ENABLE_SCALAPACK_MPI OFF)
 option(ENABLE_C_API "Enable C API" ON)
+
+set(CMAKE_INSTALL_MODULEDIR ${CMAKE_INSTALL_INCLUDEDIR}
+    CACHE STRING
+    "Fortran module installation path (Not a cmake native variable)"
+)
 
 option(BUILD_SHARED_LIBS "Build shared rather than static library" ON)
 
@@ -54,7 +60,9 @@ if(ENABLE_SCALAPACK_MPI)
             set_target_properties(MPI::MPI_Fortran PROPERTIES INTERFACE_LINK_OPTIONS "${_VALUE}")
         endif()
     endif()
-    if(MPI_Fortran_HAVE_F08_MODULE)
+    if(ENABLE_MPIFH)
+        message(STATUS "Will use the mpif.h Fortran MPI interface")
+    elseif(MPI_Fortran_HAVE_F08_MODULE)
         message(STATUS "Will use the mpi_f08 Fortran module")
     endif()
     if(NOT TARGET scalapack AND NOT DEFINED SCALAPACK_LIBRARY)

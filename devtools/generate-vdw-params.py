@@ -13,7 +13,7 @@ for i, row in enumerate(rows):
     C6 = row['C6(TS)'] or 0
     R_vdw = row['R_vdw(TS)'] or 0
     print(
-        f'    {alpha_0}d0, {C6}d0, {R_vdw}d0{"," if i < n-1 else ""} &'
+        f'    {alpha_0}d0, {C6}d0, {R_vdw}d0{"," if i < n - 1 else ""} &'
         f'  ! {row["symbol"]}'
     )
 print(f'], [3, {n}])')
@@ -24,7 +24,7 @@ for i, row in enumerate(rows):
     C6 = row['C6(TSsurf)'] or row['C6(TS)'] or 0
     R_vdw = row['R_vdw(TSsurf)'] or row['R_vdw(TS)'] or 0
     print(
-        f'    {alpha_0}d0, {C6}d0, {R_vdw}d0{"," if i < n-1 else ""} &'
+        f'    {alpha_0}d0, {C6}d0, {R_vdw}d0{"," if i < n - 1 else ""} &'
         f'  ! {row["symbol"]}'
     )
 print(f'], [3, {n}])')

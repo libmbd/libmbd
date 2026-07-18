@@ -169,14 +169,21 @@ subroutine geom_init(this)
     if (this%parallel_mode == 'auto' .or. this%parallel_mode == 'atoms') then
 #   ifdef WITH_MPI
 #       ifdef WITH_MPIF08
-        call this%blacs_grid%init(this%mpi_comm%mpi_val)
+        call this%blacs_grid%init(this%mpi_size, this%mpi_comm%mpi_val)
 #       else
-        call this%blacs_grid%init(this%mpi_comm)
+        call this%blacs_grid%init(this%mpi_size, this%mpi_comm)
 #       endif
 #   else
         call this%blacs_grid%init()
 #   endif
         call this%blacs%init(this%siz(), this%blacs_grid, this%max_atoms_per_block)
+#   ifdef WITH_MPI
+#       ifdef WITH_MPIF08
+        this%blacs%comm = this%mpi_comm%mpi_val
+#       else
+        this%blacs%comm = this%mpi_comm
+#       endif
+#   endif
         if (allocated(this%blacs%i_atom)) then
             this%parallel_mode = 'atoms'
             this%idx%parallel = .true.
@@ -224,6 +231,7 @@ subroutine geom_destroy(this)
     deallocate (this%freq)
     deallocate (this%timer%timestamps)
     deallocate (this%timer%counts)
+    deallocate (this%timer%levels)
 end subroutine
 
 integer function geom_siz(this) result(siz)
@@ -244,7 +252,7 @@ end function
 
 #ifdef WITH_MPI
 subroutine geom_sync_exc(this)
-    class(geom_t), intent(in) :: this
+    class(geom_t), intent(inout) :: this
 
     integer, allocatable :: codes(:)
     integer :: err, rank

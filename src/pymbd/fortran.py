@@ -14,15 +14,15 @@ from .pymbd import _array, from_volumes
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
 except ImportError:
-    raise Exception('Pymbd C extension unimportable, cannot use Fortran') from None
+    raise Exception('pyMBD C extension unimportable, cannot use Fortran') from None
 
 __all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 
 with_mpi = _lib.cmbd_with_mpi
-"""Whether Libmbd was compiled with MPI"""
+"""Whether libMBD was compiled with MPI"""
 
 with_scalapack = _lib.cmbd_with_scalapack
-"""Whether Libmbd was compiled with Scalapack"""
+"""Whether libMBD was compiled with Scalapack"""
 
 LIBMBD_VERSION = (
     _lib.cmbd_version_major,
@@ -45,7 +45,7 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
 
 class MBDFortranError(Exception):
     def __init__(self, code, origin, msg):
-        super(MBDFortranError, self).__init__(msg)
+        super(MBDFortranError, self).__init__(code, origin, msg)
         self.code = code
         self.origin = origin
 
@@ -62,7 +62,7 @@ def _auto_context(method):
 
 
 class MBDGeom(object):
-    """Represents an initialized Libmbd `geom_t <../type/geom_t.html>`_ object.
+    """Represents an initialized libMBD `geom_t <../type/geom_t.html>`_ object.
 
     :param array-like coords: (a.u.) atomic coordinates as rows
     :param array-like lattice: (a.u.) lattice vectors as rows
@@ -159,7 +159,7 @@ class MBDGeom(object):
         return self._lattice is not None
 
     def print_timing(self):
-        """Print timing from Libmbd."""
+        """Print timing from libMBD."""
         _lib.cmbd_print_timing(self._geom_f)
 
     @_auto_context
@@ -312,9 +312,9 @@ class MBDGeom(object):
         return ene
 
     @_auto_context
-    def dipole_matrix(
+    def dipole_matrix(  # noqa: D102
         self, damping, beta=0.0, k_point=None, R_vdw=None, sigma=None, a=6.0
-    ):  # noqa: D102
+    ):
         R_vdw, sigma, k_point = map(_array, (R_vdw, sigma, k_point))
         n_atoms = len(self)
         damping_f = _lib.cmbd_init_damping(
@@ -396,7 +396,32 @@ class MBDGeom(object):
         return res
 
     @_auto_context
-    def nonint_density(self, pts, q, m, w):  # noqa: D102
+    def nonint_density(self, pts, q, m, w):
+        r"""Evaluate the density of the non-interacting QDOs.
+
+        Returns the charge density of the quantum Drude oscillators (QDOs) in
+        the absence of the dipole coupling, that is a sum of independent
+        spherical Gaussians, one per atom,
+
+        .. math::
+            n(\mathbf r)=\sum_A q_A\left(\frac{m_A\omega_A}\pi\right)^\frac32
+            \exp\big(-m_A\omega_A|\mathbf r-\mathbf R_A|^2\big)
+
+        which integrates to :math:`\sum_A q_A`. The oscillator parameters are
+        related to the vdW parameters by
+        :math:`\omega_A=\tfrac43 C_{6,A}/\alpha_{0,A}^2` and
+        :math:`\alpha_{0,A}=q_A^2/(m_A\omega_A^2)`. The MBD convention is
+        :math:`m_A=1`, which gives :math:`q_A=\omega_A\sqrt{\alpha_{0,A}}`. See
+        :doc:`/densities` for a plotting example.
+
+        :param array-like pts: (a.u.) points at which to evaluate the density,
+            shape ``(n_pts, 3)``
+        :param array-like q: (a.u.) oscillator charges
+        :param array-like m: (a.u.) oscillator masses
+        :param array-like w: (a.u.) oscillator frequencies :math:`\omega`
+
+        :returns: (a.u.) density evaluated at ``pts``, shape ``(n_pts,)``
+        """
         n_pts = len(pts)
         n_atoms = len(self)
         rho = np.empty(n_pts)
@@ -414,7 +439,33 @@ class MBDGeom(object):
         return rho
 
     @_auto_context
-    def int_density(self, pts, q, m, w_t, modes):  # noqa: D102
+    def int_density(self, pts, q, m, w_t, modes):
+        r"""Evaluate the density of the interacting QDOs.
+
+        Returns the charge density of the quantum Drude oscillators (QDOs) with
+        the dipole coupling switched on. Unlike :meth:`nonint_density`, each
+        per-atom contribution is a general (anisotropic) Gaussian obtained by
+        integrating out the remaining oscillators from the coupled ground-state
+        wavefunction (see :doc:`/densities` for the derivation and a plotting
+        example). Like the non-interacting density, it integrates to
+        :math:`\sum_A q_A`.
+
+        The coupled frequencies ``w_t`` and eigenmodes ``modes`` are the MBD
+        normal modes, obtained from :meth:`mbd_energy` with a geometry
+        constructed with ``get_spectrum=True`` (``w_t`` are the square roots of
+        the returned eigenvalues).
+
+        :param array-like pts: (a.u.) points at which to evaluate the density,
+            shape ``(n_pts, 3)``
+        :param array-like q: (a.u.) oscillator charges
+        :param array-like m: (a.u.) oscillator masses
+        :param array-like w_t: (a.u.) coupled MBD frequencies
+            :math:`\tilde\omega`, shape ``(3 n_atoms,)``
+        :param array-like modes: MBD eigenmodes, shape
+            ``(3 n_atoms, 3 n_atoms)``
+
+        :returns: (a.u.) density evaluated at ``pts``, shape ``(n_pts,)``
+        """
         n_pts = len(pts)
         n_atoms = len(self)
         rho = np.empty(n_pts)

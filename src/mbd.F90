@@ -12,9 +12,6 @@ use mbd_formulas, only: scale_with_ratio
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_request_t, grad_t
 use mbd_methods, only: get_mbd_energy, get_mbd_scs_energy
-#ifdef WITH_MPIF08
-use mbd_mpi
-#endif
 use mbd_ts, only: get_ts_energy
 use mbd_utils, only: result_t, exception_t, printer_i
 use mbd_vdw_param, only: ts_vdw_params, tssurf_vdw_params, species_index
@@ -36,15 +33,14 @@ type, public :: mbd_input_t
         !! - `mbd-nl`: The MBD-NL method.
         !! - `ts`: The TS method.
         !! - `mbd`: Generic MBD method (without any screening).
-#ifdef WITH_MPIF08
-    type(MPI_Comm) :: comm = MPI_COMM_NULL
-#else
     integer :: comm = -1
-#endif
-        !! MPI communicator.
+        !! MPI communicator, as a plain integer handle.
         !!
         !! Only used when compiled with MPI. Leave as is to use the
-        !! MPI_COMM_WORLD communicator.
+        !! MPI_COMM_WORLD communicator. The integer handle is accepted
+        !! regardless of whether the library was built against the
+        !! `mpi_f08` module; callers using `mpi_f08` should pass the
+        !! integer handle of their communicator (e.g. `mycomm%mpi_val`).
     integer :: max_atoms_per_block = MAX_ATOMS_PER_BLOCK
         !! Number of atoms per block in a BLACS grid.
     integer :: log_level = MBD_LOG_LVL_INFO
@@ -154,12 +150,12 @@ subroutine mbd_calc_init(this, input)
         !! MBD input.
 
 #ifdef WITH_MPI
-#   ifdef WITH_MPIF08
-    if (input%comm /= MPI_COMM_NULL) then
-#   else
     if (input%comm /= -1) then
-#   endif
+#   ifdef WITH_MPIF08
+        this%geom%mpi_comm%mpi_val = input%comm
+#   else
         this%geom%mpi_comm = input%comm
+#   endif
     end if
 #endif
 #ifdef WITH_SCALAPACK
@@ -287,15 +283,33 @@ subroutine mbd_calc_update_vdw_params_from_ratios(this, ratios)
 
     allocate (ones(size(ratios)), source=1d0)
     grad%dV = this%calculate_vdw_params_gradients
+    ! Alias free_values before slicing it into the scale_with_ratio calls.
+    ! Passing an array section of an allocatable rank-2 component of the
+    ! polymorphic `this` straight into an array-valued function makes gfortran 16
+    ! emit an -fcheck=bounds check that reads the component descriptor through a
+    ! null pointer -- a bogus bounds error at -O0, a segfault at -O1/-Og
+    ! (libmbd/libmbd#127). Associating the component evaluates its descriptor
+    ! once and sidesteps the bad check; it is correct and idiomatic on every
+    ! compiler, so no version guard is needed. Do not fold the alias back into
+    ! `this%free_values(i, :)` while gfortran 16 is supported.
+    !
+    ! Scope of the bug: reproduced on the gfortran 16 series only -- 16.0 trunk
+    ! (r16-8100) and the 16.1.0 release (both x86-64 and aarch64). gfortran 13,
+    ! 14 and 15 are unaffected, and it is already fixed on the 17.0 trunk, so the
+    ! alias can be removed once gfortran 16 is no longer supported. No upstream
+    ! GCC bug was filed (it is fixed on trunk); a minimal standalone reproducer
+    ! is kept in the PR discussion for libmbd/libmbd#127.
+    associate (free_values => this%free_values)
     this%alpha_0 = scale_with_ratio( &
-        this%free_values(1, :), ratios, ones, 1d0, this%dalpha_0, grad &
+        free_values(1, :), ratios, ones, 1d0, this%dalpha_0, grad &
     )
     this%C6 = scale_with_ratio( &
-        this%free_values(2, :), ratios, ones, 2d0, this%dC6, grad &
+        free_values(2, :), ratios, ones, 2d0, this%dC6, grad &
     )
     this%damp%r_vdw = scale_with_ratio( &
-        this%free_values(3, :), ratios, ones, 1d0 / 3, this%dr_vdw, grad &
+        free_values(3, :), ratios, ones, 1d0 / 3, this%dr_vdw, grad &
     )
+    end associate
     this%vdw_params_update = 'ratios'
 end subroutine
 

@@ -37,8 +37,7 @@ jobs:
     # deploy lands on a non-production branch and Pages serves it as a preview.
     # Requires a Direct Upload Pages project named below and the repo secrets
     # CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID. Secrets aren't exposed to
-    # PRs from forks, so previews only work for same-repo branches; the guard
-    # step below skips the deploy cleanly when the secrets are absent.
+    # PRs from forks, so previews only work for same-repo branches.
     name: Preview
     if: ${{ !cancelled() && needs.build.result == 'success' && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
@@ -47,24 +46,11 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - name: Check Cloudflare configuration
-        id: cfg
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "configured=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Cloudflare secrets not set; skipping docs preview deploy."
-          fi
       - uses: actions/download-artifact@v4
-        if: steps.cfg.outputs.configured == 'true'
         with:
           name: docs
           path: doc/build
       - id: deploy
-        if: steps.cfg.outputs.configured == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -74,7 +60,6 @@ jobs:
       # identified by an HTML-comment marker. URLs are passed via env, not
       # string-interpolated into the script, to avoid any injection.
       - uses: actions/github-script@v9
-        if: steps.cfg.outputs.configured == 'true'
         env:
           ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
           DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}

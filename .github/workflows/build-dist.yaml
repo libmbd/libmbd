@@ -1,8 +1,6 @@
 name: Build distributions
 on:
-  # Validate packaging changes on PRs and master. The Release workflow reuses
-  # this same build via workflow_call (passing the release tag as `ref`) so the
-  # artifacts it publishes are produced by the exact steps CI already exercises.
+  # Validate packaging on PRs and master; also called by the Release workflow.
   pull_request:
     paths:
       - '.github/workflows/build-dist.yaml'
@@ -20,10 +18,7 @@ on:
   workflow_call:
     inputs:
       ref:
-        description: >-
-          Git ref to build. The Release workflow passes the freshly created
-          release tag so poetry-dynamic-versioning and source-dist.sh derive a
-          clean version. Empty (the default on PR/push) checks out the event ref.
+        # Ref to build; empty (PR/push) checks out the event ref.
         type: string
         default: ''
 jobs:

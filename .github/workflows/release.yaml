@@ -1,26 +1,10 @@
 name: Release
-# Cut a release DRAFT when a PR labelled `release` is merged into master. The
-# merged PR is expected to have moved its entries from the CHANGELOG's
-# [Unreleased] section into a new "## [X.Y.Z]" section; that heading is the
-# single source of truth for the version. The workflow then:
-#
-#   prepare  read the version from the changelog, tag the merge commit
-#   build    reuse Build distributions to build the pyMBD sdist + libMBD archive
-#   draft    create a DRAFT GitHub Release with both archives attached
-#
-# The workflow stops at a draft on purpose: a maintainer reviews it and
-# publishes it by hand. Publishing then triggers the Publish workflow
-# (.github/workflows/publish.yaml), which uploads the sdist to PyPI.
-#
-# Attaching every asset to the draft *before* it is published is what makes this
-# compatible with GitHub immutable releases: an immutable release is frozen at
-# publish time, so every asset must already be in place. Nothing here modifies a
-# published release.
+# On a merged `release`-labelled PR: tag the merge commit with the version from
+# the top of CHANGELOG.md, build on the tag, and create a draft GitHub Release
+# with the archives attached. A maintainer publishes the draft by hand.
 on:
   pull_request:
     types: [closed]
-  # Manual escape hatch to (re)build the draft for a release whose merge already
-  # landed. The changelog still supplies the version.
   workflow_dispatch:
 jobs:
   prepare:
@@ -32,7 +16,6 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'release')))
     runs-on: ubuntu-latest
     permissions:
-      # Push the release tag.
       contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -40,24 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # Check out the exact merge commit the release PR produced, not the
-          # ephemeral refs/pull/N/merge ref that a pull_request event defaults
-          # to, and not master's moving HEAD. On workflow_dispatch there is no
-          # merge commit, so fall back to the branch the run was dispatched from.
+          # The exact merge commit, not the ephemeral refs/pull/N/merge ref.
           ref: ${{ github.event.pull_request.merge_commit_sha || github.ref }}
           fetch-depth: 0
       - name: Read version from changelog
         id: version
-        run: |
-          version=$(bash devtools/changelog.sh version)
-          echo "Releasing version $version"
-          echo "version=$version" >>"$GITHUB_OUTPUT"
+        run: echo "version=$(bash devtools/changelog.sh version)" >>"$GITHUB_OUTPUT"
       - name: Extract release notes
         run: bash devtools/changelog.sh notes "${{ steps.version.outputs.version }}" >release-notes.md
-      # A fresh release (merge trigger) must not reuse an existing tag: that
-      # almost always means the changelog was not bumped. A manual re-run
-      # (workflow_dispatch) is the deliberate resume path, so it is allowed to
-      # find the tag already there.
+      # A merge must not reuse an existing tag; workflow_dispatch may, to resume.
       - name: Guard against re-releasing an existing tag
         if: github.event_name == 'pull_request'
         run: |
@@ -70,7 +44,7 @@ jobs:
         run: |
           tag="${{ steps.version.outputs.version }}"
           if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists; reusing it (resume)."
+            echo "Tag $tag already exists; reusing it."
           else
             git tag "$tag"
             git push origin "refs/tags/$tag"
@@ -84,10 +58,7 @@ jobs:
     name: Build
     needs: prepare
     permissions:
-      # Minimum for actions/checkout of the tag.
       contents: read
-    # Build the artifacts on the tag just created, so the version baked into the
-    # sdist and the libMBD source archive matches the release.
     uses: ./.github/workflows/build-dist.yaml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
@@ -96,11 +67,8 @@ jobs:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     permissions:
-      # Create the release and attach the source archives.
       contents: write
     steps:
-      # pyMBD sdist and the libMBD source archive are both attached to the
-      # Release; only the sdist later goes to PyPI (from the Publish workflow).
       - name: Download pyMBD sdist
         uses: actions/download-artifact@v4
         with:
@@ -115,11 +83,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-notes
-      # Create the release as a DRAFT with both source archives attached while it
-      # is still mutable. GitHub adds its auto-generated source code archives on
-      # top. A maintainer reviews and publishes it by hand. If a draft from an
-      # interrupted run already exists, re-attach the assets instead of failing
-      # (safe: it is still a draft, hence mutable).
+      # Attach both archives to a draft; an existing draft is updated in place.
       - name: Create or update draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -127,7 +91,6 @@ jobs:
           TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; re-attaching assets (resume)."
             gh release upload "$TAG" dist/*.tar.gz --clobber
           else
             gh release create "$TAG" \
@@ -136,13 +99,3 @@ jobs:
               --notes-file release-notes.md \
               dist/*.tar.gz
           fi
-      - name: Summary
-        env:
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: |
-          {
-            echo "## Draft release $TAG created"
-            echo
-            echo "Review it and publish it by hand to upload $TAG to PyPI."
-            echo "https://github.com/${{ github.repository }}/releases"
-          } >>"$GITHUB_STEP_SUMMARY"

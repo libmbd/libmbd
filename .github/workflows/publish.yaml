@@ -1,13 +1,7 @@
 name: Publish
-# Upload the pyMBD source distribution to PyPI when a GitHub Release is
-# published. The Release workflow prepares a draft with the sdist already
-# attached; a maintainer reviews and publishes it by hand, which fires the
-# `release: published` event this workflow reacts to.
-#
-# This publishes the exact sdist attached to (and reviewed in) the Release,
-# downloaded back from it -- so PyPI and the GitHub Release carry the identical
-# artifact, and this workflow never modifies the (now possibly immutable)
-# Release.
+# When a GitHub Release is published, upload the pyMBD sdist attached to it to
+# PyPI. Reading the sdist back from the Release keeps PyPI and the Release
+# identical and leaves the Release untouched.
 on:
   release:
     types: [published]
@@ -20,15 +14,10 @@ jobs:
       name: pypi
       url: https://pypi.org/project/pymbd/
     permissions:
-      # Mint a short-lived OIDC token for PyPI trusted publishing; no API token
-      # secret is stored in the repository.
       id-token: write
-      # Download the release asset.
       contents: read
     steps:
-      # Only the pyMBD sdist -- the libMBD source archive and GitHub's
-      # auto-generated source tarballs are left on the Release and never go to
-      # PyPI (pyMBD ships source-only; a wheel would bake in one libMBD build).
+      # Only the pyMBD sdist; the libMBD archive stays a Release-only asset.
       - name: Download the pyMBD sdist from the Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -37,8 +26,6 @@ jobs:
         run: |
           mkdir -p dist
           gh release download "$TAG" --pattern 'pymbd-*.tar.gz' --dir dist
-      # skip-existing keeps a re-run safe by no-opping already-published files
-      # instead of erroring.
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:

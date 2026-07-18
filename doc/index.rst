@@ -14,6 +14,7 @@ Examples
     :maxdepth: 2
 
     densities
+    examples
 
 API reference
 -------------

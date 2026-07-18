@@ -55,6 +55,9 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # v3 defaults to the old wrangler 3.90.0, which fails deploying with
+          # "Cannot convert argument to a ByteString"; pin a current wrangler.
+          wranglerVersion: '4.112.0'
           command: pages deploy doc/build --project-name=libmbd-docs --branch=${{ github.head_ref }}
       # Post (or update in place) a single PR comment with the preview links,
       # identified by an HTML-comment marker. URLs are passed via env, not

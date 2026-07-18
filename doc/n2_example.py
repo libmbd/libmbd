@@ -1,9 +1,10 @@
 from ase.build import molecule
-from ase.units import Bohr, Ha
 from ase.parallel import paropen
+from ase.units import Bohr, Ha
 from gpaw import GPAW, FermiDirac
-from gpaw.cluster import Cluster
 from gpaw.analyse.hirshfeld import HirshfeldPartitioning
+from gpaw.cluster import Cluster
+
 from pymbd import molecular_polarizability
 from pymbd.fortran import MBDGeom
 
@@ -12,7 +13,7 @@ atoms = Cluster(molecule('N2'))
 
 # initialize GPAW calculator
 h = 0.2  # set grid spacing for GPAW calculation
-atoms.minimal_box(4., h=h)
+atoms.minimal_box(4.0, h=h)
 c = GPAW(xc='PBE', h=h, nbands=-6, occupations=FermiDirac(width=0.1))
 atoms.calc = c
 
@@ -34,10 +35,9 @@ alpha = molecular_polarizability(coords, species, volumes, beta)
 
 # dispersion correction for energy and forces
 mbd_atoms = MBDGeom(coords, lattice=None)
-mbd_energy, mbd_forces = mbd_atoms.mbd_energy_species(species,
-                                                      volumes,
-                                                      beta,
-                                                      force=True)
+mbd_energy, mbd_forces = mbd_atoms.mbd_energy_species(
+    species, volumes, beta, force=True
+)
 
 # convert from Hartree to eV
 mbd_energy *= Ha
@@ -69,4 +69,3 @@ print('Total forces with dispersion correction [eV/Ang]', file=f)
 print(total_forces, file=f)
 
 f.close()
-

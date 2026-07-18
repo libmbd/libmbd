@@ -11,9 +11,15 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import erf, erfc
 
-__all__ = ['mbd_energy', 'mbd_energy_species', 'screening',
-           'from_volumes', 'atomic_polarizabilities',
-           'molecular_polarizability', 'ang']
+__all__ = [
+    'mbd_energy',
+    'mbd_energy_species',
+    'screening',
+    'from_volumes',
+    'atomic_polarizabilities',
+    'molecular_polarizability',
+    'ang',
+]
 
 ang = 1 / 0.529177249
 """(a.u.) angstrom"""
@@ -71,9 +77,7 @@ def atomic_polarizabilities(coords, species, volumes, beta, lattice=None, kind='
     a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
     # contract a_nlc in one dimension to get atomic polarizability tensors
     na = len(alpha_0)
-    alpha_a = (a_nlc.reshape(na, 3, na, 3)
-                    .swapaxes(1, 2)
-                    .sum(axis=1))
+    alpha_a = a_nlc.reshape(na, 3, na, 3).swapaxes(1, 2).sum(axis=1)
     # alpha_a has shape (na, 3, 3)
     return alpha_a
 
@@ -96,17 +100,18 @@ def molecular_polarizability(coords, species, volumes, beta):
     a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
     # contract a_nlc in two dimensions to get molecular polarizability tensor
     na = len(alpha_0)
-    alpha_molecule = (a_nlc.reshape(na, 3, na, 3)
-                     .swapaxes(1, 2)
-                     .reshape(na**2, 3, 3)
-                     .sum(axis=0))
+    alpha_molecule = (
+        a_nlc.reshape(na, 3, na, 3).swapaxes(1, 2).reshape(na**2, 3, 3).sum(axis=0)
+    )
     # molecular polarizability is a (3, 3) tensor
     return alpha_molecule
 
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):
-    r"""Calculate an MBD energy. Use with Hirshfeld-partitioned atomic polarizabilities,
-    C6 coefficients and van der Waal radii. Otherwise use mbd_energy_species().
+    r"""Calculate an MBD energy.
+
+    Use with Hirshfeld-partitioned atomic polarizabilities, C6 coefficients and
+    van der Waal radii. Otherwise use mbd_energy_species().
 
     :param array-like coords: (a.u.) atomic coordinates in rows
     :param array-like alpha_0: (a.u.) atomic polarizabilities
@@ -303,8 +308,7 @@ def T_erfc(R, a):
 
 
 def from_volumes(species, volumes, kind='TS'):
-    r"""Scale the free atomic polarizabilities, C6 coefficients and
-    van der Waal radii by the volume ratios.
+    r"""Scale free-atom vdW parameters by Hirshfeld volume ratios.
 
     :param array-like species: atom types (elements)
     :param array-like volumes: ratios of Hirshfeld volumes in molecule and vacuum

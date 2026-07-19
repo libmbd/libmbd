@@ -76,10 +76,11 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     type(matrix_cplx_t) :: relay, AT, Mmat, modes, B, dQ
     type(grad_matrix_cplx_t) :: dT
 #endif
-    real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:)
+    real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:), &
+        eigs_raw(:), g_prime(:)
     integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
-        n_atoms, i_xyz, i_latt
-    real(dp) :: freq_w, sigma_ij
+        n_atoms, i_xyz, i_latt, k
+    real(dp) :: freq_w, sigma_ij, u_resc
     type(damping_t) :: damp_alpha
     type(grad_request_t) :: grad_dip
     logical :: do_grad
@@ -87,12 +88,8 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     do_grad = .false.
     if (present(grad)) do_grad = grad%any()
     n_atoms = geom%siz()
-    if (do_grad .and. geom%param%rpa_rescale_eigs) then
-        geom%exc%code = MBD_EXC_UNIMPL
-        geom%exc%msg = 'RPA gradients not implemented with rescaled eigenvalues'
-        return
-    end if
     if (do_grad) then
+        allocate (g_prime(3 * n_atoms))
         grad_dip%dcoords = grad%dcoords
         grad_dip%dlattice = grad%dlattice
         grad_dip%dr_vdw = grad%dr_vdw
@@ -167,6 +164,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         end if
         if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
+            if (do_grad) eigs_raw = eigs
             where (eigs < 0) eigs = -erf(sqrt(pi) / 2 * eigs**4)**(1d0 / 4)
         end if
         n_negative_eigs = count(eigs(:) <= -1)
@@ -192,10 +190,30 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         end if
         if (.not. do_grad) cycle
         freq_w = geom%freq(i_freq)%weight
-        ! B = (1 + M)^-1 = C diag(1 / (1 + eigs)) C^dagger
+        ! The per-eigenvalue energy contribution is g(mu_k), whose derivative
+        ! with respect to a parameter is g'(mu_k) times the derivative of the
+        ! raw eigenvalue mu_k of M. Summed, this gives the weighted resolvent
+        ! B = C diag(g'(mu_k)) C^dagger, contracted below with dM.
+        if (.not. geom%param%rpa_rescale_eigs) then
+            ! g(mu) = log(1 + mu)
+            g_prime = 1d0 / (1d0 + eigs)
+        else
+            ! g(mu) = log(1 + lambda(mu)) - lambda(mu), with the rescaling
+            ! lambda = mu for mu >= 0 and lambda = -erf(sqrt(pi)/2 mu^4)^(1/4)
+            ! for mu < 0; dlambda/dmu = (mu/lambda)^3 exp(-(sqrt(pi)/2 mu^4)^2)
+            do k = 1, 3 * n_atoms
+                if (eigs_raw(k) >= 0d0) then
+                    g_prime(k) = 1d0 / (1d0 + eigs(k)) - 1d0
+                else
+                    u_resc = sqrt(pi) / 2 * eigs_raw(k)**4
+                    g_prime(k) = (1d0 / (1d0 + eigs(k)) - 1d0) &
+                        * (eigs_raw(k) / eigs(k))**3 * exp(-u_resc**2)
+                end if
+            end do
+        end if
         call B%copy_from(modes)
-        call B%mult_cols_3n((1d0 + eigs)**(-1d0 / 2))
-        B = B%mmul(B, transB='C')
+        call B%mult_cols_3n(g_prime)
+        B = B%mmul(modes, transB='C')
 #ifdef DO_COMPLEX_TYPE
         B%val = conjg(B%val)
 #endif

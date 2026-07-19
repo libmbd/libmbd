@@ -2262,6 +2262,92 @@ subroutine test_mbd_rpa_ewald_deriv_impl_alpha()
     end if
 end subroutine
 
+subroutine test_mbd_rpa_rescale_deriv_expl()
+    real(dp) :: delta
+    type(damping_t) :: damp
+    real(dp), allocatable :: coords(:, :), gradients(:, :), gradients_anl(:, :), &
+        diff(:, :), alpha_0(:), C6(:)
+    type(result_t) :: res(-3:3)
+    integer :: i_atom, n_atoms, i_xyz, i_step
+
+    delta = 0.01d0
+    n_atoms = 3
+    allocate (coords(3, n_atoms), source=0d0)
+    allocate (gradients(n_atoms, 3))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
+    geom%coords = coords
+    geom%do_rpa = .true.
+    geom%param%rpa_rescale_eigs = .true.
+    call geom%init()
+    damp%version = 'fermi,dip'
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    res(0) = get_mbd_energy(geom, alpha_0, C6, damp, grad_request_t(dcoords=.true.))
+    gradients_anl = res(0)%dE%dcoords
+    do i_atom = 1, n_atoms
+        do i_xyz = 1, 3
+            do i_step = -3, 3
+                if (i_step == 0) cycle
+                geom%coords = coords
+                geom%coords(i_xyz, i_atom) = geom%coords(i_xyz, i_atom) + i_step * delta
+                res(i_step) = get_mbd_energy(geom, alpha_0, C6, damp, grad_request_t())
+            end do
+            gradients(i_atom, i_xyz) = diff7(res%energy, delta)
+        end do
+    end do
+    call geom%destroy()
+    diff = (gradients - gradients_anl) / gradients_anl
+    if (failed(maxval(abs(diff)), 1d-6)) then
+        call print_matrix('delta gradients', diff)
+    end if
+end subroutine
+
+subroutine test_mbd_rpa_rescale_deriv_impl_alpha()
+    real(dp) :: delta
+    type(damping_t) :: damp
+    real(dp), allocatable :: coords(:, :), gradients(:), gradients_anl(:), &
+        diff(:), alpha_0(:), alpha_0_diff(:), C6(:)
+    type(result_t) :: res(-3:3)
+    integer :: i_atom, n_atoms, i_step
+
+    delta = 3d-2
+    n_atoms = 3
+    allocate (coords(3, n_atoms), source=0d0)
+    allocate (gradients(n_atoms))
+    coords(1, 3) = 1d0
+    coords(2, 1) = 4d0
+    coords(3, 2) = 4d0
+    geom%coords = coords
+    geom%do_rpa = .true.
+    geom%param%rpa_rescale_eigs = .true.
+    call geom%init()
+    damp%version = 'fermi,dip'
+    damp%r_vdw = [3.55d0, 3.5d0, 3.56d0]
+    damp%beta = 0.83d0
+    alpha_0 = [11d0, 10d0, 12d0]
+    C6 = [65d0, 60d0, 70d0]
+    res(0) = get_mbd_energy(geom, alpha_0, C6, damp, grad_request_t(dalpha=.true.))
+    gradients_anl = res(0)%dE%dalpha
+    do i_atom = 1, n_atoms
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            alpha_0_diff = alpha_0
+            alpha_0_diff(i_atom) = alpha_0_diff(i_atom) + i_step * delta
+            res(i_step) = get_mbd_energy(geom, alpha_0_diff, C6, damp, grad_request_t())
+        end do
+        gradients(i_atom) = diff7(res%energy, delta)
+    end do
+    call geom%destroy()
+    diff = (gradients - gradients_anl) / gradients_anl
+    if (failed(maxval(abs(diff)), 1d-6)) then
+        call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
+    end if
+end subroutine
+
 subroutine test_mbd_rpa_rsscs_deriv_expl()
     ! full stack: screening + RPA energy, with combined gradient request
     real(dp) :: delta

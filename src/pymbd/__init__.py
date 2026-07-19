@@ -9,12 +9,14 @@ from .pymbd import (
     mbd_energy_species,
     molecular_polarizability,
     screening,
+    screening_matrix,
 )
 
 __all__ = [
     'mbd_energy',
     'mbd_energy_species',
     'screening',
+    'screening_matrix',
     'from_volumes',
     'atomic_polarizabilities',
     'molecular_polarizability',

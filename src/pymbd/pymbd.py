@@ -15,6 +15,7 @@ __all__ = [
     'mbd_energy',
     'mbd_energy_species',
     'screening',
+    'screening_matrix',
     'from_volumes',
     'atomic_polarizabilities',
     'molecular_polarizability',
@@ -23,6 +24,37 @@ __all__ = [
 
 ang = 1 / 0.529177249
 """(a.u.) angstrom"""
+
+
+def screening_matrix(coords, alpha_0, R_vdw, beta, lattice=None):
+    r"""Build the screened non-local polarizability matrix.
+
+    Returns the :math:`(3N, 3N)` matrix
+    :math:`\bar{\boldsymbol\alpha}=(\boldsymbol\alpha_0^{-1}+\mathbf T_\mathrm{GG})^{-1}`,
+    whose :math:`3\times3` blocks :math:`\bar{\boldsymbol\alpha}_{ij}` are the
+    dipole-screened polarizabilities coupling atoms :math:`i` and :math:`j`. This
+    is the shared core of :func:`screening`, :func:`atomic_polarizabilities`, and
+    :func:`molecular_polarizability`.
+
+    :param array-like coords: (a.u.) atom coordinates in rows
+    :param array-like alpha_0: (a.u.) atomic polarizabilities
+    :param array-like R_vdw: (a.u.) atomic vdW radii
+    :param float beta: MBD damping parameter :math:`\beta`
+    :param array-like lattice: (a.u.) lattice vectors in rows
+    """
+    alpha_0 = np.asarray(alpha_0)
+    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
+    dipmat = dipole_matrix(
+        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=lattice
+    )
+    return np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
+
+
+def _atomic_polarizability_tensors(a_nlc):
+    # contract the (3N, 3N) screened matrix over the second atom index into
+    # per-atom (N, 3, 3) polarizability tensors
+    n = a_nlc.shape[0] // 3
+    return a_nlc.reshape(n, 3, n, 3).swapaxes(1, 2).sum(axis=1)
 
 
 def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
@@ -44,12 +76,8 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
     alpha_dyn = [alpha_0 / (1 + (u / omega) ** 2) for u in freq]
     alpha_dyn_rsscs = []
     for a in alpha_dyn:
-        sigma = (np.sqrt(2 / np.pi) * a / 3) ** (1 / 3)
-        dipmat = dipole_matrix(
-            coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=lattice
-        )
-        a_nlc = np.linalg.inv(np.diag(np.repeat(1 / a, 3)) + dipmat)
-        a_contr = sum(np.sum(a_nlc[i::3, i::3], 1) for i in range(3)) / 3
+        a_nlc = screening_matrix(coords, a, R_vdw, beta, lattice=lattice)
+        a_contr = np.einsum('aii->a', _atomic_polarizability_tensors(a_nlc)) / 3
         alpha_dyn_rsscs.append(a_contr)
     alpha_dyn_rsscs = np.stack(alpha_dyn_rsscs)
     C6_rsscs = 3 / np.pi * np.sum(freq_w[:, None] * alpha_dyn_rsscs**2, 0)
@@ -58,7 +86,7 @@ def screening(coords, alpha_0, C6, R_vdw, beta, lattice=None, nfreq=15):
 
 
 def atomic_polarizabilities(coords, species, volumes, beta, lattice=None, kind='TS'):
-    r"""Atomic polarizability tensors.
+    r"""Calculate static atomic polarizabilities.
 
     :param array-like coords: (a.u.) atom coordinates in rows
     :param array-like species: atom types (elements)
@@ -67,44 +95,29 @@ def atomic_polarizabilities(coords, species, volumes, beta, lattice=None, kind='
     :param array-like lattice: (a.u.) lattice vectors in rows
     :param str kind: one of 'TS', 'BG' or 'TSsurf'
 
-    Returns static atomic polarizability tensors (a.u.).
+    Returns the isotropic per-atom screened static polarizabilities of shape
+    ``(N,)`` (a.u.).
     """
-    alpha_0, C6, R_vdw = from_volumes(species, volumes, kind=kind)
-    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
-    dipmat = dipole_matrix(
-        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=lattice
-    )
-    a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
-    # contract a_nlc in one dimension to get atomic polarizability tensors
-    na = len(alpha_0)
-    alpha_a = a_nlc.reshape(na, 3, na, 3).swapaxes(1, 2).sum(axis=1)
-    # alpha_a has shape (na, 3, 3)
-    return alpha_a
+    alpha_0, _, R_vdw = from_volumes(species, volumes, kind=kind)
+    a_nlc = screening_matrix(coords, alpha_0, R_vdw, beta, lattice=lattice)
+    return np.einsum('aii->a', _atomic_polarizability_tensors(a_nlc)) / 3
 
 
-def molecular_polarizability(coords, species, volumes, beta):
-    r"""Calculate the static polarizability of molecules.
+def molecular_polarizability(coords, species, volumes, beta, lattice=None, kind='TS'):
+    r"""Calculate the static molecular polarizability tensor.
 
-    :param array-like coords: (a.u.) atomic coordinates in rows
+    :param array-like coords: (a.u.) atom coordinates in rows
     :param array-like species: atom types (elements)
     :param array-like volumes: ratios of Hirshfeld volumes in molecule and vacuum
     :param float beta: MBD damping parameter :math:`\beta` (see J. Chem. Phys. 140, 18A508 (2014))
+    :param array-like lattice: (a.u.) lattice vectors in rows
+    :param str kind: one of 'TS', 'BG' or 'TSsurf'
 
-    Returns static polarizability tensor in (a.u.).
+    Returns the :math:`3\times3` static polarizability tensor (a.u.).
     """
-    alpha_0, C6, R_vdw = from_volumes(species, volumes, kind='TS')
-    sigma = (np.sqrt(2 / np.pi) * alpha_0 / 3) ** (1 / 3)
-    dipmat = dipole_matrix(
-        coords, 'fermi,dip,gg', sigma=sigma, R_vdw=R_vdw, beta=beta, lattice=None
-    )
-    a_nlc = np.linalg.inv(np.diag(np.repeat(1 / alpha_0, 3)) + dipmat)
-    # contract a_nlc in two dimensions to get molecular polarizability tensor
-    na = len(alpha_0)
-    alpha_molecule = (
-        a_nlc.reshape(na, 3, na, 3).swapaxes(1, 2).reshape(na**2, 3, 3).sum(axis=0)
-    )
-    # molecular polarizability is a (3, 3) tensor
-    return alpha_molecule
+    alpha_0, _, R_vdw = from_volumes(species, volumes, kind=kind)
+    a_nlc = screening_matrix(coords, alpha_0, R_vdw, beta, lattice=lattice)
+    return _atomic_polarizability_tensors(a_nlc).sum(axis=0)
 
 
 def mbd_energy(coords, alpha_0, C6, R_vdw, beta, lattice=None, k_grid=None, nfreq=15):

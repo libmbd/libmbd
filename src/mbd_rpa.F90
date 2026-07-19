@@ -9,6 +9,8 @@ use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
 use mbd_formulas, only: sigma_selfint
 use mbd_geom, only: geom_t
+use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
+    grad_request_t
 use mbd_matrix, only: matrix_re_t, matrix_cplx_t
 use mbd_utils, only: result_t, tostr
 
@@ -28,10 +30,36 @@ contains
 
 #ifndef DO_COMPLEX_TYPE
 type(result_t) function get_mbd_rpa_energy_real( &
-        geom, alpha, damp) result(res)
+        geom, alpha, damp, grad) result(res)
+    !! Get MBD energy by the RPA method.
+    !!
+    !! The energy is obtained from the eigenvalues \(\lambda_k(\mathrm iu)\) of
+    !! the symmetrized dipole matrix \(\mathbf M(\mathrm iu)=\mathbf
+    !! A(\mathrm iu)^\frac12\mathbf T\mathbf A(\mathrm iu)^\frac12\), with
+    !! \(A_{ij}(\mathrm iu)=\alpha_i(\mathrm iu)\delta_{ij}\),
+    !!
+    !! $$
+    !! E=\frac1{2\pi}\int_0^\infty\mathrm du\sum_k\log(1+\lambda_k(\mathrm iu))
+    !! =\frac1{2\pi}\int_0^\infty\mathrm du\,\log\det(\mathbf 1+\mathbf M(\mathrm iu))
+    !! $$
+    !!
+    !! The derivatives use \(\partial\lambda_k=\mathbf c_k^\dagger(\partial\mathbf
+    !! M)\mathbf c_k\), which upon summation gives the resolvent \(\mathbf
+    !! B(\mathrm iu)=(\mathbf 1+\mathbf M(\mathrm iu))^{-1}\),
+    !!
+    !! $$
+    !! \partial E=\frac1{2\pi}\int_0^\infty\mathrm du
+    !! \operatorname{Tr}\big(\mathbf B(\mathrm iu)\partial\mathbf M(\mathrm iu)\big)
+    !! $$
+    !!
+    !! Both the explicit derivatives (coordinates, lattice vectors, van der
+    !! Waals radii, \(\mathbf q\)) and the implicit derivatives with respect to
+    !! the dynamic polarizabilities are returned. The latter propagate both
+    !! through the \(\sqrt{\alpha_i\alpha_j}\) prefactor and, when the damping
+    !! depends on it, through \(\sigma_{ij}(\alpha)\).
 #else
 type(result_t) function get_mbd_rpa_energy_complex( &
-        geom, alpha, damp, q) result(res)
+        geom, alpha, damp, q, grad) result(res)
 #endif
     type(geom_t), intent(inout) :: geom
     real(dp), intent(in) :: alpha(:, 0:)
@@ -39,15 +67,52 @@ type(result_t) function get_mbd_rpa_energy_complex( &
 #ifdef DO_COMPLEX_TYPE
     real(dp), intent(in) :: q(3)
 #endif
+    type(grad_request_t), intent(in), optional :: grad
 
 #ifndef DO_COMPLEX_TYPE
-    type(matrix_re_t) :: relay, AT
+    type(matrix_re_t) :: relay, AT, Mmat, modes, B, dQ
+    type(grad_matrix_re_t) :: dT
 #else
-    type(matrix_cplx_t) :: relay, AT
+    type(matrix_cplx_t) :: relay, AT, Mmat, modes, B, dQ
+    type(grad_matrix_cplx_t) :: dT
 #endif
-    real(dp), allocatable :: eigs(:), log_eigs(:)
-    integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom
+    real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:)
+    integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
+        n_atoms, i_xyz, i_latt
+    real(dp) :: freq_w, sigma_ij
     type(damping_t) :: damp_alpha
+    type(grad_request_t) :: grad_dip
+    logical :: do_grad
+
+    do_grad = .false.
+    if (present(grad)) do_grad = grad%any()
+    n_atoms = geom%siz()
+    if (do_grad .and. geom%param%rpa_rescale_eigs) then
+        geom%exc%code = MBD_EXC_UNIMPL
+        geom%exc%msg = 'RPA gradients not implemented with rescaled eigenvalues'
+        return
+    end if
+    if (do_grad) then
+        grad_dip%dcoords = grad%dcoords
+        grad_dip%dlattice = grad%dlattice
+        grad_dip%dr_vdw = grad%dr_vdw
+        ! the dipole matrix depends on the dynamic polarizability through the
+        ! self-consistent-screening width sigma only for the gg dampings
+        grad_dip%dsigma = grad%dalpha_dyn .and. index(damp%version, 'gg') > 0
+#ifdef DO_COMPLEX_TYPE
+        grad_dip%dq = grad%dq
+#endif
+        if (grad%dcoords) allocate (res%dE%dcoords(n_atoms, 3), source=0d0)
+        if (grad%dr_vdw) allocate (res%dE%dr_vdw(n_atoms), source=0d0)
+        if (grad%dalpha_dyn) &
+            allocate (res%dE%dalpha_dyn(n_atoms, 0:ubound(alpha, 2)), source=0d0)
+#ifndef DO_COMPLEX_TYPE
+        if (grad%dlattice) allocate (res%dE%dlattice(3, 3), source=0d0)
+#else
+        if (grad%dlattice) allocate (res%dE%dlattice(3, 3), source=0d0)
+        if (grad%dq) allocate (res%dE%dq(3), source=0d0)
+#endif
+    end if
 
     res%energy = 0d0
     damp_alpha = damp
@@ -56,30 +121,50 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     if (geom%get_rpa_orders) allocate (res%rpa_orders(geom%param%rpa_order_max), source=0d0)
     do i_freq = 0, ubound(geom%freq, 1)
         damp_alpha%sigma = sigma_selfint(alpha(:, i_freq))
+        sqrt_alpha = sqrt(alpha(:, i_freq))
+        if (do_grad) then
 #ifndef DO_COMPLEX_TYPE
-        relay = dipole_matrix(geom, damp_alpha)
+            relay = dipole_matrix(geom, damp_alpha, dT, grad_dip)
 #else
-        relay = dipole_matrix(geom, damp_alpha, q=q)
+            relay = dipole_matrix(geom, damp_alpha, dT, grad_dip, q=q)
 #endif
-        do my_i_atom = 1, size(relay%idx%i_atom)
-            do my_j_atom = 1, size(relay%idx%j_atom)
-                associate ( &
-                        i_atom => relay%idx%i_atom(my_i_atom), &
-                        j_atom => relay%idx%j_atom(my_j_atom), &
-                        relay_sub => relay%val( &
-                            3 * (my_i_atom - 1) + 1:, &
-                            3 * (my_j_atom - 1) + 1: &
-                        ) &
-                )
-                    relay_sub(:3, :3) = relay_sub(:3, :3) &
-                        * sqrt(alpha(i_atom, i_freq) * alpha(j_atom, i_freq))
-                end associate
+        else
+#ifndef DO_COMPLEX_TYPE
+            relay = dipole_matrix(geom, damp_alpha)
+#else
+            relay = dipole_matrix(geom, damp_alpha, q=q)
+#endif
+        end if
+        if (geom%has_exc()) return
+        if (do_grad) then
+            ! keep relay = T, build M = A^1/2 T A^1/2 separately
+            call Mmat%copy_from(relay)
+            call Mmat%mult_cross(sqrt_alpha)
+            call modes%alloc_from(Mmat)
+            call geom%clock(23)
+            call modes%eigh(eigs, geom%exc, src=Mmat, clock=geom%timer)
+            call geom%clock(-23)
+        else
+            do my_i_atom = 1, size(relay%idx%i_atom)
+                do my_j_atom = 1, size(relay%idx%j_atom)
+                    associate ( &
+                            i_atom => relay%idx%i_atom(my_i_atom), &
+                            j_atom => relay%idx%j_atom(my_j_atom), &
+                            relay_sub => relay%val( &
+                                3 * (my_i_atom - 1) + 1:, &
+                                3 * (my_j_atom - 1) + 1: &
+                            ) &
+                    )
+                        relay_sub(:3, :3) = relay_sub(:3, :3) &
+                            * sqrt(alpha(i_atom, i_freq) * alpha(j_atom, i_freq))
+                    end associate
+                end do
             end do
-        end do
-        call AT%move_from(relay)
-        call geom%clock(23)
-        eigs = AT%eigvalsh(geom%exc, destroy=.true.)
-        call geom%clock(-23)
+            call AT%move_from(relay)
+            call geom%clock(23)
+            eigs = AT%eigvalsh(geom%exc, destroy=.true.)
+            call geom%clock(-23)
+        end if
         if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
             where (eigs < 0) eigs = -erf(sqrt(pi) / 2 * eigs**4)**(1d0 / 4)
@@ -104,6 +189,90 @@ type(result_t) function get_mbd_rpa_energy_complex( &
                     * sum(eigs**n_order) / n_order) &
                     * geom%freq(i_freq)%weight
             end do
+        end if
+        if (.not. do_grad) cycle
+        freq_w = geom%freq(i_freq)%weight
+        ! B = (1 + M)^-1 = C diag(1 / (1 + eigs)) C^dagger
+        call B%copy_from(modes)
+        call B%mult_cols_3n((1d0 + eigs)**(-1d0 / 2))
+        B = B%mmul(B, transB='C')
+#ifdef DO_COMPLEX_TYPE
+        B%val = conjg(B%val)
+#endif
+        call dQ%init_from(relay)
+        if (grad%dcoords) then
+            do i_xyz = 1, 3
+                dQ%val = dT%dr(:, :, i_xyz)
+                call dQ%mult_cross(sqrt_alpha)
+                dQ%val = B%val * dQ%val
+                res%dE%dcoords(:, i_xyz) = res%dE%dcoords(:, i_xyz) + &
+                    freq_w / pi * dble(dQ%contract_n33_rows())
+            end do
+        end if
+        if (grad%dlattice) then
+            do i_latt = 1, 3
+                do i_xyz = 1, 3
+                    dQ%val = dT%dlattice(:, :, i_latt, i_xyz)
+                    call dQ%mult_cross(sqrt_alpha)
+                    dQ%val = B%val * dQ%val
+                    res%dE%dlattice(i_latt, i_xyz) = res%dE%dlattice(i_latt, i_xyz) + &
+                        freq_w / (2 * pi) * dble(dQ%sum_all())
+                end do
+            end do
+        end if
+        if (grad%dr_vdw) then
+            dQ%val = dT%dvdw
+            call dQ%mult_cross(sqrt_alpha)
+            dQ%val = B%val * dQ%val
+            res%dE%dr_vdw = res%dE%dr_vdw + &
+                freq_w / pi * dble(dQ%contract_n33_rows())
+        end if
+#ifdef DO_COMPLEX_TYPE
+        if (grad%dq) then
+            do i_latt = 1, 3
+                dQ%val = dT%dq(:, :, i_latt)
+                call dQ%mult_cross(sqrt_alpha)
+                dQ%val = B%val * dQ%val
+                res%dE%dq(i_latt) = res%dE%dq(i_latt) + &
+                    freq_w / (2 * pi) * dble(dQ%sum_all())
+            end do
+        end if
+#endif
+        if (grad%dalpha_dyn) then
+            ! channel through the sqrt(alpha_i alpha_j) prefactor
+            dQ%val = relay%val
+            call dQ%mult_cross(sqrt_alpha)
+            call dQ%mult_rows(1d0 / (2 * alpha(:, i_freq)))
+            dQ%val = B%val * dQ%val
+            res%dE%dalpha_dyn(:, i_freq) = res%dE%dalpha_dyn(:, i_freq) + &
+                freq_w / pi * dble(dQ%contract_n33_rows())
+            ! channel through sigma_ij(alpha), if the damping uses it
+            if (grad_dip%dsigma) then
+                dQ%val = dT%dsigma
+                call dQ%mult_cross(sqrt_alpha)
+                dQ%val = B%val * dQ%val
+                ! scale each block (i, j) by 1 / sigma_ij
+                do my_i_atom = 1, size(dQ%idx%i_atom)
+                    do my_j_atom = 1, size(dQ%idx%j_atom)
+                        associate ( &
+                                i_atom => dQ%idx%i_atom(my_i_atom), &
+                                j_atom => dQ%idx%j_atom(my_j_atom), &
+                                dQ_sub => dQ%val( &
+                                    3 * (my_i_atom - 1) + 1:, &
+                                    3 * (my_j_atom - 1) + 1: &
+                                ) &
+                        )
+                            sigma_ij = damp%mayer_scaling * sqrt(sum( &
+                                damp_alpha%sigma([i_atom, j_atom])**2))
+                            dQ_sub(:3, :3) = dQ_sub(:3, :3) / sigma_ij
+                        end associate
+                    end do
+                end do
+                res%dE%dalpha_dyn(:, i_freq) = res%dE%dalpha_dyn(:, i_freq) + &
+                    freq_w / pi * damp%mayer_scaling**2 &
+                    * damp_alpha%sigma**2 / (3 * alpha(:, i_freq)) &
+                    * dble(dQ%contract_n33_rows())
+            end if
         end if
     end do
 end function

@@ -52,18 +52,30 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
 
     real(dp), allocatable :: alpha(:, :), omega(:), k_pts(:, :), dkdlattice(:, :, :, :)
     type(grad_t), allocatable :: dalpha(:)
-    integer :: n_kpts, i_kpt, a
+    integer :: n_kpts, i_kpt, a, i_freq, n_atoms
     type(result_t) :: res_k
     type(grad_t) :: domega
-    type(grad_request_t) :: grad_ham
+    type(grad_request_t) :: grad_ham, grad_rpa
 
+    n_atoms = geom%siz()
     omega = omega_qho(C6, alpha_0, domega, grad)
     if (geom%do_rpa) then
-        alpha = alpha_dyn_qho(alpha_0, omega, geom%freq, dalpha, grad_request_t())
+        alpha = alpha_dyn_qho( &
+            alpha_0, omega, geom%freq, dalpha, &
+            grad_request_t( &
+                dalpha=grad%dalpha, domega=grad%dalpha .or. grad%dC6 &
+            ) &
+        )
     end if
     grad_ham = grad
     if (grad%dC6 .or. grad%dalpha) grad_ham%domega = .true.
     if (grad%dlattice) grad_ham%dq = .true.
+    ! RPA returns derivatives with respect to the dynamic polarizabilities,
+    ! which are chained below to alpha_0 and C6
+    grad_rpa = grad_request_t( &
+        dcoords=grad%dcoords, dlattice=grad%dlattice, dr_vdw=grad%dr_vdw, &
+        dalpha_dyn=grad%dalpha .or. grad%dC6, dq=grad%dlattice &
+    )
     if (.not. allocated(geom%lattice)) then
         if (.not. geom%do_rpa) then
             call geom%clock(52)
@@ -73,8 +85,9 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
             if (grad%dalpha) res%dE%dalpha = res%dE%dalpha + res%dE%domega * domega%dalpha
             if (allocated(res%dE%domega)) deallocate (res%dE%domega)
         else
-            res = get_mbd_rpa_energy(geom, alpha, damp)
-            ! TODO gradients
+            call geom%clock(52)
+            res = get_mbd_rpa_energy(geom, alpha, damp, grad_rpa)
+            call geom%clock(-52)
         end if
     else
         if (allocated(geom%custom_k_pts)) then
@@ -96,9 +109,15 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
         )
         if (grad%dcoords) allocate (res%dE%dcoords(geom%siz(), 3), source=0d0)
         if (grad%dlattice) allocate (res%dE%dlattice(3, 3), source=0d0)
-        if (grad%dalpha) allocate (res%dE%dalpha(geom%siz()), source=0d0)
-        if (grad%dC6) allocate (res%dE%dC6(geom%siz()), source=0d0)
         if (grad%dR_vdw) allocate (res%dE%dR_vdw(geom%siz()), source=0d0)
+        if (geom%do_rpa) then
+            if (grad%dalpha .or. grad%dC6) allocate ( &
+                res%dE%dalpha_dyn(geom%siz(), 0:ubound(geom%freq, 1)), source=0d0 &
+            )
+        else
+            if (grad%dalpha) allocate (res%dE%dalpha(geom%siz()), source=0d0)
+            if (grad%dC6) allocate (res%dE%dC6(geom%siz()), source=0d0)
+        end if
         do i_kpt = 1, n_kpts
 #ifdef WITH_MPI
             if (geom%parallel_mode == 'k_points') then
@@ -112,7 +131,7 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
                         geom, alpha_0, omega, damp, grad_ham, k_pt &
                     )
                 else
-                    res_k = get_mbd_rpa_energy(geom, alpha, damp, k_pt)
+                    res_k = get_mbd_rpa_energy(geom, alpha, damp, k_pt, grad_rpa)
                 end if
             end associate
             call geom%clock(-51)
@@ -135,11 +154,16 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
                         + res_k%dE%dq(a) * dkdlattice(a, i_kpt, :, :) / n_kpts
                 end do
             end if
-            if (grad%dalpha) then
-                res%dE%dalpha = res%dE%dalpha &
-                    + (res_k%dE%dalpha + res_k%dE%domega * domega%dalpha) / n_kpts
+            if (geom%do_rpa) then
+                if (grad%dalpha .or. grad%dC6) res%dE%dalpha_dyn = &
+                    res%dE%dalpha_dyn + res_k%dE%dalpha_dyn / n_kpts
+            else
+                if (grad%dalpha) then
+                    res%dE%dalpha = res%dE%dalpha &
+                        + (res_k%dE%dalpha + res_k%dE%domega * domega%dalpha) / n_kpts
+                end if
+                if (grad%dC6) res%dE%dC6 = res%dE%dC6 + res_k%dE%domega * domega%dC6 / n_kpts
             end if
-            if (grad%dC6) res%dE%dC6 = res%dE%dC6 + res_k%dE%domega * domega%dC6 / n_kpts
             if (grad%dR_vdw) res%dE%dR_vdw = res%dE%dR_vdw + res_k%dE%dR_vdw / n_kpts
         end do
 #ifdef WITH_MPI
@@ -148,11 +172,30 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
             call mpi_all_reduce(res%energy, geom%mpi_comm)
             if (grad%dcoords) call mpi_all_reduce(res%dE%dcoords, geom%mpi_comm)
             if (grad%dlattice) call mpi_all_reduce(res%dE%dlattice, geom%mpi_comm)
-            if (grad%dalpha) call mpi_all_reduce(res%dE%dalpha, geom%mpi_comm)
-            if (grad%dC6) call mpi_all_reduce(res%dE%dC6, geom%mpi_comm)
+            if (geom%do_rpa) then
+                if (grad%dalpha .or. grad%dC6) &
+                    call mpi_all_reduce(res%dE%dalpha_dyn, geom%mpi_comm)
+            else
+                if (grad%dalpha) call mpi_all_reduce(res%dE%dalpha, geom%mpi_comm)
+                if (grad%dC6) call mpi_all_reduce(res%dE%dC6, geom%mpi_comm)
+            end if
             if (grad%dR_vdw) call mpi_all_reduce(res%dE%dR_vdw, geom%mpi_comm)
         end if
 #endif
+    end if
+    ! chain the RPA derivatives with respect to the dynamic polarizabilities
+    ! to the static polarizabilities and C6 coefficients
+    if (geom%do_rpa .and. (grad%dalpha .or. grad%dC6) .and. .not. geom%has_exc()) then
+        if (grad%dalpha) allocate (res%dE%dalpha(n_atoms), source=0d0)
+        if (grad%dC6) allocate (res%dE%dC6(n_atoms), source=0d0)
+        do i_freq = 0, ubound(geom%freq, 1)
+            if (grad%dalpha) res%dE%dalpha = res%dE%dalpha &
+                + res%dE%dalpha_dyn(:, i_freq) &
+                * (dalpha(i_freq)%dalpha + dalpha(i_freq)%domega * domega%dalpha)
+            if (grad%dC6) res%dE%dC6 = res%dE%dC6 &
+                + res%dE%dalpha_dyn(:, i_freq) * dalpha(i_freq)%domega * domega%dC6
+        end do
+        deallocate (res%dE%dalpha_dyn)
     end if
 end function
 

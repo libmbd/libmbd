@@ -13,6 +13,7 @@ implicit none
 
 private
 public :: omega_qho, alpha_dyn_qho, C6_from_alpha, sigma_selfint, scale_with_ratio
+public :: rpa_rescale_eigval
 
 contains
 
@@ -114,6 +115,40 @@ function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
     sigma = (sqrt(2d0 / pi) * alpha / 3d0)**(1d0 / 3)
     if (.not. present(grad)) return
     if (grad) dsigma_dalpha = sigma / (3 * alpha)
+end function
+
+function rpa_rescale_eigval(x, dxr, grad) result(xr)
+    !! Rescale an eigenvalue \(x\) of the RPA matrix \(\mathbf{AT}\) to tame the
+    !! spurious divergence of \(\log(1+x)\) as \(x\to-1\). Non-negative
+    !! eigenvalues are left intact.
+    !!
+    !! $$
+    !! x_\mathrm r=\begin{cases}x & x\ge0\\
+    !! -\operatorname{erf}\!\big(\tfrac{\sqrt\pi}2 x^4\big)^\frac14 & x<0
+    !! \end{cases},\qquad
+    !! \frac{\mathrm dx_\mathrm r}{\mathrm dx}=\begin{cases}1 & x\ge0\\
+    !! \big(\tfrac x{x_\mathrm r}\big)^3
+    !! \mathrm e^{-(\frac{\sqrt\pi}2 x^4)^2} & x<0\end{cases}
+    !! $$
+    real(dp), intent(in) :: x
+    real(dp), intent(out), optional :: dxr
+    logical, intent(in), optional :: grad
+    real(dp) :: xr
+
+    real(dp) :: u
+
+    if (x >= 0) then
+        xr = x
+        if (present(grad)) then
+            if (grad) dxr = 1d0
+        end if
+    else
+        u = sqrt(pi) / 2 * x**4
+        xr = -erf(u)**(1d0 / 4)
+        if (present(grad)) then
+            if (grad) dxr = (x / xr)**3 * exp(-u**2)
+        end if
+    end if
 end function
 
 function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)

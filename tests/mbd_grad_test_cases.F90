@@ -6,6 +6,7 @@ module mbd_grad_test_cases
 use mbd_constants
 use mbd_damping, only: damping_t, damping_fermi
 use mbd_dipole, only: dipole_matrix, T_bare, T_erf_coulomb, damping_grad, T_erfc
+use mbd_formulas, only: rpa_rescale_eigval
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_request_t, grad_scalar_t
 use mbd_hamiltonian, only: get_mbd_hamiltonian_energy
@@ -2259,6 +2260,28 @@ subroutine test_mbd_rpa_ewald_deriv_impl_alpha()
     diff = (gradients - gradients_anl) / gradients_anl
     if (failed(maxval(abs(diff)), 1d-7)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
+    end if
+end subroutine
+
+subroutine test_rpa_rescale_deriv()
+    real(dp) :: x, dxr, delta, xr(-3:3), num, diff
+    integer :: i_x, i_step
+    real(dp) :: xs(4)
+
+    xs = [-1d0, -0.5d0, -0.2d0, 1.5d0]
+    delta = 1d-3
+    diff = 0d0
+    do i_x = 1, size(xs)
+        x = xs(i_x)
+        xr(0) = rpa_rescale_eigval(x, dxr, grad=.true.)
+        do i_step = -3, 3
+            if (i_step == 0) cycle
+            xr(i_step) = rpa_rescale_eigval(x + i_step * delta)
+        end do
+        num = diff7(xr, delta)
+        diff = max(diff, abs((num - dxr) / dxr))
+    end do
+    if (failed(diff, 1d-9)) then
     end if
 end subroutine
 

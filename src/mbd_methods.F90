@@ -70,8 +70,6 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
     grad_ham = grad
     if (grad%dC6 .or. grad%dalpha) grad_ham%domega = .true.
     if (grad%dlattice) grad_ham%dq = .true.
-    ! RPA returns derivatives with respect to the dynamic polarizabilities,
-    ! which are chained below to alpha_0 and C6
     grad_rpa = grad_request_t( &
         dcoords=grad%dcoords, dlattice=grad%dlattice, dr_vdw=grad%dr_vdw, &
         dalpha_dyn=grad%dalpha .or. grad%dC6, dq=grad%dlattice &
@@ -183,8 +181,6 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
         end if
 #endif
     end if
-    ! chain the RPA derivatives with respect to the dynamic polarizabilities
-    ! to the static polarizabilities and C6 coefficients
     if (geom%do_rpa .and. (grad%dalpha .or. grad%dC6) .and. .not. geom%has_exc()) then
         if (grad%dalpha) allocate (res%dE%dalpha(n_atoms), source=0d0)
         if (grad%dC6) allocate (res%dE%dC6(n_atoms), source=0d0)

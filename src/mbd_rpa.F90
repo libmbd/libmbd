@@ -7,7 +7,7 @@ module mbd_rpa
 use mbd_constants
 use mbd_damping, only: damping_t
 use mbd_dipole, only: dipole_matrix
-use mbd_formulas, only: sigma_selfint
+use mbd_formulas, only: sigma_selfint, rpa_rescale_eigval
 use mbd_geom, only: geom_t
 use mbd_gradients, only: grad_t, grad_matrix_re_t, grad_matrix_cplx_t, &
     grad_request_t
@@ -88,7 +88,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         eigs_raw(:), g_prime(:), contr(:)
     integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
         n_atoms, i_xyz, i_latt, k
-    real(dp) :: freq_w, sigma_ij, u_resc
+    real(dp) :: freq_w, sigma_ij, lambda, dlambda
     type(damping_t) :: damp_alpha
     type(grad_request_t) :: grad_dip
     logical :: do_grad
@@ -159,7 +159,9 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
             if (do_grad) eigs_raw = eigs
-            where (eigs < 0) eigs = -erf(sqrt(pi) / 2 * eigs**4)**(1d0 / 4)
+            do k = 1, 3 * n_atoms
+                eigs(k) = rpa_rescale_eigval(eigs(k))
+            end do
         end if
         n_negative_eigs = count(eigs(:) <= -1)
         if (n_negative_eigs > 0) then
@@ -192,17 +194,11 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             ! g(mu) = log(1 + mu)
             g_prime = 1d0 / (1d0 + eigs)
         else
-            ! g(mu) = log(1 + lambda(mu)) - lambda(mu), with the rescaling
-            ! lambda = mu for mu >= 0 and lambda = -erf(sqrt(pi)/2 mu^4)^(1/4)
-            ! for mu < 0; dlambda/dmu = (mu/lambda)^3 exp(-(sqrt(pi)/2 mu^4)^2)
+            ! g(mu) = log(1 + lambda(mu)) - lambda(mu); chain rule
+            ! g'(mu) = (1 / (1 + lambda) - 1) dlambda/dmu
             do k = 1, 3 * n_atoms
-                if (eigs_raw(k) >= 0d0) then
-                    g_prime(k) = 1d0 / (1d0 + eigs(k)) - 1d0
-                else
-                    u_resc = sqrt(pi) / 2 * eigs_raw(k)**4
-                    g_prime(k) = (1d0 / (1d0 + eigs(k)) - 1d0) &
-                        * (eigs_raw(k) / eigs(k))**3 * exp(-u_resc**2)
-                end if
+                lambda = rpa_rescale_eigval(eigs_raw(k), dlambda, grad=.true.)
+                g_prime(k) = (1d0 / (1d0 + lambda) - 1d0) * dlambda
             end do
         end if
         call B%copy_from(modes)

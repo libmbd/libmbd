@@ -118,7 +118,7 @@ function sigma_selfint(alpha, dsigma_dalpha, grad) result(sigma)
 end function
 
 function rpa_rescale_eigval(x, dxr, grad) result(xr)
-    !! Rescale eigenvalues \(x\) of the RPA matrix \(\mathbf{AT}\) to tame the
+    !! Rescale an eigenvalue \(x\) of the RPA matrix \(\mathbf{AT}\) to tame the
     !! spurious divergence of \(\log(1+x)\) as \(x\to-1\). Non-negative
     !! eigenvalues are left intact.
     !!
@@ -130,28 +130,25 @@ function rpa_rescale_eigval(x, dxr, grad) result(xr)
     !! \big(\tfrac x{x_\mathrm r}\big)^3
     !! \mathrm e^{-(\frac{\sqrt\pi}2 x^4)^2} & x<0\end{cases}
     !! $$
-    real(dp), intent(in) :: x(:)
-    real(dp), allocatable, intent(out), optional :: dxr(:)
+    real(dp), intent(in) :: x
+    real(dp), intent(out), optional :: dxr
     logical, intent(in), optional :: grad
-    real(dp) :: xr(size(x))
+    real(dp) :: xr
 
-    real(dp) :: u, d(size(x))
-    integer :: i
+    real(dp) :: u
 
-    ! an explicit loop keeps the x < 0 branch (which divides by xr) from being
-    ! evaluated for x >= 0, where it would raise a floating-point exception
-    do i = 1, size(x)
-        if (x(i) >= 0) then
-            xr(i) = x(i)
-            d(i) = 1d0
-        else
-            u = sqrt(pi) / 2 * x(i)**4
-            xr(i) = -erf(u)**(1d0 / 4)
-            d(i) = (x(i) / xr(i))**3 * exp(-u**2)
+    if (x >= 0) then
+        xr = x
+        if (present(grad)) then
+            if (grad) dxr = 1d0
         end if
-    end do
-    if (.not. present(grad)) return
-    if (grad) dxr = d
+    else
+        u = sqrt(pi) / 2 * x**4
+        xr = -erf(u)**(1d0 / 4)
+        if (present(grad)) then
+            if (grad) dxr = (x / xr)**3 * exp(-u**2)
+        end if
+    end if
 end function
 
 function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)

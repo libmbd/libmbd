@@ -135,25 +135,23 @@ function rpa_rescale_eigval(x, dxr, grad) result(xr)
     logical, intent(in), optional :: grad
     real(dp) :: xr(size(x))
 
-    real(dp) :: u
+    real(dp) :: u, d(size(x))
     integer :: i
-    logical :: do_grad
 
-    do_grad = .false.
-    if (present(grad)) do_grad = grad
-    if (do_grad) allocate (dxr(size(x)))
     ! an explicit loop keeps the x < 0 branch (which divides by xr) from being
     ! evaluated for x >= 0, where it would raise a floating-point exception
     do i = 1, size(x)
         if (x(i) >= 0) then
             xr(i) = x(i)
-            if (do_grad) dxr(i) = 1d0
+            d(i) = 1d0
         else
             u = sqrt(pi) / 2 * x(i)**4
             xr(i) = -erf(u)**(1d0 / 4)
-            if (do_grad) dxr(i) = (x(i) / xr(i))**3 * exp(-u**2)
+            d(i) = (x(i) / xr(i))**3 * exp(-u**2)
         end if
     end do
+    if (.not. present(grad)) return
+    if (grad) dxr = d
 end function
 
 function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)

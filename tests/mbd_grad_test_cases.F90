@@ -2264,21 +2264,21 @@ subroutine test_mbd_rpa_ewald_deriv_impl_alpha()
 end subroutine
 
 subroutine test_rpa_rescale_deriv()
-    real(dp) :: delta, num, diff, xr(-3:3)
-    real(dp), allocatable :: dxr(:), tmp(:)
-    integer :: i_x, i_step
+    real(dp) :: delta, num, diff, xr(-3:3), xpts(7), rpts(7), dummy(4)
+    real(dp), allocatable :: dxr(:)
+    integer :: i_x, j
     real(dp) :: xs(4)
 
     xs = [-1d0, -0.5d0, -0.2d0, 1.5d0]
     delta = 1d-3
-    tmp = rpa_rescale_eigval(xs, dxr, grad=.true.)
+    dummy = rpa_rescale_eigval(xs, dxr, grad=.true.)
     diff = 0d0
     do i_x = 1, size(xs)
-        do i_step = -3, 3
-            if (i_step == 0) cycle
-            tmp = rpa_rescale_eigval([xs(i_x) + i_step * delta])
-            xr(i_step) = tmp(1)
+        do j = 1, 7
+            xpts(j) = xs(i_x) + (j - 4) * delta
         end do
+        rpts = rpa_rescale_eigval(xpts)
+        xr = rpts
         num = diff7(xr, delta)
         diff = max(diff, abs((num - dxr(i_x)) / dxr(i_x)))
     end do

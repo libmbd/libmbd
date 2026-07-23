@@ -87,7 +87,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:), &
         g_prime(:), contr(:), dxr(:)
     integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
-        n_atoms, i_xyz, i_latt, k
+        n_atoms, i_xyz, i_latt
     real(dp) :: freq_w, sigma_ij
     type(damping_t) :: damp_alpha
     type(grad_request_t) :: grad_dip
@@ -159,14 +159,13 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         end if
         if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
-            do k = 1, 3 * n_atoms
-                if (do_grad) then
-                    ! rescale and keep dlambda/dmu for the gradient below
-                    eigs(k) = rpa_rescale_eigval(eigs(k), dxr(k), grad=.true.)
-                else
-                    eigs(k) = rpa_rescale_eigval(eigs(k))
-                end if
-            end do
+            ! rescale in place; dxr (dlambda/dmu) is caller-allocated and filled
+            ! only when do_grad, then reused for the spectral weights below
+            if (do_grad) then
+                eigs(:) = rpa_rescale_eigval(eigs, dxr)
+            else
+                eigs(:) = rpa_rescale_eigval(eigs)
+            end if
         end if
         n_negative_eigs = count(eigs(:) <= -1)
         if (n_negative_eigs > 0) then

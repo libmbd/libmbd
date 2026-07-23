@@ -85,7 +85,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     type(grad_matrix_cplx_t) :: dT
 #endif
     real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:), &
-        eigs_raw(:), g_prime(:)
+        eigs_raw(:), g_prime(:), contr(:)
     integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
         n_atoms, i_xyz, i_latt, k
     real(dp) :: freq_w, sigma_ij, u_resc
@@ -150,21 +150,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             call modes%eigh(eigs, geom%exc, src=Mmat, clock=geom%timer)
             call geom%clock(-23)
         else
-            do my_i_atom = 1, size(relay%idx%i_atom)
-                do my_j_atom = 1, size(relay%idx%j_atom)
-                    associate ( &
-                            i_atom => relay%idx%i_atom(my_i_atom), &
-                            j_atom => relay%idx%j_atom(my_j_atom), &
-                            relay_sub => relay%val( &
-                                3 * (my_i_atom - 1) + 1:, &
-                                3 * (my_j_atom - 1) + 1: &
-                            ) &
-                    )
-                        relay_sub(:3, :3) = relay_sub(:3, :3) &
-                            * sqrt(alpha(i_atom, i_freq) * alpha(j_atom, i_freq))
-                    end associate
-                end do
-            end do
+            call relay%mult_cross(sqrt_alpha)
             call AT%move_from(relay)
             call geom%clock(23)
             eigs = AT%eigvalsh(geom%exc, destroy=.true.)
@@ -231,8 +217,8 @@ type(result_t) function get_mbd_rpa_energy_complex( &
                 dQ%val = dT%dr(:, :, i_xyz)
                 call dQ%mult_cross(sqrt_alpha)
                 dQ%val = B%val * dQ%val
-                res%dE%dcoords(:, i_xyz) = res%dE%dcoords(:, i_xyz) + &
-                    freq_w / pi * dble(dQ%contract_n33_rows())
+                contr = freq_w / pi * dble(dQ%contract_n33_rows())
+                res%dE%dcoords(:, i_xyz) = res%dE%dcoords(:, i_xyz) + contr
             end do
         end if
         if (grad%dlattice) then
@@ -250,8 +236,8 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             dQ%val = dT%dvdw
             call dQ%mult_cross(sqrt_alpha)
             dQ%val = B%val * dQ%val
-            res%dE%dr_vdw = res%dE%dr_vdw + &
-                freq_w / pi * dble(dQ%contract_n33_rows())
+            contr = freq_w / pi * dble(dQ%contract_n33_rows())
+            res%dE%dr_vdw = res%dE%dr_vdw + contr
         end if
 #ifdef DO_COMPLEX_TYPE
         if (grad%dq) then
@@ -270,8 +256,8 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             call dQ%mult_cross(sqrt_alpha)
             call dQ%mult_rows(1d0 / (2 * alpha(:, i_freq)))
             dQ%val = B%val * dQ%val
-            res%dE%dalpha_dyn(:, i_freq) = res%dE%dalpha_dyn(:, i_freq) + &
-                freq_w / pi * dble(dQ%contract_n33_rows())
+            contr = freq_w / pi * dble(dQ%contract_n33_rows())
+            res%dE%dalpha_dyn(:, i_freq) = res%dE%dalpha_dyn(:, i_freq) + contr
             ! channel through sigma_ij(alpha), if the damping uses it
             if (grad_dip%dsigma) then
                 dQ%val = dT%dsigma
@@ -294,10 +280,10 @@ type(result_t) function get_mbd_rpa_energy_complex( &
                         end associate
                     end do
                 end do
-                res%dE%dalpha_dyn(:, i_freq) = res%dE%dalpha_dyn(:, i_freq) + &
-                    freq_w / pi * damp%mayer_scaling**2 &
+                contr = freq_w / pi * damp%mayer_scaling**2 &
                     * damp_alpha%sigma**2 / (3 * alpha(:, i_freq)) &
                     * dble(dQ%contract_n33_rows())
+                res%dE%dalpha_dyn(:, i_freq) = res%dE%dalpha_dyn(:, i_freq) + contr
             end if
         end if
     end do

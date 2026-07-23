@@ -7,7 +7,7 @@
 /coverage-fortran/
 /.tox
 /.pytest_cache/
-/build
+/build*
 /dist/
 /doc/build/
 /poetry.lock

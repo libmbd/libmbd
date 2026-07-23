@@ -85,10 +85,10 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     type(grad_matrix_cplx_t) :: dT
 #endif
     real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:), &
-        eigs_raw(:), g_prime(:), contr(:)
+        g_prime(:), contr(:), dxr(:)
     integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
         n_atoms, i_xyz, i_latt, k
-    real(dp) :: freq_w, sigma_ij, lambda, dlambda
+    real(dp) :: freq_w, sigma_ij
     type(damping_t) :: damp_alpha
     type(grad_request_t) :: grad_dip
     logical :: do_grad
@@ -98,6 +98,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     n_atoms = geom%siz()
     if (do_grad) then
         allocate (g_prime(3 * n_atoms))
+        if (geom%param%rpa_rescale_eigs) allocate (dxr(3 * n_atoms))
         grad_dip%dcoords = grad%dcoords
         grad_dip%dlattice = grad%dlattice
         grad_dip%dr_vdw = grad%dr_vdw
@@ -158,9 +159,13 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         end if
         if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
-            if (do_grad) eigs_raw = eigs
             do k = 1, 3 * n_atoms
-                eigs(k) = rpa_rescale_eigval(eigs(k))
+                if (do_grad) then
+                    ! rescale and keep dlambda/dmu for the gradient below
+                    eigs(k) = rpa_rescale_eigval(eigs(k), dxr(k), grad=.true.)
+                else
+                    eigs(k) = rpa_rescale_eigval(eigs(k))
+                end if
             end do
         end if
         n_negative_eigs = count(eigs(:) <= -1)
@@ -194,12 +199,9 @@ type(result_t) function get_mbd_rpa_energy_complex( &
             ! g(mu) = log(1 + mu)
             g_prime = 1d0 / (1d0 + eigs)
         else
-            ! g(mu) = log(1 + lambda(mu)) - lambda(mu); chain rule
-            ! g'(mu) = (1 / (1 + lambda) - 1) dlambda/dmu
-            do k = 1, 3 * n_atoms
-                lambda = rpa_rescale_eigval(eigs_raw(k), dlambda, grad=.true.)
-                g_prime(k) = (1d0 / (1d0 + lambda) - 1d0) * dlambda
-            end do
+            ! g(mu) = log(1 + lambda) - lambda with lambda = eigs (rescaled) and
+            ! dlambda/dmu = dxr; chain rule g'(mu) = (1/(1 + lambda) - 1) dlambda/dmu
+            g_prime = (1d0 / (1d0 + eigs) - 1d0) * dxr
         end if
         call B%copy_from(modes)
         call B%mult_cols_3n(g_prime)

@@ -20,6 +20,40 @@ private
 public :: get_mbd_rpa_energy
 
 interface get_mbd_rpa_energy
+    !! Get the MBD energy by the RPA method.
+    !!
+    !! The energy is obtained from the eigenvalues \(\mu_k(\mathrm iu)\) of the
+    !! symmetrized dipole matrix \(\mathbf M(\mathrm iu)=\mathbf A(\mathrm
+    !! iu)^\frac12\mathbf T\mathbf A(\mathrm iu)^\frac12\), with \(A_{ij}(\mathrm
+    !! iu)=\alpha_i(\mathrm iu)\delta_{ij}\),
+    !!
+    !! $$
+    !! E=\frac1{2\pi}\int_0^\infty\mathrm du\sum_k\log(1+\mu_k(\mathrm iu))
+    !! =\frac1{2\pi}\int_0^\infty\mathrm du\,\log\det(\mathbf 1+\mathbf M(\mathrm iu))
+    !! $$
+    !!
+    !! The derivatives use \(\partial\mu_k=\mathbf c_k^\dagger(\partial\mathbf
+    !! M)\mathbf c_k\), which upon summation over the eigenvalues gives the
+    !! weighted resolvent \(\mathbf B(\mathrm iu)=\mathbf C\operatorname{diag}(
+    !! g'(\mu_k))\mathbf C^\dagger\), where \(g(\mu)=\log(1+\mu)\) is the
+    !! per-eigenvalue energy contribution,
+    !!
+    !! $$
+    !! \partial E=\frac1{2\pi}\int_0^\infty\mathrm du
+    !! \operatorname{Tr}\big(\mathbf B(\mathrm iu)\partial\mathbf M(\mathrm iu)\big)
+    !! $$
+    !!
+    !! Both the explicit derivatives (coordinates, lattice vectors, van der
+    !! Waals radii, \(\mathbf q\)) and the implicit derivatives with respect to
+    !! the dynamic polarizabilities are returned. The latter propagate both
+    !! through the \(\sqrt{\alpha_i\alpha_j}\) prefactor and, when the damping
+    !! depends on it, through \(\sigma_{ij}(\alpha)\). With eigenvalue rescaling
+    !! ([[mbd_calc_params_t:rpa_rescale_eigs]]) the contribution becomes
+    !! \(g(\mu)=\log(1+\lambda(\mu))-\lambda(\mu)\), with
+    !! \(\lambda=-\operatorname{erf}(\tfrac{\sqrt\pi}2\mu^4)^\frac14\) for
+    !! \(\mu<0\), and the same weighted resolvent is used.
+    !!
+    !! The real-typed version is equivalent to \(\mathbf q=0\).
     module procedure get_mbd_rpa_energy_real
     module procedure get_mbd_rpa_energy_complex
 end interface
@@ -31,32 +65,6 @@ contains
 #ifndef DO_COMPLEX_TYPE
 type(result_t) function get_mbd_rpa_energy_real( &
         geom, alpha, damp, grad) result(res)
-    !! Get MBD energy by the RPA method.
-    !!
-    !! The energy is obtained from the eigenvalues \(\lambda_k(\mathrm iu)\) of
-    !! the symmetrized dipole matrix \(\mathbf M(\mathrm iu)=\mathbf
-    !! A(\mathrm iu)^\frac12\mathbf T\mathbf A(\mathrm iu)^\frac12\), with
-    !! \(A_{ij}(\mathrm iu)=\alpha_i(\mathrm iu)\delta_{ij}\),
-    !!
-    !! $$
-    !! E=\frac1{2\pi}\int_0^\infty\mathrm du\sum_k\log(1+\lambda_k(\mathrm iu))
-    !! =\frac1{2\pi}\int_0^\infty\mathrm du\,\log\det(\mathbf 1+\mathbf M(\mathrm iu))
-    !! $$
-    !!
-    !! The derivatives use \(\partial\lambda_k=\mathbf c_k^\dagger(\partial\mathbf
-    !! M)\mathbf c_k\), which upon summation gives the resolvent \(\mathbf
-    !! B(\mathrm iu)=(\mathbf 1+\mathbf M(\mathrm iu))^{-1}\),
-    !!
-    !! $$
-    !! \partial E=\frac1{2\pi}\int_0^\infty\mathrm du
-    !! \operatorname{Tr}\big(\mathbf B(\mathrm iu)\partial\mathbf M(\mathrm iu)\big)
-    !! $$
-    !!
-    !! Both the explicit derivatives (coordinates, lattice vectors, van der
-    !! Waals radii, \(\mathbf q\)) and the implicit derivatives with respect to
-    !! the dynamic polarizabilities are returned. The latter propagate both
-    !! through the \(\sqrt{\alpha_i\alpha_j}\) prefactor and, when the damping
-    !! depends on it, through \(\sigma_{ij}(\alpha)\).
 #else
 type(result_t) function get_mbd_rpa_energy_complex( &
         geom, alpha, damp, q, grad) result(res)

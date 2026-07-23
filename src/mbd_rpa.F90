@@ -87,7 +87,7 @@ type(result_t) function get_mbd_rpa_energy_complex( &
     real(dp), allocatable :: eigs(:), log_eigs(:), sqrt_alpha(:), &
         g_prime(:), contr(:), dxr(:)
     integer :: i_freq, my_i_atom, n_order, n_negative_eigs, my_j_atom, &
-        n_atoms, i_xyz, i_latt
+        n_atoms, i_xyz, i_latt, i
     real(dp) :: freq_w, sigma_ij
     type(damping_t) :: damp_alpha
     type(grad_request_t) :: grad_dip
@@ -194,7 +194,10 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         else
             ! g(mu) = log(1 + lambda) - lambda with lambda = eigs (rescaled) and
             ! dlambda/dmu = dxr; chain rule g'(mu) = (1/(1 + lambda) - 1) dlambda/dmu
-            g_prime = (1d0 / (1d0 + eigs) - 1d0) * dxr
+            ! (explicit loop: nvhpc miscompiles the fused whole-array form)
+            do i = 1, 3 * n_atoms
+                g_prime(i) = (1d0 / (1d0 + eigs(i)) - 1d0) * dxr(i)
+            end do
         end if
         call B%copy_from(modes)
         call B%mult_cols_3n(g_prime)

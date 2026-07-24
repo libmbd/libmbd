@@ -140,8 +140,6 @@ function rpa_rescale_eigval(x, dxr) result(xr)
         xr = -erf(sqrt(pi) / 2 * x**4)**(1d0 / 4)
     end where
     if (.not. present(dxr)) return
-    ! the masked x >= 0 elements evaluate x / xr = 1 (xr = x there), so the
-    ! elsewhere division is well-defined
     where (x >= 0)
         dxr = 1d0
     elsewhere

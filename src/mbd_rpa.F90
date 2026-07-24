@@ -159,13 +159,9 @@ type(result_t) function get_mbd_rpa_energy_complex( &
         end if
         if (geom%has_exc()) return
         if (geom%param%rpa_rescale_eigs) then
-            ! rescale in place; dxr (dlambda/dmu) is caller-allocated and filled
-            ! only when do_grad, then reused for the spectral weights below
-            if (do_grad) then
-                eigs(:) = rpa_rescale_eigval(eigs, dxr)
-            else
-                eigs(:) = rpa_rescale_eigval(eigs)
-            end if
+            ! rescale in place; dxr (dlambda/dmu) is allocated only when do_grad
+            ! (absent otherwise) and reused for the spectral weights below
+            eigs(:) = rpa_rescale_eigval(eigs, dxr)
         end if
         n_negative_eigs = count(eigs(:) <= -1)
         if (n_negative_eigs > 0) then

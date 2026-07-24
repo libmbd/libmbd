@@ -16,7 +16,6 @@ exclude:
     mbd_linalg.F90
     mbd_matrix.F90
     mbd_mpi.F90
-    mbd_rpa.F90
     mbd_scalapack.f90
     mbd_vdw_param.f90
 ---

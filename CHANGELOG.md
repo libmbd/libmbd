@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Analytic energy gradients for the RPA method, including the rescaled-eigenvalue variant ([#141](https://github.com/libmbd/libmbd/pull/141))
+
 ## [0.14.1] - 2026-07-17
 
 ### Added

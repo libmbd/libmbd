@@ -134,21 +134,19 @@ function rpa_rescale_eigval(x, dxr) result(xr)
     real(dp), intent(out), optional :: dxr(:)
     real(dp) :: xr(size(x))
 
-    real(dp) :: u
-    integer :: i
-
-    ! an explicit loop keeps the x < 0 branch (which divides by xr) from being
-    ! evaluated for x >= 0, where it would raise a floating-point exception
-    do i = 1, size(x)
-        if (x(i) >= 0) then
-            xr(i) = x(i)
-            if (present(dxr)) dxr(i) = 1d0
-        else
-            u = sqrt(pi) / 2 * x(i)**4
-            xr(i) = -erf(u)**(1d0 / 4)
-            if (present(dxr)) dxr(i) = (x(i) / xr(i))**3 * exp(-u**2)
-        end if
-    end do
+    where (x >= 0)
+        xr = x
+    elsewhere
+        xr = -erf(sqrt(pi) / 2 * x**4)**(1d0 / 4)
+    end where
+    if (.not. present(dxr)) return
+    ! the masked x >= 0 elements evaluate x / xr = 1 (xr = x there), so the
+    ! elsewhere division is well-defined
+    where (x >= 0)
+        dxr = 1d0
+    elsewhere
+        dxr = (x / xr)**3 * exp(-(sqrt(pi) / 2 * x**4)**2)
+    end where
 end function
 
 function scale_with_ratio(x, yp, y, q, dx, grad) result(xp)

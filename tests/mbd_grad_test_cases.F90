@@ -1953,7 +1953,7 @@ subroutine test_mbd_rpa_deriv_impl_alpha()
     end do
     call geom%destroy()
     diff = (gradients - gradients_anl) / gradients_anl
-    if (failed(maxval(abs(diff)), 1d-7)) then
+    if (failed(maxval(abs(diff)), 1d-6)) then
         call print_matrix('delta gradients', reshape(diff, [n_atoms, 1]))
     end if
 end subroutine

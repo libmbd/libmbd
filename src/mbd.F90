@@ -100,6 +100,13 @@ type, public :: mbd_input_t
         !! periodic.
     integer :: k_grid(3) = [-1, -1, -1]
         !! Number of \(k\)-points along reciprocal axes.
+    real(dp), allocatable :: custom_k_pts(:, :)
+        !! (\(3\times N_k\), a.u.) Custom \(k\)-points in reciprocal space as
+        !! columns.
+        !!
+        !! An alternative to specifying a regular Monkhorst–Pack-style grid via
+        !! [[mbd_input_t:k_grid]]. When allocated, these \(k\)-points are used
+        !! instead of a grid generated from `k_grid`.
     character(len=10) :: parallel_mode = 'auto'
         !! Parallelization scheme.
         !!
@@ -173,13 +180,15 @@ subroutine mbd_calc_init(this, input)
     this%geom%param%k_grid_shift = input%k_grid_shift
     this%geom%param%zero_negative_eigvals = input%zero_negative_eigvals
     if (.not. all(input%k_grid == -1)) this%geom%k_grid = input%k_grid
+    if (allocated(input%custom_k_pts)) this%geom%custom_k_pts = input%custom_k_pts
     this%geom%coords = input%coords
     if (allocated(input%lattice_vectors)) then
-        if (input%method /= 'ts' .and. .not. allocated(this%geom%k_grid)) then
+        if (input%method /= 'ts' .and. .not. allocated(this%geom%k_grid) &
+                .and. .not. allocated(this%geom%custom_k_pts)) then
             this%geom%exc = exception_t( &
                 MBD_EXC_INPUT, &
                 'calc%init()', &
-                'Lattice vectors present but no k-grid specified' &
+                'Lattice vectors present but no k-points specified' &
             )
             return
         end if

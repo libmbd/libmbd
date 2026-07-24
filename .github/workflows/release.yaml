@@ -95,7 +95,7 @@ jobs:
           else
             gh release create "$TAG" \
               --draft \
-              --title "$TAG" \
+              --title "libMBD $TAG" \
               --notes-file release-notes.md \
               dist/*.tar.gz
           fi

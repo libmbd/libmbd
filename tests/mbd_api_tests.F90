@@ -36,8 +36,8 @@ subroutine test(test_name)
     character(len=*), intent(in) :: test_name
 
     type(mbd_input_t) :: inp
-    type(mbd_calc_t) :: calc
-    real(dp) :: energy
+    type(mbd_calc_t) :: calc, calc_grid
+    real(dp) :: energy, energy_grid
     real(dp), allocatable :: gradients(:, :)
     integer :: code
     character(200) :: origin, msg
@@ -132,6 +132,25 @@ subroutine test(test_name)
         allocate (gradients(3, 2))
         call calc%get_gradients(gradients)
         call check(sum(abs(gradients)), 3.8405275467790542d-4, 1d-10)
+    case ('custom_k_pts')
+        ! A single custom Gamma point must reproduce a Gamma-only regular grid
+        ! (k_grid = [1, 1, 1] with no off-Gamma shift).
+        inp%lattice_vectors = reshape( &
+            [8d0 * ang, 0d0, 0d0, 0d0, 8d0 * ang, 0d0, 0d0, 0d0, 8d0 * ang], [3, 3])
+        inp%k_grid_shift = 0d0
+        inp%k_grid = [1, 1, 1]
+        call calc_grid%init(inp)
+        call calc_grid%update_vdw_params_custom( &
+            [11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc_grid%evaluate_vdw_method(energy_grid)
+        call calc_grid%destroy()
+        inp%k_grid = [-1, -1, -1]
+        inp%custom_k_pts = reshape([0d0, 0d0, 0d0], [3, 1])
+        call calc%init(inp)
+        call calc%update_vdw_params_custom( &
+            [11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc%evaluate_vdw_method(energy)
+        call check(energy, energy_grid, 1d-10)
     end select
     call calc%destroy()
 end subroutine

@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Custom k-points in the high-level Fortran API via `mbd_input_t%custom_k_pts` ([#6](https://github.com/libmbd/libmbd/issues/6))
+
 ## [0.15.0] - 2026-07-24
 
 ### Added

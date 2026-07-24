@@ -90,6 +90,11 @@ type(result_t) function get_mbd_energy(geom, alpha_0, C6, damp, grad) result(res
     else
         if (allocated(geom%custom_k_pts)) then
             k_pts = geom%custom_k_pts
+            ! Custom k-points are fixed absolute points in reciprocal space and
+            ! are treated as independent of the lattice, so their contribution
+            ! to the lattice derivative vanishes.
+            if (grad%dlattice) &
+                allocate (dkdlattice(3, size(k_pts, 2), 3, 3), source=0d0)
         else
             call make_k_pts( &
                 k_pts, geom%k_grid, geom%lattice, geom%param%k_grid_shift, &

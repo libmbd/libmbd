@@ -38,10 +38,12 @@ numpy = ">=1.20"
 cffi = ">=1"
 pytest = { version = "*", optional = true }
 mpi4py = { version = "^3 || ^4", optional = true }
+pyscf = { version = ">=2.1", optional = true, markers = "platform_system != 'Windows'" }
 
 [tool.poetry.extras]
 mpi = ["mpi4py"]
 test = ["pytest"]
+pyscf = ["pyscf"]
 
 [tool.poetry.dev-dependencies]
 ruff = ">=0.10"

@@ -114,7 +114,7 @@ quote-style = "preserve"
 branch = true
 source = ["pymbd"]
 parallel = true
-omit = ["*/pymbd/tensorflow.py", "*/pymbd/benchmark.py"]
+omit = ["*/pymbd/tensorflow.py", "*/pymbd/benchmark.py", "*/pymbd/pyscf.py"]
 
 # Map the installed (non-editable) package back onto the source tree so the
 # combined report and coverage.xml use src/pymbd/... paths regardless of how

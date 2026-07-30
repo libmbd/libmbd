@@ -184,7 +184,10 @@ def hirshfeld_volume_ratios(
         for ia in range(mol.natm):
             _, _, p0, p1 = aoslices[ia]
             ao_a = ao_free[:, p0:p1]
-            rho_free[ia] = np.einsum('gi,ij,gj->g', ao_a, free_dms[ia], ao_a)
+            # contract via a matrix product, as eval_rho does internally: going
+            # through BLAS is ~10x faster than a three-operand einsum here, and
+            # the block structure avoids the (much larger) dense nao x nao product
+            rho_free[ia] = np.einsum('gi,gi->g', ao_a.dot(free_dms[ia]), ao_a)
         np.clip(rho_free, 0, None, out=rho_free)
         rho_promol = rho_free.sum(axis=0)
         np.maximum(rho_promol, 1e-30, out=rho_promol)

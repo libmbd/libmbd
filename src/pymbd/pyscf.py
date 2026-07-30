@@ -46,6 +46,12 @@ __all__ = ['hirshfeld_volume_ratios', 'mbd_energy', 'AtomSphAverageRKS']
 # MBD@rsSCS range-separation parameter beta per exchange-correlation functional.
 _BETA_RSSCS = {'pbe': 0.83, 'pbe0': 0.85, 'hse': 0.85}
 
+# Grid is processed in blocks: the promolecule AO array would otherwise be
+# ngrid x nao of the (large) free-atom basis, which reaches several GB for a
+# few dozen atoms in aug-cc-pVQZ.
+_GRID_BLKSIZE = 8192
+_AO_BLOCK_BYTES = 128 << 20
+
 
 class AtomSphAverageRKS(dft.rks.KohnShamDFT, atom_hf.AtomSphAverageRHF):
     """Spherically averaged neutral free-atom solver with a Kohn--Sham potential.
@@ -66,15 +72,17 @@ class AtomSphAverageRKS(dft.rks.KohnShamDFT, atom_hf.AtomSphAverageRHF):
 
 
 @lru_cache(maxsize=None)
-def _free_atom(symb, basis, xc):
-    """Spherically averaged free-atom ``(Mole, density matrix)`` for one element.
+def _free_atom_dm(symb, basis, xc):
+    """Spherically averaged free-atom density matrix for one element.
 
     Cached per ``(element, basis, xc)``, so each atomic SCF runs once per process.
-    The Mole is placed at the origin; callers evaluate it elsewhere by shifting
-    the grid. The one-electron atom (hydrogen) is kept as the self-consistent DFT
-    density (diffuse, self-interaction and all), which is the MBD/TS convention.
-    ``spin`` is set to the electron-count parity only to satisfy the Mole build;
-    the spherical-average solver fixes the occupation by fractional filling.
+    Since it only depends on the element and the basis, the result is expressed in
+    exactly the AO ordering of that element's block of the promolecule (see
+    :func:`_promolecule_mole`), where it is used. The one-electron atom (hydrogen)
+    is kept as the self-consistent DFT density (diffuse, self-interaction and
+    all), which is the MBD/TS convention. ``spin`` is set to the electron-count
+    parity only to satisfy the Mole build; the spherical-average solver fixes the
+    occupation by fractional filling.
     """
     mol = gto.M(
         atom=[[symb, (0.0, 0.0, 0.0)]],
@@ -84,19 +92,24 @@ def _free_atom(symb, basis, xc):
     )
     mf = AtomSphAverageRKS(mol, xc=xc)
     mf.kernel()
-    return mol, mf.make_rdm1()
+    return mf.make_rdm1()
 
 
-def _promolecule_densities(mol, coords, xc, free_atom_basis):
-    """Per-atom free-atom densities on ``coords`` and their sum (the promolecule)."""
-    rho_free = np.zeros((mol.natm, len(coords)))
-    for ia in range(mol.natm):
-        atm, dm = _free_atom(mol.atom_symbol(ia), free_atom_basis, xc)
-        # atm is centered at the origin; shift the grid rather than rebuild a Mole
-        ao = dft.numint.eval_ao(atm, coords - mol.atom_coord(ia))
-        rho_free[ia] = dft.numint.eval_rho(atm, ao, dm)
-    rho_free = np.clip(rho_free, 0, None)
-    return rho_free, rho_free.sum(axis=0)
+def _promolecule_mole(mol, free_atom_basis):
+    """Mole with the free-atom basis on every atom of ``mol`` (the promolecule).
+
+    Only ever used to evaluate basis functions on a grid, never for an SCF, so
+    ``spin`` just has to match the parity of the neutral-atom electron count.
+    """
+    return gto.M(
+        atom=[
+            [mol.atom_symbol(ia), tuple(mol.atom_coord(ia))] for ia in range(mol.natm)
+        ],
+        basis=free_atom_basis,
+        unit='Bohr',
+        spin=sum(gto.charge(mol.atom_symbol(ia)) for ia in range(mol.natm)) % 2,
+        verbose=0,
+    )
 
 
 def hirshfeld_volume_ratios(
@@ -129,32 +142,59 @@ def hirshfeld_volume_ratios(
             'MBD Hirshfeld partitioning requires a KS-DFT mean-field; got one '
             'with no exchange-correlation functional (Hartree-Fock)'
         )
+    ghosts = [ia for ia in range(mol.natm) if mol.atom_charge(ia) == 0]
+    if ghosts:
+        raise ValueError(
+            'Hirshfeld partitioning is undefined for ghost atoms (no nucleus, '
+            f'hence no free-atom reference); found at atom indices {ghosts}. '
+            'Evaluate the dispersion on the ghost-free fragments: unlike the '
+            'DFT interaction energy, the MBD term needs no counterpoise.'
+        )
     grids = getattr(mf, 'grids', None)
     if grids is None or grids.coords is None:
         grids = dft.gen_grid.Grids(mol)
         grids.level = grid_level
         grids.build()
-    coords, weights = grids.coords, grids.weights
-
     dm = mf.make_rdm1()
     if np.ndim(dm) == 3:  # unrestricted -> total density
         dm = dm[0] + dm[1]
-    rho = dft.numint.eval_rho(mol, dft.numint.eval_ao(mol, coords), dm)
 
-    rho_free, rho_promol = _promolecule_densities(
-        mol, coords, free_atom_xc, free_atom_basis
-    )
-    rho_promol = np.where(rho_promol > 1e-30, rho_promol, 1e-30)
-
+    # All free-atom densities come from one basis (the promolecule Mole) evaluated
+    # in a single pass over the grid: the free-atom density matrices are
+    # block-diagonal in it, so atom A's density is the contraction of A's own AO
+    # block with its cached density matrix. Grid blocking keeps the AO array
+    # bounded and lets the integrals be accumulated on the fly, so neither the
+    # (natm, ngrid) promolecule matrix nor a full AO array is ever materialized.
+    promol = _promolecule_mole(mol, free_atom_basis)
+    aoslices = promol.aoslice_by_atom()
+    free_dms = [
+        _free_atom_dm(mol.atom_symbol(ia), free_atom_basis, free_atom_xc)
+        for ia in range(mol.natm)
+    ]
     atom_coords = mol.atom_coords()
-    ratios = np.empty(mol.natm)
-    for ia in range(mol.natm):
-        r3 = np.linalg.norm(coords - atom_coords[ia], axis=1) ** 3
-        w = rho_free[ia] / rho_promol
-        v_eff = np.einsum('g,g,g,g->', weights, w, r3, rho)
-        v_free = np.einsum('g,g,g->', weights, r3, rho_free[ia])
-        ratios[ia] = v_eff / v_free
-    return ratios
+    blksize = max(128, min(_GRID_BLKSIZE, _AO_BLOCK_BYTES // (8 * promol.nao)))
+
+    v_eff = np.zeros(mol.natm)
+    v_free = np.zeros(mol.natm)
+    for i0 in range(0, len(grids.coords), blksize):
+        coords = grids.coords[i0 : i0 + blksize]
+        weights = grids.weights[i0 : i0 + blksize]
+        ao_free = dft.numint.eval_ao(promol, coords)
+        rho_free = np.empty((mol.natm, len(coords)))
+        for ia in range(mol.natm):
+            _, _, p0, p1 = aoslices[ia]
+            ao_a = ao_free[:, p0:p1]
+            rho_free[ia] = np.einsum('gi,ij,gj->g', ao_a, free_dms[ia], ao_a)
+        np.clip(rho_free, 0, None, out=rho_free)
+        rho_promol = rho_free.sum(axis=0)
+        np.maximum(rho_promol, 1e-30, out=rho_promol)
+        rho = dft.numint.eval_rho(mol, dft.numint.eval_ao(mol, coords), dm)
+        for ia in range(mol.natm):
+            r3 = np.linalg.norm(coords - atom_coords[ia], axis=1) ** 3
+            w = rho_free[ia] / rho_promol  # Hirshfeld weight
+            v_eff[ia] += np.einsum('g,g,g,g->', weights, w, r3, rho)
+            v_free[ia] += np.einsum('g,g,g->', weights, r3, rho_free[ia])
+    return v_eff / v_free
 
 
 def mbd_energy(

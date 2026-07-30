@@ -52,6 +52,22 @@ def test_hartree_fock_is_rejected():
 
 
 @pytest.mark.no_scalapack
+def test_ghost_atoms_are_rejected():
+    # counterpoise fragments carry ghost centers, which have no free-atom
+    # reference; silently they would give a zero free volume (NaN ratio)
+    mol = gto.M(
+        atom=[['O', (0, 0, 0)], ['H', (0, 0, 1.8)], ['ghost:O', (0, 0, 5.0)]],
+        basis='def2-svp',
+        unit='Bohr',
+        spin=1,
+        verbose=0,
+    )
+    mf = dft.UKS(mol, xc='PBE').run()
+    with pytest.raises(ValueError, match='ghost'):
+        hirshfeld_volume_ratios(mf, free_atom_basis='def2-svp')
+
+
+@pytest.mark.no_scalapack
 def test_mbd_energy_requires_known_beta():
     mf = dft.RKS(gto.M(atom='Ne 0 0 0', basis='def2-svp', verbose=0), xc='M06-L')
     mf.run()

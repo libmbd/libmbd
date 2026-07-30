@@ -13,9 +13,10 @@ point, with the FHI-aims MBD energies of
 
 whose processed results are published on figshare. Because FHI-aims shares no
 code, basis, or Hirshfeld implementation with PySCF/pyMBD, agreement on the MBD
-term is an independent cross-code validation of the bridge. The DFT (PBE) term
-is also reported: its residual against the all-electron reference is a
-basis-set effect, not a bridge effect.
+term is an independent cross-code validation of the bridge; it currently agrees
+to ~0.003 kcal/mol MAE. The DFT (PBE) term is also reported: its residual
+against the all-electron reference is a basis-set (and, without counterpoise,
+BSSE) effect, not a bridge effect.
 
 Data (downloaded/located, not shipped):
   * figshare all-data.h5  https://ndownloader.figshare.com/files/9775933

@@ -32,7 +32,15 @@ choices: MBD interaction energies agree to ~0.003 kcal/mol (against ~0.016 with 
 fixed aug-cc-pVQZ reference). MBD is only meaningful on top of a
 (semi)local/hybrid KS functional, so a Hartree--Fock mean-field is rejected.
 
-Requires PySCF (``pip install pymbd[pyscf]``).
+Requires PySCF (``pip install pymbd[pyscf]``)::
+
+    from pyscf import dft, gto
+
+    from pymbd.pyscf import mbd_energy
+
+    mol = gto.M(atom='He 0 0 0; He 0 0 3', basis='def2-tzvp')
+    mf = dft.RKS(mol, xc='PBE').run()
+    ene = mbd_energy(mf)  # beta is taken from the functional
 """
 
 from functools import lru_cache
@@ -49,9 +57,8 @@ __all__ = ['hirshfeld_volume_ratios', 'mbd_energy', 'AtomSphAverageRKS']
 # MBD@rsSCS range-separation parameter beta per exchange-correlation functional.
 _BETA_RSSCS = {'pbe': 0.83, 'pbe0': 0.85, 'hse': 0.85}
 
-# Grid is processed in blocks: the promolecule AO array would otherwise be
-# ngrid x nao of the (large) free-atom basis, which reaches several GB for a
-# few dozen atoms in aug-cc-pVQZ.
+# Grid is processed in blocks: a whole-grid AO array is ngrid x nao, which runs
+# into several GB for a few dozen atoms in a triple-zeta or larger basis.
 _GRID_BLKSIZE = 8192
 _AO_BLOCK_BYTES = 128 << 20
 
@@ -91,13 +98,13 @@ def _free_atom_dm(symb, basis, xc):
     """Spherically averaged free-atom density matrix for one element.
 
     Cached per ``(element, basis, xc)``, so each atomic SCF runs once per process.
-    Since it only depends on the element and the basis, the result is expressed in
-    exactly the AO ordering of that element's block of the promolecule (see
-    :func:`_promolecule_mole`), where it is used. The one-electron atom (hydrogen)
-    is kept as the self-consistent DFT density (diffuse, self-interaction and
-    all), which is the MBD/TS convention. ``spin`` is set to the electron-count
-    parity only to satisfy the Mole build; the spherical-average solver fixes the
-    occupation by fractional filling.
+    Because it depends only on the element and the basis, the result comes out in
+    exactly the AO ordering of that element's block of the molecule it is used
+    with, which is what lets it be contracted against a slice of the molecular AOs.
+    The one-electron atom (hydrogen) is kept as the self-consistent DFT density
+    (diffuse, self-interaction and all), which is the MBD/TS convention. ``spin``
+    is set to the electron-count parity only to satisfy the Mole build; the
+    spherical-average solver fixes the occupation by fractional filling.
     """
     mol = gto.M(
         atom=[[symb, (0.0, 0.0, 0.0)]],

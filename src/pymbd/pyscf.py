@@ -117,42 +117,16 @@ def _free_atom_dm(symb, basis, xc):
     return mf.make_rdm1()
 
 
-def _promolecule_mole(mol, basis_of_symbol):
-    """Mole with the free-atom basis on every atom of ``mol`` (the promolecule).
-
-    Only ever used to evaluate basis functions on a grid, never for an SCF, so
-    ``spin`` just has to match the parity of the neutral-atom electron count.
-    """
-    return gto.M(
-        atom=[
-            [mol.atom_symbol(ia), tuple(mol.atom_coord(ia))] for ia in range(mol.natm)
-        ],
-        basis=dict(basis_of_symbol),
-        unit='Bohr',
-        spin=sum(gto.charge(mol.atom_symbol(ia)) for ia in range(mol.natm)) % 2,
-        verbose=0,
-    )
-
-
-def hirshfeld_volume_ratios(
-    mf, free_atom_xc='auto', free_atom_basis=None, grid_level=3
-):
+def hirshfeld_volume_ratios(mf):
     """Per-atom Hirshfeld volume ratios from a converged PySCF Kohn--Sham object.
 
     :param mf: converged PySCF KS object (restricted or unrestricted)
-    :param free_atom_xc: functional for the free-atom reference; ``'auto'`` (the
-        default) uses the molecular functional, or pass an explicit functional
-    :param free_atom_basis: basis for the free-atom reference; ``None`` (the
-        default) uses the molecular basis, which is what makes the ratios a pure
-        measure of the chemical environment -- see below
-    :param int grid_level: fallback PySCF grid level, only used if ``mf`` has no
-        integration grid of its own
 
     Returns an array of per-atom ratios of shape ``(natm,)``.
 
     Requires an all-electron KS-DFT mean-field; Hartree--Fock (no
     exchange-correlation functional), ghost atoms and ECPs are rejected. The
-    molecular integration grid is taken from ``mf``.
+    functional, basis and integration grid are all taken from ``mf``.
 
     The free-atom reference is deliberately computed in the *molecular* basis. Any
     other choice mixes basis-set incompleteness into the ratio: a well-separated
@@ -162,9 +136,8 @@ def hirshfeld_volume_ratios(
     density. The two agree only at the basis-set limit.
     """
     mol = mf.mol
-    if free_atom_xc == 'auto':
-        free_atom_xc = getattr(mf, 'xc', None)
-    if not free_atom_xc:
+    xc = getattr(mf, 'xc', None)
+    if not xc:
         raise ValueError(
             'MBD Hirshfeld partitioning requires a KS-DFT mean-field; got one '
             'with no exchange-correlation functional (Hartree-Fock)'
@@ -183,48 +156,38 @@ def hirshfeld_volume_ratios(
             'uses an ECP, so its core density is missing and cannot be matched '
             'by a neutral free-atom reference'
         )
-    grids = getattr(mf, 'grids', None)
-    if grids is None or grids.coords is None:
-        grids = dft.gen_grid.Grids(mol)
-        grids.level = grid_level
+    grids = mf.grids  # a KS object always carries one
+    if grids.coords is None:
         grids.build()
     dm = mf.make_rdm1()
     if np.ndim(dm) == 3:  # unrestricted -> total density
         dm = dm[0] + dm[1]
 
-    # All free-atom densities come from one basis (the promolecule Mole) evaluated
-    # in a single pass over the grid: the free-atom density matrices are
-    # block-diagonal in it, so atom A's density is the contraction of A's own AO
-    # block with its cached density matrix. Grid blocking keeps the AO array
-    # bounded and lets the integrals be accumulated on the fly, so neither the
-    # (natm, ngrid) promolecule matrix nor a full AO array is ever materialized.
+    # Since the free-atom reference uses the molecular basis, the promolecule is
+    # just mol and one AO evaluation serves both the free-atom densities and the
+    # molecular one: the free-atom density matrices are block-diagonal in that
+    # basis, so atom A's density is the contraction of A's own AO block with its
+    # cached density matrix. Grid blocking keeps the AO array bounded and lets the
+    # integrals be accumulated on the fly, so neither a whole-grid AO array nor an
+    # (natm, ngrid) promolecule matrix is ever materialized.
     symbols = [mol.atom_symbol(ia) for ia in range(mol.natm)]
-    basis_of_symbol = {
-        symb: _hashable_basis(
-            mol._basis[symb] if free_atom_basis is None else free_atom_basis
-        )
-        for symb in set(symbols)
-    }
-    # With the molecular basis the promolecule Mole *is* mol, so a single AO
-    # evaluation serves both the free-atom blocks and the molecular density.
-    promol = mol if free_atom_basis is None else _promolecule_mole(mol, basis_of_symbol)
-    aoslices = promol.aoslice_by_atom()
     free_dms = [
-        _free_atom_dm(symb, basis_of_symbol[symb], free_atom_xc) for symb in symbols
+        _free_atom_dm(symb, _hashable_basis(mol._basis[symb]), xc) for symb in symbols
     ]
+    aoslices = mol.aoslice_by_atom()
     atom_coords = mol.atom_coords()
-    blksize = max(128, min(_GRID_BLKSIZE, _AO_BLOCK_BYTES // (8 * promol.nao)))
+    blksize = max(128, min(_GRID_BLKSIZE, _AO_BLOCK_BYTES // (8 * mol.nao)))
 
     v_eff = np.zeros(mol.natm)
     v_free = np.zeros(mol.natm)
     for i0 in range(0, len(grids.coords), blksize):
         coords = grids.coords[i0 : i0 + blksize]
         weights = grids.weights[i0 : i0 + blksize]
-        ao_free = dft.numint.eval_ao(promol, coords)
+        ao = dft.numint.eval_ao(mol, coords)
         rho_free = np.empty((mol.natm, len(coords)))
         for ia in range(mol.natm):
             _, _, p0, p1 = aoslices[ia]
-            ao_a = ao_free[:, p0:p1]
+            ao_a = ao[:, p0:p1]
             # contract via a matrix product, as eval_rho does internally: going
             # through BLAS is ~10x faster than a three-operand einsum here, and
             # the block structure avoids the (much larger) dense nao x nao product
@@ -232,8 +195,7 @@ def hirshfeld_volume_ratios(
         np.clip(rho_free, 0, None, out=rho_free)
         rho_promol = rho_free.sum(axis=0)
         np.maximum(rho_promol, 1e-30, out=rho_promol)
-        ao_mol = ao_free if promol is mol else dft.numint.eval_ao(mol, coords)
-        rho = dft.numint.eval_rho(mol, ao_mol, dm)
+        rho = dft.numint.eval_rho(mol, ao, dm)
         for ia in range(mol.natm):
             r3 = np.linalg.norm(coords - atom_coords[ia], axis=1) ** 3
             w = rho_free[ia] / rho_promol  # Hirshfeld weight
@@ -242,9 +204,7 @@ def hirshfeld_volume_ratios(
     return v_eff / v_free
 
 
-def mbd_energy(
-    mf, beta=None, variant='rsscs', a=6.0, damping='fermi,dip', **ratio_kwargs
-):
+def mbd_energy(mf, beta=None, variant='rsscs', a=6.0, damping='fermi,dip'):
     """MBD dispersion energy (a.u.) for a converged PySCF Kohn--Sham object.
 
     :param mf: converged PySCF KS object
@@ -254,7 +214,6 @@ def mbd_energy(
         mbd_energy` (``'rsscs'`` or ``'plain'``)
     :param float a: MBD damping steepness
     :param str damping: MBD damping function
-    :param ratio_kwargs: forwarded to :func:`hirshfeld_volume_ratios`
 
     Free-atom vdW parameters are taken from libMBD's built-in table and rescaled
     by the Hirshfeld volume ratios.
@@ -265,7 +224,7 @@ def mbd_energy(
         beta = _BETA_RSSCS.get(xc)
         if beta is None:
             raise ValueError(f'No default MBD beta for xc={xc!r}; pass beta explicitly')
-    ratios = hirshfeld_volume_ratios(mf, **ratio_kwargs)
+    ratios = hirshfeld_volume_ratios(mf)
     species = [mol.atom_symbol(i) for i in range(mol.natm)]
     alpha_0 = np.array([vdw_params[s]['alpha_0(TS)'] for s in species]) * ratios
     C6 = np.array([vdw_params[s]['C6(TS)'] for s in species]) * ratios**2

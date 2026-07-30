@@ -81,16 +81,9 @@ class AtomSphAverageRKS(dft.rks.KohnShamDFT, atom_hf.AtomSphAverageRHF):
     energy_elec = dft.rks.energy_elec
 
 
-def _hashable_basis(basis):
-    """Make a basis spec hashable (nested lists -> tuples) for use as a cache key.
-
-    A parsed per-element basis (``mol._basis[symb]``) is a nested list; PySCF
-    accepts the tuple form just as well, so the result doubles as the spec passed
-    back to :func:`pyscf.gto.M`.
-    """
-    if isinstance(basis, (list, tuple)):
-        return tuple(_hashable_basis(b) for b in basis)
-    return basis  # str basis name, or a number inside a parsed basis
+def _real_atoms(mol):
+    """Return the indices of atoms carrying a nucleus, i.e. all but ghost centers."""
+    return [ia for ia in range(mol.natm) if mol.atom_charge(ia) > 0]
 
 
 @lru_cache(maxsize=None)
@@ -108,7 +101,10 @@ def _free_atom_dm(symb, basis, xc):
     """
     mol = gto.M(
         atom=[[symb, (0.0, 0.0, 0.0)]],
-        basis={symb: basis},
+        basis=basis,
+        # the parity PySCF's own atomic solver uses (scf.atom_hf); it only has to
+        # satisfy the Mole electron-count check, since the spherical-average
+        # solver sets the occupation by fractional filling
         spin=gto.charge(symb) % 2,
         verbose=0,
     )
@@ -122,10 +118,15 @@ def hirshfeld_volume_ratios(mf):
 
     :param mf: converged PySCF KS object (restricted or unrestricted)
 
-    Returns an array of per-atom ratios of shape ``(natm,)``.
+    Returns one ratio per atom carrying a nucleus, in order. Ghost centers have no
+    free-atom reference and are skipped, so adding counterpoise ghosts leaves the
+    ratios (and hence the MBD energy) almost unchanged -- they then differ only
+    through the improvement the extra basis functions make to the molecular
+    density, not through the partitioning itself.
 
     Requires an all-electron KS-DFT mean-field; Hartree--Fock (no
-    exchange-correlation functional), ghost atoms and ECPs are rejected. The
+    exchange-correlation functional) and ECPs are rejected, as is a per-element
+    basis, since the free-atom reference is built in the molecular basis. The
     functional, basis and integration grid are all taken from ``mf``.
 
     The free-atom reference is deliberately computed in the *molecular* basis. Any
@@ -142,13 +143,11 @@ def hirshfeld_volume_ratios(mf):
             'MBD Hirshfeld partitioning requires a KS-DFT mean-field; got one '
             'with no exchange-correlation functional (Hartree-Fock)'
         )
-    ghosts = [ia for ia in range(mol.natm) if mol.atom_charge(ia) == 0]
-    if ghosts:
+    if not isinstance(mol.basis, str):
         raise ValueError(
-            'Hirshfeld partitioning is undefined for ghost atoms (no nucleus, '
-            f'hence no free-atom reference); found at atom indices {ghosts}. '
-            'Evaluate the dispersion on the ghost-free fragments: unlike the '
-            'DFT interaction energy, the MBD term needs no counterpoise.'
+            'the free-atom reference is built in the molecular basis, so that '
+            'basis has to be a single basis-set name; per-element basis sets are '
+            f'not supported (got {type(mol.basis).__name__})'
         )
     if mol.has_ecp():
         raise ValueError(
@@ -170,37 +169,35 @@ def hirshfeld_volume_ratios(mf):
     # cached density matrix. Grid blocking keeps the AO array bounded and lets the
     # integrals be accumulated on the fly, so neither a whole-grid AO array nor an
     # (natm, ngrid) promolecule matrix is ever materialized.
-    symbols = [mol.atom_symbol(ia) for ia in range(mol.natm)]
-    free_dms = [
-        _free_atom_dm(symb, _hashable_basis(mol._basis[symb]), xc) for symb in symbols
-    ]
+    real = _real_atoms(mol)
+    free_dms = [_free_atom_dm(mol.atom_symbol(ia), mol.basis, xc) for ia in real]
     aoslices = mol.aoslice_by_atom()
-    atom_coords = mol.atom_coords()
+    atom_coords = mol.atom_coords()[real]
     blksize = max(128, min(_GRID_BLKSIZE, _AO_BLOCK_BYTES // (8 * mol.nao)))
 
-    v_eff = np.zeros(mol.natm)
-    v_free = np.zeros(mol.natm)
+    v_eff = np.zeros(len(real))
+    v_free = np.zeros(len(real))
     for i0 in range(0, len(grids.coords), blksize):
         coords = grids.coords[i0 : i0 + blksize]
         weights = grids.weights[i0 : i0 + blksize]
         ao = dft.numint.eval_ao(mol, coords)
-        rho_free = np.empty((mol.natm, len(coords)))
-        for ia in range(mol.natm):
+        rho_free = np.empty((len(real), len(coords)))
+        for i, ia in enumerate(real):
             _, _, p0, p1 = aoslices[ia]
             ao_a = ao[:, p0:p1]
             # contract via a matrix product, as eval_rho does internally: going
             # through BLAS is ~10x faster than a three-operand einsum here, and
             # the block structure avoids the (much larger) dense nao x nao product
-            rho_free[ia] = np.einsum('gi,gi->g', ao_a.dot(free_dms[ia]), ao_a)
+            rho_free[i] = np.einsum('gi,gi->g', ao_a.dot(free_dms[i]), ao_a)
         np.clip(rho_free, 0, None, out=rho_free)
         rho_promol = rho_free.sum(axis=0)
         np.maximum(rho_promol, 1e-30, out=rho_promol)
         rho = dft.numint.eval_rho(mol, ao, dm)
-        for ia in range(mol.natm):
-            r3 = np.linalg.norm(coords - atom_coords[ia], axis=1) ** 3
-            w = rho_free[ia] / rho_promol  # Hirshfeld weight
-            v_eff[ia] += np.einsum('g,g,g,g->', weights, w, r3, rho)
-            v_free[ia] += np.einsum('g,g,g->', weights, r3, rho_free[ia])
+        for i in range(len(real)):
+            r3 = np.linalg.norm(coords - atom_coords[i], axis=1) ** 3
+            w = rho_free[i] / rho_promol  # Hirshfeld weight
+            v_eff[i] += np.einsum('g,g,g,g->', weights, w, r3, rho)
+            v_free[i] += np.einsum('g,g,g->', weights, r3, rho_free[i])
     return v_eff / v_free
 
 
@@ -225,10 +222,11 @@ def mbd_energy(mf, beta=None, variant='rsscs', a=6.0, damping='fermi,dip'):
         if beta is None:
             raise ValueError(f'No default MBD beta for xc={xc!r}; pass beta explicitly')
     ratios = hirshfeld_volume_ratios(mf)
-    species = [mol.atom_symbol(i) for i in range(mol.natm)]
+    real = _real_atoms(mol)
+    species = [mol.atom_symbol(ia) for ia in real]
     alpha_0 = np.array([vdw_params[s]['alpha_0(TS)'] for s in species]) * ratios
     C6 = np.array([vdw_params[s]['C6(TS)'] for s in species]) * ratios**2
     R_vdw = np.array([vdw_params[s]['R_vdw(TS)'] for s in species]) * ratios ** (1 / 3)
-    return MBDGeom(mol.atom_coords()).mbd_energy(
+    return MBDGeom(mol.atom_coords()[real]).mbd_energy(
         alpha_0, C6, R_vdw, beta=beta, a=a, variant=variant, damping=damping
     )

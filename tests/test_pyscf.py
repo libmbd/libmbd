@@ -63,18 +63,31 @@ def test_hartree_fock_is_rejected():
 
 
 @pytest.mark.no_scalapack
-def test_ghost_atoms_are_rejected():
-    # counterpoise fragments carry ghost centers, which have no free-atom
-    # reference; silently they would give a zero free volume (NaN ratio)
+def test_ghost_atoms_leave_the_energy_invariant():
+    # Ghost centers have no free-atom reference, so they take no part in the
+    # partitioning. Adding a counterpoise ghost fragment may then only change the
+    # result through the molecular density, which is a tiny effect.
+    water = 'O 0 0 0.1173; H 0 0.7572 -0.4692; H 0 -0.7572 -0.4692'
+    ghosts = 'ghost:O 0 0 6.0; ghost:H 0 0.757 5.53; ghost:H 0 -0.757 5.53'
+    bare = dft.RKS(gto.M(atom=water, basis='def2-svp', verbose=0), xc='PBE').run()
+    ghosted = dft.RKS(
+        gto.M(atom=f'{water}; {ghosts}', basis='def2-svp', verbose=0), xc='PBE'
+    ).run()
+    ratios = hirshfeld_volume_ratios(ghosted)
+    assert len(ratios) == 3  # the ghosts are skipped, not partitioned
+    assert ratios == approx(hirshfeld_volume_ratios(bare), abs=1e-3)
+    assert mbd_energy(ghosted) == approx(mbd_energy(bare), abs=1e-7)
+
+
+@pytest.mark.no_scalapack
+def test_per_element_basis_is_rejected():
     mol = gto.M(
-        atom=[['O', (0, 0, 0)], ['H', (0, 0, 1.8)], ['ghost:O', (0, 0, 5.0)]],
-        basis='def2-svp',
-        unit='Bohr',
-        spin=1,
+        atom='O 0 0 0.1173; H 0 0.7572 -0.4692; H 0 -0.7572 -0.4692',
+        basis={'O': 'def2-tzvp', 'H': 'def2-svp'},
         verbose=0,
     )
-    mf = dft.UKS(mol, xc='PBE').run()
-    with pytest.raises(ValueError, match='ghost'):
+    mf = dft.RKS(mol, xc='PBE').run()
+    with pytest.raises(ValueError, match='basis-set name'):
         hirshfeld_volume_ratios(mf)
 
 

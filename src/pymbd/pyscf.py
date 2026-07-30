@@ -28,9 +28,9 @@ is also present in the molecular density, so well-separated atoms come out at
 exactly 1 in any basis. For a one-electron atom (hydrogen) the reference is the
 diffuse, self-consistent DFT density, matching the FHI-aims/libMBD convention.
 Benchmarking against independent all-electron FHI-aims MBD energies confirms these
-choices (MBD interaction energies agree to ~0.02 kcal/mol). MBD is only meaningful
-on top of a (semi)local/hybrid KS functional, so a Hartree--Fock mean-field is
-rejected.
+choices: MBD interaction energies agree to ~0.003 kcal/mol (against ~0.016 with a
+fixed aug-cc-pVQZ reference). MBD is only meaningful on top of a
+(semi)local/hybrid KS functional, so a Hartree--Fock mean-field is rejected.
 
 Requires PySCF (``pip install pymbd[pyscf]``).
 """

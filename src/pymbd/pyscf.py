@@ -3,7 +3,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 r"""Bridge between PySCF and pyMBD via Hirshfeld volume rescaling.
 
-This optional module turns a converged PySCF mean-field object into an MBD (or
+This optional module turns a converged PySCF Kohn--Sham object into an MBD (or
 TS) dispersion energy. It computes per-atom Hirshfeld volume ratios
 
 .. math::
@@ -24,9 +24,10 @@ The free-atom reference is a *spherically averaged Kohn--Sham* atom computed wit
 the same functional as the molecule (:class:`AtomSphAverageRKS`) in a large,
 fixed basis (aug-cc-pVQZ by default). This matches the FHI-aims/libMBD
 convention: for a one-electron atom (hydrogen) the reference is the diffuse,
-self-consistent DFT density, *not* the exact density -- benchmarking against
-independent all-electron FHI-aims MBD energies confirms this choice reproduces
-them best (MBD interaction energies agree to ~0.02 kcal/mol).
+self-consistent DFT density. Benchmarking against independent all-electron
+FHI-aims MBD energies confirms this choice reproduces them best (MBD interaction
+energies agree to ~0.02 kcal/mol). MBD is only meaningful on top of a
+(semi)local/hybrid KS functional, so a Hartree--Fock mean-field is rejected.
 
 Requires PySCF (``pip install pymbd[pyscf]``).
 """
@@ -59,76 +60,61 @@ class AtomSphAverageRKS(dft.rks.KohnShamDFT, atom_hf.AtomSphAverageRHF):
     def __init__(self, mol, xc='LDA,VWN'):
         atom_hf.AtomSphAverageRHF.__init__(self, mol)
         dft.rks.KohnShamDFT.__init__(self, xc)
-        self.init_guess = 'vsap'
 
     get_veff = dft.rks.get_veff
     energy_elec = dft.rks.energy_elec
 
 
 @lru_cache(maxsize=None)
-def _free_atom_dm(symb, basis, xc, h_exact=False):
-    """Spherically averaged free-atom density matrix for one element (cached).
+def _free_atom(symb, basis, xc):
+    """Spherically averaged free-atom ``(Mole, density matrix)`` for one element.
 
-    ``xc=None`` gives a Hartree--Fock reference; otherwise a Kohn--Sham reference
-    with functional ``xc``. A one-electron atom is routed to the exact one-body
-    solver only in the HF path or when ``h_exact`` is set; in the KS path it is
-    kept as the (diffuse, self-interaction-carrying) self-consistent DFT density,
-    which is the MBD/TS convention.
+    Cached per ``(element, basis, xc)``, so each atomic SCF runs once per process.
+    The Mole is placed at the origin; callers evaluate it elsewhere by shifting
+    the grid. The one-electron atom (hydrogen) is kept as the self-consistent DFT
+    density (diffuse, self-interaction and all), which is the MBD/TS convention.
+    ``spin`` is set to the electron-count parity only to satisfy the Mole build;
+    the spherical-average solver fixes the occupation by fractional filling.
     """
-    atm = gto.M(
+    mol = gto.M(
         atom=[[symb, (0.0, 0.0, 0.0)]],
         basis={symb: basis},
         spin=gto.charge(symb) % 2,
         verbose=0,
     )
-    if atm.nelectron == 1 and (xc is None or h_exact):
-        mf = atom_hf.AtomHF1e(atm)
-    elif xc is None:
-        mf = atom_hf.AtomSphAverageRHF(atm)
-    else:
-        mf = AtomSphAverageRKS(atm, xc=xc)
+    mf = AtomSphAverageRKS(mol, xc=xc)
     mf.kernel()
-    return mf.make_rdm1()
+    return mol, mf.make_rdm1()
 
 
-def _free_atom_density_on_grid(mol, coords, xc, free_atom_basis, h_exact):
-    """Return per-atom free-atom densities on ``coords`` and their sum."""
+def _promolecule_densities(mol, coords, xc, free_atom_basis):
+    """Per-atom free-atom densities on ``coords`` and their sum (the promolecule)."""
     rho_free = np.zeros((mol.natm, len(coords)))
     for ia in range(mol.natm):
-        symb = mol.atom_symbol(ia)
-        dm = _free_atom_dm(symb, free_atom_basis, xc, h_exact)
-        atm = gto.M(
-            atom=[[symb, mol.atom_coord(ia, unit='Bohr')]],
-            basis={symb: free_atom_basis},
-            unit='Bohr',
-            spin=gto.charge(symb) % 2,
-            verbose=0,
-        )
-        ao = dft.numint.eval_ao(atm, coords)
+        atm, dm = _free_atom(mol.atom_symbol(ia), free_atom_basis, xc)
+        # atm is centered at the origin; shift the grid rather than rebuild a Mole
+        ao = dft.numint.eval_ao(atm, coords - mol.atom_coord(ia))
         rho_free[ia] = dft.numint.eval_rho(atm, ao, dm)
     rho_free = np.clip(rho_free, 0, None)
     return rho_free, rho_free.sum(axis=0)
 
 
 def hirshfeld_volume_ratios(
-    mf,
-    grid_level=3,
-    free_atom_xc='auto',
-    free_atom_basis='aug-cc-pVQZ',
-    h_exact=False,
+    mf, free_atom_xc='auto', free_atom_basis='aug-cc-pVQZ', grid_level=3
 ):
-    """Per-atom Hirshfeld volume ratios from a converged PySCF mean-field.
+    """Per-atom Hirshfeld volume ratios from a converged PySCF Kohn--Sham object.
 
-    :param mf: converged PySCF SCF/KS object (restricted or unrestricted)
-    :param int grid_level: PySCF DFT grid level for the integration
-    :param free_atom_xc: functional for the free-atom reference; ``'auto'`` uses
-        the molecular functional (HF if ``mf`` has none), ``None`` forces HF, or
-        an explicit functional string
+    :param mf: converged PySCF KS object (restricted or unrestricted)
+    :param free_atom_xc: functional for the free-atom reference; ``'auto'`` (the
+        default) uses the molecular functional, or pass an explicit functional
     :param str free_atom_basis: basis for the free-atom reference (fixed, large)
-    :param bool h_exact: use the exact one-electron density for hydrogen instead
-        of the self-consistent DFT one (off by default; see module docstring)
+    :param int grid_level: fallback PySCF grid level, only used if ``mf`` has no
+        integration grid of its own
 
     Returns an array of per-atom ratios of shape ``(natm,)``.
+
+    Requires a KS-DFT mean-field; a Hartree--Fock ``mf`` (no exchange-correlation
+    functional) is rejected. The molecular integration grid is taken from ``mf``.
 
     An isolated atom returns a ratio of exactly 1 only when ``free_atom_basis``
     matches the molecular basis (or both are at the basis-set limit); with the
@@ -138,19 +124,25 @@ def hirshfeld_volume_ratios(
     mol = mf.mol
     if free_atom_xc == 'auto':
         free_atom_xc = getattr(mf, 'xc', None)
-    grids = dft.gen_grid.Grids(mol)
-    grids.level = grid_level
-    grids.build()
+    if not free_atom_xc:
+        raise ValueError(
+            'MBD Hirshfeld partitioning requires a KS-DFT mean-field; got one '
+            'with no exchange-correlation functional (Hartree-Fock)'
+        )
+    grids = getattr(mf, 'grids', None)
+    if grids is None or grids.coords is None:
+        grids = dft.gen_grid.Grids(mol)
+        grids.level = grid_level
+        grids.build()
     coords, weights = grids.coords, grids.weights
 
     dm = mf.make_rdm1()
     if np.ndim(dm) == 3:  # unrestricted -> total density
         dm = dm[0] + dm[1]
-    ao = dft.numint.eval_ao(mol, coords)
-    rho = dft.numint.eval_rho(mol, ao, dm)
+    rho = dft.numint.eval_rho(mol, dft.numint.eval_ao(mol, coords), dm)
 
-    rho_free, rho_promol = _free_atom_density_on_grid(
-        mol, coords, free_atom_xc, free_atom_basis, h_exact
+    rho_free, rho_promol = _promolecule_densities(
+        mol, coords, free_atom_xc, free_atom_basis
     )
     rho_promol = np.where(rho_promol > 1e-30, rho_promol, 1e-30)
 
@@ -168,9 +160,9 @@ def hirshfeld_volume_ratios(
 def mbd_energy(
     mf, beta=None, variant='rsscs', a=6.0, damping='fermi,dip', **ratio_kwargs
 ):
-    """MBD dispersion energy (a.u.) for a converged PySCF mean-field.
+    """MBD dispersion energy (a.u.) for a converged PySCF Kohn--Sham object.
 
-    :param mf: converged PySCF SCF/KS object
+    :param mf: converged PySCF KS object
     :param float beta: MBD range-separation parameter; if ``None`` it is looked
         up from the molecular functional (currently PBE, PBE0, HSE)
     :param str variant: MBD variant passed to :meth:`~pymbd.fortran.MBDGeom.
@@ -184,7 +176,7 @@ def mbd_energy(
     """
     mol = mf.mol
     if beta is None:
-        xc = getattr(mf, 'xc', 'hf').lower().replace(' ', '')
+        xc = getattr(mf, 'xc', '').lower().replace(' ', '')
         beta = _BETA_RSSCS.get(xc)
         if beta is None:
             raise ValueError(f'No default MBD beta for xc={xc!r}; pass beta explicitly')

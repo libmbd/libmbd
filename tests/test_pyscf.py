@@ -43,6 +43,15 @@ def test_water_mbd_energy():
 
 
 @pytest.mark.no_scalapack
+def test_hartree_fock_is_rejected():
+    from pyscf import scf
+
+    mf = scf.RHF(gto.M(atom='Ne 0 0 0', basis='def2-svp', verbose=0)).run()
+    with pytest.raises(ValueError, match='KS-DFT'):
+        hirshfeld_volume_ratios(mf, free_atom_basis='def2-svp')
+
+
+@pytest.mark.no_scalapack
 def test_mbd_energy_requires_known_beta():
     mf = dft.RKS(gto.M(atom='Ne 0 0 0', basis='def2-svp', verbose=0), xc='M06-L')
     mf.run()

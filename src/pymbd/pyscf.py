@@ -57,11 +57,6 @@ __all__ = ['hirshfeld_volume_ratios', 'mbd_energy', 'AtomSphAverageRKS']
 # MBD@rsSCS range-separation parameter beta per exchange-correlation functional.
 _BETA_RSSCS = {'pbe': 0.83, 'pbe0': 0.85, 'hse': 0.85}
 
-# Grid is processed in blocks: a whole-grid AO array is ngrid x nao, which runs
-# into several GB for a few dozen atoms in a triple-zeta or larger basis.
-_GRID_BLKSIZE = 8192
-_AO_BLOCK_BYTES = 128 << 20
-
 
 class AtomSphAverageRKS(dft.rks.KohnShamDFT, atom_hf.AtomSphAverageRHF):
     """Spherically averaged neutral free-atom solver with a Kohn--Sham potential.
@@ -155,9 +150,6 @@ def hirshfeld_volume_ratios(mf):
             'uses an ECP, so its core density is missing and cannot be matched '
             'by a neutral free-atom reference'
         )
-    grids = mf.grids  # a KS object always carries one
-    if grids.coords is None:
-        grids.build()
     dm = mf.make_rdm1()
     if np.ndim(dm) == 3:  # unrestricted -> total density
         dm = dm[0] + dm[1]
@@ -173,26 +165,28 @@ def hirshfeld_volume_ratios(mf):
     free_dms = [_free_atom_dm(mol.atom_symbol(ia), mol.basis, xc) for ia in real]
     aoslices = mol.aoslice_by_atom()
     atom_coords = mol.atom_coords()[real]
-    blksize = max(128, min(_GRID_BLKSIZE, _AO_BLOCK_BYTES // (8 * mol.nao)))
 
+    ni = dft.numint.NumInt()
     v_eff = np.zeros(len(real))
     v_free = np.zeros(len(real))
-    for i0 in range(0, len(grids.coords), blksize):
-        coords = grids.coords[i0 : i0 + blksize]
-        weights = grids.weights[i0 : i0 + blksize]
-        ao = dft.numint.eval_ao(mol, coords)
+    # PySCF's own grid blocking: it sizes the blocks, reuses the AO buffer and
+    # hands us the screening mask, so no whole-grid AO array is ever built.
+    for ao, mask, weights, coords in ni.block_loop(mol, mf.grids, deriv=0):
         rho_free = np.empty((len(real), len(coords)))
         for i, ia in enumerate(real):
             _, _, p0, p1 = aoslices[ia]
             ao_a = ao[:, p0:p1]
-            # contract via a matrix product, as eval_rho does internally: going
-            # through BLAS is ~10x faster than a three-operand einsum here, and
-            # the block structure avoids the (much larger) dense nao x nao product
+            # Atom A's free density is the contraction of its own AO block with
+            # its free-atom density matrix: the free-atom density matrices are
+            # block-diagonal in the molecular basis, so the off-diagonal blocks
+            # they would occupy are zero and can be skipped. Contracting as a
+            # matrix product (the way eval_rho does internally) goes through
+            # BLAS, ~10x faster than the equivalent three-operand einsum.
             rho_free[i] = np.einsum('gi,gi->g', ao_a.dot(free_dms[i]), ao_a)
         np.clip(rho_free, 0, None, out=rho_free)
         rho_promol = rho_free.sum(axis=0)
         np.maximum(rho_promol, 1e-30, out=rho_promol)
-        rho = dft.numint.eval_rho(mol, ao, dm)
+        rho = ni.eval_rho(mol, ao, dm, mask, 'LDA')
         for i in range(len(real)):
             r3 = np.linalg.norm(coords - atom_coords[i], axis=1) ** 3
             w = rho_free[i] / rho_promol  # Hirshfeld weight
@@ -201,16 +195,14 @@ def hirshfeld_volume_ratios(mf):
     return v_eff / v_free
 
 
-def mbd_energy(mf, beta=None, variant='rsscs', a=6.0, damping='fermi,dip'):
+def mbd_energy(mf, beta=None, **kwargs):
     """MBD dispersion energy (a.u.) for a converged PySCF Kohn--Sham object.
 
     :param mf: converged PySCF KS object
     :param float beta: MBD range-separation parameter; if ``None`` it is looked
         up from the molecular functional (currently PBE, PBE0, HSE)
-    :param str variant: MBD variant passed to :meth:`~pymbd.fortran.MBDGeom.
-        mbd_energy` (``'rsscs'`` or ``'plain'``)
-    :param float a: MBD damping steepness
-    :param str damping: MBD damping function
+    :param kwargs: passed on to :meth:`~pymbd.fortran.MBDGeom.mbd_energy`, whose
+        defaults (MBD@rsSCS with Fermi dipole damping) are used as they stand
 
     Free-atom vdW parameters are taken from libMBD's built-in table and rescaled
     by the Hirshfeld volume ratios.
@@ -228,5 +220,5 @@ def mbd_energy(mf, beta=None, variant='rsscs', a=6.0, damping='fermi,dip'):
     C6 = np.array([vdw_params[s]['C6(TS)'] for s in species]) * ratios**2
     R_vdw = np.array([vdw_params[s]['R_vdw(TS)'] for s in species]) * ratios ** (1 / 3)
     return MBDGeom(mol.atom_coords()[real]).mbd_energy(
-        alpha_0, C6, R_vdw, beta=beta, a=a, variant=variant, damping=damping
+        alpha_0, C6, R_vdw, beta=beta, **kwargs
     )

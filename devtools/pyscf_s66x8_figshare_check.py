@@ -22,16 +22,18 @@ MBD MAE of 0.037 kcal/mol against def2-TZVP's 0.018, and the gap is concentrated
 in the systems with pi systems (0.11 for pyridine-ethene, 0.09 for
 uracil-ethyne, against 0.005-0.009 for the small hydrogen-bonded ones).
 
-The integration grid, by contrast, hardly matters, because the same grid
-integrates the in-molecule and the free-atom volume and its error largely
-cancels in their ratio. Between PySCF grid levels 0 and 4 the MBD interaction
-energy of a 17-atom dimer moves by 7e-4 kcal/mol, two orders of magnitude below
-the deviation being measured, while the SCF energy moves by 16 kcal/mol. This
-script only validates the MBD term, so it defaults to level 0 and takes the
-speedup. The DFT (PBE) term is reported alongside, but at this grid its residual
-against the all-electron reference is dominated by grid error, on top of the
-basis set and (no counterpoise) BSSE -- raise --grid before reading anything
-into it. None of it is a bridge effect.
+The integration grid matters much less than it does for the DFT, because the
+same grid integrates the in-molecule and the free-atom volume and its error
+largely cancels in their ratio, so this script defaults to level 1 rather than
+PySCF's 3. It does not survive level 0, though, and how far it survives is
+system-dependent: on an aromatic dimer levels 0 to 4 span 7e-4 kcal/mol, but on
+pentane-pentane, the most hydrogen-rich system in S66, level 0 is 0.029 off
+while level 1 is within 3e-4 of a converged grid. Hydrogen carries the coarsest
+atomic grid, so the aliphatic systems set the requirement. The DFT (PBE) term is
+reported alongside, but at this grid its residual against the all-electron
+reference has a grid component, on top of the basis set and (no counterpoise)
+BSSE -- raise --grid before reading anything into it. None of it is a bridge
+effect.
 
 The SCF convergence threshold can be loosened a long way for the same reason, so
 it defaults to 1e-4 rather than PySCF's 1e-9. Measured over the default subset
@@ -195,8 +197,8 @@ def main(argv=None):
     p.add_argument(
         '--grid',
         type=int,
-        default=0,
-        help='PySCF grid level (default 0: enough for MBD, see the module '
+        default=1,
+        help='PySCF grid level (default 1: enough for MBD, see the module '
         'docstring, but too coarse for the DFT energies)',
     )
     p.add_argument(

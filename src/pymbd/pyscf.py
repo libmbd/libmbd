@@ -50,7 +50,7 @@ from pyscf import dft, gto
 from pyscf.scf import atom_hf
 
 from .fortran import MBDGeom
-from .pymbd import vdw_params
+from .pymbd import from_volumes
 
 __all__ = ['hirshfeld_volume_ratios', 'mbd_energy', 'AtomSphAverageRKS']
 
@@ -213,8 +213,8 @@ def mbd_energy(mf, beta=None, **kwargs):
     :param kwargs: passed on to :meth:`~pymbd.fortran.MBDGeom.mbd_energy`, whose
         defaults (MBD@rsSCS with Fermi dipole damping) are used as they stand
 
-    Free-atom vdW parameters are taken from libMBD's built-in table and rescaled
-    by the Hirshfeld volume ratios.
+    Free-atom vdW parameters come from libMBD's built-in table, rescaled by the
+    Hirshfeld volume ratios with :func:`~pymbd.from_volumes`.
     """
     mol = mf.mol
     if beta is None:
@@ -225,9 +225,7 @@ def mbd_energy(mf, beta=None, **kwargs):
     ratios = hirshfeld_volume_ratios(mf)
     real = _real_atoms(mol)
     species = [mol.atom_symbol(ia) for ia in real]
-    alpha_0 = np.array([vdw_params[s]['alpha_0(TS)'] for s in species]) * ratios
-    C6 = np.array([vdw_params[s]['C6(TS)'] for s in species]) * ratios**2
-    R_vdw = np.array([vdw_params[s]['R_vdw(TS)'] for s in species]) * ratios ** (1 / 3)
+    alpha_0, C6, R_vdw = from_volumes(species, ratios)
     return MBDGeom(mol.atom_coords()[real]).mbd_energy(
         alpha_0, C6, R_vdw, beta=beta, **kwargs
     )

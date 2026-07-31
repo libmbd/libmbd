@@ -133,16 +133,24 @@ def load_paper(h5_path):
 _ENERGIES = {}
 
 
-def our_energies(species, coords, basis, xc, grid):
-    """Return (SCF energy, MBD energy) for one fragment, memoized on its geometry.
+def our_energies(species, coords, basis, xc, grid, dm0=None):
+    """Return (SCF energy, MBD energy, density matrix) for one fragment.
 
-    The two monomers of a system are taken at its equilibrium separation whatever
-    the separation of the complex, so they are the same fragment at all eight
-    points of a dissociation curve and only need computing once.
+    Memoized on the geometry: the two monomers of a system are taken at its
+    equilibrium separation whatever the separation of the complex, so they are the
+    same fragment at all eight points of a dissociation curve and only need
+    computing once. The density matrix is returned for chaining (below) and is
+    None on a cache hit, since it is not worth keeping every fragment's.
+
+    ``dm0`` is an initial guess, meant to be the converged density of the previous
+    point of a dissociation curve. The monomers are rigid along one, so successive
+    complexes differ only in their separation and the previous density is a good
+    starting point. It cannot change the converged result and so is deliberately
+    not part of the cache key.
     """
     key = (basis, xc, grid, tuple(species), tuple(map(tuple, coords)))
     if key in _ENERGIES:
-        return _ENERGIES[key]
+        return (*_ENERGIES[key], None)
 
     from pyscf import dft, gto
 
@@ -156,9 +164,9 @@ def our_energies(species, coords, basis, xc, grid):
     )
     mf = dft.RKS(mol, xc=xc).density_fit()
     mf.grids.level = grid
-    mf.kernel()
+    mf.kernel(dm0=dm0)
     _ENERGIES[key] = (mf.e_tot, mbd_energy(mf, beta=MBD_BETA))
-    return _ENERGIES[key]
+    return (*_ENERGIES[key], mf.make_rdm1())
 
 
 def main(argv=None):
@@ -189,14 +197,22 @@ def main(argv=None):
 
     rows = []
     seen = set()
+    # the converged density of the previous point of the current dissociation
+    # curve, fed to the next one as its initial guess; only one is ever held,
+    # since the points arrive grouped by system
+    curve_idx, curve_dm = None, None
     for idx, label, scale, frags in load_geometries(args.vdwsets, idx_filter):
         key = (_norm(label), float(scale))
         if key not in mbd_ref:
             continue
-        e = {
-            name: our_energies(*g, args.basis, args.xc, args.grid)
-            for name, g in frags.items()
-        }
+        if idx != curve_idx:
+            curve_idx, curve_dm = idx, None
+        e = {}
+        for name, g in frags.items():
+            guess = curve_dm if name == 'complex' else None
+            *e[name], dm = our_energies(*g, args.basis, args.xc, args.grid, guess)
+            if name == 'complex':
+                curve_dm = dm
         pbe_int = (e['complex'][0] - e['fragment-1'][0] - e['fragment-2'][0]) * AU2KCAL
         mbd_int = (e['complex'][1] - e['fragment-1'][1] - e['fragment-2'][1]) * AU2KCAL
         rows.append(

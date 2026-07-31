@@ -20,9 +20,18 @@ the molecular basis makes the Hirshfeld ratios far less basis-sensitive than the
 density itself, but not insensitive: over the default subset def2-SVP gives an
 MBD MAE of 0.037 kcal/mol against def2-TZVP's 0.018, and the gap is concentrated
 in the systems with pi systems (0.11 for pyridine-ethene, 0.09 for
-uracil-ethyne, against 0.005-0.009 for the small hydrogen-bonded ones). The DFT
-(PBE) term is also reported: its residual against the all-electron reference is
-a basis-set (and, without counterpoise, BSSE) effect, not a bridge effect.
+uracil-ethyne, against 0.005-0.009 for the small hydrogen-bonded ones).
+
+The integration grid, by contrast, hardly matters, because the same grid
+integrates the in-molecule and the free-atom volume and its error largely
+cancels in their ratio. Between PySCF grid levels 0 and 4 the MBD interaction
+energy of a 17-atom dimer moves by 7e-4 kcal/mol, two orders of magnitude below
+the deviation being measured, while the SCF energy moves by 16 kcal/mol. This
+script only validates the MBD term, so it defaults to level 0 and takes the
+speedup. The DFT (PBE) term is reported alongside, but at this grid its residual
+against the all-electron reference is dominated by grid error, on top of the
+basis set and (no counterpoise) BSSE -- raise --grid before reading anything
+into it. None of it is a bridge effect.
 
 Data (downloaded/located, not shipped):
   * figshare all-data.h5  https://ndownloader.figshare.com/files/9775933
@@ -124,14 +133,14 @@ def load_paper(h5_path):
 _ENERGIES = {}
 
 
-def our_energies(species, coords, basis, xc):
+def our_energies(species, coords, basis, xc, grid):
     """Return (SCF energy, MBD energy) for one fragment, memoized on its geometry.
 
     The two monomers of a system are taken at its equilibrium separation whatever
     the separation of the complex, so they are the same fragment at all eight
     points of a dissociation curve and only need computing once.
     """
-    key = (basis, xc, tuple(species), tuple(map(tuple, coords)))
+    key = (basis, xc, grid, tuple(species), tuple(map(tuple, coords)))
     if key in _ENERGIES:
         return _ENERGIES[key]
 
@@ -146,6 +155,7 @@ def our_energies(species, coords, basis, xc):
         verbose=0,
     )
     mf = dft.RKS(mol, xc=xc).density_fit()
+    mf.grids.level = grid
     mf.kernel()
     _ENERGIES[key] = (mf.e_tot, mbd_energy(mf, beta=MBD_BETA))
     return _ENERGIES[key]
@@ -157,6 +167,13 @@ def main(argv=None):
     p.add_argument('--h5', default='all-data.h5', help='path to all-data.h5')
     p.add_argument('--basis', default='def2-tzvp')
     p.add_argument('--xc', default='PBE')
+    p.add_argument(
+        '--grid',
+        type=int,
+        default=0,
+        help='PySCF grid level (default 0: enough for MBD, see the module '
+        'docstring, but too coarse for the DFT energies)',
+    )
     p.add_argument(
         '--idx',
         type=int,
@@ -176,7 +193,10 @@ def main(argv=None):
         key = (_norm(label), float(scale))
         if key not in mbd_ref:
             continue
-        e = {name: our_energies(*g, args.basis, args.xc) for name, g in frags.items()}
+        e = {
+            name: our_energies(*g, args.basis, args.xc, args.grid)
+            for name, g in frags.items()
+        }
         pbe_int = (e['complex'][0] - e['fragment-1'][0] - e['fragment-2'][0]) * AU2KCAL
         mbd_int = (e['complex'][1] - e['fragment-1'][1] - e['fragment-2'][1]) * AU2KCAL
         rows.append(
@@ -211,9 +231,9 @@ def main(argv=None):
         f'max|Δ| {np.abs(dmbd).max():.4f}  bias {dmbd.mean():+.4f} kcal/mol'
     )
     print(
-        f'PBE  (our {args.basis}, no CP, vs all-electron):  '
+        f'PBE  (our {args.basis}, grid {args.grid}, no CP, vs all-electron):  '
         f'MAE {np.abs(dpbe).mean():.4f}  bias {dpbe.mean():+.4f} kcal/mol  '
-        f'(basis-set + BSSE, not the bridge)'
+        f'(basis set + BSSE + grid, not the bridge)'
     )
     return 0
 

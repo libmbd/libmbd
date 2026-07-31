@@ -121,7 +121,20 @@ def load_paper(h5_path):
     return pbe, mbd, ref
 
 
+_ENERGIES = {}
+
+
 def our_energies(species, coords, basis, xc):
+    """Return (SCF energy, MBD energy) for one fragment, memoized on its geometry.
+
+    The two monomers of a system are taken at its equilibrium separation whatever
+    the separation of the complex, so they are the same fragment at all eight
+    points of a dissociation curve and only need computing once.
+    """
+    key = (basis, xc, tuple(species), tuple(map(tuple, coords)))
+    if key in _ENERGIES:
+        return _ENERGIES[key]
+
     from pyscf import dft, gto
 
     from pymbd.pyscf import mbd_energy
@@ -134,7 +147,8 @@ def our_energies(species, coords, basis, xc):
     )
     mf = dft.RKS(mol, xc=xc).density_fit()
     mf.kernel()
-    return mf.e_tot, mbd_energy(mf, beta=MBD_BETA)
+    _ENERGIES[key] = (mf.e_tot, mbd_energy(mf, beta=MBD_BETA))
+    return _ENERGIES[key]
 
 
 def main(argv=None):

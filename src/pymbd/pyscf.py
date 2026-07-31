@@ -192,6 +192,9 @@ def hirshfeld_volume_ratios(mf):
         np.clip(rho_free, 0, None, out=rho_free)
         rho_promol = rho_free.sum(axis=0)
         np.maximum(rho_promol, 1e-30, out=rho_promol)
+        # 'LDA' is eval_rho's derivative order, not a functional: it asks for the
+        # density alone, which is all the Hirshfeld integrals use. The GGA modes
+        # would additionally return its gradient, and would need deriv=1 above.
         rho = ni.eval_rho(mol, ao, dm, mask, 'LDA')
         for i in range(len(real)):
             r3 = np.linalg.norm(coords - atom_coords[i], axis=1) ** 3

@@ -14,7 +14,10 @@ point, with the FHI-aims MBD energies of
 whose processed results are published on figshare. Because FHI-aims shares no
 code, basis, or Hirshfeld implementation with PySCF/pyMBD, agreement on the MBD
 term is an independent cross-code validation of the bridge; it currently agrees
-to ~0.003 kcal/mol MAE. The DFT (PBE) term is also reported: its residual
+to ~0.006 kcal/mol MAE in the default def2-SVP basis (~0.003 in def2-TZVP).
+The MBD term is only weakly basis-dependent, because the free-atom reference is
+taken in the same basis and cancels its incompleteness, so the cheap basis is
+enough to validate the bridge. The DFT (PBE) term is also reported: its residual
 against the all-electron reference is a basis-set (and, without counterpoise,
 BSSE) effect, not a bridge effect.
 
@@ -26,7 +29,7 @@ Data (downloaded/located, not shipped):
 
 Usage:
     python pyscf_s66x8_figshare_check.py --vdwsets /path/to/vdwsets/clone \\
-        [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis def2-tzvp]
+        [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis def2-svp]
 """
 
 import argparse
@@ -127,7 +130,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--vdwsets', required=True, help='path to a vdwsets checkout')
     p.add_argument('--h5', default='all-data.h5', help='path to all-data.h5')
-    p.add_argument('--basis', default='def2-tzvp')
+    p.add_argument('--basis', default='def2-svp')
     p.add_argument('--xc', default='PBE')
     p.add_argument(
         '--idx',

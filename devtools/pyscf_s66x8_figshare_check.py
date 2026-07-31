@@ -31,8 +31,16 @@ Data (downloaded/located, not shipped):
     https://github.com/azag0/vdwsets  (git clone it and pass --vdwsets)
 
 Usage:
-    python pyscf_s66x8_figshare_check.py --vdwsets /path/to/vdwsets/clone \\
+    OPENBLAS_NUM_THREADS=1 python pyscf_s66x8_figshare_check.py \\
+        --vdwsets /path/to/vdwsets/clone \\
         [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis def2-tzvp]
+
+Almost all the run time is the DFT itself, so it is worth giving OpenBLAS a
+single thread and leaving the rest to PySCF's OpenMP. Where the two thread pools
+both try to use every core they contend badly: a water dimer took 1.28 s with
+both at four threads against 0.15 s with OPENBLAS_NUM_THREADS=1, and a 17-atom
+dimer 13.4 s against 9.9 s. Restricting OpenMP instead is not a substitute --
+two threads was slower than four at both sizes.
 """
 
 import argparse

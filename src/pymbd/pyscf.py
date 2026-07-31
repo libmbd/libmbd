@@ -124,6 +124,13 @@ def hirshfeld_volume_ratios(mf):
     basis, since the free-atom reference is built in the molecular basis. The
     functional, basis and integration grid are all taken from ``mf``.
 
+    The ratios are barely sensitive to the integration grid, because the same grid
+    integrates both the in-molecule and the free-atom volume and the quadrature
+    error largely cancels in their ratio. On a 17-atom dimer the MBD interaction
+    energy varies by under 1e-4 kcal/mol across PySCF grid levels 1 to 4, and by
+    7e-4 between levels 0 and 4 -- at which point the SCF energy is already 16
+    kcal/mol adrift. Choose the grid for the density; the dispersion will follow.
+
     The free-atom reference is deliberately computed in the *molecular* basis. Any
     other choice mixes basis-set incompleteness into the ratio: a well-separated
     argon dimer in def2-SVP gives 0.89 against a fixed aug-cc-pVQZ reference (a

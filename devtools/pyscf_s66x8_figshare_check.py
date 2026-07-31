@@ -33,6 +33,13 @@ against the all-electron reference is dominated by grid error, on top of the
 basis set and (no counterpoise) BSSE -- raise --grid before reading anything
 into it. None of it is a bridge effect.
 
+The SCF convergence threshold can be loosened a long way for the same reason.
+Over the default subset, --conv-tol 1e-4 moves the MBD energies by ~5e-5
+kcal/mol while taking the run from 220 s to 139 s; 1e-2 takes it to 123 s but
+the energies then scatter by 0.0035 kcal/mol on average and 0.012 at worst,
+which is an appreciable fraction of the deviation being measured, and it is
+scatter rather than a bias, so it does not average out.
+
 Data (downloaded/located, not shipped):
   * figshare all-data.h5  https://ndownloader.figshare.com/files/9775933
     (article 5117167, "dft-vdw-range Data")
@@ -133,7 +140,7 @@ def load_paper(h5_path):
 _ENERGIES = {}
 
 
-def our_energies(species, coords, basis, xc, grid, dm0=None):
+def our_energies(species, coords, basis, xc, grid, conv_tol, dm0=None):
     """Return (SCF energy, MBD energy, density matrix) for one fragment.
 
     Memoized on the geometry: the two monomers of a system are taken at its
@@ -148,7 +155,7 @@ def our_energies(species, coords, basis, xc, grid, dm0=None):
     starting point. It cannot change the converged result and so is deliberately
     not part of the cache key.
     """
-    key = (basis, xc, grid, tuple(species), tuple(map(tuple, coords)))
+    key = (basis, xc, grid, conv_tol, tuple(species), tuple(map(tuple, coords)))
     if key in _ENERGIES:
         return (*_ENERGIES[key], None)
 
@@ -164,6 +171,7 @@ def our_energies(species, coords, basis, xc, grid, dm0=None):
     )
     mf = dft.RKS(mol, xc=xc).density_fit()
     mf.grids.level = grid
+    mf.conv_tol = conv_tol
     mf.kernel(dm0=dm0)
     _ENERGIES[key] = (mf.e_tot, mbd_energy(mf, beta=MBD_BETA))
     return (*_ENERGIES[key], mf.make_rdm1())
@@ -181,6 +189,12 @@ def main(argv=None):
         default=0,
         help='PySCF grid level (default 0: enough for MBD, see the module '
         'docstring, but too coarse for the DFT energies)',
+    )
+    p.add_argument(
+        '--conv-tol',
+        type=float,
+        default=1e-9,
+        help="SCF convergence threshold (PySCF's own default is 1e-9)",
     )
     p.add_argument(
         '--idx',
@@ -210,7 +224,9 @@ def main(argv=None):
         e = {}
         for name, g in frags.items():
             guess = curve_dm if name == 'complex' else None
-            *e[name], dm = our_energies(*g, args.basis, args.xc, args.grid, guess)
+            *e[name], dm = our_energies(
+                *g, args.basis, args.xc, args.grid, args.conv_tol, guess
+            )
             if name == 'complex':
                 curve_dm = dm
         pbe_int = (e['complex'][0] - e['fragment-1'][0] - e['fragment-2'][0]) * AU2KCAL
@@ -247,7 +263,8 @@ def main(argv=None):
         f'max|Δ| {np.abs(dmbd).max():.4f}  bias {dmbd.mean():+.4f} kcal/mol'
     )
     print(
-        f'PBE  (our {args.basis}, grid {args.grid}, no CP, vs all-electron):  '
+        f'PBE  (our {args.basis}, grid {args.grid}, conv {args.conv_tol:g}, no CP, '
+        f'vs all-electron):  '
         f'MAE {np.abs(dpbe).mean():.4f}  bias {dpbe.mean():+.4f} kcal/mol  '
         f'(basis set + BSSE + grid, not the bridge)'
     )

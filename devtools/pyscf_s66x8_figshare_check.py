@@ -33,12 +33,18 @@ against the all-electron reference is dominated by grid error, on top of the
 basis set and (no counterpoise) BSSE -- raise --grid before reading anything
 into it. None of it is a bridge effect.
 
-The SCF convergence threshold can be loosened a long way for the same reason.
-Over the default subset, --conv-tol 1e-4 moves the MBD energies by ~5e-5
-kcal/mol while taking the run from 220 s to 139 s; 1e-2 takes it to 123 s but
-the energies then scatter by 0.0035 kcal/mol on average and 0.012 at worst,
-which is an appreciable fraction of the deviation being measured, and it is
-scatter rather than a bias, so it does not average out.
+The SCF convergence threshold can be loosened a long way for the same reason, so
+it defaults to 1e-4 rather than PySCF's 1e-9. Measured over the default subset
+against a tight run, that shifts the MBD energies by 0.0002 kcal/mol on average
+and 0.002 at worst, and takes the run from 220 s to 139 s. Going on to 1e-2
+reaches 123 s but the scatter grows to 0.0035 and 0.012, which is an appreciable
+fraction of the deviation being measured, and being scatter rather than bias it
+does not average out.
+
+Successive points of a curve start from the previous point's converged density,
+which combines with the loose threshold without the error compounding along the
+curve: the deviation from a tight run is flat from the first point, which has no
+guess, to the last.
 
 Data (downloaded/located, not shipped):
   * figshare all-data.h5  https://ndownloader.figshare.com/files/9775933
@@ -152,8 +158,11 @@ def our_energies(species, coords, basis, xc, grid, conv_tol, dm0=None):
     ``dm0`` is an initial guess, meant to be the converged density of the previous
     point of a dissociation curve. The monomers are rigid along one, so successive
     complexes differ only in their separation and the previous density is a good
-    starting point. It cannot change the converged result and so is deliberately
-    not part of the cache key.
+    starting point. At a tight threshold it cannot change the converged result; at
+    a loose one it can shift where the SCF stops, but only within that threshold's
+    own noise, and measurably without compounding along the curve. Either way it
+    is not part of the cache key, which identifies a geometry rather than a path
+    taken to it.
     """
     key = (basis, xc, grid, conv_tol, tuple(species), tuple(map(tuple, coords)))
     if key in _ENERGIES:
@@ -193,8 +202,9 @@ def main(argv=None):
     p.add_argument(
         '--conv-tol',
         type=float,
-        default=1e-9,
-        help="SCF convergence threshold (PySCF's own default is 1e-9)",
+        default=1e-4,
+        help='SCF convergence threshold (default 1e-4: see the module docstring; '
+        "PySCF's own default is 1e-9)",
     )
     p.add_argument(
         '--idx',

@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional `pymbd.pyscf` bridge turning a converged PySCF Kohn–Sham object into an MBD or TS dispersion energy via Hirshfeld volume ratios ([#145](https://github.com/libmbd/libmbd/pull/145))
+
 ## [0.15.0] - 2026-07-24
 
 ### Added

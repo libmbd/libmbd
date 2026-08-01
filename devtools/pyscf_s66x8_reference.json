@@ -1,0 +1,12 @@
+{
+ "schema": 1,
+ "comment": "Per-system baseline deviation of the PySCF -> pyMBD MBD term from the FHI-aims values, not zero by construction. Regenerate from a full run, or null a system out to stop gating it.",
+ "settings": {
+  "basis": "aug-cc-pvdz",
+  "xc": "PBE",
+  "grid": 1,
+  "conv_tol": 0.0001
+ },
+ "vdwsets_ref": "1da24b4fea312e2beaf9b3b9c2966be0200f3879",
+ "systems": {}
+}

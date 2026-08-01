@@ -28,8 +28,11 @@ is also present in the molecular density, so well-separated atoms come out at
 exactly 1 in any basis. For a one-electron atom (hydrogen) the reference is the
 diffuse, self-consistent DFT density, matching the FHI-aims/libMBD convention.
 Benchmarking against independent all-electron FHI-aims MBD energies confirms these
-choices: MBD interaction energies agree to ~0.003 kcal/mol (against ~0.016 with a
-fixed aug-cc-pVQZ reference). MBD is only meaningful on top of a
+choices: over the full S66x8 set (528 points) the MBD interaction energies agree to
+0.03 kcal/mol MAE in aug-cc-pVDZ and 0.04 in def2-TZVP, the residual in each case
+being a systematic basis-set offset rather than scatter, and on the subset used to
+compare free-atom references the molecular-basis choice was about five times more
+accurate than a fixed aug-cc-pVQZ one. MBD is only meaningful on top of a
 (semi)local/hybrid KS functional, so a Hartree--Fock mean-field is rejected.
 
 Requires PySCF (``pip install pymbd[pyscf]``)::

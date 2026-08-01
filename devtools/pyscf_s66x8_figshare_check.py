@@ -15,12 +15,29 @@ whose processed results are published on figshare. Because FHI-aims shares no
 code, basis, or Hirshfeld implementation with PySCF/pyMBD, agreement on the MBD
 term is an independent cross-code validation of the bridge.
 
-Use a basis of at least triple-zeta quality. Taking the free-atom reference in
-the molecular basis makes the Hirshfeld ratios far less basis-sensitive than the
-density itself, but not insensitive: over the default subset def2-SVP gives an
-MBD MAE of 0.037 kcal/mol against def2-TZVP's 0.018, and the gap is concentrated
-in the systems with pi systems (0.11 for pyridine-ethene, 0.09 for
-uracil-ethyne, against 0.005-0.009 for the small hydrogen-bonded ones).
+What the basis has to supply is diffuse functions, not zeta level. Taking the
+free-atom reference in the molecular basis makes the Hirshfeld ratios far less
+basis-sensitive than the density itself, but not insensitive, and the r^3 weight
+of the volume integrals probes the density tail. Over the whole set the residual
+against FHI-aims is a pure systematic offset -- all 528 points deviate in the
+same direction, so the MAE and the bias coincide -- and augmentation shrinks it:
+
+    aug-cc-pVDZ   MAE 0.029 kcal/mol (bias +0.029, i.e. underbinding)
+    def2-TZVP     MAE 0.044 kcal/mol (bias -0.044, i.e. overbinding)
+
+The two bracket the reference from opposite sides, as two incomplete bases
+should either side of the basis-set limit. Hence the aug-cc-pVDZ default: a
+third less residual than def2-TZVP for about 9% more time, despite being only
+double-zeta. Augmentation has to be even-handed across elements, though, since
+the ratio is taken against a promolecule: ma-def2-SVP and ma-def2-TZVP augment
+the heavy atoms only, which shifts weight away from hydrogen and trades error
+out of the pi-stacked systems into the hydrogen-bonded ones for no net gain,
+while def2-SVPD's property-optimized diffuse set is worse than plain def2-SVP.
+
+Note that the diffuse functions make the *DFT* residual worse, not better (PBE
+MAE 0.50 kcal/mol against def2-TZVP's 0.33), because this script computes no
+counterpoise correction and augmentation inflates BSSE. That column is not a
+bridge diagnostic either way; see below.
 
 The integration grid matters much less than it does for the DFT, because the
 same grid integrates the in-molecule and the free-atom volume and its error
@@ -57,7 +74,7 @@ Data (downloaded/located, not shipped):
 Usage:
     OPENBLAS_NUM_THREADS=1 python pyscf_s66x8_figshare_check.py \\
         --vdwsets /path/to/vdwsets/clone \\
-        [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis def2-tzvp]
+        [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis aug-cc-pvdz]
 
 Almost all the run time is the DFT itself, so it is worth giving OpenBLAS a
 single thread and leaving the rest to PySCF's OpenMP. Where the two thread pools
@@ -192,7 +209,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--vdwsets', required=True, help='path to a vdwsets checkout')
     p.add_argument('--h5', default='all-data.h5', help='path to all-data.h5')
-    p.add_argument('--basis', default='def2-tzvp')
+    p.add_argument('--basis', default='aug-cc-pvdz')
     p.add_argument('--xc', default='PBE')
     p.add_argument(
         '--grid',

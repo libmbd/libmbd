@@ -16,75 +16,44 @@ code, basis, or Hirshfeld implementation with PySCF/pyMBD, agreement on the MBD
 term is an independent cross-code validation of the bridge.
 
 Besides the MBD term itself the summary reports what that deviation is worth on
-the benchmark the method is actually judged by, as a MARE against the CCSD(T)/CBS
-S66x8 reference energies. The reconstructed total puts our MBD term on top of the
-*reference's* own all-electron PBE interaction energy rather than ours, so the DFT
-part is identical in both totals and the whole gap between the reconstructed and
-the reference MARE is the bridge. Using our PBE would drown it: uncorrected for
-BSSE and in a finite basis that term is off by of order 1 kcal/mol, against the
-~0.03 the MBD term is being judged on. Over the full set (--all) the reference
-row reproduces the published MAE 0.318 / MARE 10.1%, which doubles as a check on
-the surrounding machinery, and the reconstructed MARE is 10.1% in aug-cc-pVDZ,
-10.6% in def2-TZVP and 11.4% in def2-SVP, against 65.6% with no dispersion.
+the benchmark the method is judged by, as a MARE against the CCSD(T)/CBS S66x8
+reference energies. Both the reconstructed and the reference total take the DFT
+part from the reference's own all-electron PBE interaction energies, so the DFT
+is identical in the two and the whole gap between them is the dispersion term.
+Using our PBE instead would drown it, being uncorrected for BSSE and in a finite
+basis. Both are broken down by separation alongside the relative MBD deviation,
+since that deviation is very nearly a pure systematic offset and so cancels
+against the reference's own error at some separations and compounds at others --
+which means a basis can rank well on the compressed geometries for reasons that
+reverse at long range.
 
-Both are also broken down by separation, which is where the two ways of being
-wrong separate. The MBD deviation is a nearly pure systematic offset -- in every
-basis tried the MAE equals the bias to four decimals and 96-99% of points deviate
-in the same direction -- so it partly cancels against the reference's own error at
-some separations and compounds at others. def2-SVP is the sharpest illustration:
-it scores better than the reference at the most compressed geometry (22.4% against
-26.6%) and worst of all at the longest (8.4% against 4.5%). Ranking bases on the
-short separations alone orders them backwards.
+The defaults are all chosen for the MBD term rather than for the DFT:
 
-What the basis has to supply is diffuse functions, not zeta level. Taking the
-free-atom reference in the molecular basis makes the Hirshfeld ratios far less
-basis-sensitive than the density itself, but not insensitive, and the r^3 weight
-of the volume integrals probes the density tail. Over the whole set the residual
-against FHI-aims is a pure systematic offset -- all 528 points deviate in the
-same direction, so the MAE and the bias coincide -- and augmentation shrinks it:
-
-    aug-cc-pVDZ   MAE 0.029 kcal/mol (bias +0.029, i.e. underbinding)
-    def2-TZVP     MAE 0.044 kcal/mol (bias -0.044, i.e. overbinding)
-
-The two bracket the reference from opposite sides, as two incomplete bases
-should either side of the basis-set limit. Hence the aug-cc-pVDZ default: a
-third less residual than def2-TZVP for about 9% more time, despite being only
-double-zeta. Augmentation has to be even-handed across elements, though, since
-the ratio is taken against a promolecule: ma-def2-SVP and ma-def2-TZVP augment
-the heavy atoms only, which shifts weight away from hydrogen and trades error
-out of the pi-stacked systems into the hydrogen-bonded ones for no net gain,
-while def2-SVPD's property-optimized diffuse set is worse than plain def2-SVP.
-
-Note that the diffuse functions make the *DFT* residual worse, not better (PBE
-MAE 0.50 kcal/mol against def2-TZVP's 0.33), because this script computes no
-counterpoise correction and augmentation inflates BSSE. That column is not a
-bridge diagnostic either way; see below.
-
-The integration grid matters much less than it does for the DFT, because the
-same grid integrates the in-molecule and the free-atom volume and its error
-largely cancels in their ratio, so this script defaults to level 1 rather than
-PySCF's 3. It does not survive level 0, though, and how far it survives is
-system-dependent: on an aromatic dimer levels 0 to 4 span 7e-4 kcal/mol, but on
-pentane-pentane, the most hydrogen-rich system in S66, level 0 is 0.029 off
-while level 1 is within 3e-4 of a converged grid. Hydrogen carries the coarsest
-atomic grid, so the aliphatic systems set the requirement. The DFT (PBE) term is
-reported alongside, but at this grid its residual against the all-electron
-reference has a grid component, on top of the basis set and (no counterpoise)
-BSSE -- raise --grid before reading anything into it. None of it is a bridge
-effect.
-
-The SCF convergence threshold can be loosened a long way for the same reason, so
-it defaults to 1e-4 rather than PySCF's 1e-9. Measured over the default subset
-against a tight run, that shifts the MBD energies by 0.0002 kcal/mol on average
-and 0.002 at worst, and takes the run from 220 s to 139 s. Going on to 1e-2
-reaches 123 s but the scatter grows to 0.0035 and 0.012, which is an appreciable
-fraction of the deviation being measured, and being scatter rather than bias it
-does not average out.
+  * ``--basis aug-cc-pvdz``. What matters is diffuse functions rather than zeta
+    level, since the r^3 weight of the volume integrals probes the density tail;
+    an augmented double-zeta set beats an unaugmented triple-zeta one. The
+    augmentation has to be even-handed across elements, because the ratio is
+    taken against a promolecule -- the ma-def2 sets augment the heavy atoms only,
+    which shifts weight off hydrogen and reallocates the error between the
+    hydrogen-bonded and pi-stacked systems rather than removing it.
+  * ``--grid 1``, against PySCF's 3. The same grid integrates the in-molecule and
+    the free-atom volume, so its error largely cancels in the ratio -- but not
+    unconditionally: hydrogen carries the coarsest atomic grid, so the aliphatic
+    systems set the requirement, and level 0 does not meet it.
+  * ``--conv-tol 1e-4``, against PySCF's 1e-9, resting on the same cancellation.
+    Loosening it further turns a negligible shift into scatter comparable with
+    the deviation being measured, and scatter, unlike a bias, does not average
+    out.
 
 Successive points of a curve start from the previous point's converged density,
 which combines with the loose threshold without the error compounding along the
-curve: the deviation from a tight run is flat from the first point, which has no
-guess, to the last.
+curve.
+
+The DFT (PBE) term is reported alongside but is not a bridge diagnostic: with no
+counterpoise correction its residual against the all-electron reference is basis
+set incompleteness plus BSSE plus grid. The augmented default makes it worse
+rather than better, since diffuse functions inflate BSSE. Raise --grid and
+--basis before reading anything into it.
 
 Data (downloaded/located, not shipped):
   * figshare all-data.h5  https://ndownloader.figshare.com/files/9775933
@@ -98,11 +67,9 @@ Usage:
         [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis aug-cc-pvdz]
 
 Almost all the run time is the DFT itself, so it is worth giving OpenBLAS a
-single thread and leaving the rest to PySCF's OpenMP. Where the two thread pools
-both try to use every core they contend badly: a water dimer took 1.28 s with
-both at four threads against 0.15 s with OPENBLAS_NUM_THREADS=1, and a 17-atom
-dimer 13.4 s against 9.9 s. Restricting OpenMP instead is not a substitute --
-two threads was slower than four at both sizes.
+single thread and leaving the rest to PySCF's OpenMP: where the two thread pools
+both try to use every core they contend badly. Restricting OpenMP instead is not
+a substitute.
 """
 
 import argparse
@@ -316,8 +283,7 @@ def report(rows, seen, args):
     all-electron PBE interaction energy. That keeps the DFT part identical to the
     reference, so the whole difference between the reconstructed and the reference
     MARE is the dispersion term, i.e. the bridge. Adding our own PBE instead would
-    swamp it: at this basis and with no counterpoise correction that term is off by
-    of order 1 kcal/mol, against the ~0.03 the MBD term is being judged on.
+    swamp it, that term being uncorrected for BSSE and in a finite basis.
     """
     mbd_our = np.array([r['mbd_our'] for r in rows])
     mbd_paper = np.array([r['mbd_paper'] for r in rows])

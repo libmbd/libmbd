@@ -26,14 +26,13 @@ as the molecule. Sharing the basis is what makes the ratio a pure measure of the
 chemical environment: the reference then cancels the basis-set incompleteness that
 is also present in the molecular density, so well-separated atoms come out at
 exactly 1 in any basis. For a one-electron atom (hydrogen) the reference is the
-diffuse, self-consistent DFT density, matching the FHI-aims/libMBD convention.
-Benchmarking against independent all-electron FHI-aims MBD energies confirms these
-choices: over the full S66x8 set (528 points) the MBD interaction energies agree to
-0.03 kcal/mol MAE in aug-cc-pVDZ and 0.04 in def2-TZVP, the residual in each case
-being a systematic basis-set offset rather than scatter, and on the subset used to
-compare free-atom references the molecular-basis choice was about five times more
-accurate than a fixed aug-cc-pVQZ one. MBD is only meaningful on top of a
-(semi)local/hybrid KS functional, so a Hartree--Fock mean-field is rejected.
+diffuse, self-consistent DFT density, matching the FHI-aims/libMBD convention. MBD
+is only meaningful on top of a (semi)local/hybrid KS functional, so a
+Hartree--Fock mean-field is rejected.
+
+These choices are validated point by point against independent all-electron
+FHI-aims MBD energies over S66x8; ``devtools/pyscf_s66x8_figshare_check.py``
+reproduces that comparison.
 
 Requires PySCF (``pip install pymbd[pyscf]``)::
 
@@ -129,22 +128,17 @@ def hirshfeld_volume_ratios(mf):
 
     The ratios are much less sensitive to the integration grid than the energy is,
     because the same grid integrates both the in-molecule and the free-atom volume
-    and the quadrature error largely cancels in their ratio -- but only down to a
-    point, and where that point lies depends on the elements present. On an
-    aromatic 17-atom dimer the MBD interaction energy varies by under 1e-4
-    kcal/mol across PySCF grid levels 1 to 4 and by 7e-4 between levels 0 and 4, at
-    which point the SCF energy is already 16 kcal/mol adrift. Hydrogen, though,
-    carries the coarsest atomic grid, and on a hydrogen-rich aliphatic dimer
-    (pentane-pentane) level 0 costs 0.03 kcal/mol while level 1 is within 3e-4 of a
-    converged grid. Level 1 is enough for the dispersion on any of these; below
-    that it is not. Choose the grid for the density and the dispersion will follow.
+    and the quadrature error largely cancels in their ratio. The cancellation is
+    not unconditional, though, and how far it reaches depends on the elements
+    present: hydrogen carries the coarsest atomic grid, so hydrogen-rich systems
+    need a finer one than the cancellation alone would suggest. Choosing the grid
+    for the density is enough in practice; PySCF's coarsest level is not.
 
     The free-atom reference is deliberately computed in the *molecular* basis. Any
-    other choice mixes basis-set incompleteness into the ratio: a well-separated
-    argon dimer in def2-SVP gives 0.89 against a fixed aug-cc-pVQZ reference (a
-    21% error in :math:`C_6`) but 1.000000 against a def2-SVP one, since the
-    reference then cancels the incompleteness that is also in the molecular
-    density. The two agree only at the basis-set limit.
+    other choice mixes basis-set incompleteness into the ratio, so that a
+    well-separated dimer no longer comes out at exactly 1 and the error carries
+    straight into :math:`C_6`. A fixed reference basis is correct only at the
+    basis-set limit.
     """
     mol = mf.mol
     xc = getattr(mf, 'xc', None)

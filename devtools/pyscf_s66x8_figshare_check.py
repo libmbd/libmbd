@@ -15,6 +15,27 @@ whose processed results are published on figshare. Because FHI-aims shares no
 code, basis, or Hirshfeld implementation with PySCF/pyMBD, agreement on the MBD
 term is an independent cross-code validation of the bridge.
 
+Besides the MBD term itself the summary reports what that deviation is worth on
+the benchmark the method is actually judged by, as a MARE against the CCSD(T)/CBS
+S66x8 reference energies. The reconstructed total puts our MBD term on top of the
+*reference's* own all-electron PBE interaction energy rather than ours, so the DFT
+part is identical in both totals and the whole gap between the reconstructed and
+the reference MARE is the bridge. Using our PBE would drown it: uncorrected for
+BSSE and in a finite basis that term is off by of order 1 kcal/mol, against the
+~0.03 the MBD term is being judged on. Over the full set (--all) the reference
+row reproduces the published MAE 0.318 / MARE 10.1%, which doubles as a check on
+the surrounding machinery, and the reconstructed MARE is 10.1% in aug-cc-pVDZ,
+10.6% in def2-TZVP and 11.4% in def2-SVP, against 65.6% with no dispersion.
+
+Both are also broken down by separation, which is where the two ways of being
+wrong separate. The MBD deviation is a nearly pure systematic offset -- in every
+basis tried the MAE equals the bias to four decimals and 96-99% of points deviate
+in the same direction -- so it partly cancels against the reference's own error at
+some separations and compounds at others. def2-SVP is the sharpest illustration:
+it scores better than the reference at the most compressed geometry (22.4% against
+26.6%) and worst of all at the longest (8.4% against 4.5%). Ranking bases on the
+short separations alone orders them backwards.
+
 What the basis has to supply is diffuse functions, not zeta level. Taking the
 free-atom reference in the molecular basis makes the Hirshfeld ratios far less
 basis-sensitive than the density itself, but not insensitive, and the r^3 weight
@@ -284,12 +305,36 @@ def main(argv=None):
     if not rows:
         print('no matching systems found', file=sys.stderr)
         return 1
-    dmbd = np.array([r['mbd_our'] - r['mbd_paper'] for r in rows])
+    report(rows, seen, args)
+    return 0
+
+
+def report(rows, seen, args):
+    """Print the summary: MBD deviation, reconstructed MARE, and both by separation.
+
+    The reconstructed total energy is our MBD term on top of the *reference's* own
+    all-electron PBE interaction energy. That keeps the DFT part identical to the
+    reference, so the whole difference between the reconstructed and the reference
+    MARE is the dispersion term, i.e. the bridge. Adding our own PBE instead would
+    swamp it: at this basis and with no counterpoise correction that term is off by
+    of order 1 kcal/mol, against the ~0.03 the MBD term is being judged on.
+    """
+    mbd_our = np.array([r['mbd_our'] for r in rows])
+    mbd_paper = np.array([r['mbd_paper'] for r in rows])
+    pbe_paper = np.array([r['pbe_paper'] for r in rows])
     dpbe = np.array([r['pbe_our'] - r['pbe_paper'] for r in rows])
+    ref = np.array([r['ref'] for r in rows])
+    scales = np.array([r['scale'] for r in rows])
+    dmbd = mbd_our - mbd_paper
+
+    def mare(total, sel=slice(None)):
+        return 100 * np.mean(np.abs((total[sel] - ref[sel]) / ref[sel]))
+
     print(f'\n{len(rows)} points over systems {sorted(seen)}')
     print(
         f'MBD  (ours vs FHI-aims):  MAE {np.abs(dmbd).mean():.4f}  '
-        f'max|Δ| {np.abs(dmbd).max():.4f}  bias {dmbd.mean():+.4f} kcal/mol'
+        f'max|Δ| {np.abs(dmbd).max():.4f}  bias {dmbd.mean():+.4f} kcal/mol  '
+        f'({100 * np.mean(mbd_our / mbd_paper - 1):+.2f}% mean relative)'
     )
     print(
         f'PBE  (our {args.basis}, grid {args.grid}, conv {args.conv_tol:g}, no CP, '
@@ -297,7 +342,29 @@ def main(argv=None):
         f'MAE {np.abs(dpbe).mean():.4f}  bias {dpbe.mean():+.4f} kcal/mol  '
         f'(basis set + BSSE + grid, not the bridge)'
     )
-    return 0
+
+    # against the CCSD(T)/CBS benchmark, with the reference's PBE in both totals
+    print(
+        f'\nvs CCSD(T)/CBS, reference PBE + MBD:  '
+        f'reconstructed (our MBD) MARE {mare(pbe_paper + mbd_our):.1f}%   '
+        f'reference MARE {mare(pbe_paper + mbd_paper):.1f}%   '
+        f'no dispersion {mare(pbe_paper):.1f}%'
+    )
+
+    print('\nby separation:')
+    print(
+        f'{"scale":>7} {"n":>5} {"MBD rel dev":>13} '
+        f'{"MARE recon":>12} {"MARE ref":>10} {"|E| ref":>9}'
+    )
+    for s in sorted(set(scales)):
+        m = scales == s
+        print(
+            f'{s:>7.2f} {m.sum():>5d} '
+            f'{100 * np.mean(mbd_our[m] / mbd_paper[m] - 1):>+12.2f}% '
+            f'{mare(pbe_paper + mbd_our, m):>11.1f}% '
+            f'{mare(pbe_paper + mbd_paper, m):>9.1f}% '
+            f'{np.mean(np.abs(ref[m])):>9.3f}'
+        )
 
 
 if __name__ == '__main__':

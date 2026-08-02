@@ -1,0 +1,359 @@
+name: S66x8 benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      systems:
+        description: 'S66 indices, space-separated (empty or "all" = all 66)'
+        type: string
+        # the runner's own subset: minutes of compute against hours for all 66
+        default: '1 2 8 32 33 51 59 60'
+      basis:
+        description: 'PySCF basis'
+        type: string
+        default: 'aug-cc-pvdz'
+      grid:
+        description: 'PySCF grid level'
+        type: choice
+        options: ['0', '1', '2', '3']
+        default: '1'
+      conv_tol:
+        description: 'SCF convergence threshold'
+        type: string
+        default: '1e-4'
+      report_only:
+        description: 'Render the summary without failing on a regression'
+        type: boolean
+        default: false
+      # no --xc input: the MBD parameters and the reference set are both PBE
+
+env:
+  # pinned: the committed baseline was measured on these geometries
+  VDWSETS_REF: 1da24b4fea312e2beaf9b3b9c2966be0200f3879
+  H5_SHA256: d268d10a570c8492af95bdc1c453491e1af7d1a9a67e5e8c5fc484d675624802
+  # pinned: pyscf and tables lag new CPython releases
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  # Fetch both external inputs once and hand the shards a 300 kB tarball
+  # instead of eight downloads of the 185 MB figshare store.
+  prefetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/cache@v5
+        with:
+          path: ~/s66x8-cache
+          key: s66x8-h5-${{ env.H5_SHA256 }}
+      - name: Fetch all-data.h5 from figshare
+        run: |
+          mkdir -p ~/s66x8-cache
+          if [ ! -f ~/s66x8-cache/all-data.h5 ]; then
+            curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
+              -o ~/s66x8-cache/all-data.h5.part \
+              https://ndownloader.figshare.com/files/9775933
+            mv ~/s66x8-cache/all-data.h5.part ~/s66x8-cache/all-data.h5
+          fi
+          echo "$H5_SHA256  $HOME/s66x8-cache/all-data.h5" | sha256sum -c -
+      - name: Fetch the pinned vdwsets geometries
+        run: |
+          git init -q vdwsets-clone
+          git -C vdwsets-clone remote add origin https://github.com/azag0/vdwsets
+          git -C vdwsets-clone fetch -q --depth 1 origin "$VDWSETS_REF"
+          git -C vdwsets-clone checkout -q FETCH_HEAD
+          mkdir -p data/vdwsets/vdwsets/data
+          cp -r vdwsets-clone/vdwsets/data/s66x8 data/vdwsets/vdwsets/data/
+      - name: Distil the reference values
+        # pandas and tables are needed only here, to read the HDF5 store
+        run: |
+          pip install numpy pandas tables
+          python devtools/pyscf_s66x8_figshare_check.py \
+            --h5 ~/s66x8-cache/all-data.h5 --dump-refs data/refs.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: s66x8-data
+          path: data/
+
+  # Filter the shard layout down to what was dispatched, so a run over three
+  # systems does not also produce five green check marks for empty shards.
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      has_jobs: ${{ steps.plan.outputs.has_jobs }}
+      systems: ${{ steps.plan.outputs.systems }}
+    steps:
+      - name: Build the benchmark matrix
+        id: plan
+        env:
+          SYSTEMS: ${{ inputs.systems }}
+        # A static partition of the 66 systems, balanced on the basis-function
+        # count of each curve. A whole curve has to stay in one shard: the
+        # runner's monomer memoization and density chaining are both
+        # curve-local, so splitting one costs SCFs and buys nothing.
+        run: |
+          python - >>"$GITHUB_OUTPUT" <<'PY'
+          import json, math, os
+          SHARDS = [
+              {"batch_id": "b0", "systems": "13 16 34 46 51 55 57 61"},
+              {"batch_id": "b1", "systems": "4 7 12 22 27 30 35 39"},
+              {"batch_id": "b2", "systems": "6 10 23 24 36 47 59 64 66"},
+              {"batch_id": "b3", "systems": "8 11 20 32 38 41 58 63"},
+              {"batch_id": "b4", "systems": "2 19 29 31 43 44 49 65"},
+              {"batch_id": "b5", "systems": "9 15 17 21 40 50 60 62"},
+              {"batch_id": "b6", "systems": "5 18 25 26 28 33 53 56"},
+              {"batch_id": "b7", "systems": "1 3 14 37 42 45 48 52 54"},
+          ]
+          want = os.environ["SYSTEMS"].split()
+          if want == ["all"]:
+              want = []
+          layout = [s["systems"].split() for s in SHARDS]
+          per_shard = math.ceil(sum(map(len, layout)) / len(SHARDS))
+          dispatched = [s for b in layout for s in b if not want or s in want]
+          # deal a partial dispatch back out, so it does not pay the libMBD
+          # build on every shard that kept even one system
+          n = max(1, math.ceil(len(dispatched) / per_shard))
+          kept = [[s for s in b if s in dispatched] for b in layout]
+          if sum(1 for b in kept if b) > n:
+              kept = [dispatched[i::n] for i in range(n)]
+          include = [
+              {"batch_id": f"b{i}", "systems": " ".join(sorted(b, key=int))}
+              for i, b in enumerate(b for b in kept if b)
+          ]
+          print("matrix=" + json.dumps({"include": include}))
+          print("has_jobs=" + ("true" if include else "false"))
+          print("systems=" + " ".join(sorted(dispatched, key=int)))
+          PY
+
+  benchmark:
+    needs: [setup, prefetch]
+    if: needs.setup.outputs.has_jobs == 'true'
+    name: s66x8 ${{ matrix.batch_id }}
+    runs-on: ubuntu-latest
+    # generous against the ~30 min a shard should take, but well short of
+    # GitHub's 360-min cap so a hung shard dies while aggregation is worth it
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.setup.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # poetry-dynamic-versioning derives the version from the tags
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set environment variables
+        run: |
+          echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
+          echo $HOME/env/bin >>$GITHUB_PATH
+      - name: Pin the numeric-library threads
+        # one OpenBLAS thread, the cores to PySCF's OpenMP: where both pools
+        # claim every core they contend badly
+        run: |
+          n=$(lscpu -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+          echo "Detected $n physical cores on this runner."
+          echo "OMP_NUM_THREADS=$n" >>"$GITHUB_ENV"
+          echo "OPENBLAS_NUM_THREADS=1" >>"$GITHUB_ENV"
+          echo "MKL_NUM_THREADS=1" >>"$GITHUB_ENV"
+      - name: Install libMBD dependencies
+        # no MPI: the bridge is serial
+        run: |
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends \
+            gfortran libblas-dev liblapack-dev
+      - name: Create the Python virtual environment
+        run: |
+          python3 -m venv $HOME/env
+          $HOME/env/bin/pip install -U pip
+      - name: Build & install libMBD and pyMBD
+        run: make install PYMBD_EXTRAS=pyscf
+      - uses: actions/download-artifact@v4
+        with:
+          name: s66x8-data
+          path: data
+      - name: Run the shard
+        env:
+          BATCH: ${{ matrix.batch_id }}
+          SYSTEMS: ${{ matrix.systems }}
+          BASIS: ${{ inputs.basis }}
+          GRID: ${{ inputs.grid }}
+          CONV_TOL: ${{ inputs.conv_tol }}
+        run: |
+          read -ra idx <<< "$SYSTEMS"
+          python devtools/pyscf_s66x8_figshare_check.py \
+            --vdwsets data/vdwsets --refs data/refs.json \
+            --basis "$BASIS" --grid "$GRID" --conv-tol "$CONV_TOL" \
+            --idx "${idx[@]}" \
+            --out-json "results/s66x8-${BATCH}.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s66x8-results-${{ matrix.batch_id }}
+          path: results/
+
+  aggregate:
+    needs: [setup, benchmark]
+    # Still aggregate when a shard failed -- the partial results are the point.
+    if: always() && needs.benchmark.result != 'cancelled' && needs.benchmark.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # the publish step force-updates ci-assets; serialize so two runs cannot
+    # clobber each other's directory
+    permissions:
+      contents: write
+    concurrency:
+      group: ci-assets-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: all-results
+          pattern: s66x8-results-*
+          merge-multiple: true
+      - name: Install the aggregator's dependencies
+        # no libMBD build and no pyscf: the runner's imports of both are lazy
+        run: pip install numpy matplotlib
+      - name: Aggregate
+        run: |
+          python devtools/pyscf_s66x8_aggregate.py \
+            --results-dir all-results \
+            --expect-systems "${{ needs.setup.outputs.systems }}" \
+            --vdwsets-ref "$VDWSETS_REF" \
+            ${{ inputs.report_only && '--report-only' || '' }}
+      - name: Plot the deviation against separation
+        # always() so a regression exit still leaves the figure behind
+        if: always()
+        run: python devtools/pyscf_s66x8_plot.py --results-dir all-results
+      - name: Publish the plot and embed it in the run summary
+        # Inline images in a job summary need a public URL, so commit the PNG
+        # to a single-commit orphan ci-assets branch and link it by raw URL.
+        # Best-effort: a publish error must not turn a green benchmark red.
+        if: always()
+        uses: actions/github-script@v9
+        env:
+          SRC_BRANCH: ${{ github.ref_name }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { owner, repo } = context.repo;
+            const branch = 'ci-assets';
+            const src = process.env.SRC_BRANCH;
+            let files = [];
+            try {
+              files = fs.readdirSync('results')
+                .filter((f) => /^convergence-.*\.png$/.test(f))
+                .sort();
+            } catch (e) {
+              core.info('no results directory; nothing to publish');
+              return;
+            }
+            if (files.length === 0) {
+              core.info('no plot produced');
+              return;
+            }
+            let published = false;
+            try {
+              let baseTree;
+              let exists = true;
+              try {
+                const ref = await github.rest.git.getRef({
+                  owner,
+                  repo,
+                  ref: `heads/${branch}`,
+                });
+                const commit = await github.rest.git.getCommit({
+                  owner,
+                  repo,
+                  commit_sha: ref.data.object.sha,
+                });
+                baseTree = commit.data.tree.sha;
+              } catch (e) {
+                if (e.status === 404) exists = false;
+                else throw e;
+              }
+              // base_tree keeps the other branches' directories; parents: []
+              // keeps this branch one commit deep so binaries never pile up
+              const tree = [];
+              for (const f of files) {
+                const content = fs
+                  .readFileSync(path.join('results', f))
+                  .toString('base64');
+                const blob = await github.rest.git.createBlob({
+                  owner,
+                  repo,
+                  content,
+                  encoding: 'base64',
+                });
+                tree.push({
+                  path: `${src}/${f}`,
+                  mode: '100644',
+                  type: 'blob',
+                  sha: blob.data.sha,
+                });
+              }
+              const newTree = await github.rest.git.createTree({
+                owner,
+                repo,
+                base_tree: baseTree,
+                tree,
+              });
+              const commit = await github.rest.git.createCommit({
+                owner,
+                repo,
+                message: `s66x8 benchmark plot: ${src} @ ${context.sha.slice(0, 7)}`,
+                tree: newTree.data.sha,
+                parents: [],
+              });
+              if (exists) {
+                await github.rest.git.updateRef({
+                  owner,
+                  repo,
+                  ref: `heads/${branch}`,
+                  sha: commit.data.sha,
+                  force: true,
+                });
+              } else {
+                await github.rest.git.createRef({
+                  owner,
+                  repo,
+                  ref: `refs/heads/${branch}`,
+                  sha: commit.data.sha,
+                });
+              }
+              published = true;
+            } catch (e) {
+              core.warning(`could not publish the plot to ${branch}: ${e.message}`);
+            }
+            core.summary.addHeading('Deviation against separation', 2);
+            if (published) {
+              const enc = src.split('/').map(encodeURIComponent).join('/');
+              for (const f of files) {
+                const url =
+                  `https://raw.githubusercontent.com/${owner}/${repo}/` +
+                  `${branch}/${enc}/${f}?${context.runId}`;
+                core.summary.addRaw(`\n![${f}](${url})\n`);
+              }
+            } else {
+              core.summary.addRaw(
+                'The plot is in the **s66x8-summary** artifact below.'
+              );
+            }
+            await core.summary.write();
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s66x8-summary
+          path: |
+            results/summary-s66x8.md
+            results/convergence-s66x8.png
+            results/reference-s66x8.json

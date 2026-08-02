@@ -61,10 +61,17 @@ Data (downloaded/located, not shipped):
   * geometries + labels from the vdwsets data files (read directly, no import)
     https://github.com/azag0/vdwsets  (git clone it and pass --vdwsets)
 
+Requires ``pyscf`` and a pyMBD with the compiled extension; reading the figshare
+HDF5 additionally needs ``pandas`` and ``tables``. ``--dump-refs`` distils it
+once into a small JSON that ``--refs`` reads back with neither.
+
 Usage:
     OPENBLAS_NUM_THREADS=1 python pyscf_s66x8_figshare_check.py \\
         --vdwsets /path/to/vdwsets/clone \\
-        [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] [--basis aug-cc-pvdz]
+        [--h5 all-data.h5 | --refs refs.json] [--idx 1 2 8 32 33 51 59 60] \\
+        [--basis aug-cc-pvdz] [--out-json results/s66x8-b0.json]
+
+    python pyscf_s66x8_figshare_check.py --h5 all-data.h5 --dump-refs refs.json
 
 Almost all the run time is the DFT itself, so it is worth giving OpenBLAS a
 single thread and leaving the rest to PySCF's OpenMP: where the two thread pools
@@ -74,9 +81,16 @@ a substitute.
 
 import argparse
 import csv
+import json
+import os
 import re
 import sys
+import time
+import traceback
 import urllib.request
+from importlib.metadata import PackageNotFoundError, version
+from itertools import groupby
+from operator import itemgetter
 from pathlib import Path
 
 import numpy as np
@@ -85,6 +99,10 @@ AU2KCAL = 627.509474
 H5_URL = 'https://ndownloader.figshare.com/files/9775933'
 # MBD@rsSCS for PBE (matches the reference calculations)
 MBD_A, MBD_BETA = 6.0, 0.83
+# separations per system in S66x8; a curve with fewer points ran short
+N_SCALES = 8
+# version of the --out-json and --refs payloads, checked by the aggregator
+SCHEMA = 1
 
 
 def _norm(label):
@@ -132,7 +150,11 @@ def load_geometries(vdwsets_root, idx_filter):
 def ensure_h5(path):
     if not path.exists():
         print(f'downloading all-data.h5 -> {path} ...', flush=True)
-        urllib.request.urlretrieve(H5_URL, path)
+        # renamed on success, so a half-finished download is not mistaken for a
+        # good one by the next run
+        part = path.with_name(path.name + '.part')
+        urllib.request.urlretrieve(H5_URL, part)
+        os.replace(part, path)
     return path
 
 
@@ -150,6 +172,49 @@ def load_paper(h5_path):
     return pbe, mbd, ref
 
 
+def dump_refs(h5_path, out_path):
+    """Distil the reference values this script uses out of the 185 MB HDF5 store.
+
+    Only the points present in all three tables, which is what the run loop
+    consumes. Lets a sharded run fetch figshare once rather than once per shard.
+    """
+    pbe, mbd, ref = load_paper(h5_path)
+    keys = sorted(pbe.keys() & mbd.keys() & ref.keys())
+    payload = {
+        'schema': SCHEMA,
+        'source': H5_URL,
+        'mbd_a': MBD_A,
+        'mbd_beta': MBD_BETA,
+        'points': [
+            {'label': lbl, 'scale': scale, 'pbe': pbe[k], 'mbd': mbd[k], 'ref': ref[k]}
+            for k in keys
+            for lbl, scale in [k]
+        ],
+    }
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, 'w') as f:
+        json.dump(payload, f)
+    print(f'wrote {len(keys)} reference points -> {out_path}')
+
+
+def load_refs(args):
+    """Return the reference values as {'pbe'|'mbd'|'ref': {(label, scale): value}}."""
+    if args.refs:
+        with open(args.refs) as f:
+            payload = json.load(f)
+        if payload.get('schema') != SCHEMA:
+            raise SystemExit(f'{args.refs}: unsupported schema {payload.get("schema")}')
+        if (payload['mbd_a'], payload['mbd_beta']) != (MBD_A, MBD_BETA):
+            raise SystemExit(f'{args.refs}: MBD parameters differ from this script')
+        pts = payload['points']
+        return {
+            k: {(p['label'], p['scale']): p[k] for p in pts}
+            for k in ('pbe', 'mbd', 'ref')
+        }
+    pbe, mbd, ref = load_paper(ensure_h5(Path(args.h5)))
+    return {'pbe': pbe, 'mbd': mbd, 'ref': ref}
+
+
 _ENERGIES = {}
 
 
@@ -160,7 +225,8 @@ def our_energies(species, coords, basis, xc, grid, conv_tol, dm0=None):
     equilibrium separation whatever the separation of the complex, so they are the
     same fragment at all eight points of a dissociation curve and only need
     computing once. The density matrix is returned for chaining (below) and is
-    None on a cache hit, since it is not worth keeping every fragment's.
+    None on a cache hit, since it is not worth keeping every fragment's -- which
+    doubles as how the caller counts the SCFs it actually ran.
 
     ``dm0`` is an initial guess, meant to be the converged density of the previous
     point of a dissociation curve. The monomers are rigid along one, so successive
@@ -193,10 +259,217 @@ def our_energies(species, coords, basis, xc, grid, conv_tol, dm0=None):
     return (*_ENERGIES[key], mf.make_rdm1())
 
 
-def main(argv=None):
+def run_curve(points, refs, args):
+    """Return the rows for one system's dissociation curve.
+
+    The curve is the unit of work because the density chaining is curve-local,
+    which is also what lets a failing system be dropped without poisoning the
+    next one.
+    """
+    rows, dm = [], None
+    for idx, label, scale, frags in points:
+        key = (_norm(label), float(scale))
+        if key not in refs['mbd']:
+            continue
+        t0 = time.perf_counter()
+        e, n_scf = {}, 0
+        for name, g in frags.items():
+            guess = dm if name == 'complex' else None
+            *e[name], new_dm = our_energies(
+                *g, args.basis, args.xc, args.grid, args.conv_tol, guess
+            )
+            n_scf += new_dm is not None  # None means served from _ENERGIES
+            if name == 'complex':
+                dm = new_dm
+        pbe_int = (e['complex'][0] - e['fragment-1'][0] - e['fragment-2'][0]) * AU2KCAL
+        mbd_int = (e['complex'][1] - e['fragment-1'][1] - e['fragment-2'][1]) * AU2KCAL
+        rows.append(
+            {
+                'idx': idx,
+                'label': label,
+                'scale': float(scale),
+                'mbd_our': mbd_int,
+                'mbd_paper': refs['mbd'][key],
+                'pbe_our': pbe_int,
+                'pbe_paper': refs['pbe'][key],
+                'ref': refs['ref'][key],
+                'wall': time.perf_counter() - t0,
+                'n_scf': n_scf,
+            }
+        )
+        r = rows[-1]
+        print(
+            f'{idx:2d} {label:28.28s} {scale:4.2f} | '
+            f'MBD our {r["mbd_our"]:7.3f}  paper {r["mbd_paper"]:7.3f}  '
+            f'Δ {r["mbd_our"] - r["mbd_paper"]:+.3f}',
+            flush=True,
+        )
+    return rows
+
+
+def run_systems(refs, args):
+    """Run every requested system, one dissociation curve at a time.
+
+    A system that raises is recorded and skipped rather than taking the rest of
+    the shard down with it.
+    """
+    idx_filter = None if args.all else set(args.idx)
+    systems, done = [], set()
+    for idx, group in groupby(load_geometries(args.vdwsets, idx_filter), itemgetter(0)):
+        if idx in done:
+            raise SystemExit(f'system {idx} is not contiguous in energies.csv')
+        done.add(idx)
+        group = list(group)
+        t0 = time.perf_counter()
+        try:
+            rows, error = run_curve(group, refs, args), None
+        except Exception as exc:
+            rows, error = [], f'{type(exc).__name__}: {exc}'
+            traceback.print_exc()
+        systems.append(
+            {
+                'idx': idx,
+                'label': group[0][1],
+                'error': error,
+                'wall': time.perf_counter() - t0,
+                'n_scf': sum(r['n_scf'] for r in rows),
+                'points': rows,
+            }
+        )
+    return systems
+
+
+def flatten_rows(systems):
+    """Every system's point rows, in the shape summarize/format_report want."""
+    return [p for s in systems for p in s['points']]
+
+
+def _version(name):
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return None
+
+
+def meta_from_args(args):
+    """The settings a result was produced under, for the JSON and the report header."""
+    return {
+        'basis': args.basis,
+        'xc': args.xc,
+        'grid': args.grid,
+        'conv_tol': args.conv_tol,
+        'mbd_a': MBD_A,
+        'mbd_beta': MBD_BETA,
+        'versions': {n: _version(n) for n in ('pymbd', 'pyscf', 'numpy')},
+    }
+
+
+def summarize(rows):
+    """Aggregate statistics over point rows.
+
+    Shared by the report, the CI aggregator (which calls it per system too, to
+    gate on ``mbd_rel_dev``) and the plot script.
+    """
+    mbd_our = np.array([r['mbd_our'] for r in rows])
+    mbd_paper = np.array([r['mbd_paper'] for r in rows])
+    pbe_paper = np.array([r['pbe_paper'] for r in rows])
+    dpbe = np.array([r['pbe_our'] - r['pbe_paper'] for r in rows])
+    ref = np.array([r['ref'] for r in rows])
+    scales = np.array([r['scale'] for r in rows])
+    dmbd = mbd_our - mbd_paper
+    argmax = int(np.abs(dmbd).argmax())
+
+    def mare(total, sel=slice(None)):
+        return 100 * np.mean(np.abs((total[sel] - ref[sel]) / ref[sel]))
+
+    def rel_dev(sel=slice(None)):
+        return 100 * np.mean(mbd_our[sel] / mbd_paper[sel] - 1)
+
+    return {
+        'n': len(rows),
+        'systems': sorted({r['idx'] for r in rows}),
+        'wall': sum(r['wall'] for r in rows),
+        'mbd_mae': float(np.abs(dmbd).mean()),
+        'mbd_absmax': float(np.abs(dmbd).max()),
+        'mbd_argmax': (rows[argmax]['idx'], rows[argmax]['scale']),
+        'mbd_bias': float(dmbd.mean()),
+        'mbd_rel_dev': float(rel_dev()),
+        'pbe_mae': float(np.abs(dpbe).mean()),
+        'pbe_bias': float(dpbe.mean()),
+        'mare_recon': float(mare(pbe_paper + mbd_our)),
+        'mare_ref': float(mare(pbe_paper + mbd_paper)),
+        'mare_nodisp': float(mare(pbe_paper)),
+        'by_scale': [
+            {
+                'scale': float(s),
+                'n': int((scales == s).sum()),
+                'mbd_rel_dev': float(rel_dev(scales == s)),
+                'mare_recon': float(mare(pbe_paper + mbd_our, scales == s)),
+                'mare_ref': float(mare(pbe_paper + mbd_paper, scales == s)),
+                'mare_nodisp': float(mare(pbe_paper, scales == s)),
+                'abs_ref': float(np.mean(np.abs(ref[scales == s]))),
+            }
+            for s in sorted(set(scales))
+        ],
+    }
+
+
+def format_report(rows, seen, meta, failed=()):
+    """The summary block: MBD deviation, reconstructed MARE, and both by separation.
+
+    The reconstructed total energy is our MBD term on top of the *reference's* own
+    all-electron PBE interaction energy. That keeps the DFT part identical to the
+    reference, so the whole difference between the reconstructed and the reference
+    MARE is the dispersion term, i.e. the bridge. Adding our own PBE instead would
+    swamp it, that term being uncorrected for BSSE and in a finite basis.
+    """
+    s = summarize(rows)
+    out = [
+        f'\n{s["n"]} points over systems {sorted(seen)}',
+        f'MBD  (ours vs FHI-aims):  MAE {s["mbd_mae"]:.4f}  '
+        f'max|Δ| {s["mbd_absmax"]:.4f}  bias {s["mbd_bias"]:+.4f} kcal/mol  '
+        f'({s["mbd_rel_dev"]:+.2f}% mean relative)',
+        f'PBE  (our {meta["basis"]}, grid {meta["grid"]}, '
+        f'conv {meta["conv_tol"]:g}, no CP, vs all-electron):  '
+        f'MAE {s["pbe_mae"]:.4f}  bias {s["pbe_bias"]:+.4f} kcal/mol  '
+        f'(basis set + BSSE + grid, not the bridge)',
+        # against the CCSD(T)/CBS benchmark, with the reference's PBE in both totals
+        f'\nvs CCSD(T)/CBS, reference PBE + MBD:  '
+        f'reconstructed (our MBD) MARE {s["mare_recon"]:.1f}%   '
+        f'reference MARE {s["mare_ref"]:.1f}%   '
+        f'no dispersion {s["mare_nodisp"]:.1f}%',
+        '\nby separation:',
+        f'{"scale":>7} {"n":>5} {"MBD rel dev":>13} '
+        f'{"MARE recon":>12} {"MARE ref":>10} {"|E| ref":>9}',
+    ]
+    out += [
+        f'{b["scale"]:>7.2f} {b["n"]:>5d} '
+        f'{b["mbd_rel_dev"]:>+12.2f}% '
+        f'{b["mare_recon"]:>11.1f}% '
+        f'{b["mare_ref"]:>9.1f}% '
+        f'{b["abs_ref"]:>9.3f}'
+        for b in s['by_scale']
+    ]
+    if failed:
+        out.append('\nfailed systems:')
+        out += [f'{f["idx"]:2d} {f["label"]:28.28s} {f["error"]}' for f in failed]
+    return '\n'.join(out) + '\n'
+
+
+def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--vdwsets', required=True, help='path to a vdwsets checkout')
+    p.add_argument('--vdwsets', help='path to a vdwsets checkout')
     p.add_argument('--h5', default='all-data.h5', help='path to all-data.h5')
+    p.add_argument(
+        '--refs',
+        help='reference values from a previous --dump-refs, read instead of --h5 '
+        '(needs neither pandas nor tables)',
+    )
+    p.add_argument(
+        '--dump-refs',
+        metavar='PATH',
+        help='distil --h5 into a small JSON for --refs and exit, running nothing',
+    )
     p.add_argument('--basis', default='aug-cc-pvdz')
     p.add_argument('--xc', default='PBE')
     p.add_argument(
@@ -221,116 +494,52 @@ def main(argv=None):
         help='S66 system indices to run (default: a small E/D/M-spanning subset)',
     )
     p.add_argument('--all', action='store_true', help='run all 66 systems')
+    p.add_argument(
+        '--out-json',
+        metavar='PATH',
+        help='write the per-point results here, for pyscf_s66x8_aggregate.py',
+    )
     args = p.parse_args(argv)
+    if not args.dump_refs and not args.vdwsets:
+        p.error('--vdwsets is required unless --dump-refs is given')
+    return args
 
-    pbe_ref, mbd_ref, ccsdt = load_paper(ensure_h5(Path(args.h5)))
-    idx_filter = None if args.all else set(args.idx)
 
-    rows = []
-    seen = set()
-    # the converged density of the previous point of the current dissociation
-    # curve, fed to the next one as its initial guess; only one is ever held,
-    # since the points arrive grouped by system
-    curve_idx, curve_dm = None, None
-    for idx, label, scale, frags in load_geometries(args.vdwsets, idx_filter):
-        key = (_norm(label), float(scale))
-        if key not in mbd_ref:
-            continue
-        if idx != curve_idx:
-            curve_idx, curve_dm = idx, None
-        e = {}
-        for name, g in frags.items():
-            guess = curve_dm if name == 'complex' else None
-            *e[name], dm = our_energies(
-                *g, args.basis, args.xc, args.grid, args.conv_tol, guess
+def main(argv=None):
+    args = parse_args(argv)
+    if args.dump_refs:
+        dump_refs(ensure_h5(Path(args.h5)), args.dump_refs)
+        return 0
+
+    systems = run_systems(load_refs(args), args)
+    # written before the exit code is decided, so a shard that lost a system
+    # still hands the rest over to the aggregator
+    if args.out_json:
+        Path(args.out_json).parent.mkdir(parents=True, exist_ok=True)
+        with open(args.out_json, 'w') as f:
+            json.dump(
+                {'schema': SCHEMA, 'meta': meta_from_args(args), 'systems': systems},
+                f,
+                indent=1,
             )
-            if name == 'complex':
-                curve_dm = dm
-        pbe_int = (e['complex'][0] - e['fragment-1'][0] - e['fragment-2'][0]) * AU2KCAL
-        mbd_int = (e['complex'][1] - e['fragment-1'][1] - e['fragment-2'][1]) * AU2KCAL
-        rows.append(
-            {
-                'idx': idx,
-                'label': label,
-                'scale': float(scale),
-                'mbd_our': mbd_int,
-                'mbd_paper': mbd_ref[key],
-                'pbe_our': pbe_int,
-                'pbe_paper': pbe_ref[key],
-                'ref': ccsdt[key],
-            }
-        )
-        seen.add(idx)
-        r = rows[-1]
-        print(
-            f'{idx:2d} {label:28.28s} {scale:4.2f} | '
-            f'MBD our {r["mbd_our"]:7.3f}  paper {r["mbd_paper"]:7.3f}  '
-            f'Δ {r["mbd_our"] - r["mbd_paper"]:+.3f}',
-            flush=True,
-        )
 
+    rows = flatten_rows(systems)
+    failed = [s for s in systems if s['error']]
     if not rows:
         print('no matching systems found', file=sys.stderr)
+        for s in failed:
+            print(f'{s["idx"]:2d} {s["label"]}: {s["error"]}', file=sys.stderr)
         return 1
-    report(rows, seen, args)
-    return 0
-
-
-def report(rows, seen, args):
-    """Print the summary: MBD deviation, reconstructed MARE, and both by separation.
-
-    The reconstructed total energy is our MBD term on top of the *reference's* own
-    all-electron PBE interaction energy. That keeps the DFT part identical to the
-    reference, so the whole difference between the reconstructed and the reference
-    MARE is the dispersion term, i.e. the bridge. Adding our own PBE instead would
-    swamp it, that term being uncorrected for BSSE and in a finite basis.
-    """
-    mbd_our = np.array([r['mbd_our'] for r in rows])
-    mbd_paper = np.array([r['mbd_paper'] for r in rows])
-    pbe_paper = np.array([r['pbe_paper'] for r in rows])
-    dpbe = np.array([r['pbe_our'] - r['pbe_paper'] for r in rows])
-    ref = np.array([r['ref'] for r in rows])
-    scales = np.array([r['scale'] for r in rows])
-    dmbd = mbd_our - mbd_paper
-
-    def mare(total, sel=slice(None)):
-        return 100 * np.mean(np.abs((total[sel] - ref[sel]) / ref[sel]))
-
-    print(f'\n{len(rows)} points over systems {sorted(seen)}')
     print(
-        f'MBD  (ours vs FHI-aims):  MAE {np.abs(dmbd).mean():.4f}  '
-        f'max|Δ| {np.abs(dmbd).max():.4f}  bias {dmbd.mean():+.4f} kcal/mol  '
-        f'({100 * np.mean(mbd_our / mbd_paper - 1):+.2f}% mean relative)'
+        format_report(
+            rows,
+            {s['idx'] for s in systems if s['points']},
+            meta_from_args(args),
+            failed,
+        ),
+        end='',
     )
-    print(
-        f'PBE  (our {args.basis}, grid {args.grid}, conv {args.conv_tol:g}, no CP, '
-        f'vs all-electron):  '
-        f'MAE {np.abs(dpbe).mean():.4f}  bias {dpbe.mean():+.4f} kcal/mol  '
-        f'(basis set + BSSE + grid, not the bridge)'
-    )
-
-    # against the CCSD(T)/CBS benchmark, with the reference's PBE in both totals
-    print(
-        f'\nvs CCSD(T)/CBS, reference PBE + MBD:  '
-        f'reconstructed (our MBD) MARE {mare(pbe_paper + mbd_our):.1f}%   '
-        f'reference MARE {mare(pbe_paper + mbd_paper):.1f}%   '
-        f'no dispersion {mare(pbe_paper):.1f}%'
-    )
-
-    print('\nby separation:')
-    print(
-        f'{"scale":>7} {"n":>5} {"MBD rel dev":>13} '
-        f'{"MARE recon":>12} {"MARE ref":>10} {"|E| ref":>9}'
-    )
-    for s in sorted(set(scales)):
-        m = scales == s
-        print(
-            f'{s:>7.2f} {m.sum():>5d} '
-            f'{100 * np.mean(mbd_our[m] / mbd_paper[m] - 1):>+12.2f}% '
-            f'{mare(pbe_paper + mbd_our, m):>11.1f}% '
-            f'{mare(pbe_paper + mbd_paper, m):>9.1f}% '
-            f'{np.mean(np.abs(ref[m])):>9.3f}'
-        )
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':

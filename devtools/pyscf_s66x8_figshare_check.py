@@ -61,17 +61,14 @@ Data (downloaded/located, not shipped):
   * geometries + labels from the vdwsets data files (read directly, no import)
     https://github.com/azag0/vdwsets  (git clone it and pass --vdwsets)
 
-Requires ``pyscf`` and a pyMBD with the compiled extension; reading the figshare
-HDF5 additionally needs ``pandas`` and ``tables``. ``--dump-refs`` distils it
-once into a small JSON that ``--refs`` reads back with neither.
+Requires ``pyscf``, ``pandas``, ``tables`` and a pyMBD with the compiled
+extension.
 
 Usage:
     OPENBLAS_NUM_THREADS=1 python pyscf_s66x8_figshare_check.py \\
         --vdwsets /path/to/vdwsets/clone \\
-        [--h5 all-data.h5 | --refs refs.json] [--idx 1 2 8 32 33 51 59 60] \\
+        [--h5 all-data.h5] [--idx 1 2 8 32 33 51 59 60] \\
         [--basis aug-cc-pvdz] [--out-json results/s66x8-b0.json]
-
-    python pyscf_s66x8_figshare_check.py --h5 all-data.h5 --dump-refs refs.json
 
 Almost all the run time is the DFT itself, so it is worth giving OpenBLAS a
 single thread and leaving the rest to PySCF's OpenMP: where the two thread pools
@@ -101,7 +98,7 @@ H5_URL = 'https://ndownloader.figshare.com/files/9775933'
 MBD_A, MBD_BETA = 6.0, 0.83
 # separations per system in S66x8; a curve with fewer points ran short
 N_SCALES = 8
-# version of the --out-json and --refs payloads, checked by the aggregator
+# version of the --out-json payload, checked by the aggregator
 SCHEMA = 1
 
 
@@ -159,6 +156,7 @@ def ensure_h5(path):
 
 
 def load_paper(h5_path):
+    """Return the reference values as {'pbe'|'mbd'|'ref': {(label, scale): value}}."""
     import pandas as pd
 
     with pd.HDFStore(str(h5_path), 'r') as store:
@@ -169,49 +167,6 @@ def load_paper(h5_path):
     pbe = {(_norm(s), float(d)): v for (s, d), v in scf['ene'].items()}
     ref = {(_norm(s), float(d)): v for (s, d), v in scf['ref'].items()}
     mbd = {(_norm(s), float(d)): v for (s, d), v in mbd.items()}
-    return pbe, mbd, ref
-
-
-def dump_refs(h5_path, out_path):
-    """Distil the reference values this script uses out of the 185 MB HDF5 store.
-
-    Only the points present in all three tables, which is what the run loop
-    consumes. Lets a sharded run fetch figshare once rather than once per shard.
-    """
-    pbe, mbd, ref = load_paper(h5_path)
-    keys = sorted(pbe.keys() & mbd.keys() & ref.keys())
-    payload = {
-        'schema': SCHEMA,
-        'source': H5_URL,
-        'mbd_a': MBD_A,
-        'mbd_beta': MBD_BETA,
-        'points': [
-            {'label': lbl, 'scale': scale, 'pbe': pbe[k], 'mbd': mbd[k], 'ref': ref[k]}
-            for k in keys
-            for lbl, scale in [k]
-        ],
-    }
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, 'w') as f:
-        json.dump(payload, f)
-    print(f'wrote {len(keys)} reference points -> {out_path}')
-
-
-def load_refs(args):
-    """Return the reference values as {'pbe'|'mbd'|'ref': {(label, scale): value}}."""
-    if args.refs:
-        with open(args.refs) as f:
-            payload = json.load(f)
-        if payload.get('schema') != SCHEMA:
-            raise SystemExit(f'{args.refs}: unsupported schema {payload.get("schema")}')
-        if (payload['mbd_a'], payload['mbd_beta']) != (MBD_A, MBD_BETA):
-            raise SystemExit(f'{args.refs}: MBD parameters differ from this script')
-        pts = payload['points']
-        return {
-            k: {(p['label'], p['scale']): p[k] for p in pts}
-            for k in ('pbe', 'mbd', 'ref')
-        }
-    pbe, mbd, ref = load_paper(ensure_h5(Path(args.h5)))
     return {'pbe': pbe, 'mbd': mbd, 'ref': ref}
 
 
@@ -458,18 +413,8 @@ def format_report(rows, seen, meta, failed=()):
 
 def parse_args(argv):
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--vdwsets', help='path to a vdwsets checkout')
+    p.add_argument('--vdwsets', required=True, help='path to a vdwsets checkout')
     p.add_argument('--h5', default='all-data.h5', help='path to all-data.h5')
-    p.add_argument(
-        '--refs',
-        help='reference values from a previous --dump-refs, read instead of --h5 '
-        '(needs neither pandas nor tables)',
-    )
-    p.add_argument(
-        '--dump-refs',
-        metavar='PATH',
-        help='distil --h5 into a small JSON for --refs and exit, running nothing',
-    )
     p.add_argument('--basis', default='aug-cc-pvdz')
     p.add_argument('--xc', default='PBE')
     p.add_argument(
@@ -499,19 +444,12 @@ def parse_args(argv):
         metavar='PATH',
         help='write the per-point results here, for pyscf_s66x8_aggregate.py',
     )
-    args = p.parse_args(argv)
-    if not args.dump_refs and not args.vdwsets:
-        p.error('--vdwsets is required unless --dump-refs is given')
-    return args
+    return p.parse_args(argv)
 
 
 def main(argv=None):
     args = parse_args(argv)
-    if args.dump_refs:
-        dump_refs(ensure_h5(Path(args.h5)), args.dump_refs)
-        return 0
-
-    systems = run_systems(load_refs(args), args)
+    systems = run_systems(load_paper(ensure_h5(Path(args.h5))), args)
     # written before the exit code is decided, so a shard that lost a system
     # still hands the rest over to the aggregator
     if args.out_json:

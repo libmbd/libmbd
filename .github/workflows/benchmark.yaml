@@ -34,49 +34,6 @@ env:
   PYTHON_VERSION: '3.12'
 
 jobs:
-  # Fetch both external inputs once and hand the shards a 300 kB tarball
-  # instead of eight downloads of the 185 MB figshare store.
-  prefetch:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/cache@v5
-        with:
-          path: ~/s66x8-cache
-          key: s66x8-h5-${{ env.H5_SHA256 }}
-      - name: Fetch all-data.h5 from figshare
-        run: |
-          mkdir -p ~/s66x8-cache
-          if [ ! -f ~/s66x8-cache/all-data.h5 ]; then
-            curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
-              -o ~/s66x8-cache/all-data.h5.part \
-              https://ndownloader.figshare.com/files/9775933
-            mv ~/s66x8-cache/all-data.h5.part ~/s66x8-cache/all-data.h5
-          fi
-          echo "$H5_SHA256  $HOME/s66x8-cache/all-data.h5" | sha256sum -c -
-      - name: Fetch the pinned vdwsets geometries
-        run: |
-          git init -q vdwsets-clone
-          git -C vdwsets-clone remote add origin https://github.com/azag0/vdwsets
-          git -C vdwsets-clone fetch -q --depth 1 origin "$VDWSETS_REF"
-          git -C vdwsets-clone checkout -q FETCH_HEAD
-          mkdir -p data/vdwsets/vdwsets/data
-          cp -r vdwsets-clone/vdwsets/data/s66x8 data/vdwsets/vdwsets/data/
-      - name: Distil the reference values
-        # pandas and tables are needed only here, to read the HDF5 store
-        run: |
-          pip install numpy pandas tables
-          python devtools/pyscf_s66x8_figshare_check.py \
-            --h5 ~/s66x8-cache/all-data.h5 --dump-refs data/refs.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: s66x8-data
-          path: data/
-
   # Filter the shard layout down to what was dispatched, so a run over three
   # systems does not also produce five green check marks for empty shards.
   setup:
@@ -140,7 +97,7 @@ jobs:
           PY
 
   benchmark:
-    needs: [setup, prefetch]
+    needs: setup
     if: needs.setup.outputs.has_jobs == 'true'
     name: s66x8 ${{ matrix.batch_id }}
     runs-on: ubuntu-latest
@@ -181,11 +138,30 @@ jobs:
           python3 -m venv $HOME/env
           $HOME/env/bin/pip install -U pip
       - name: Build & install libMBD and pyMBD
-        run: make install PYMBD_EXTRAS=pyscf
-      - uses: actions/download-artifact@v4
+        # pandas and tables read the HDF5 store
+        run: |
+          make install PYMBD_EXTRAS=pyscf
+          pip install pandas tables
+      - uses: actions/cache@v5
         with:
-          name: s66x8-data
-          path: data
+          path: ~/s66x8-cache
+          key: s66x8-h5-${{ env.H5_SHA256 }}
+      - name: Fetch all-data.h5 from figshare
+        run: |
+          mkdir -p ~/s66x8-cache
+          if [ ! -f ~/s66x8-cache/all-data.h5 ]; then
+            curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
+              -o ~/s66x8-cache/all-data.h5.part \
+              https://ndownloader.figshare.com/files/9775933
+            mv ~/s66x8-cache/all-data.h5.part ~/s66x8-cache/all-data.h5
+          fi
+          echo "$H5_SHA256  $HOME/s66x8-cache/all-data.h5" | sha256sum -c -
+      - name: Fetch the pinned vdwsets geometries
+        run: |
+          git init -q vdwsets
+          git -C vdwsets remote add origin https://github.com/azag0/vdwsets
+          git -C vdwsets fetch -q --depth 1 origin "$VDWSETS_REF"
+          git -C vdwsets checkout -q FETCH_HEAD
       - name: Run the shard
         env:
           BATCH: ${{ matrix.batch_id }}
@@ -196,7 +172,7 @@ jobs:
         run: |
           read -ra idx <<< "$SYSTEMS"
           python devtools/pyscf_s66x8_figshare_check.py \
-            --vdwsets data/vdwsets --refs data/refs.json \
+            --vdwsets vdwsets --h5 ~/s66x8-cache/all-data.h5 \
             --basis "$BASIS" --grid "$GRID" --conv-tol "$CONV_TOL" \
             --idx "${idx[@]}" \
             --out-json "results/s66x8-${BATCH}.json"

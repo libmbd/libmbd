@@ -250,6 +250,7 @@ jobs:
         run: make test_libmbd
       - name: Test pyMBD
         run: |
+          set -o pipefail
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Generate coverage reports
@@ -297,12 +298,16 @@ jobs:
       matrix:
         # intel -> ifx + icx (LLVM-based), intel-classic -> ifort (last release)
         toolchain: [intel, intel-classic]
-    env:
-      VIRTUAL_ENV: ${{ github.workspace }}/env
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
+      - name: Set environment variables
+        # Outside the workspace: an untracked directory inside it makes
+        # poetry-dynamic-versioning stamp pyMBD as dirty, and pymbd.fortran
+        # then refuses to import because its git suffix no longer matches
+        # the one libMBD got from git describe.
+        run: echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
       - name: Set up Intel Fortran/C compiler
         id: setup-fortran
         uses: fortran-lang/setup-fortran@v1
@@ -349,6 +354,7 @@ jobs:
         run: make test_libmbd
       - name: Test pyMBD
         run: |
+          set -o pipefail
           make test -o test_libmbd | tee output
           ! grep failed output >/dev/null
   pr-gate:

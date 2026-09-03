@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Optional `pymbd.pyscf` bridge turning a converged PySCF Kohn–Sham object into an MBD or TS dispersion energy via Hirshfeld volume ratios ([#145](https://github.com/libmbd/libmbd/pull/145))
 
+### Fixed
+
+- pyMBD failing to import its C extension (`undefined symbol: cmbd_nonint_density`) when libMBD is built with gfortran 16.2, which no longer exports the two density bindings that were missing from the C API module's public list ([#147](https://github.com/libmbd/libmbd/pull/147))
+
 ## [0.15.0] - 2026-07-24
 
 ### Added

@@ -62,7 +62,6 @@ opt_einsum==3.4.0
 optax==0.2.7
 orbax-checkpoint==0.11.24
 orjson==3.11.7
-packaging @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_packaging_1769093650/work
 palettable==3.3.3
 pandas==3.0.1
 pillow==12.1.1
@@ -78,7 +77,6 @@ pydantic==2.12.5
 pydantic_core==2.41.5
 Pygments==2.19.2
 pymatgen==2025.10.7
-pymbd @ file:///mnt/tier2/project/p200715/evgeny/Projects/OMC_25_recomputation/sanity_check_mbdml_framework/software/libmbd
 pyparsing==3.3.2
 pysages @ git+https://github.com/em819/PySAGES.git@bcacf6007ff27f7e8a6a6eabc465c85b84a1850f
 pytest==9.0.2

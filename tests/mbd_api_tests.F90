@@ -41,6 +41,14 @@ subroutine test(test_name)
     real(dp), allocatable :: gradients(:, :)
     integer :: code
     character(200) :: origin, msg
+#ifdef WITH_MPI
+    integer :: mpi_size, mpi_rank, color
+#   ifdef WITH_MPIF08
+    type(MPI_Comm) :: subcomm
+#   else
+    integer :: subcomm
+#   endif
+#endif
 
     inp%atom_types = ['Ar', 'Ar']
     inp%coords = reshape([0d0, 0d0, 0d0, 0d0, 0d0, 4d0 * ang], [3, 2])
@@ -57,6 +65,45 @@ subroutine test(test_name)
         call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
         call calc%evaluate_vdw_method(energy)
         call check(energy, -2.4329456747018696d-4, 1d-10)
+    case ('energy_subcomm')
+#ifdef WITH_MPI
+#   ifdef WITH_SCALAPACK
+        call MPI_COMM_SIZE(MPI_COMM_WORLD, mpi_size, err)
+        call MPI_COMM_RANK(MPI_COMM_WORLD, mpi_rank, err)
+        if (mpi_size > 1) then
+            ! Split the world into two halves so that each subcommunicator is a
+            ! strict subset of MPI_COMM_WORLD, exercising the communicator ->
+            ! BLACS context translation and grid sizing on a sub-communicator.
+            if (mpi_rank < mpi_size / 2) then
+                color = 0
+            else
+                color = 1
+            end if
+            call MPI_COMM_SPLIT(MPI_COMM_WORLD, color, mpi_rank, subcomm, err)
+#       ifdef WITH_MPIF08
+            inp%comm = subcomm%mpi_val
+#       else
+            inp%comm = subcomm
+#       endif
+        end if
+        inp%parallel_mode = 'atoms'
+        call calc%init(inp)
+        call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc%evaluate_vdw_method(energy)
+        call check(energy, -2.4329456747018696d-4, 1d-10)
+        if (mpi_size > 1) call MPI_COMM_FREE(subcomm, err)
+#   else
+        call calc%init(inp)
+        call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc%evaluate_vdw_method(energy)
+        call check(energy, -2.4329456747018696d-4, 1d-10)
+#   endif
+#else
+        call calc%init(inp)
+        call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])
+        call calc%evaluate_vdw_method(energy)
+        call check(energy, -2.4329456747018696d-4, 1d-10)
+#endif
     case ('gradients')
         call calc%init(inp)
         call calc%update_vdw_params_custom([11d0, 11d0], [63.525d0, 63.525d0], [3.55d0, 3.55d0])

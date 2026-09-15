@@ -1,7 +1,10 @@
 *.pyc
 *.so
+*.gcov
 *.egg-info/
 /.coverage*
+/coverage.xml
+/coverage-fortran/
 /.tox
 /.pytest_cache/
 /build

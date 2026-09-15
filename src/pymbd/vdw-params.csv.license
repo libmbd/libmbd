@@ -1,0 +1,7 @@
+SPDX-FileCopyrightText: 2017-2025 Jan Hermann and libMBD contributors
+SPDX-License-Identifier: CC0-1.0
+
+This file is a compilation of numerical reference data (free-atom polarizabilities,
+C6 coefficients and van der Waals radii) released into the public domain via CC0-1.0.
+The underlying data are sourced from published literature; see vdw-params.SOURCES.md
+in the same directory for per-column provenance and DOIs.

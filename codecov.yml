@@ -1,0 +1,26 @@
+# Coverage is assembled from several CI matrix legs that preprocess the Fortran
+# sources differently (serial vs MPI vs MPIFH vs ELSI), plus the Python suite.
+# Each configuration uploads under its own flag (see the COV_FLAG logic and
+# devtools/gen-fortran-coverage.sh in this repo) so Codecov never has to
+# reconcile conflicting line tables for a single *.F90 file; the flags are then
+# combined as a union for the overall number. carryforward keeps a flag's last
+# report when a given push doesn't re-run that leg.
+flag_management:
+  default_rules:
+    carryforward: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        informational: true
+
+ignore:
+  - "tests"
+  - "doc"
+  - "build"
+  - "**/mbd_version.f90"

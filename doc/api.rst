@@ -10,6 +10,12 @@ Pure-Python implementation
 
     Can be imported directly as :py:data:`pymbd.ang`.
 
+PySCF bridge
+------------
+
+.. automodule:: pymbd.pyscf
+   :members: hirshfeld_volume_ratios, mbd_energy
+
 Fortran bindings
 ----------------
 

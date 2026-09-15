@@ -7,6 +7,15 @@ For installation, see the Readme_. For examples, see the Readme_ or the `tests <
 
 .. _Readme: https://github.com/libmbd/libmbd/blob/master/README.md
 
+Examples
+--------
+
+.. toctree::
+    :maxdepth: 2
+
+    densities
+    examples
+
 API reference
 -------------
 

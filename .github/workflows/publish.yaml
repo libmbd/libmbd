@@ -1,0 +1,33 @@
+name: Publish
+# When a GitHub Release is published, upload the pyMBD sdist attached to it to
+# PyPI. Reading the sdist back from the Release keeps PyPI and the Release
+# identical and leaves the Release untouched.
+on:
+  release:
+    types: [published]
+jobs:
+  publish:
+    name: Publish to PyPI
+    if: github.repository == 'libmbd/libmbd'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pymbd/
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      # Only the pyMBD sdist; the libMBD archive stays a Release-only asset.
+      - name: Download the pyMBD sdist from the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          mkdir -p dist
+          gh release download "$TAG" --pattern 'pymbd-*.tar.gz' --dir dist
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+          packages-dir: dist

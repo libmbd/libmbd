@@ -4,6 +4,7 @@ summary: Many-body dispersion library
 license: by
 src_dir: ../src
 css: tweaks.css
+favicon: _static/favicon-32.png
 hide_undoc: true
 preprocessor: gfortran -cpp -E -P -DWITH_MPI -DWITH_SCALAPACK
 exclude:
@@ -15,7 +16,6 @@ exclude:
     mbd_linalg.F90
     mbd_matrix.F90
     mbd_mpi.F90
-    mbd_rpa.F90
     mbd_scalapack.f90
     mbd_vdw_param.f90
 ---

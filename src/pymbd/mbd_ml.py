@@ -4,6 +4,8 @@
 
 import os
 import sys
+import shutil
+import tempfile
 from pymbd import from_volumes
 from pymbd.fortran  import MBDGeom
 import numpy as np
@@ -23,30 +25,38 @@ except ImportError:
 
 def ratios_from_mbdml(atoms):
     '''This function is a wrapper for the MBD-ML model, which predicts a0 and C6 ratios given a molecular or crystal structure'''
-    mbdml_in_filename = 'temp_mbdml_in.extxyz'
-    mbdml_out_filename = 'temp_mbdml_out.extxyz'
+    tmpdir = tempfile.mkdtemp(prefix='mbdml-')
+    mbdml_in_filename = os.path.join(tmpdir, 'mbdml_in.extxyz')
+    mbdml_out_filename = os.path.join(tmpdir, 'mbdml_out.extxyz')
 
-    ase.io.write(mbdml_in_filename, atoms, format='extxyz', write_info=True, write_results=True)
+    try:
+        ase.io.write(mbdml_in_filename, atoms, format='extxyz', write_info=True, write_results=True)
 
-    #model_path=f"{os.path.dirname(os.path.realpath(__file__))}/mbd_ml_model/sv2j_b128_l2d_42e_16hh_10_24novv"
-    model_path=f"{os.path.dirname(os.path.realpath(__file__))}/mbd_ml_model/sv2j_b64_l2d_42e_16hh_10_24novv"
-    print(f'Path of model: {model_path}')
-    _ = evaluate_so3lr_on(
-            datafile = mbdml_in_filename,
-            batch_size = 1,
-            lr_cutoff = 0.1,
-            dispersion_damping = 2.0,
-            jit_compile = False,
-            save_to = mbdml_out_filename,
-            model_path = model_path,
-            precision = "float32",
-            targets = "hirshfeld_ratios,c6_ratios",
-            log_file = None
-            )
+        #model_path=f"{os.path.dirname(os.path.realpath(__file__))}/mbd_ml_model/sv2j_b128_l2d_42e_16hh_10_24novv"
+        model_path=f"{os.path.dirname(os.path.realpath(__file__))}/mbd_ml_model/sv2j_b64_l2d_42e_16hh_10_24novv"
+        print(f'Path of model: {model_path}')
+        _ = evaluate_so3lr_on(
+                datafile = mbdml_in_filename,
+                batch_size = 1,
+                lr_cutoff = 0.1,
+                dispersion_damping = 2.0,
+                jit_compile = False,
+                save_to = mbdml_out_filename,
+                model_path = model_path,
+                precision = "float32",
+                targets = "hirshfeld_ratios,c6_ratios",
+                log_file = None
+                )
 
-    atoms_eval = ase.io.read(mbdml_out_filename, format='extxyz')
-    c6 = atoms_eval.arrays["c6_ratios_so3lr"]
-    a0 = atoms_eval.arrays["hirshfeld_ratios_so3lr"]
+        atoms_eval = ase.io.read(mbdml_out_filename, format='extxyz')
+        c6 = atoms_eval.arrays["c6_ratios_so3lr"]
+        a0 = atoms_eval.arrays["hirshfeld_ratios_so3lr"]
+    except Exception:
+        print(f'MBD-ML evaluation failed, temporary files kept in {tmpdir}')
+        raise
+
+    #Remove temporary xyz files, as otherwise so3lr eval fails in the second step
+    shutil.rmtree(tmpdir)
 
     combined_ratios = np.concatenate([c6, a0])
     ratio_min = 0.05
@@ -54,13 +64,6 @@ def ratios_from_mbdml(atoms):
     if np.any((combined_ratios < ratio_min) | (combined_ratios > ratio_max)):
         print(f"\n{'!'*50}\nWARNING: a0 or c6 ratios outside [{ratio_min}, {ratio_max}]!\nThis indicates that either your system is pathological or that the MBD-ML is\nextrapolating and th\
 at the result is potentially not reliable. Proceed with care!\n{'!'*50}")
-
-    #Remove temporary xyz files, as otherwise so3lr eval fails in the second step
-    if os.path.exists(mbdml_in_filename):
-        os.remove(mbdml_in_filename)
-
-    if os.path.exists(mbdml_out_filename):
-        os.remove(mbdml_out_filename)
 
     return {'c6' : c6, 'a0': a0}
 

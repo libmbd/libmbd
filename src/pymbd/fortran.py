@@ -31,23 +31,16 @@ LIBMBD_VERSION = (
     _ffi.string(_lib.cmbd_version_suffix).strip().decode(),
 )
 
-'''
 # do not test versions when running autodoc
 if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
-    try:
-        assert PYMBD_VERSION[0] == LIBMBD_VERSION[0]
-            
-        if PYMBD_VERSION[0] == 0:
-            assert PYMBD_VERSION[1] == LIBMBD_VERSION[1]
-        else:
-            assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
-    except AssertionError as e:
-        raise AssertionError(f"{PYMBD_VERSION} is different from {LIBMBD_VERSION}")
-
+    assert PYMBD_VERSION[0] == LIBMBD_VERSION[0]
+    if PYMBD_VERSION[0] == 0:
+        assert PYMBD_VERSION[1] == LIBMBD_VERSION[1]
+    else:
+        assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
     if len(PYMBD_VERSION) == 4:
         git_commit = re.split('[+-]', PYMBD_VERSION[3])[1]
         assert LIBMBD_VERSION[3].endswith(git_commit)
-'''
 
 
 class MBDFortranError(Exception):

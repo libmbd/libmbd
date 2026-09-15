@@ -77,7 +77,12 @@ def compute_stress_from_lattice_gradient(lattice, coords_cartesian, dE_dlattice,
 
 def mbd_properties_from_structure(atoms, beta, k_grid=None):
     '''Given a molecular or crystal structure, this function uses ratios_from_mbdml to obtain ratios and then computes energy, forces and stress'''
-    
+
+    if any(atoms.pbc) and k_grid is None:
+        raise ValueError(
+                "k_grid must be given for periodic systems"
+        )
+
     ratios_dict = ratios_from_mbdml(atoms)
 
     a0_ratios = ratios_dict['a0']

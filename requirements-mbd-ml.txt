@@ -1,0 +1,30 @@
+# Optional dependencies for the pymbd.mbd_ml module.
+#
+# These are not declared in pyproject.toml on purpose. so3lr is not on PyPI, so
+# the only way to name it in package metadata is a direct git URL, and PyPI
+# rejects any upload whose metadata contains one -- declaring it would make
+# every pymbd release unpublishable. There is no "source-only" extra: metadata
+# is the same whether a wheel is installed from PyPI or built from a checkout.
+#
+# Install alongside pymbd from a checkout:
+#
+#     pip install -e . -r requirements-mbd-ml.txt
+#
+# pip resolves both sources together, so a conflict between them fails the
+# install rather than silently overriding one.
+#
+# so3lr is pinned to a commit rather than the mbd-ml branch so that installs are
+# reproducible; that branch is on a personal fork and has been force-pushed
+# before. The pin must be at or after a93685e, which is where the MBD-ML models
+# that pymbd.mbd_ml resolves through so3lr.models were added.
+#
+# so3lr needs Python >= 3.12 and pulls a chain of git dependencies of its own
+# (mlff, jraph, jax-md, glp, jax-pme, pysages). Its mlff fork cannot load the
+# published SO3LR force field, so do not install this into an environment that
+# also uses stock SO3LR.
+#
+# Replace this file with a plain `so3lr` extra in pyproject.toml once so3lr has
+# a PyPI release.
+
+ase
+so3lr @ git+https://github.com/em819/so3lr.git@a93685e379779c70d3354d64c9e98a88f2f685c3

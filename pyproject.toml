@@ -39,13 +39,11 @@ cffi = ">=1"
 pytest = { version = "*", optional = true }
 mpi4py = { version = "^3 || ^4", optional = true }
 pyscf = { version = ">=2.1", optional = true }
-so3lr = { git = "https://github.com/em819/so3lr.git", branch = "mbd-ml", optional = true }
 
 [tool.poetry.extras]
 mpi = ["mpi4py"]
 test = ["pytest"]
 pyscf = ["pyscf"]
-mbd-ml = ["so3lr"]
 
 [tool.poetry.dev-dependencies]
 ruff = ">=0.10"

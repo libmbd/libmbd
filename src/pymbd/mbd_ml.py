@@ -6,6 +6,7 @@ import os
 import sys
 import shutil
 import tempfile
+from pathlib import Path
 from pymbd import from_volumes
 from pymbd.fortran  import MBDGeom
 import numpy as np
@@ -19,12 +20,33 @@ except ImportError:
 
 try:
     from so3lr.cli.so3lr_eval import evaluate_so3lr_on
+    from so3lr.models import MBD_ML_MODELS as SO3LR_MBD_ML_MODELS
+    from so3lr.models import model_path as so3lr_model_path
 except ImportError:
     print('so3lr package cannot be imported. Please reinstall pymbd via pip install ".[mbd-ml]"')
     sys.exit(1)
 
-def ratios_from_mbdml(atoms):
+DEFAULT_MODEL = 'sv2j_b64_l2d_42e_16hh_10_24novv'
+
+def resolve_model(model):
+    """Return the directory holding the MBD-ML model `model`.
+
+    `model` is either the name of a model shipped by so3lr (see
+    `so3lr.models.MBD_ML_MODELS`) or the path of a directory holding one.
+    """
+    if model in SO3LR_MBD_ML_MODELS:
+        return so3lr_model_path(model)
+    path = Path(model).expanduser().resolve()
+    if not (path / 'hyperparameters.json').is_file():
+        raise FileNotFoundError(
+            f'{model!r} is neither an MBD-ML model shipped by so3lr '
+            f'({", ".join(SO3LR_MBD_ML_MODELS)}) nor a directory holding one'
+        )
+    return path
+
+def ratios_from_mbdml(atoms, model=DEFAULT_MODEL):
     '''This function is a wrapper for the MBD-ML model, which predicts a0 and C6 ratios given a molecular or crystal structure'''
+    model_path = resolve_model(model)
     tmpdir = tempfile.mkdtemp(prefix='mbdml-')
     mbdml_in_filename = os.path.join(tmpdir, 'mbdml_in.extxyz')
     mbdml_out_filename = os.path.join(tmpdir, 'mbdml_out.extxyz')
@@ -32,9 +54,6 @@ def ratios_from_mbdml(atoms):
     try:
         ase.io.write(mbdml_in_filename, atoms, format='extxyz', write_info=True, write_results=True)
 
-        #model_path=f"{os.path.dirname(os.path.realpath(__file__))}/mbd_ml_model/sv2j_b128_l2d_42e_16hh_10_24novv"
-        model_path=f"{os.path.dirname(os.path.realpath(__file__))}/mbd_ml_model/sv2j_b64_l2d_42e_16hh_10_24novv"
-        print(f'Path of model: {model_path}')
         _ = evaluate_so3lr_on(
                 datafile = mbdml_in_filename,
                 batch_size = 1,
@@ -78,7 +97,7 @@ def compute_stress_from_lattice_gradient(lattice, coords_cartesian, dE_dlattice,
 
 
 
-def mbd_properties_from_structure(atoms, beta, k_grid=None):
+def mbd_properties_from_structure(atoms, beta, k_grid=None, model=DEFAULT_MODEL):
     '''Given a molecular or crystal structure, this function uses ratios_from_mbdml to obtain ratios and then computes energy, forces and stress'''
 
     if any(atoms.pbc) and k_grid is None:
@@ -86,7 +105,7 @@ def mbd_properties_from_structure(atoms, beta, k_grid=None):
                 "k_grid must be given for periodic systems"
         )
 
-    ratios_dict = ratios_from_mbdml(atoms)
+    ratios_dict = ratios_from_mbdml(atoms, model=model)
 
     a0_ratios = ratios_dict['a0']
     C6_ratios = ratios_dict['c6']

@@ -1,1 +1,0 @@
-{"item_handlers": {"metrics": "orbax.checkpoint._src.handlers.json_checkpoint_handler.JsonCheckpointHandler", "params": "orbax.checkpoint._src.handlers.standard_checkpoint_handler.StandardCheckpointHandler"}, "metrics": {}, "performance_metrics": {}, "init_timestamp_nsecs": 1764417404686085648, "commit_timestamp_nsecs": 1764417405816745152, "custom_metadata": {}}

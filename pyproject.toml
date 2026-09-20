@@ -52,6 +52,9 @@ fprettify = { git = "https://github.com/jhrmnn/fprettify.git", rev = "fix-config
 [tool.poetry-dynamic-versioning]
 enable = true
 dirty = true
+# Count only tracked modifications as dirty, like `git describe --dirty` does
+# for libMBD's version suffix; pymbd.fortran asserts the two agree.
+ignore-untracked = true
 pattern = '^(?P<base>\d+\.\d+\.\d+)$'
 
 [tool.ruff]

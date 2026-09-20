@@ -250,6 +250,10 @@ jobs:
         run: make test_libmbd
       - name: Test pyMBD
         run: |
+          # Without pipefail the pipe reports tee's status and a pytest that
+          # failed to even start (e.g. an unimportable C extension) stays
+          # green with zero tests run; the grep only catches test failures.
+          set -o pipefail
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
       - name: Generate coverage reports
@@ -349,6 +353,7 @@ jobs:
         run: make test_libmbd
       - name: Test pyMBD
         run: |
+          set -o pipefail
           make test -o test_libmbd | tee output
           ! grep failed output >/dev/null
   pr-gate:

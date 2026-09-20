@@ -13,8 +13,8 @@ from .pymbd import _array, from_volumes
 
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
-except ImportError:
-    raise Exception('pyMBD C extension unimportable, cannot use Fortran') from None
+except ImportError as e:
+    raise Exception(f'pyMBD C extension unimportable, cannot use Fortran: {e}') from e
 
 __all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 

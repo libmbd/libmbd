@@ -123,7 +123,7 @@ double cmbd_dipole_energy(
     double* C
 );
 
-double cmbd_nonint_density(
+void cmbd_nonint_density(
     struct geom_t* geom,
     int n_atoms,
     int n_pts,
@@ -134,7 +134,7 @@ double cmbd_nonint_density(
     double* rho
 );
 
-double cmbd_int_density(
+void cmbd_int_density(
     struct geom_t* geom,
     int n_atoms,
     int n_pts,

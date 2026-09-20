@@ -54,7 +54,8 @@ struct result_t* cmbd_ts_energy(
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    _Bool grad
+    _Bool grad,
+    _Bool vdw_params_grad
 );
 
 struct result_t* cmbd_mbd_energy(
@@ -62,7 +63,8 @@ struct result_t* cmbd_mbd_energy(
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    _Bool grad
+    _Bool grad,
+    _Bool vdw_params_grad
 );
 
 struct result_t* cmbd_mbd_scs_energy(
@@ -71,7 +73,8 @@ struct result_t* cmbd_mbd_scs_energy(
     double* alpha_0,
     double* C6,
     struct cmbd_damping* damping,
-    _Bool grad
+    _Bool grad,
+    _Bool vdw_params_grad
 );
 
 void cmbd_get_results(
@@ -85,7 +88,10 @@ void cmbd_get_results(
     double* eigvals_k,  // is actually complex double
     double* eigvecs_k,  // is actually complex double
     double* alpha_0,
-    double* C6
+    double* C6,
+    double* dE_dalpha_0,
+    double* dE_dC6,
+    double* dE_dR_vdw
 );
 
 void cmbd_destroy_result(struct result_t* result);
@@ -123,7 +129,7 @@ double cmbd_dipole_energy(
     double* C
 );
 
-double cmbd_nonint_density(
+void cmbd_nonint_density(
     struct geom_t* geom,
     int n_atoms,
     int n_pts,
@@ -134,7 +140,7 @@ double cmbd_nonint_density(
     double* rho
 );
 
-double cmbd_int_density(
+void cmbd_int_density(
     struct geom_t* geom,
     int n_atoms,
     int n_pts,

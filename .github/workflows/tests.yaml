@@ -353,6 +353,62 @@ jobs:
           set -o pipefail
           make test -o test_libmbd | tee output
           ! grep failed output >/dev/null
+  mbd-ml:
+    # pymbd.mbd_ml needs so3lr, which is not on PyPI and pulls a chain of git
+    # dependencies on Python >= 3.12, so it cannot join the matrix above. Without
+    # a leg that installs it, every test in tests/test_mbd_ml.py skips and the
+    # module's numerics -- the ratio prediction and the analytic forces -- are
+    # never exercised anywhere.
+    if: github.event_name != 'schedule' || github.repository == 'libmbd/libmbd'
+    name: MBD-ML
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set environment variables
+        run: echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install libMBD dependencies
+        run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev
+      - uses: actions/setup-python@v5
+        with:
+          # so3lr requires >= 3.12
+          python-version: '3.12'
+      - name: Create Python virtual environment
+        run: |
+          python3 -m venv "$VIRTUAL_ENV"
+          "$VIRTUAL_ENV/bin/pip" install -U pip
+          echo "$VIRTUAL_ENV/bin" >>"$GITHUB_PATH"
+      - name: Build libMBD
+        run: make build_libmbd
+      - name: Install libMBD
+        run: make install_libmbd -o build_libmbd
+      - name: Build & install pyMBD
+        run: make install -o install_libmbd
+      - name: Install the MBD-ML dependencies
+        # Pinned in the file rather than in pyproject.toml: a direct git URL in
+        # the package metadata would make the sdist unpublishable to PyPI.
+        run: pip install -r requirements-mbd-ml.txt
+      - run: pip list
+      - name: Test MBD-ML
+        run: |
+          set -o pipefail
+          coverage run -m pytest -v --durations=3 tests/test_mbd_ml.py | tee output
+          ! grep failed output >/dev/null
+      - name: Generate coverage report
+        run: |
+          coverage combine 2>/dev/null || true
+          coverage xml -o coverage.xml
+      - name: Upload Python coverage to Codecov
+        uses: codecov/codecov-action@v6
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.xml
+          flags: python
+          disable_search: true
+          plugins: noop
+          name: python-mbd-ml
   pr-gate:
     # Single stable check that branch protection can require on pull requests.
     # It collapses the whole test matrix and both Intel legs into one job name,
@@ -362,7 +418,7 @@ jobs:
     # when a dependency fails so it can report that failure.
     if: always() && github.event_name == 'pull_request'
     name: PR gate
-    needs: [all, intel]
+    needs: [all, intel, mbd-ml]
     runs-on: ubuntu-latest
     steps:
       - name: Fail if any test job did not succeed

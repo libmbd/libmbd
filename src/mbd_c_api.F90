@@ -28,7 +28,8 @@ public :: cmbd_init_geom, cmbd_destroy_geom, cmbd_init_damping, &
     cmbd_destroy_damping, cmbd_get_exception, cmbd_update_coords, cmbd_update_lattice, &
     cmbd_get_results, cmbd_destroy_result, cmbd_print_timing
 public :: cmbd_ts_energy, cmbd_mbd_energy, cmbd_mbd_scs_energy, &
-    cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy
+    cmbd_dipole_matrix, cmbd_coulomb_energy, cmbd_dipole_energy, &
+    cmbd_nonint_density, cmbd_int_density
 
 #ifdef WITH_MPI
 logical(c_bool), bind(c) :: cmbd_with_mpi = .true.

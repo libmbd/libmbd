@@ -37,7 +37,7 @@ scipy = "^1.6"
 numpy = ">=1.20"
 cffi = ">=1"
 pytest = { version = "*", optional = true }
-mpi4py = { version = "^3 || ^4", optional = true }
+mpi4py = { version = ">=3,<5", optional = true }
 pyscf = { version = ">=2.1", optional = true }
 
 [tool.poetry.extras]
@@ -52,6 +52,7 @@ fprettify = { git = "https://github.com/jhrmnn/fprettify.git", rev = "fix-config
 [tool.poetry-dynamic-versioning]
 enable = true
 dirty = true
+ignore-untracked = true
 pattern = '^(?P<base>\d+\.\d+\.\d+)$'
 
 [tool.ruff]

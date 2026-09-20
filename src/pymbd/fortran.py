@@ -13,8 +13,8 @@ from .pymbd import _array, from_volumes
 
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
-except ImportError:
-    raise Exception('pyMBD C extension unimportable, cannot use Fortran') from None
+except ImportError as e:
+    raise Exception(f'pyMBD C extension unimportable, cannot use Fortran: {e}') from e
 
 __all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 
@@ -40,7 +40,7 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
         assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
     if len(PYMBD_VERSION) == 4:
         git_commit = re.split('[+-]', PYMBD_VERSION[3])[1]
-        assert LIBMBD_VERSION[3].endswith(git_commit)
+        assert LIBMBD_VERSION[3].endswith(git_commit), (PYMBD_VERSION, LIBMBD_VERSION)
 
 
 class MBDFortranError(Exception):

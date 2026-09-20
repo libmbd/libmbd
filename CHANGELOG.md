@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Optional `pymbd.pyscf` bridge turning a converged PySCF Kohn–Sham object into an MBD or TS dispersion energy via Hirshfeld volume ratios ([#145](https://github.com/libmbd/libmbd/pull/145))
 
+### Fixed
+
+- Installing pyMBD with recent pip, which rejects the invalid version specifier poetry generated from the `mpi4py` constraint. The failure happened while reading the metadata, so it affected every install, not only `pymbd[mpi]` ([#150](https://github.com/libmbd/libmbd/pull/150))
+
 ## [0.15.0] - 2026-07-24
 
 ### Added

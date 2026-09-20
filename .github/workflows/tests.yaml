@@ -302,7 +302,11 @@ jobs:
         # intel -> ifx + icx (LLVM-based), intel-classic -> ifort (last release)
         toolchain: [intel, intel-classic]
     env:
-      VIRTUAL_ENV: ${{ github.workspace }}/env
+      # Outside the checkout: an untracked env/ inside it makes
+      # poetry-dynamic-versioning stamp pyMBD as .dirty while libMBD's
+      # `git describe` (which ignores untracked files) stays clean, and the
+      # commit check in pymbd.fortran then refuses to import.
+      VIRTUAL_ENV: ${{ runner.temp }}/env
     steps:
       - uses: actions/checkout@v6
         with:

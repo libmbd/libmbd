@@ -39,8 +39,14 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
     else:
         assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
     if len(PYMBD_VERSION) == 4:
-        git_commit = re.split('[+-]', PYMBD_VERSION[3])[1]
-        assert LIBMBD_VERSION[3].endswith(git_commit)
+        # Compare commits only: the dirty marker is decided by different
+        # tools on the two sides (untracked files count for pyMBD, not for
+        # libMBD), so it may legitimately differ.
+        git_commit = re.split('[+-]', PYMBD_VERSION[3])[1].removesuffix('.dirty')
+        assert LIBMBD_VERSION[3].removesuffix('.dirty').endswith(git_commit), (
+            PYMBD_VERSION,
+            LIBMBD_VERSION,
+        )
 
 
 class MBDFortranError(Exception):

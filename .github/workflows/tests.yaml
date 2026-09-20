@@ -379,6 +379,8 @@ jobs:
           python3 -m venv "$VIRTUAL_ENV"
           "$VIRTUAL_ENV/bin/pip" install -U pip
           echo "$VIRTUAL_ENV/bin" >>"$GITHUB_PATH"
+      - name: Install coverage Python package
+        run: pip install -U 'coverage[toml]'
       - name: Build libMBD
         run: make build_libmbd
       - name: Install libMBD

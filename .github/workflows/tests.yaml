@@ -250,9 +250,6 @@ jobs:
         run: make test_libmbd
       - name: Test pyMBD
         run: |
-          # Without pipefail the pipe reports tee's status and a pytest that
-          # failed to even start (e.g. an unimportable C extension) stays
-          # green with zero tests run; the grep only catches test failures.
           set -o pipefail
           make test -o test_libmbd RUN_CMD="coverage run -m" | tee output
           ! grep failed output >/dev/null
@@ -303,11 +300,6 @@ jobs:
         toolchain: [intel, intel-classic]
     steps:
       - name: Set environment variables
-        # Keep the venv outside the checkout, as the other legs do: an
-        # untracked env/ inside it makes poetry-dynamic-versioning stamp
-        # pyMBD as .dirty while libMBD's `git describe` (which ignores
-        # untracked files) stays clean, and the commit check in
-        # pymbd.fortran then refuses to import.
         run: echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
       - uses: actions/checkout@v6
         with:

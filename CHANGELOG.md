@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Installing pyMBD with recent pip, which rejects the invalid version specifier poetry generated from the `mpi4py` constraint. The failure happened while reading the metadata, so it affected every install, not only `pymbd[mpi]` ([#150](https://github.com/libmbd/libmbd/pull/150))
-- libMBD built with gfortran 16.2 did not export the `cmbd_nonint_density` and `cmbd_int_density` C API functions, which made the pyMBD C extension unimportable. The two are now declared public like the rest of the C API, and `mbd.h` declares them as `void`, matching their Fortran definition. The import error now reports the underlying loader message instead of hiding it, and pyMBD's version no longer counts untracked files as dirty, matching libMBD's `git describe --dirty`, so the two no longer disagree about a checkout that merely contains a build directory or virtual environment ([#150](https://github.com/libmbd/libmbd/pull/150))
+- Installing pyMBD with recent pip, which rejected the invalid `mpi4py` version specifier poetry generated for the `mpi` extra ([#150](https://github.com/libmbd/libmbd/pull/150))
+- Missing `cmbd_nonint_density` and `cmbd_int_density` exports from libMBD built with gfortran 16.2, which made the pyMBD C extension unimportable ([#150](https://github.com/libmbd/libmbd/pull/150))
+- pyMBD's version stamp counted untracked files as dirty, unlike libMBD's, so the two could refuse to load together from a checkout containing a build directory or virtual environment ([#150](https://github.com/libmbd/libmbd/pull/150))
 
 ## [0.15.0] - 2026-07-24
 

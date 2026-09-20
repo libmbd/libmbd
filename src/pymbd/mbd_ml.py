@@ -3,30 +3,39 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import os
-import sys
 import shutil
+import sys
 import tempfile
 from pathlib import Path
-from pymbd import from_volumes
-from pymbd.fortran  import MBDGeom
+
 import numpy as np
+
+from pymbd import from_volumes
+from pymbd.fortran import MBDGeom
 
 try:
     import ase.io
-    from ase.units import Bohr, Hartree
+    from ase.units import Bohr
 except ImportError:
-    print('ase package cannot be imported but is required to use MBD-ML. Please install.')
+    print(
+        'ase package cannot be imported but is required to use MBD-ML. Please install.'
+    )
     sys.exit(1)
 
 try:
     from so3lr.cli.so3lr_eval import evaluate_so3lr_on
-    from so3lr.models import MBD_ML_MODELS as SO3LR_MBD_ML_MODELS
-    from so3lr.models import model_path as so3lr_model_path
+    from so3lr.models import (
+        MBD_ML_MODELS as SO3LR_MBD_ML_MODELS,
+        model_path as so3lr_model_path,
+    )
 except ImportError:
-    print('so3lr package cannot be imported. Please reinstall pymbd via pip install ".[mbd-ml]"')
+    print(
+        'so3lr package cannot be imported. Please reinstall pymbd via pip install ".[mbd-ml]"'
+    )
     sys.exit(1)
 
 DEFAULT_MODEL = 'sv2j_b64_l2d_42e_16hh_10_24novv'
+
 
 def resolve_model(model):
     """Return the directory holding the MBD-ML model `model`.
@@ -44,66 +53,99 @@ def resolve_model(model):
         )
     return path
 
+
 def ratios_from_mbdml(atoms, model=DEFAULT_MODEL):
-    '''This function is a wrapper for the MBD-ML model, which predicts a0 and C6 ratios given a molecular or crystal structure'''
+    """Predict the alpha_0 and C6 ratios of a structure with the MBD-ML model.
+
+    :param atoms: ASE ``Atoms`` object
+    :param model: name of an MBD-ML model shipped by so3lr, or the path of a
+        directory holding one
+
+    Returns a dict with the per-atom ``'a0'`` and ``'c6'`` ratios.
+    """
     model_path = resolve_model(model)
     tmpdir = tempfile.mkdtemp(prefix='mbdml-')
     mbdml_in_filename = os.path.join(tmpdir, 'mbdml_in.extxyz')
     mbdml_out_filename = os.path.join(tmpdir, 'mbdml_out.extxyz')
 
     try:
-        ase.io.write(mbdml_in_filename, atoms, format='extxyz', write_info=True, write_results=True)
+        ase.io.write(
+            mbdml_in_filename,
+            atoms,
+            format='extxyz',
+            write_info=True,
+            write_results=True,
+        )
 
         _ = evaluate_so3lr_on(
-                datafile = mbdml_in_filename,
-                batch_size = 1,
-                lr_cutoff = 0.1,
-                dispersion_damping = 2.0,
-                jit_compile = False,
-                save_to = mbdml_out_filename,
-                model_path = model_path,
-                precision = "float32",
-                targets = "hirshfeld_ratios,c6_ratios",
-                log_file = None
-                )
+            datafile=mbdml_in_filename,
+            batch_size=1,
+            lr_cutoff=0.1,
+            dispersion_damping=2.0,
+            jit_compile=False,
+            save_to=mbdml_out_filename,
+            model_path=model_path,
+            precision='float32',
+            targets='hirshfeld_ratios,c6_ratios',
+            log_file=None,
+        )
 
         atoms_eval = ase.io.read(mbdml_out_filename, format='extxyz')
-        c6 = atoms_eval.arrays["c6_ratios_so3lr"]
-        a0 = atoms_eval.arrays["hirshfeld_ratios_so3lr"]
+        c6 = atoms_eval.arrays['c6_ratios_so3lr']
+        a0 = atoms_eval.arrays['hirshfeld_ratios_so3lr']
     except Exception:
         print(f'MBD-ML evaluation failed, temporary files kept in {tmpdir}')
         raise
 
-    #Remove temporary xyz files, as otherwise so3lr eval fails in the second step
+    # Remove temporary xyz files, as otherwise so3lr eval fails in the second step
     shutil.rmtree(tmpdir)
 
     combined_ratios = np.concatenate([c6, a0])
     ratio_min = 0.05
     ratio_max = 3.0
     if np.any((combined_ratios < ratio_min) | (combined_ratios > ratio_max)):
-        print(f"\n{'!'*50}\nWARNING: a0 or c6 ratios outside [{ratio_min}, {ratio_max}]!\nThis indicates that either your system is pathological or that the MBD-ML is\nextrapolating and th\
-at the result is potentially not reliable. Proceed with care!\n{'!'*50}")
+        print(
+            f"\n{'!' * 50}\nWARNING: a0 or c6 ratios outside [{ratio_min}, {ratio_max}]!\nThis indicates that either your system is pathological or that the MBD-ML is\nextrapolating and th\
+at the result is potentially not reliable. Proceed with care!\n{'!' * 50}"
+        )
 
-    return {'c6' : c6, 'a0': a0}
+    return {'c6': c6, 'a0': a0}
 
-def compute_stress_from_lattice_gradient(lattice, coords_cartesian, dE_dlattice, dE_dcoords):
+
+def compute_stress_from_lattice_gradient(
+    lattice, coords_cartesian, dE_dlattice, dE_dcoords
+):
+    """Convert a lattice gradient into a stress tensor (a.u.).
+
+    :param lattice: lattice vectors as rows
+    :param coords_cartesian: Cartesian atomic coordinates
+    :param dE_dlattice: energy gradient with respect to the lattice vectors
+    :param dE_dcoords: energy gradient with respect to the coordinates
+    """
     term1 = lattice.T @ dE_dlattice
     term2 = coords_cartesian.T @ dE_dcoords
 
     stress_times_volume = term1 + term2
     cell_vol = abs(np.linalg.det(lattice))
 
-    return stress_times_volume/cell_vol
-
+    return stress_times_volume / cell_vol
 
 
 def mbd_properties_from_structure(atoms, beta, k_grid=None, model=DEFAULT_MODEL):
-    '''Given a molecular or crystal structure, this function uses ratios_from_mbdml to obtain ratios and then computes energy, forces and stress'''
+    """Compute the MBD energy, forces and stress of a structure with MBD-ML ratios.
+
+    :param atoms: ASE ``Atoms`` object
+    :param float beta: MBD range-separation parameter
+    :param k_grid: k-point grid, required for periodic systems
+    :param model: name of an MBD-ML model shipped by so3lr, or the path of a
+        directory holding one
+
+    Returns a dict with the energy ``'E'``, forces ``'F'`` and, for periodic
+    systems, the stress ``'S'``, in atomic units.
+    """
 
     if any(atoms.pbc) and k_grid is None:
-        raise ValueError(
-                "k_grid must be given for periodic systems"
-        )
+        raise ValueError('k_grid must be given for periodic systems')
 
     ratios_dict = ratios_from_mbdml(atoms, model=model)
 
@@ -112,34 +154,47 @@ def mbd_properties_from_structure(atoms, beta, k_grid=None, model=DEFAULT_MODEL)
 
     atom_pos = atoms.get_positions() / Bohr
     atom_species = atoms.get_chemical_symbols()
-    atom_Z = atoms.get_atomic_numbers()
     n_atoms = len(atoms)
 
     if any(atoms.pbc):
-        lattice_vecs = atoms.cell[:,:] / Bohr
+        lattice_vecs = atoms.cell[:, :] / Bohr
     else:
         lattice_vecs = None
 
     a0_free, C6_free, _ = from_volumes(atom_species, np.ones(n_atoms))
-    Rvdw = 2.5 * a0_free**(1/7) * a0_ratios**(1/3)
+    Rvdw = 2.5 * a0_free ** (1 / 7) * a0_ratios ** (1 / 3)
 
     a0 = a0_free * a0_ratios
     C6 = C6_free * C6_ratios
 
     confMBD = MBDGeom(coords=atom_pos, lattice=lattice_vecs, k_grid=k_grid)
 
-    #mbd_energy() returns energies in Ha and energy gradients in Ha/Bohr
+    # mbd_energy() returns energies in Ha and energy gradients in Ha/Bohr
     if any(atoms.pbc):
-        E,gradE,dE_dL = confMBD.mbd_energy(a0,C6,R_vdw=Rvdw,beta=beta,damping='fermi,dip',variant='plain', force=True)
+        E, gradE, dE_dL = confMBD.mbd_energy(
+            a0,
+            C6,
+            R_vdw=Rvdw,
+            beta=beta,
+            damping='fermi,dip',
+            variant='plain',
+            force=True,
+        )
     else:
-        E,gradE = confMBD.mbd_energy(a0,C6,R_vdw=Rvdw,beta=beta,damping='fermi,dip',variant='plain', force=True)
+        E, gradE = confMBD.mbd_energy(
+            a0,
+            C6,
+            R_vdw=Rvdw,
+            beta=beta,
+            damping='fermi,dip',
+            variant='plain',
+            force=True,
+        )
 
     F = (-1.0) * gradE
 
     if any(atoms.pbc):
         S = compute_stress_from_lattice_gradient(lattice_vecs, atom_pos, dE_dL, -F)
-        return {'E' : E, 'F' : F, 'S' : S}
+        return {'E': E, 'F': F, 'S': S}
     else:
-        return {'E' : E, 'F' : F}
-
-
+        return {'E': E, 'F': F}

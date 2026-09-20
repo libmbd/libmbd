@@ -213,7 +213,7 @@ mbd_props = pymbd.mbd_ml.mbd_properties_from_structure(atoms, beta=0.81, k_grid=
 
 E_MBD = mbd_props['E']
 F_MBD = mbd_props['F']
-S_MBD = mbd_props['S'] #stress tensor for periodic systems
+S_MBD = mbd_props['S']  # stress tensor for periodic systems
 ```
 
 If only the MBD ratios (a0/C6) are desired, use instead the `ratios_from_mbdml()` function (no k-mesh needed) 

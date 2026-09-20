@@ -81,6 +81,17 @@ def test_resolve_model_accepts_a_directory(tmp_path):
     assert resolve_model(str(tmp_path)) == tmp_path.resolve()
 
 
+@pytest.mark.no_scalapack
+def test_mixed_periodicity_is_rejected():
+    # A slab is neither a molecule nor a 3D crystal here: the lattice handed to
+    # libMBD would be singular, so it must not be silently treated as periodic.
+    atoms = Atoms(
+        'Ar', positions=[(0, 0, 0)], cell=np.eye(3) * 5, pbc=(True, True, False)
+    )
+    with pytest.raises(ValueError, match='fully periodic'):
+        mbd_properties_from_structure(atoms, beta=0.83, k_grid=(2, 2, 1))
+
+
 # --- pieces that need the model -----------------------------------------------
 
 
@@ -106,18 +117,16 @@ def test_water_ratios():
 
 @needs_so3lr
 @pytest.mark.no_scalapack
-@pytest.mark.xfail(
-    strict=True,
-    reason='the reported forces hold the ML ratios fixed, so they omit the '
-    'dRatios/dR term and are not the gradient of the reported energy',
-)
 def test_forces_are_the_gradient_of_the_energy():
-    # libMBD differentiates at fixed alpha_0/C6, but here those come from a
-    # model that depends on the geometry. The neglected term is large: on water
-    # it is most of the force. Delete the xfail once the model's own gradient is
-    # propagated (jax can supply it).
+    # alpha_0, C6 and R_vdw come from a model that depends on the geometry, so
+    # libMBD's fixed-parameter gradient is not the gradient of the energy. With
+    # the response term the two agree; without it the error is two orders of
+    # magnitude larger, which is what this pins down.
     atoms = molecule('H2O')
     forces = np.asarray(mbd_properties_from_structure(atoms, beta=0.83)['F'])
+    bare = np.asarray(
+        mbd_properties_from_structure(atoms, beta=0.83, ratio_response=False)['F']
+    )
 
     h = 1e-3  # Angstrom
     numerical = np.zeros(3)
@@ -128,7 +137,23 @@ def test_forces_are_the_gradient_of_the_energy():
             positions = moved.get_positions()
             positions[0, k] += sign * h
             moved.set_positions(positions)
-            shifted.append(mbd_properties_from_structure(moved, beta=0.83)['E'])
+            shifted.append(
+                mbd_properties_from_structure(moved, beta=0.83, ratio_response=False)[
+                    'E'
+                ]
+            )
         numerical[k] = -(shifted[0] - shifted[1]) / (2 * h / BOHR)
 
-    assert forces[0] == approx(numerical, abs=1e-6)
+    assert forces[0] == approx(numerical, abs=1e-5)
+    # and the term is worth having: without it the force is off by ~40%
+    assert np.abs(bare[0] - numerical).max() > 10 * np.abs(forces[0] - numerical).max()
+
+
+@needs_so3lr
+@pytest.mark.no_scalapack
+def test_ratio_response_leaves_the_energy_alone():
+    # The response term is a gradient correction only; the energy is the same.
+    atoms = molecule('H2O')
+    with_response = mbd_properties_from_structure(atoms, beta=0.83)
+    without = mbd_properties_from_structure(atoms, beta=0.83, ratio_response=False)
+    assert with_response['E'] == approx(without['E'], rel=1e-12)

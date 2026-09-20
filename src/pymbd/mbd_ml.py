@@ -2,9 +2,12 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import json
 import os
 import shutil
 import tempfile
+import types
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -32,24 +35,144 @@ _INSTALL_HINT = (
 
 
 def _so3lr():
-    """Import so3lr on demand, with a message pointing at how to install it.
+    """Import so3lr and its jax stack on demand, with an install hint.
 
     so3lr is imported lazily rather than at module level so that the parts of
     this module that do not need it -- the periodicity checks and the stress
     conversion -- stay importable, and testable, without it.
     """
     try:
-        from so3lr.cli.so3lr_eval import evaluate_so3lr_on
+        import jax
+        import jraph
+        from mlff.data import AseDataLoaderSparse
+        from mlff.mdx.potential.mlff_potential_sparse import load_model_from_workdir
+        from mlff.utils import jraph_utils
         from so3lr.models import MBD_ML_MODELS, model_path
     except ImportError as e:
         raise ImportError(_INSTALL_HINT) from e
-    return evaluate_so3lr_on, MBD_ML_MODELS, model_path
+    return types.SimpleNamespace(
+        jax=jax,
+        jraph=jraph,
+        AseDataLoaderSparse=AseDataLoaderSparse,
+        load_model_from_workdir=load_model_from_workdir,
+        jraph_utils=jraph_utils,
+        MBD_ML_MODELS=MBD_ML_MODELS,
+        model_path=model_path,
+    )
+
+
+#: Long-range settings the MBD-ML models were evaluated with. They have no
+#: long-range terms of their own (both ``*_energy_bool`` are false), but the
+#: loader insists on values.
+LR_CUTOFF, LR_DAMPING = 0.1, 2.0
+
+_MODELS = {}
+
+
+def _load_model(model):
+    """Load a model once and cache it, keyed by its resolved directory.
+
+    Loading the checkpoint dominates a single evaluation, so a module-level
+    cache is what makes repeated calls -- a relaxation, a benchmark -- cheap.
+    """
+    path = str(resolve_model(model))
+    if path not in _MODELS:
+        so3lr = _so3lr()
+        with open(os.path.join(path, 'hyperparameters.json')) as f:
+            cutoff = json.load(f)['model']['cutoff']
+        net, params = so3lr.load_model_from_workdir(
+            path,
+            model='so3krates',
+            from_file=False,
+            long_range_kwargs={
+                'cutoff_lr': LR_CUTOFF,
+                'dispersion_energy_cutoff_lr_damping': LR_DAMPING,
+                'neighborlist_format_lr': 'sparse',
+            },
+        )
+        _MODELS[path] = (net, params, cutoff)
+    return _MODELS[path]
+
+
+def _graph_inputs(atoms, cutoff):
+    """Build the padded graph the model expects from an ASE ``Atoms``.
+
+    The neighbour lists come from mlff's own loader, which reads a file, so the
+    structure goes through a temporary extxyz. Everything after this is
+    in-process, which is what makes the ratios differentiable.
+    """
+    so3lr = _so3lr()
+    tmpdir = tempfile.mkdtemp(prefix='mbdml-')
+    try:
+        path = os.path.join(tmpdir, 'mbdml_in.extxyz')
+        ase.io.write(path, atoms, format='extxyz', write_info=True, write_results=True)
+        data, _ = so3lr.AseDataLoaderSparse(path).load(
+            cutoff=cutoff,
+            cutoff_lr=LR_CUTOFF,
+            calculate_neighbors_lr=False,
+            pick_idx=np.arange(1),
+        )
+    finally:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+    batch = so3lr.jraph.batch_np([data[0]])
+    n_pairs = int(getattr(batch, 'n_pairs', np.array([0])).sum()) + 1
+    padded = so3lr.jraph.pad_with_graphs(
+        batch,
+        n_node=int(batch.n_node.sum()) + 1,
+        n_edge=int(batch.n_edge.sum()) + 1,
+        n_graph=3,
+        n_pairs=n_pairs,
+    )
+    inputs = so3lr.jraph_utils.graph_to_batch_fn(padded)
+    for key in ('energy', 'forces'):
+        inputs.pop(key, None)
+    return inputs
+
+
+def _warn_on_extreme_ratios(a0, c6):
+    ratio_min, ratio_max = 0.05, 3.0
+    combined = np.concatenate([c6, a0])
+    if np.any((combined < ratio_min) | (combined > ratio_max)):
+        warnings.warn(
+            f'MBD-ML predicted alpha_0 or C6 ratios outside [{ratio_min}, '
+            f'{ratio_max}]. Either the system is pathological or the model is '
+            'extrapolating; the result may not be reliable.',
+            stacklevel=3,
+        )
+
+
+def _ratios(atoms, model, jacobian=False):
+    """Predict the ratios, and optionally their derivatives w.r.t. positions.
+
+    The Jacobians are returned per Bohr, matching libMBD's gradients, while the
+    model works in Angstrom.
+    """
+    so3lr = _so3lr()
+    net, params, cutoff = _load_model(model)
+    n_atoms = len(atoms)
+    inputs = _graph_inputs(atoms, cutoff)
+    positions = so3lr.jax.numpy.asarray(inputs['positions'])
+    rest = {k: v for k, v in inputs.items() if k != 'positions'}
+
+    def ratios_of(pos, other):
+        out = net.apply(params, dict(positions=pos, **other))
+        return out['hirshfeld_ratios'][:n_atoms], out['c6_ratios'][:n_atoms]
+
+    a0, c6 = (np.asarray(x, dtype=float) for x in ratios_of(positions, rest))
+    _warn_on_extreme_ratios(a0, c6)
+    if not jacobian:
+        return a0, c6, None, None
+    da0, dc6 = (
+        np.asarray(x, dtype=float)[:, :n_atoms, :] * Bohr
+        for x in so3lr.jax.jacrev(ratios_of, argnums=0)(positions, rest)
+    )
+    return a0, c6, da0, dc6
 
 
 def _shipped_models():
     """Names of the MBD-ML models so3lr ships, or () if so3lr is unavailable."""
     try:
-        return _so3lr()[1]
+        return _so3lr().MBD_ML_MODELS
     except ImportError:
         return ()
 
@@ -65,7 +188,7 @@ def resolve_model(model):
     """
     shipped = _shipped_models()
     if model in shipped:
-        return _so3lr()[2](model)
+        return _so3lr().model_path(model)
     path = Path(model).expanduser().resolve()
     if (path / 'hyperparameters.json').is_file():
         return path
@@ -88,53 +211,7 @@ def ratios_from_mbdml(atoms, model=DEFAULT_MODEL):
 
     Returns a dict with the per-atom ``'a0'`` and ``'c6'`` ratios.
     """
-    model_path = resolve_model(model)
-    tmpdir = tempfile.mkdtemp(prefix='mbdml-')
-    mbdml_in_filename = os.path.join(tmpdir, 'mbdml_in.extxyz')
-    mbdml_out_filename = os.path.join(tmpdir, 'mbdml_out.extxyz')
-
-    try:
-        ase.io.write(
-            mbdml_in_filename,
-            atoms,
-            format='extxyz',
-            write_info=True,
-            write_results=True,
-        )
-
-        evaluate_so3lr_on = _so3lr()[0]
-        _ = evaluate_so3lr_on(
-            datafile=mbdml_in_filename,
-            batch_size=1,
-            lr_cutoff=0.1,
-            dispersion_damping=2.0,
-            jit_compile=False,
-            save_to=mbdml_out_filename,
-            model_path=model_path,
-            precision='float32',
-            targets='hirshfeld_ratios,c6_ratios',
-            log_file=None,
-        )
-
-        atoms_eval = ase.io.read(mbdml_out_filename, format='extxyz')
-        c6 = atoms_eval.arrays['c6_ratios_so3lr']
-        a0 = atoms_eval.arrays['hirshfeld_ratios_so3lr']
-    except Exception:
-        print(f'MBD-ML evaluation failed, temporary files kept in {tmpdir}')
-        raise
-
-    # Remove temporary xyz files, as otherwise so3lr eval fails in the second step
-    shutil.rmtree(tmpdir)
-
-    combined_ratios = np.concatenate([c6, a0])
-    ratio_min = 0.05
-    ratio_max = 3.0
-    if np.any((combined_ratios < ratio_min) | (combined_ratios > ratio_max)):
-        print(
-            f"\n{'!' * 50}\nWARNING: a0 or c6 ratios outside [{ratio_min}, {ratio_max}]!\nThis indicates that either your system is pathological or that the MBD-ML is\nextrapolating and th\
-at the result is potentially not reliable. Proceed with care!\n{'!' * 50}"
-        )
-
+    a0, c6, _, _ = _ratios(atoms, model)
     return {'c6': c6, 'a0': a0}
 
 
@@ -157,38 +234,67 @@ def compute_stress_from_lattice_gradient(
     return stress_times_volume / cell_vol
 
 
-def mbd_properties_from_structure(atoms, beta, k_grid=None, model=DEFAULT_MODEL):
-    """Compute the MBD energy, forces and stress of a structure with MBD-ML ratios.
+def mbd_properties_from_structure(
+    atoms, beta, k_grid=None, model=DEFAULT_MODEL, ratio_response=True
+):
+    r"""Compute the MBD energy, forces and stress of a structure with MBD-ML ratios.
 
     :param atoms: ASE ``Atoms`` object
     :param float beta: MBD range-separation parameter
     :param k_grid: k-point grid, required for periodic systems
     :param model: name of an MBD-ML model shipped by so3lr, or the path of a
         directory holding one
+    :param bool ratio_response: if True, add the term that accounts for the
+        ratios themselves depending on the geometry (see below)
 
     Returns a dict with the energy ``'E'``, forces ``'F'`` and, for periodic
     systems, the stress ``'S'``, in atomic units.
-    """
 
-    if any(atoms.pbc) and k_grid is None:
+    libMBD differentiates at fixed :math:`\alpha_0`, :math:`C_6` and
+    :math:`R_\mathrm{vdw}`, but here those come from a model that depends on
+    the geometry, so the bare gradient is not the gradient of the energy. The
+    missing term,
+
+    .. math::
+
+        \sum_a
+        \frac{\partial E}{\partial\alpha_a}\frac{\mathrm d\alpha_a}{\mathrm d\mathbf R}
+        + \frac{\partial E}{\partial C_{6,a}}
+          \frac{\mathrm dC_{6,a}}{\mathrm d\mathbf R}
+        + \frac{\partial E}{\partial R_{\mathrm{vdw},a}}
+          \frac{\mathrm dR_{\mathrm{vdw},a}}{\mathrm d\mathbf R},
+
+    combines libMBD's vdW-parameter gradients with the model's own Jacobian,
+    which jax supplies. It is not small: on water it is a tenth of the force,
+    and without it a relaxation does not converge to a minimum of the energy it
+    reports. ``ratio_response=False`` restores the older, inconsistent
+    behaviour for comparison.
+
+    The stress does not yet carry the corresponding lattice term, so for a
+    periodic system ``'S'`` remains the fixed-ratio stress.
+    """
+    periodic = all(atoms.pbc)
+    if any(atoms.pbc) and not periodic:
+        raise ValueError(
+            'MBD-ML supports fully periodic or fully non-periodic systems, '
+            f'got pbc={tuple(bool(x) for x in atoms.pbc)}'
+        )
+    if periodic and k_grid is None:
         raise ValueError('k_grid must be given for periodic systems')
 
-    ratios_dict = ratios_from_mbdml(atoms, model=model)
-
-    a0_ratios = ratios_dict['a0']
-    C6_ratios = ratios_dict['c6']
+    a0_ratios, C6_ratios, da0_dR, dC6_dR = _ratios(
+        atoms, model, jacobian=ratio_response
+    )
 
     atom_pos = atoms.get_positions() / Bohr
     atom_species = atoms.get_chemical_symbols()
     n_atoms = len(atoms)
-
-    if any(atoms.pbc):
-        lattice_vecs = atoms.cell[:, :] / Bohr
-    else:
-        lattice_vecs = None
+    lattice_vecs = atoms.cell[:, :] / Bohr if periodic else None
 
     a0_free, C6_free, _ = from_volumes(atom_species, np.ones(n_atoms))
-    Rvdw = 2.5 * a0_free ** (1 / 7) * a0_ratios ** (1 / 3)
+    # the QDO vdW radius, which agrees with libMBD's R_vdw(TS) table to 1%
+    Rvdw_free = 2.5 * a0_free ** (1 / 7)
+    Rvdw = Rvdw_free * a0_ratios ** (1 / 3)
 
     a0 = a0_free * a0_ratios
     C6 = C6_free * C6_ratios
@@ -196,31 +302,34 @@ def mbd_properties_from_structure(atoms, beta, k_grid=None, model=DEFAULT_MODEL)
     confMBD = MBDGeom(coords=atom_pos, lattice=lattice_vecs, k_grid=k_grid)
 
     # mbd_energy() returns energies in Ha and energy gradients in Ha/Bohr
-    if any(atoms.pbc):
-        E, gradE, dE_dL = confMBD.mbd_energy(
-            a0,
-            C6,
-            R_vdw=Rvdw,
-            beta=beta,
-            damping='fermi,dip',
-            variant='plain',
-            force=True,
-        )
+    results = confMBD.mbd_energy(
+        a0,
+        C6,
+        R_vdw=Rvdw,
+        beta=beta,
+        damping='fermi,dip',
+        variant='plain',
+        force=True,
+        vdw_params_grad=ratio_response,
+    )
+    if periodic:
+        E, gradE, dE_dL = results[:3]
     else:
-        E, gradE = confMBD.mbd_energy(
-            a0,
-            C6,
-            R_vdw=Rvdw,
-            beta=beta,
-            damping='fermi,dip',
-            variant='plain',
-            force=True,
+        (E, gradE), dE_dL = results[:2], None
+
+    if ratio_response:
+        dE_da0, dE_dC6, dE_dRvdw = results[-3:]
+        # alpha_0 = alpha_free * v, C6 = C6_free * c, R_vdw = R_free * v**(1/3)
+        dE_dv = dE_da0 * a0_free + dE_dRvdw * Rvdw_free * a0_ratios ** (-2 / 3) / 3
+        gradE = (
+            gradE
+            + np.einsum('a,ajk->jk', dE_dv, da0_dR)
+            + np.einsum('a,ajk->jk', dE_dC6 * C6_free, dC6_dR)
         )
 
-    F = (-1.0) * gradE
+    F = -gradE
 
-    if any(atoms.pbc):
+    if periodic:
         S = compute_stress_from_lattice_gradient(lattice_vecs, atom_pos, dE_dL, -F)
         return {'E': E, 'F': F, 'S': S}
-    else:
-        return {'E': E, 'F': F}
+    return {'E': E, 'F': F}

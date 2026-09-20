@@ -186,12 +186,14 @@ subroutine cmbd_destroy_damping(damping_c) bind(c)
     deallocate (damping)
 end subroutine
 
-type(c_ptr) function cmbd_ts_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) bind(c)
+type(c_ptr) function cmbd_ts_energy( &
+        geom_c, alpha_0_c, C6_c, damping_c, grad, vdw_params_grad) bind(c)
     type(c_ptr), value, intent(in) :: geom_c
     type(c_ptr), value, intent(in) :: alpha_0_c
     type(c_ptr), value, intent(in) :: C6_c
     type(c_ptr), value, intent(in) :: damping_c
     logical(c_bool), value, intent(in) :: grad
+    logical(c_bool), value, intent(in) :: vdw_params_grad
 
     type(geom_t), pointer :: geom
     real(c_double), pointer :: alpha_0(:)
@@ -206,18 +208,21 @@ type(c_ptr) function cmbd_ts_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) bi
     allocate (res)
     res = get_ts_energy( &
         geom, alpha_0, C6, damping, grad_request_t( &
-            dcoords=grad, dlattice=grad .and. allocated(geom%lattice) &
+            dcoords=grad, dlattice=grad .and. allocated(geom%lattice), &
+            dalpha=vdw_params_grad, dC6=vdw_params_grad, dr_vdw=vdw_params_grad &
         ) &
     )
     cmbd_ts_energy = c_loc(res)
 end function
 
-type(c_ptr) function cmbd_mbd_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) bind(c)
+type(c_ptr) function cmbd_mbd_energy( &
+        geom_c, alpha_0_c, C6_c, damping_c, grad, vdw_params_grad) bind(c)
     type(c_ptr), value, intent(in) :: geom_c
     type(c_ptr), value, intent(in) :: alpha_0_c
     type(c_ptr), value, intent(in) :: C6_c
     type(c_ptr), value, intent(in) :: damping_c
     logical(c_bool), value, intent(in) :: grad
+    logical(c_bool), value, intent(in) :: vdw_params_grad
 
     type(geom_t), pointer :: geom
     real(c_double), pointer :: alpha_0(:)
@@ -232,20 +237,22 @@ type(c_ptr) function cmbd_mbd_energy(geom_c, alpha_0_c, C6_c, damping_c, grad) b
     allocate (res)
     res = get_mbd_energy( &
         geom, alpha_0, C6, damping, grad_request_t( &
-            dcoords=grad, dlattice=grad .and. allocated(geom%lattice) &
+            dcoords=grad, dlattice=grad .and. allocated(geom%lattice), &
+            dalpha=vdw_params_grad, dC6=vdw_params_grad, dr_vdw=vdw_params_grad &
         ) &
     )
     cmbd_mbd_energy = c_loc(res)
 end function
 
 type(c_ptr) function cmbd_mbd_scs_energy( &
-        geom_c, variant_c, alpha_0_c, C6_c, damping_c, grad) bind(c)
+        geom_c, variant_c, alpha_0_c, C6_c, damping_c, grad, vdw_params_grad) bind(c)
     type(c_ptr), value, intent(in) :: geom_c
     character(kind=c_char), intent(in) :: variant_c(*)
     type(c_ptr), value, intent(in) :: alpha_0_c
     type(c_ptr), value, intent(in) :: C6_c
     type(c_ptr), value, intent(in) :: damping_c
     logical(c_bool), value, intent(in) :: grad
+    logical(c_bool), value, intent(in) :: vdw_params_grad
 
     type(geom_t), pointer :: geom
     character(len=20) :: variant
@@ -262,7 +269,8 @@ type(c_ptr) function cmbd_mbd_scs_energy( &
     allocate (res)
     res = get_mbd_scs_energy( &
         geom, variant, alpha_0, C6, damping, grad_request_t( &
-            dcoords=grad, dlattice=grad .and. allocated(geom%lattice) &
+            dcoords=grad, dlattice=grad .and. allocated(geom%lattice), &
+            dalpha=vdw_params_grad, dC6=vdw_params_grad, dr_vdw=vdw_params_grad &
         ) &
     )
     cmbd_mbd_scs_energy = c_loc(res)
@@ -270,7 +278,8 @@ end function
 
 subroutine cmbd_get_results( &
     res_c, energy, gradients_c, lattice_gradients_c, eigvals_c, eigvecs_c, rpa_orders_c, &
-    eigvals_k_c, eigvecs_k_c, alpha_0_c, C6_c &
+    eigvals_k_c, eigvecs_k_c, alpha_0_c, C6_c, dE_dalpha_0_c, dE_dC6_c, &
+    dE_dR_vdw_c &
 ) bind(c)
     type(c_ptr), value, intent(in) :: res_c
     real(c_double), intent(out) :: energy
@@ -283,6 +292,9 @@ subroutine cmbd_get_results( &
     type(c_ptr), value, intent(in) :: eigvecs_k_c
     type(c_ptr), value, intent(in) :: alpha_0_c
     type(c_ptr), value, intent(in) :: C6_c
+    type(c_ptr), value, intent(in) :: dE_dalpha_0_c
+    type(c_ptr), value, intent(in) :: dE_dC6_c
+    type(c_ptr), value, intent(in) :: dE_dR_vdw_c
 
     type(result_t), pointer :: res
     real(c_double), pointer :: gradients(:, :)
@@ -294,6 +306,9 @@ subroutine cmbd_get_results( &
     complex(c_double_complex), pointer :: eigvecs_k(:, :, :)
     real(c_double), pointer :: alpha_0(:)
     real(c_double), pointer :: C6(:)
+    real(c_double), pointer :: dE_dalpha_0(:)
+    real(c_double), pointer :: dE_dC6(:)
+    real(c_double), pointer :: dE_dR_vdw(:)
 
     call c_f_pointer(res_c, res)
     energy = res%energy
@@ -338,6 +353,18 @@ subroutine cmbd_get_results( &
     if (c_associated(C6_c) .and. allocated(res%C6)) then
         call c_f_pointer(C6_c, C6, [size(res%C6)])
         C6 = res%C6
+    end if
+    if (c_associated(dE_dalpha_0_c) .and. allocated(res%dE%dalpha)) then
+        call c_f_pointer(dE_dalpha_0_c, dE_dalpha_0, [size(res%dE%dalpha)])
+        dE_dalpha_0 = res%dE%dalpha
+    end if
+    if (c_associated(dE_dC6_c) .and. allocated(res%dE%dC6)) then
+        call c_f_pointer(dE_dC6_c, dE_dC6, [size(res%dE%dC6)])
+        dE_dC6 = res%dE%dC6
+    end if
+    if (c_associated(dE_dR_vdw_c) .and. allocated(res%dE%dr_vdw)) then
+        call c_f_pointer(dE_dR_vdw_c, dE_dR_vdw, [size(res%dE%dr_vdw)])
+        dE_dR_vdw = res%dE%dr_vdw
     end if
 end subroutine
 

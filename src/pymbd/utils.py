@@ -41,6 +41,30 @@ def numerical_latt_gradients(geom, func, *args, **kwargs):
     return gradients
 
 
+def numerical_vdw_params_gradients(func, alpha_0, C6, R_vdw, delta=1e-3, npts=5):
+    """Numerically differentiate ``func(alpha_0, C6, R_vdw)`` in its arguments.
+
+    Unlike the coordinate steps above, the step is relative, because the three
+    kinds of vdW parameter differ in magnitude by an order of magnitude or two.
+    Returns the three gradients in the order of the arguments.
+    """
+    steps, diff = finite_diff_gen(npts)
+    params_0 = [np.array(param, dtype=float) for param in (alpha_0, C6, R_vdw)]
+    gradients = []
+    for i_param, param_0 in enumerate(params_0):
+        gradient = np.zeros_like(param_0)
+        for i_atom in range(len(param_0)):
+            step_size = delta * param_0[i_atom]
+            ene = {}
+            for step in steps:
+                params = [param.copy() for param in params_0]
+                params[i_param][i_atom] += step * step_size
+                ene[step] = func(*params)
+            gradient[i_atom] = diff(ene, step_size)
+        gradients.append(gradient)
+    return gradients
+
+
 def _diff3(x, delta):
     return (-1.0 / 2 * x[-1] + 1.0 / 2 * x[1]) / delta
 

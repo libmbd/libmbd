@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `vdw_params_grad=True` on `MBDGeom.mbd_energy()` and `MBDGeom.ts_energy()`, which returns the energy gradients with respect to the atomic polarizabilities, C6 coefficients and vdW radii next to the existing coordinate gradients ([#151](https://github.com/libmbd/libmbd/pull/151))
 - Optional `pymbd.pyscf` bridge turning a converged PySCF Kohn–Sham object into an MBD or TS dispersion energy via Hirshfeld volume ratios ([#145](https://github.com/libmbd/libmbd/pull/145))
+
+### Changed
+
+- **Breaking:** The C API functions `cmbd_ts_energy()`, `cmbd_mbd_energy()` and `cmbd_mbd_scs_energy()` take an extra `vdw_params_grad` flag, and `cmbd_get_results()` three extra output pointers, `dE_dalpha_0`, `dE_dC6` and `dE_dR_vdw` ([#151](https://github.com/libmbd/libmbd/pull/151))
 
 ### Fixed
 

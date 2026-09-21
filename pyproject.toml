@@ -106,6 +106,7 @@ convention = "pep257"
 "tests/**" = ["D"]
 "devtools/**" = ["D"]
 "doc/**" = ["D"]
+"examples/**" = ["D"]
 "cffi_build.py" = ["D"]
 
 [tool.ruff.format]

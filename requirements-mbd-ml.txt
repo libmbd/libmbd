@@ -1,0 +1,4 @@
+# Optional dependencies for the pymbd.mbd_ml module.
+
+ase
+so3lr @ git+https://github.com/em819/so3lr.git@a93685e379779c70d3354d64c9e98a88f2f685c3

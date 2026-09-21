@@ -52,6 +52,13 @@ jobs:
             mpi: mpich=4
             mpi-nodes: 2
             elsi: elsi
+          # pymbd.mbd_ml needs so3lr, which is not on PyPI, pulls a chain of git
+          # dependencies and requires Python >= 3.12. Without a leg that installs
+          # it, every test in tests/test_mbd_ml.py skips and the module's
+          # numerics -- the ratio prediction and the analytic forces -- are never
+          # exercised anywhere.
+          - type: ubuntu
+            mbd-ml: mbd-ml
     runs-on: ${{ fromJSON('{"ubuntu":"ubuntu-latest","macos":"macos-latest","conda":"ubuntu-latest","nvhpc":"ubuntu-latest"}')[matrix.type] }}
     env:
       CONDA_ALWAYS_YES: "true"
@@ -96,7 +103,7 @@ jobs:
           path: |
             ${{ env.XDG_CACHE_HOME }}/conda/pkgs
             ${{ env.XDG_CACHE_HOME }}/pip
-          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ matrix.mpifh }}-${{ matrix.numpy }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
+          key: ${{ matrix.type }}-${{ matrix.python-version }}-${{ matrix.cmake-version }}-${{ matrix.gfortran-version }}-${{ matrix.mpi }}-${{ matrix.mpifh }}-${{ matrix.numpy }}-${{ matrix.mbd-ml }}-${{ env.YEAR_MONTH }}-${{ hashFiles('pyproject.toml') }}
       - name: Install libMBD dependencies
         if: matrix.type == 'ubuntu'
         run: sudo apt-get install -yq --no-install-suggests --no-install-recommends gfortran libblas-dev liblapack-dev mpi-default-dev mpi-default-bin libscalapack-mpi-dev
@@ -164,6 +171,12 @@ jobs:
         # green again. No matching upstream report yet; drop the exclusion once
         # a fixed release lands.
         run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} pip cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} 'openblas!=0.3.34' ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
+      - uses: actions/setup-python@v5
+        # so3lr requires >= 3.12, which the runner image's python3 is not
+        # guaranteed to be; the other venv legs use whatever it ships.
+        if: matrix.mbd-ml
+        with:
+          python-version: '3.12'
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |
@@ -245,6 +258,11 @@ jobs:
         run: |
           [[ "${{ matrix.type }}" != "conda" ]] || { source $CONDA/etc/profile.d/conda.sh && conda activate $HOME/env; }
           make install -o install_libmbd
+      - name: Install the MBD-ML dependencies
+        # Pinned in the file rather than in pyproject.toml: a direct git URL in
+        # the package metadata would make the sdist unpublishable to PyPI.
+        if: matrix.mbd-ml
+        run: pip install -r requirements-mbd-ml.txt
       - run: pip list
       - name: Test libMBD
         run: make test_libmbd

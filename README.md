@@ -44,6 +44,16 @@ conda install -c conda-forge 'libmbd=*=mpi_*' mpi4py
 pip install pymbd[mpi]
 ```
 
+If an installation with support for MBD-ML is desired, do
+
+```
+conda install -c conda-forge libmbd
+pip install .[mbd-ml]
+```
+
+To retrieve the exact dependencies used for the MBD-ML publication, 
+a `requirements.txt` file has been deposited in the `mbd_ml_paper/` directory.
+
 Verify installation with
 
 ```
@@ -143,6 +153,84 @@ call calc%evaluate_vdw_method(energy)
 call calc%get_gradients(gradients)
 call calc%destroy()
 ```
+### MBD-ML
+
+To make use of the MBD-ML model, you only need to provide
+your molecule or material structure as a ASE Atoms object
+and the damping parameter beta corresponding to the
+desired exchange-correlation functional. For example, 
+to obtain the MBD energy and force correction for a PBE-level
+calculation (beta=0.81), do
+
+```python
+import pymbd.mbd_ml
+from ase import Atoms
+
+mol = Atoms('CO', positions=[(0, 0, 0), (0, 0, 1.1)])
+
+mbd_props = pymbd.mbd_ml.mbd_properties_from_structure(atoms, beta=0.81)
+
+E_MBD = mbd_props['E']
+F_MBD = mbd_props['F']
+```
+
+for a periodic calculation, e.g a molecular crystal, you need to additionally
+provide a k-mesh. For example for a urea crystal, with the following structure (.extxyz file)
+
+`urea.extxyz`
+```
+16
+Lattice="5.565 0.0 0.0 0.0 5.565 0.0 0.0 0.0 4.684" Properties=species:S:1:pos:R:3 pbc="T T T"
+C        0.00000000       2.78250000       1.52698400
+C        2.78250000       0.00000000       3.15701600
+O        0.00000000       2.78250000       2.78838520
+O        2.78250000       0.00000000       1.89561480
+N        0.81193350       3.59443350       0.82719440
+N        1.97056650       0.81193350       3.85680560
+N        4.75306650       1.97056650       0.82719440
+N        3.59443350       4.75306650       3.85680560
+H        1.43298750       4.21548750       1.32416680
+H        1.34951250       1.43298750       3.35983320
+H        4.13201250       1.34951250       1.32416680
+H        4.21548750       4.13201250       3.35983320
+H        0.80191650       3.58441650       4.50600800
+H        1.98058350       0.80191650       0.17799200
+H        4.76308350       1.98058350       4.50600800
+H        3.58441650       4.76308350       0.17799200
+```
+
+the same function call will output the stress tensor in addition to the MBD energy
+and atomic forces.
+
+```python
+import pymbd.mbd_ml
+import ase.io
+
+urea = ase.io.read('urea.extxyz')
+k_grid = (4, 4, 4)
+
+mbd_props = pymbd.mbd_ml.mbd_properties_from_structure(atoms, beta=0.81, k_grid=k_grid)
+
+E_MBD = mbd_props['E']
+F_MBD = mbd_props['F']
+S_MBD = mbd_props['S']  # stress tensor for periodic systems
+```
+
+If only the MBD ratios (a0/C6) are desired, use instead the `ratios_from_mbdml()` function (no k-mesh needed) 
+
+```python
+import pymbd.mbd_ml
+import ase.io
+
+urea = ase.io.read('urea.extxyz')
+
+mbd_ratios = pymbd.mbd_ml.ratios_from_mbdml(urea)
+
+a0 = mbd_ratios['a0']
+c6 = mbd_ratios['c6']
+```
+
+To use the MBD-ML framework in combination with an ASE calculator, see the examples/ folder.
 
 ## Links
 

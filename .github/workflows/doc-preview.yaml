@@ -1,17 +1,21 @@
 name: Preview Docs
-# Per-PR documentation preview on Cloudflare Pages, for same-repo and fork PRs
-# alike. Production docs stay on GitHub Pages (doc-deploy.yaml).
+# Per-PR documentation preview on Cloudflare Pages. Production docs stay on
+# GitHub Pages (doc-deploy.yaml).
 #
 # Documentation builds the docs on `pull_request`, without secrets, and uploads
-# them as the `docs` artifact. This workflow then runs in the base repository,
-# where the secrets are available, and only deploys that artifact: it never
-# checks out or executes anything from the PR, treats the artifact as untrusted
-# static files, and puts nothing PR-controlled into a command line.
+# them as the `docs` artifact. This workflow runs in the base repository, where
+# the secrets are available, and only deploys that artifact: it never checks
+# out or executes anything from the PR, treats the artifact as untrusted static
+# files, and puts nothing PR-controlled into a command line. That is what makes
+# the `pull_request_target` trigger below safe.
 #
-# Fork PRs deploy through the `doc-preview-fork` environment, which should have
-# required reviewers so that a maintainer approves each fork preview.
+# Same-repo PRs get a preview after every successful docs build. Fork PRs get
+# one only while they carry the `preview` label, which only maintainers can add:
+# - workflow_run deploys after each successful docs build, if allowed;
+# - pull_request_target (labeled) deploys the PR's latest successful docs build
+#   when `preview` is added, so the label takes effect without another push.
 #
-# workflow_run always runs this file as it is on the default branch, so changes
+# Both triggers always run this file as it is on the default branch, so changes
 # here take effect only once merged.
 #
 # Requires a Direct Upload Pages project named below and the repo secrets
@@ -20,49 +24,71 @@ on:
   workflow_run:
     workflows: [Documentation]
     types: [completed]
+  pull_request_target:
+    types: [labeled]
 permissions: {}
 jobs:
   resolve:
     name: Find PR
     runs-on: ubuntu-latest
     if: >-
-      github.repository == 'libmbd/libmbd' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+      github.repository == 'libmbd/libmbd' && (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.event == 'pull_request' &&
+         github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'pull_request_target' &&
+         github.event.label.name == 'preview'))
     permissions:
+      actions: read
       pull-requests: read
     outputs:
       number: ${{ steps.pr.outputs.number }}
-      fork: ${{ steps.pr.outputs.fork }}
+      run-id: ${{ steps.pr.outputs.run-id }}
     steps:
       - id: pr
         uses: actions/github-script@v9
         with:
           script: |
-            // workflow_run.pull_requests is empty for fork PRs, so look the PR
-            // up by its head, and accept it only if its head is still the
-            // commit these docs were built from.
-            const run = context.payload.workflow_run;
             const { owner, repo } = context.repo;
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open',
-              head: `${run.head_repository.owner.login}:${run.head_branch}`,
-            });
-            const pr = prs.find((p) => p.head.sha === run.head_sha);
-            if (!pr) {
-              core.info(`No open PR has head ${run.head_sha} - skipping`);
+            let pr, runId;
+            if (context.eventName === 'workflow_run') {
+              // workflow_run.pull_requests is empty for fork PRs, so look the
+              // PR up by its head, and accept it only if its head is still the
+              // commit these docs were built from.
+              const run = context.payload.workflow_run;
+              const prs = await github.paginate(github.rest.pulls.list, {
+                owner, repo, state: 'open',
+                head: `${run.head_repository.owner.login}:${run.head_branch}`,
+              });
+              pr = prs.find((p) => p.head.sha === run.head_sha);
+              runId = run.id;
+            } else {
+              // `preview` was just added: deploy the latest successful docs
+              // build of the PR's head. If none has finished yet, the
+              // workflow_run trigger deploys it once it does.
+              pr = context.payload.pull_request;
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id: 'doc.yaml', event: 'pull_request',
+                head_sha: pr.head.sha, status: 'success', per_page: 1,
+              });
+              runId = data.workflow_runs[0]?.id;
+            }
+            if (!pr || !runId) {
+              core.info('No open PR with a successful docs build - skipping');
+              return;
+            }
+            const fork = pr.head.repo?.full_name !== `${owner}/${repo}`;
+            if (fork && !pr.labels.some((l) => l.name === 'preview')) {
+              core.info(`#${pr.number} is from a fork and has no preview label - skipping`);
               return;
             }
             core.setOutput('number', String(pr.number));
-            core.setOutput('fork', String(pr.head.repo?.full_name !== `${owner}/${repo}`));
+            core.setOutput('run-id', String(runId));
   deploy:
     name: Preview
     needs: resolve
     if: needs.resolve.outputs.number
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ needs.resolve.outputs.fork == 'true' && 'doc-preview-fork' || 'doc-preview' }}
-      url: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
     concurrency:
       group: doc-preview-${{ needs.resolve.outputs.number }}
     permissions:
@@ -73,7 +99,7 @@ jobs:
         with:
           name: docs
           path: doc/build
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.resolve.outputs.run-id }}
           github-token: ${{ github.token }}
       - name: Keep the preview static
         # Cloudflare Pages runs a `_worker.js` (file or directory) found in the

@@ -275,9 +275,12 @@ jobs:
             export GCOV=$(printf '%s' "$MACOS_GFORTRAN" | sed -E 's#gfortran(-[0-9]+)?$#gcov\1#')
           fi
           ./devtools/gen-fortran-coverage.sh coverage-fortran
+      # Fork PRs get no CODECOV_TOKEN, so the token is empty there and the
+      # action uploads tokenless, which Codecov accepts from forks of public
+      # repos. Upload errors don't fail the job (fail_ci_if_error is off).
       - name: Upload Python coverage to Codecov
         uses: codecov/codecov-action@v6
-        if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: matrix.type != 'nvhpc'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
@@ -290,7 +293,7 @@ jobs:
           name: python-${{ matrix.type }}-${{ strategy.job-index }}
       - name: Upload Fortran coverage to Codecov
         uses: codecov/codecov-action@v6
-        if: matrix.type != 'nvhpc' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: matrix.type != 'nvhpc'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: coverage-fortran

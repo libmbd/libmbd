@@ -58,6 +58,14 @@ jobs:
         run: |
           brew install --cask miniforge
           echo "CONDA=/opt/homebrew/Caskroom/miniforge/base" >>$GITHUB_ENV
+      - name: Install Miniforge on Linux
+        if: runner.os == 'Linux'
+        # The ubuntu-26.04 runner image behind ubuntu-latest no longer ships
+        # Miniconda, so $CONDA is unset there.
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/miniforge.sh" "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+          bash "$RUNNER_TEMP/miniforge.sh" -b -p "$HOME/miniforge3"
+          echo "CONDA=$HOME/miniforge3" >>$GITHUB_ENV
       - name: Create Conda environment
         run: |
           $CONDA/bin/conda create -p ${{ env.CONDA_PREFIX }} -c conda-forge python pip ${{ env.CONDA_PKGS }} numpy scipy

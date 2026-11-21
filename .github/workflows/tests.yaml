@@ -154,6 +154,14 @@ jobs:
           nvroot=$(ls -d /opt/nvidia/hpc_sdk/Linux_x86_64/*/compilers | sort -V | tail -1)
           echo "$nvroot/bin" >>$GITHUB_PATH
           echo "LD_LIBRARY_PATH=$nvroot/lib:$LD_LIBRARY_PATH" >>$GITHUB_ENV
+      - name: Install Miniforge
+        if: matrix.type == 'conda'
+        # The ubuntu-26.04 runner image behind ubuntu-latest no longer ships
+        # Miniconda, so neither `conda` nor $CONDA exist there.
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/miniforge.sh" "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+          bash "$RUNNER_TEMP/miniforge.sh" -b -p "$HOME/miniforge3"
+          echo "CONDA=$HOME/miniforge3" >>$GITHUB_ENV
       - name: Create Conda environment
         if: matrix.type == 'conda'
         # openblas 0.3.34 SIGSEGVs in the LAPACK complex Hermitian eigensolver
@@ -163,7 +171,7 @@ jobs:
         # nothing else in the env changed, and excluding it makes the legs
         # green again. No matching upstream report yet; drop the exclusion once
         # a fixed release lands.
-        run: conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} pip cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} 'openblas!=0.3.34' ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
+        run: $CONDA/bin/conda create -p ${{ env.VIRTUAL_ENV }} -c conda-forge python${{ matrix.python-version }} pip cmake${{ matrix.cmake-version }} gfortran_linux-64${{ matrix.gfortran-version }} 'openblas!=0.3.34' ${{ matrix.mpi }} scalapack elsi numpy scipy mpi4py
       - name: Create Python virtual environment
         if: matrix.type != 'conda'
         run: |

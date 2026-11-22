@@ -62,15 +62,17 @@ interface dipole_matrix
     !! \end{gathered}
     !! $$
     !!
-    !! In the real-space sum for $\mathbf T^\mathrm{erfc}$, $\mathbf s_{ij}$
-    !! (`pair_shift`) centers each pair's image search before looping over
-    !! the relative index $\mathbf n$.
+    !! In the real-space image sums (for every damping, and likewise in the TS
+    !! energy), \(\mathbf s_{ij}\) (`pair_shift`) centers each pair's image
+    !! search before looping over the relative index \(\mathbf n\).
     !! $$
     !! \begin{gathered}
     !! \mathbf R_{\mathbf nij} = \mathbf R_j + \mathbf R_\mathbf{n}
-    !! +\boldsymbol{\mathcal A} \mathbf s_{ij}-\mathbf R_i \\
-    !! \mathbf s_{ij}=\operatorname{nint}[\boldsymbol{\mathcal A}^{-1}
+    !! +\boldsymbol{\mathcal A} \mathbf s_{ij}-\mathbf R_i
+    !! \\ \mathbf s_{ij}=\operatorname{nint}[\boldsymbol{\mathcal A}^{-1}
     !! (\mathbf R_i-\mathbf R_j)]
+    !! \\ \partial(\mathbf R_\mathbf n+\boldsymbol{\mathcal A}\mathbf s_{ij})
+    !! =(\partial\boldsymbol{\mathcal A})(\mathbf n+\mathbf s_{ij})
     !! \end{gathered}
     !! $$
     !!

@@ -46,13 +46,10 @@ def test_periodic_energy_and_gradients_unwrapped(argon_crystal, method):
         assert shifted_lattice_gradient + shifts.T @ shifted_gradient == approx(
             lattice_gradient, abs=1e-10
         )
-    # recreate geoms to obtain numerical gradients
-    with MBDGeom(coords + shifts @ lattice, lattice, k_grid) as geom:
         numeric = numerical_gradients(
             geom, function, species, volumes, beta, delta=1e-4, **kwargs
         )
         assert shifted_gradient == approx(numeric, abs=1e-9)
-    with MBDGeom(coords + shifts @ lattice, lattice, k_grid) as geom:
         numeric_lattice = numerical_latt_gradients(
             geom, function, species, volumes, beta, delta=1e-4, **kwargs
         )

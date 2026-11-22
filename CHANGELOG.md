@@ -5,23 +5,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-22
+
 ### Added
 
-- `vdw_params_grad=True` on `MBDGeom.mbd_energy()` and `MBDGeom.ts_energy()`, which returns the energy gradients with respect to the atomic polarizabilities, C6 coefficients and vdW radii next to the existing coordinate gradients ([#151](https://github.com/libmbd/libmbd/pull/151))
-- Optional `pymbd.pyscf` bridge turning a converged PySCF Kohn–Sham object into an MBD or TS dispersion energy via Hirshfeld volume ratios ([#145](https://github.com/libmbd/libmbd/pull/145))
+- Gradients w.r.t. vdW parameters in the Python API ([#151](https://github.com/libmbd/libmbd/pull/151))
+- PySCF interface `pymbd.pyscf` ([#145](https://github.com/libmbd/libmbd/pull/145))
 
 ### Changed
 
-- **Breaking:** The C API functions `cmbd_ts_energy()`, `cmbd_mbd_energy()` and `cmbd_mbd_scs_energy()` take an extra `vdw_params_grad` flag, and `cmbd_get_results()` three extra output pointers, `dE_dalpha_0`, `dE_dC6` and `dE_dR_vdw` ([#151](https://github.com/libmbd/libmbd/pull/151))
+- **Breaking:** New arguments of `cmbd_ts_energy()`, `cmbd_mbd_energy()`, `cmbd_mbd_scs_energy()` and `cmbd_get_results()` ([#151](https://github.com/libmbd/libmbd/pull/151))
 
 ### Fixed
 
-- Installing pyMBD with recent pip, which rejected the invalid `mpi4py` version specifier poetry generated for the `mpi` extra ([#150](https://github.com/libmbd/libmbd/pull/150))
-- Missing `cmbd_nonint_density` and `cmbd_int_density` exports from libMBD built with gfortran 16.2, which made the pyMBD C extension unimportable ([#150](https://github.com/libmbd/libmbd/pull/150))
-- pyMBD's version stamp counted untracked files as dirty, unlike libMBD's, so the two could refuse to load together from a checkout containing a build directory or virtual environment ([#150](https://github.com/libmbd/libmbd/pull/150))
-- `MBDGeom.coords` and `MBDGeom.lattice` returning the original values after being set, re-entering a `with` block reverting to them, and setting either outside a `with` block raising `TypeError`; arrays of the wrong shape are now rejected ([#157](https://github.com/libmbd/libmbd/pull/157))
-- `pymbd.utils.numerical_gradients()` and `numerical_latt_gradients()` leaving the geometry displaced by their last finite-difference step ([#157](https://github.com/libmbd/libmbd/pull/157))
-- Wrong results for periodic systems with atoms outside the unit cell: TS and MBD energies, forces and lattice gradients from libMBD ([#153](https://github.com/libmbd/libmbd/pull/153)), and energies and polarizabilities from pyMBD's pure-Python implementation ([#158](https://github.com/libmbd/libmbd/pull/158))
+- Wrong results for periodic systems with atoms outside the unit cell ([#153](https://github.com/libmbd/libmbd/pull/153), [#158](https://github.com/libmbd/libmbd/pull/158))
+- Installation of pyMBD with pip>=24.1 ([#150](https://github.com/libmbd/libmbd/pull/150))
+- Density functions missing from the C API with gfortran 16.2 ([#150](https://github.com/libmbd/libmbd/pull/150))
+- Version mismatch between pyMBD and libMBD built from a checkout with untracked files ([#150](https://github.com/libmbd/libmbd/pull/150))
+- `MBDGeom.coords` and `MBDGeom.lattice` setters, and numerical gradients in `pymbd.utils` ([#157](https://github.com/libmbd/libmbd/pull/157))
 
 ## [0.15.0] - 2026-07-24
 
@@ -298,7 +299,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.15.0...HEAD
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.16.0...HEAD
+[0.16.0]: https://github.com/libmbd/libmbd/compare/0.15.0...0.16.0
 [0.15.0]: https://github.com/libmbd/libmbd/compare/0.14.1...0.15.0
 [0.14.1]: https://github.com/libmbd/libmbd/compare/0.14.0...0.14.1
 [0.14.0]: https://github.com/libmbd/libmbd/compare/0.12.8...0.14.0

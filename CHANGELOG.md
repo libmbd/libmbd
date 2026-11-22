@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Installing pyMBD with recent pip, which rejected the invalid `mpi4py` version specifier poetry generated for the `mpi` extra ([#150](https://github.com/libmbd/libmbd/pull/150))
 - Missing `cmbd_nonint_density` and `cmbd_int_density` exports from libMBD built with gfortran 16.2, which made the pyMBD C extension unimportable ([#150](https://github.com/libmbd/libmbd/pull/150))
 - pyMBD's version stamp counted untracked files as dirty, unlike libMBD's, so the two could refuse to load together from a checkout containing a build directory or virtual environment ([#150](https://github.com/libmbd/libmbd/pull/150))
+- `MBDGeom.coords` and `MBDGeom.lattice` returning the original values after being set, re-entering a `with` block reverting to them, and setting either outside a `with` block raising `TypeError`; arrays of the wrong shape are now rejected ([#157](https://github.com/libmbd/libmbd/pull/157))
+- `pymbd.utils.numerical_gradients()` and `numerical_latt_gradients()` leaving the geometry displaced by their last finite-difference step ([#157](https://github.com/libmbd/libmbd/pull/157))
 
 ## [0.15.0] - 2026-07-24
 

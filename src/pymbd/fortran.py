@@ -143,7 +143,12 @@ class MBDGeom(object):
 
     @coords.setter
     def coords(self, coords):
-        _lib.cmbd_update_coords(self._geom_f, _cast('double*', _array(coords)))
+        coords = _array(coords)
+        if coords.shape != self._coords.shape:
+            raise ValueError(f'Expected coords of shape {self._coords.shape}')
+        self._coords = coords
+        if self._geom_f:
+            _lib.cmbd_update_coords(self._geom_f, _cast('double*', coords))
 
     @property
     def lattice(self):
@@ -152,7 +157,14 @@ class MBDGeom(object):
 
     @lattice.setter
     def lattice(self, lattice):
-        _lib.cmbd_update_lattice(self._geom_f, _cast('double*', _array(lattice)))
+        if not self.has_lattice():
+            raise ValueError('Cannot set lattice of a non-periodic geometry')
+        lattice = _array(lattice)
+        if lattice.shape != (3, 3):
+            raise ValueError('Expected lattice of shape (3, 3)')
+        self._lattice = lattice
+        if self._geom_f:
+            _lib.cmbd_update_lattice(self._geom_f, _cast('double*', lattice))
 
     def has_lattice(self):
         """Whether structure is a crystal."""

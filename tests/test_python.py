@@ -25,6 +25,23 @@ def test_ethylcarbamate(ethylcarbamate):
 
 
 @pytest.mark.no_scalapack
+def test_unwrapped_coords(argon_crystal):
+    coords, lattice, k_grid, species, vol_ratios = argon_crystal
+    # move the atoms by whole lattice vectors, far outside the unit cell
+    shifted = coords + np.array([[19, -23, 17], [-29, 11, -13]]) @ lattice
+    ene, ene_shifted = (
+        mbd_energy_species(c, species, vol_ratios, 0.83, lattice=lattice, k_grid=k_grid)
+        for c in (coords, shifted)
+    )
+    assert ene_shifted == approx(ene, rel=1e-12)
+    alpha, alpha_shifted = (
+        atomic_polarizabilities(c, species, vol_ratios, 0.83, lattice=lattice)
+        for c in (coords, shifted)
+    )
+    assert alpha_shifted == approx(alpha, rel=1e-12)
+
+
+@pytest.mark.no_scalapack
 def test_screening_matrix(benzene_dimer):
     coords, species, vol_ratios = benzene_dimer[0]
     n = len(species)

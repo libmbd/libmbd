@@ -30,8 +30,12 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
     type(damping_t), intent(in) :: damp
     type(grad_request_t), intent(in) :: grad
 
-    real(dp) :: C6_ij, Rnij(3), Rnij_norm, R_vdw_ij, ene_ij, Rn(3), f_damp
-    integer :: i_cell, i_atom, j_atom, range_n(3), n(3), n_atoms, i_latt
+    real(dp) :: C6_ij, Rnij(3), Rnij_norm, R_vdw_ij, ene_ij, f_damp, &
+        Rij(3), latt_inv(3, 3)
+    integer :: i_cell, i_atom, j_atom, range_n(3), n(3), n_atoms, i_latt, &
+        pair_shift(3), image_idx(3), n_cells
+    integer, allocatable :: cell_indices(:, :)
+    real(dp), allocatable :: cell_vectors(:, :)
     logical :: is_periodic, do_ewald
     type(grad_request_t) :: grad_ij
     type(grad_scalar_t) :: df, dC6, dphi, dene_ij
@@ -44,6 +48,7 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
     if (is_periodic) then
         do_ewald = geom%gamm > 0d0
         range_n = supercell_circum(geom%lattice, geom%real_space_cutoff)
+        latt_inv = inverse(geom%lattice)
     else
         range_n(:) = 0
     end if
@@ -53,23 +58,37 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
     if (grad%dalpha) allocate (res%dE%dalpha(n_atoms), source=0d0)
     if (grad%dr_vdw) allocate (res%dE%dr_vdw(n_atoms), source=0d0)
     res%energy = 0d0
+    ! Cache relative images once per call; only the search center depends on the pair.
+    n_cells = product(1 + 2 * range_n)
+    allocate (cell_indices(3, n_cells), cell_vectors(3, n_cells))
     n = [0, 0, -1]
-    each_cell: do i_cell = 1, product(1 + 2 * range_n)
+    do i_cell = 1, n_cells
         call shift_idx(n, -range_n, range_n)
+        cell_indices(:, i_cell) = n
         if (is_periodic) then
-            Rn = matmul(geom%lattice, n)
+            cell_vectors(:, i_cell) = matmul(geom%lattice, n)
         else
-            Rn(:) = 0d0
+            cell_vectors(:, i_cell) = 0d0
         end if
-        each_atom: do i_atom = 1, geom%siz()
+    end do
+    each_atom: do i_atom = 1, geom%siz()
 #ifdef WITH_MPI
-            if (modulo(i_atom, geom%mpi_size) /= geom%mpi_rank) cycle
+        if (modulo(i_atom, geom%mpi_size) /= geom%mpi_rank) cycle
 #endif
-            each_atom_pair: do j_atom = 1, i_atom
+        each_atom_pair: do j_atom = 1, i_atom
+            Rij = geom%coords(:, i_atom) - geom%coords(:, j_atom)
+            pair_shift = 0
+            ! Use the same pair-centered image search as the dipole matrix.
+            ! Lattice derivatives use the full image index n + pair_shift.
+            if (is_periodic) then
+                pair_shift = nint(matmul(latt_inv, Rij))
+                Rij = Rij - matmul(geom%lattice, pair_shift)
+            end if
+            each_cell: do i_cell = 1, n_cells
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                Rnij = geom%coords(:, i_atom) - geom%coords(:, j_atom) - Rn
+                Rnij = Rij - cell_vectors(:, i_cell)
                 Rnij_norm = sqrt(sum(Rnij**2))
                 if (is_periodic .and. Rnij_norm > geom%real_space_cutoff) cycle
                 C6_ij = combine_C6( &
@@ -112,9 +131,10 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
                     res%dE%dcoords(j_atom, :) = res%dE%dcoords(j_atom, :) - dene_ij%dr
                 end if
                 if (grad%dlattice) then
+                    image_idx = cell_indices(:, i_cell) + pair_shift
                     do concurrent(i_latt=1:3)
                         res%dE%dlattice(i_latt, :) = res%dE%dlattice(i_latt, :) &
-                            - dene_ij%dr * n(i_latt)
+                            - dene_ij%dr * image_idx(i_latt)
                     end do
                 end if
                 if (grad%dC6) then
@@ -129,9 +149,9 @@ type(result_t) function get_ts_energy(geom, alpha_0, C6, damp, grad) result(res)
                     res%dE%dr_vdw(i_atom) = res%dE%dr_vdw(i_atom) + dene_ij%dvdw
                     res%dE%dr_vdw(j_atom) = res%dE%dr_vdw(j_atom) + dene_ij%dvdw
                 end if
-            end do each_atom_pair
-        end do each_atom
-    end do each_cell
+            end do each_cell
+        end do each_atom_pair
+    end do each_atom
     if (do_ewald) call add_ewald_ts_parts(geom, alpha_0, C6, res, grad)
 #ifdef WITH_MPI
     call mpi_all_reduce(res%energy, geom%mpi_comm)

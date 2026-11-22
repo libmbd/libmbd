@@ -198,9 +198,16 @@ def dipole_matrix(
         S_vdw = beta * (R_vdw[:, None] + R_vdw[None, :])
     if sigma is not None:
         sigma_ij = np.sqrt(sigma[:, None] ** 2 + sigma[None, :] ** 2)
+    Rs_pair = coords[:, None, :] - coords[None, :, :]
+    if lattice is not None:
+        # Center each pair's image search on its nearest image, so that the
+        # search box, which assumes fractional separations within [-1/2, 1/2],
+        # also covers atoms outside the unit cell, as in libMBD.
+        pair_shifts = np.rint(Rs_pair @ np.linalg.inv(lattice))
+        Rs_pair = Rs_pair - pair_shifts @ lattice
     for idx_cell in product(*(range(-i, i + 1) for i in range_cell)):
         R_cell = lattice.T.dot(idx_cell) if lattice is not None else np.zeros(3)
-        Rs = coords[:, None, :] - coords[None, :, :] + R_cell
+        Rs = Rs_pair + R_cell
         dists = np.sqrt(np.sum(Rs**2, -1))
         if damping == 'fermi,dip':
             T = damping_fermi(dists, S_vdw, a)[:, :, None, None] * T_bare(Rs)

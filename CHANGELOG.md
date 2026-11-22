@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pyMBD's version stamp counted untracked files as dirty, unlike libMBD's, so the two could refuse to load together from a checkout containing a build directory or virtual environment ([#150](https://github.com/libmbd/libmbd/pull/150))
 - `MBDGeom.coords` and `MBDGeom.lattice` returning the original values after being set, re-entering a `with` block reverting to them, and setting either outside a `with` block raising `TypeError`; arrays of the wrong shape are now rejected ([#157](https://github.com/libmbd/libmbd/pull/157))
 - `pymbd.utils.numerical_gradients()` and `numerical_latt_gradients()` leaving the geometry displaced by their last finite-difference step ([#157](https://github.com/libmbd/libmbd/pull/157))
-- Incorrect periodic MBD and TS energies when atoms lie outside of the unit cell, in `src/mbd_dipole.F90` and `src/mbd_ts.F90` ([#153](https://github.com/libmbd/libmbd/pull/153))
+- Wrong results for periodic systems with atoms outside the unit cell: TS and MBD energies, forces and lattice gradients from libMBD ([#153](https://github.com/libmbd/libmbd/pull/153)), and energies and polarizabilities from pyMBD's pure-Python implementation ([#158](https://github.com/libmbd/libmbd/pull/158))
 
 ## [0.15.0] - 2026-07-24
 

@@ -8,14 +8,14 @@ The gate compares each system against what a previous run of the same setup
 measured, in pyscf_s66x8_reference.json, not against the FHI-aims values
 themselves: the deviation from those is basis-set incompleteness in the
 Hirshfeld ratios and is not meant to be zero. The baseline therefore has to be
-seeded from a full run before it gates anything.
+seeded from a full run before it gates anything; every run writes the one it
+measured, ready to commit.
 
-Needs numpy and nothing else: the runner's pyscf, pymbd and pandas imports are
-lazy, and importing from it here must not change that.
+Needs numpy and matplotlib and nothing else: the runner's pyscf, pymbd and
+pandas imports are lazy, and importing from it here must not change that.
 
 Usage:
-    python pyscf_s66x8_aggregate.py --results-dir all-results \\
-        [--expect-systems "1 2 8"] [--report-only]
+    python pyscf_s66x8_aggregate.py --results-dir all-results [--report-only]
 """
 
 import argparse
@@ -34,14 +34,14 @@ REFERENCE_COMMENT = (
     'FHI-aims values, not zero by construction. Regenerate from a full run, or '
     'null a system out to stop gating it.'
 )
-# what a result must share with the baseline for the comparison to mean
-# anything; all of them are dispatch inputs of the workflow
+# what a result must share with the baseline for the comparison to mean anything
 SETTINGS = ('basis', 'xc', 'grid', 'conv_tol')
 # gated quantity -> unit, absolute floor of the tolerance, fraction of |baseline|
 GATED = (
     ('mbd_rel_dev', '%', 0.5, 0.25),
     ('mbd_mae', ' kcal/mol', 0.010, 0.30),
 )
+NO_FILE = 'no results (the shard produced no file)'
 
 
 def load_shards(results_dir):
@@ -51,22 +51,21 @@ def load_shards(results_dir):
     if not paths:
         raise SystemExit(f'no s66x8-*.json in {results_dir}')
     for path in paths:
-        with open(path) as f:
-            shard = json.load(f)
+        shard = json.loads(path.read_text())
         if shard.get('schema') != SCHEMA:
             raise SystemExit(f'{path}: unsupported schema {shard.get("schema")}')
         if meta is None:
             meta = shard['meta']
         elif [meta[k] for k in SETTINGS] != [shard['meta'][k] for k in SETTINGS]:
-            raise SystemExit(f'{path}: settings differ from {list(source.values())[0]}')
+            raise SystemExit(f'{path}: settings differ from the other shards')
         for system in shard['systems']:
             idx = system['idx']
             if idx in systems:
                 raise SystemExit(
-                    f'system {idx} appears in both {source[idx].name} and '
-                    f'{path.name}; the shard layout is not a partition'
+                    f'system {idx} is in both {source[idx]} and {path.name}; '
+                    'the shard layout is not a partition'
                 )
-            systems[idx], source[idx] = system, path
+            systems[idx], source[idx] = system, path.name
     return systems, meta
 
 
@@ -93,10 +92,8 @@ def regression_reason(stats, ref):
         return stats['error']
     if stats['n'] != N_SCALES:
         return f'{stats["n"]}/{N_SCALES} points'
-    if ref is None:
-        return None
     for key, unit, floor, frac in GATED:
-        want = ref.get(key)
+        want = (ref or {}).get(key)
         if want is None:
             continue
         got, tol = stats[key], max(floor, frac * abs(want))
@@ -108,35 +105,31 @@ def regression_reason(stats, ref):
     return None
 
 
-def load_reference(path, meta):
+def load_reference(meta):
     """Return (per-system baselines, why the gate is off) for this run's settings."""
-    with open(path) as f:
-        reference = json.load(f)
+    reference = json.loads(REFERENCE.read_text())
     if reference.get('schema') != SCHEMA:
-        raise SystemExit(f'{path}: unsupported schema {reference.get("schema")}')
-    settings = reference['settings']
-    # basis and grid are dispatch inputs, so a mismatch turns the gate off
-    # loudly rather than producing failures nobody should act on
-    if [settings[k] for k in SETTINGS] != [meta[k] for k in SETTINGS]:
-        got = ', '.join(f'{k} {meta[k]}' for k in SETTINGS)
-        want = ', '.join(f'{k} {settings[k]}' for k in SETTINGS)
-        return {}, f'this run is {got}, the baseline is {want}'
-    systems = {int(k): v for k, v in reference['systems'].items()}
-    if not systems:
-        return {}, 'the baseline has no systems yet; seed it from a full run'
-    return systems, None
+        raise SystemExit(f'{REFERENCE}: unsupported schema {reference.get("schema")}')
+
+    def fmt(settings):
+        return ', '.join(f'{k} {settings[k]}' for k in SETTINGS)
+
+    # the settings are the runner's own defaults, so a mismatch means someone
+    # changed them: turn the gate off loudly rather than fail on a known change
+    if [reference['settings'][k] for k in SETTINGS] != [meta[k] for k in SETTINGS]:
+        return (
+            {},
+            f'this run is {fmt(meta)}, the baseline is {fmt(reference["settings"])}',
+        )
+    return {int(k): v for k, v in reference['systems'].items()}, None
+
+
+def _rnd(value, digits):
+    return None if value is None else round(value, digits)
 
 
 def write_reference(path, stats, meta, vdwsets_ref):
-    """Write the baseline this run measured, ready to commit as the reference file.
-
-    One line per system: a plain indent=1 dump would spend five on each, and 66
-    systems of that is most of the file.
-    """
-
-    def rnd(value, digits):
-        return None if value is None else round(value, digits)
-
+    """Write the baseline this run measured, ready to commit as the reference file."""
     head = json.dumps(
         {
             'schema': SCHEMA,
@@ -146,31 +139,29 @@ def write_reference(path, stats, meta, vdwsets_ref):
         },
         indent=1,
     )
+    # one line per system: indent=1 throughout would spend five on each, and 66
+    # systems of that is most of the file
     systems = ',\n'.join(
         f'  "{s["idx"]}": '
         + json.dumps(
             {
                 'label': s['label'],
-                'mbd_rel_dev': rnd(s['mbd_rel_dev'], 3),
-                'mbd_mae': rnd(s['mbd_mae'], 4),
+                'mbd_rel_dev': _rnd(s['mbd_rel_dev'], 3),
+                'mbd_mae': _rnd(s['mbd_mae'], 4),
             }
         )
         for s in stats
     )
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(
-        f'{head[:-2]},\n "systems": {{\n{systems}\n }}\n}}\n'  # [:-2] drops "\n}"
-    )
+    # head[:-2] drops its closing "\n}"
+    path.write_text(f'{head[:-2]},\n "systems": {{\n{systems}\n }}\n}}\n')
 
 
 def write_plot(path, systems, meta):
     """The deviation, and what it is worth, against separation.
 
-    Two panels: the relative deviation of our MBD term from the FHI-aims one
-    per system, over the MARE against CCSD(T)/CBS with our MBD term, with the
-    reference's, and with none. Being an offset rather than scatter, the
-    deviation cancels against the reference's own error at some separations and
-    compounds at others, which the table can state but only this shows.
+    Being very nearly a pure offset rather than scatter, the deviation cancels
+    against the reference's own error at some separations and compounds at
+    others, which the table can state but only this shows.
     """
     import matplotlib
 
@@ -178,10 +169,8 @@ def write_plot(path, systems, meta):
 
     import matplotlib.pyplot as plt
 
-    rows = flatten_rows(systems.values())
-    overall = summarize(rows)
+    overall = summarize(flatten_rows(systems.values()))
     scales = [b['scale'] for b in overall['by_scale']]
-
     fig, (top, bottom) = plt.subplots(
         2, 1, sharex=True, figsize=(7, 7), constrained_layout=True
     )
@@ -200,7 +189,6 @@ def write_plot(path, systems, meta):
         scales,
         [b['mbd_rel_dev'] for b in overall['by_scale']],
         'o-',
-        color='C0',
         lw=2,
         zorder=3,
         label=f'mean over {len(overall["systems"])} systems',
@@ -212,7 +200,6 @@ def write_plot(path, systems, meta):
         f'conv {meta["conv_tol"]:g}'
     )
     top.legend(loc='best', fontsize='small')
-
     for key, label, style in (
         ('mare_nodisp', 'no dispersion', ':'),
         ('mare_ref', 'reference MBD', '--'),
@@ -229,8 +216,6 @@ def write_plot(path, systems, meta):
     bottom.set_xlabel('separation (fraction of the equilibrium distance)')
     bottom.set_ylabel('MARE vs CCSD(T)/CBS (%)')
     bottom.legend(loc='best', fontsize='small')
-
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=150)
 
 
@@ -268,38 +253,32 @@ def format_markdown(stats, rows, meta, reference, gate_off, verdicts):
         '| ---: | --- | ---: | ---: | ---: | ---: | ---: | --- |',
     ]
     for x in stats:
-        ref = reference.get(x['idx'])
-        status = 'ok'
-        if x['error']:
-            status = '**error**'
-        elif verdicts.get(x['idx']):
-            status = '**regressed**'
-        elif gate_off or ref is None or ref.get('mbd_rel_dev') is None:
+        ref = reference.get(x['idx']) or {}
+        if x['idx'] in verdicts:
+            status = '**error**' if x['error'] else '**regressed**'
+        elif gate_off or ref.get('mbd_rel_dev') is None:
             status = 'ungated'
+        else:
+            status = 'ok'
         out.append(
             f'| {x["idx"]} | {x["label"]} | {x["n"]} | '
             f'{_f(x["mbd_rel_dev"], "+.2f", " %")} | '
-            f'{_f(None if ref is None else ref.get("mbd_rel_dev"), "+.2f", " %")} | '
+            f'{_f(ref.get("mbd_rel_dev"), "+.2f", " %")} | '
             f'{_f(x["mbd_mae"], ".4f")} | {_f(x["mbd_absmax"], ".4f")} | {status} |'
         )
     if gate_off:
         out += ['', f'> The gate is off: {gate_off}.']
-    for heading, failed in (('Failures', True), ('Regressions', False)):
-        listed = [
-            x
+    if verdicts:
+        out += ['', '## Regressions and failures', '']
+        out += [
+            f'- **{x["idx"]} {x["label"]}**: {verdicts[x["idx"]]}'
             for x in stats
-            if verdicts.get(x['idx'])
-            and bool(x['error'] or x['n'] != N_SCALES) is failed
+            if x['idx'] in verdicts
         ]
-        if listed:
-            out += ['', f'## {heading}', '']
-            out += [
-                f'- **{x["idx"]} {x["label"]}**: {verdicts[x["idx"]]}' for x in listed
-            ]
     out += [
         '',
-        'The deviation against separation is in the figure below; the baseline '
-        'this run measured is in the artifact, ready to commit as '
+        'The figure and the baseline this run measured are in the '
+        '**s66x8-summary** artifact, the baseline ready to commit as '
         '`devtools/pyscf_s66x8_reference.json`.',
         '',
     ]
@@ -309,32 +288,23 @@ def format_markdown(stats, rows, meta, reference, gate_off, verdicts):
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--results-dir', required=True, help='directory of shard JSONs')
-    p.add_argument('--reference', default=REFERENCE, help='the committed baseline')
-    p.add_argument(
-        '--expect-systems',
-        default='',
-        help='indices the run dispatched; any with no shard file at all are '
-        'reported as failures rather than silently dropped',
-    )
-    p.add_argument('--out', default='results/summary-s66x8.md')
-    p.add_argument('--write-reference', default='results/reference-s66x8.json')
-    p.add_argument('--plot', default='results/convergence-s66x8.png')
+    p.add_argument('--out-dir', default='results', help='where the report goes')
     p.add_argument('--vdwsets-ref', default='', help='stamped into the baseline')
     p.add_argument('--report-only', action='store_true', help='render without gating')
     args = p.parse_args(argv)
 
     systems, meta = load_shards(args.results_dir)
-    for idx in sorted(int(i) for i in args.expect_systems.split()):
+    reference, gate_off = load_reference(meta)
+    for idx, ref in reference.items():
         # a shard that died outright leaves no file; a placeholder keeps the
-        # table the shape the dispatch asked for and fails the gate
+        # system in the table and fails the gate instead of dropping it silently
         systems.setdefault(
             idx,
             {
                 'idx': idx,
-                'label': '?',
-                'error': 'no results (the shard produced no file)',
+                'label': ref['label'],
+                'error': NO_FILE,
                 'wall': 0.0,
-                'n_scf': 0,
                 'points': [],
             },
         )
@@ -343,31 +313,26 @@ def main(argv=None):
     if not rows:
         raise SystemExit('every system failed; nothing to report')
 
-    reference, gate_off = load_reference(args.reference, meta)
     verdicts = {
-        x['idx']: regression_reason(
-            x, reference.get(x['idx']) if not gate_off else None
-        )
+        x['idx']: regression_reason(x, None if gate_off else reference.get(x['idx']))
         for x in stats
     }
     verdicts = {k: v for k, v in verdicts.items() if v}
 
-    write_reference(args.write_reference, stats, meta, args.vdwsets_ref)
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    write_reference(out / 'reference-s66x8.json', stats, meta, args.vdwsets_ref)
     # before the gate's exit code, so a red run still leaves the figure
-    write_plot(args.plot, systems, meta)
+    write_plot(out / 'convergence-s66x8.png', systems, meta)
     summary = format_markdown(stats, rows, meta, reference, gate_off, verdicts)
-    Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-    Path(args.out).write_text(summary, encoding='utf-8')
+    (out / 'summary-s66x8.md').write_text(summary, encoding='utf-8')
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
             f.write(summary)
     print(summary)
-
-    if not verdicts:
-        return 0
     for idx in sorted(verdicts):
         print(f'{idx}: {verdicts[idx]}', file=sys.stderr)
-    return 0 if args.report_only else 1
+    return 1 if verdicts and not args.report_only else 0
 
 
 if __name__ == '__main__':

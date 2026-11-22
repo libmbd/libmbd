@@ -13,8 +13,8 @@ from .pymbd import _array, from_volumes
 
 try:
     from ._libmbd import ffi as _ffi, lib as _lib
-except ImportError:
-    raise Exception('pyMBD C extension unimportable, cannot use Fortran') from None
+except ImportError as e:
+    raise Exception(f'pyMBD C extension unimportable, cannot use Fortran: {e}') from e
 
 __all__ = ['MBDGeom', 'with_mpi', 'with_scalapack']
 
@@ -40,7 +40,7 @@ if PYMBD_VERSION and isinstance(LIBMBD_VERSION[0], int):
         assert PYMBD_VERSION[1] <= LIBMBD_VERSION[1]
     if len(PYMBD_VERSION) == 4:
         git_commit = re.split('[+-]', PYMBD_VERSION[3])[1]
-        assert LIBMBD_VERSION[3].endswith(git_commit)
+        assert LIBMBD_VERSION[3].endswith(git_commit), (PYMBD_VERSION, LIBMBD_VERSION)
 
 
 class MBDFortranError(Exception):
@@ -143,7 +143,12 @@ class MBDGeom(object):
 
     @coords.setter
     def coords(self, coords):
-        _lib.cmbd_update_coords(self._geom_f, _cast('double*', _array(coords)))
+        coords = _array(coords)
+        if coords.shape != self._coords.shape:
+            raise ValueError(f'Expected coords of shape {self._coords.shape}')
+        self._coords = coords
+        if self._geom_f:
+            _lib.cmbd_update_coords(self._geom_f, _cast('double*', coords))
 
     @property
     def lattice(self):
@@ -152,7 +157,14 @@ class MBDGeom(object):
 
     @lattice.setter
     def lattice(self, lattice):
-        _lib.cmbd_update_lattice(self._geom_f, _cast('double*', _array(lattice)))
+        if not self.has_lattice():
+            raise ValueError('Cannot set lattice of a non-periodic geometry')
+        lattice = _array(lattice)
+        if lattice.shape != (3, 3):
+            raise ValueError('Expected lattice of shape (3, 3)')
+        self._lattice = lattice
+        if self._geom_f:
+            _lib.cmbd_update_lattice(self._geom_f, _cast('double*', lattice))
 
     def has_lattice(self):
         """Whether structure is a crystal."""
@@ -163,7 +175,17 @@ class MBDGeom(object):
         _lib.cmbd_print_timing(self._geom_f)
 
     @_auto_context
-    def ts_energy(self, alpha_0, C6, R_vdw, sR, d=20.0, damping='fermi', force=False):
+    def ts_energy(
+        self,
+        alpha_0,
+        C6,
+        R_vdw,
+        sR,
+        d=20.0,
+        damping='fermi',
+        force=False,
+        vdw_params_grad=False,
+    ):
         """Calculate a TS energy.
 
         :param array-like alpha_0: (a.u.) atomic polarizabilities
@@ -173,6 +195,8 @@ class MBDGeom(object):
         :param float d: TS damping parameter :math:`d`
         :param damping str: type of damping
         :param force bool: if True, calculate energy gradients
+        :param vdw_params_grad bool: if True, calculate the energy gradients
+            with respect to ``alpha_0``, ``C6`` and ``R_vdw``
         """
         alpha_0, C6, R_vdw = map(_array, (alpha_0, C6, R_vdw))
         n_atoms = len(self)
@@ -185,23 +209,37 @@ class MBDGeom(object):
             _cast('double*', C6),
             damping_f,
             force,
+            vdw_params_grad,
         )
         _lib.cmbd_destroy_damping(damping_f)
         self._check_exc()
         ene = np.empty(1)  # for some reason np.array(0) doesn't work
         gradients, lattice_gradients = 2 * [None]
+        vdw_params_gradients = 3 * [None]
         if force:
             gradients = np.zeros((n_atoms, 3))
             if self.has_lattice():
                 lattice_gradients = np.zeros((3, 3))
-        results = (ene, gradients, lattice_gradients, *(7 * [None]))
+        if vdw_params_grad:
+            vdw_params_gradients = [np.zeros(n_atoms) for _ in range(3)]
+        results = (
+            ene,
+            gradients,
+            lattice_gradients,
+            *(7 * [None]),
+            *vdw_params_gradients,
+        )
         _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
         _lib.cmbd_destroy_result(res_f)
         ene = ene.item()
+        if force or vdw_params_grad:
+            ene = (ene,)
         if force:
-            ene = (ene, gradients)
+            ene += (gradients,)
             if self.has_lattice():
                 ene += (lattice_gradients,)
+        if vdw_params_grad:
+            ene += tuple(vdw_params_gradients)
         return ene
 
     @_auto_context
@@ -216,6 +254,7 @@ class MBDGeom(object):
         damping='fermi,dip',
         variant='rsscs',
         force=False,
+        vdw_params_grad=False,
         intermediates=False,
     ):
         r"""Calculate an MBD energy.
@@ -229,6 +268,8 @@ class MBDGeom(object):
         :param damping str: type of damping
         :param variant str: one of 'plain', 'scs', 'rsscs'
         :param force bool: if True, calculate energy gradients
+        :param vdw_params_grad bool: if True, calculate the energy gradients
+            with respect to ``alpha_0``, ``C6`` and ``R_vdw``
         """
         alpha_0, C6, R_vdw, sigma = map(_array, (alpha_0, C6, R_vdw, sigma))
         n_atoms = len(self)
@@ -246,6 +287,7 @@ class MBDGeom(object):
             _cast('double*', C6),
             damping_f,
             force,
+            vdw_params_grad,
         )
         if variant == 'plain':
             res_f = _lib.cmbd_mbd_energy(*args)
@@ -257,11 +299,14 @@ class MBDGeom(object):
         ene = np.empty(1)  # for some reason np.array(0) doesn't work
         gradients, lattice_gradients = 2 * [None]
         alpha_0_scs, C6_scs = 2 * [None]
+        vdw_params_gradients = 3 * [None]
         eigs, modes, rpa_orders, eigs_k, modes_k = 5 * [None]
         if force:
             gradients = np.zeros((n_atoms, 3))
             if self.has_lattice():
                 lattice_gradients = np.zeros((3, 3))
+        if vdw_params_grad:
+            vdw_params_gradients = [np.zeros(n_atoms) for _ in range(3)]
         if intermediates:
             alpha_0_scs, C6_scs = np.zeros(n_atoms), np.zeros(n_atoms)
         if self._get_spectrum:
@@ -291,6 +336,7 @@ class MBDGeom(object):
             modes_k,
             alpha_0_scs,
             C6_scs,
+            *vdw_params_gradients,
         )
         _lib.cmbd_get_results(res_f, *(_cast('double*', x) for x in results))
         _lib.cmbd_destroy_result(res_f)
@@ -301,12 +347,14 @@ class MBDGeom(object):
             ene = ene, eigs, modes
         elif self._get_rpa_orders:
             ene = ene, rpa_orders
-        if force or intermediates:
+        if force or vdw_params_grad or intermediates:
             ene = (ene,)
         if force:
             ene += (gradients,)
             if self.has_lattice():
                 ene += (lattice_gradients,)
+        if vdw_params_grad:
+            ene += tuple(vdw_params_gradients)
         if intermediates:
             ene += (alpha_0_scs, C6_scs)
         return ene

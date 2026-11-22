@@ -50,10 +50,10 @@ interface dipole_matrix
     !! \\ \frac{\mathrm d\mathbf R_{\mathbf nij}}{\mathrm d\mathbf
     !! R_k}=(\delta_{jk}-\delta_{ik})\mathbf I
     !! \\ \mathbf{T}_{ij}(\mathbf{q})\approx\mathbf{T}^\text{Ew}_{ij}(\mathbf{q})
-    !! =\sum_\mathbf n^{|\mathbf R_{\mathbf nij}|<R_\text c}\mathbf
+    !! =\sum_\mathbf n^{|\mathbf R_{\mathbf nij}|\lt R_\text c}\mathbf
     !! T^\text{erfc}(\mathbf R_{\mathbf nij};\gamma)\mathrm e^{-\mathrm i\mathbf
     !! q\cdot\mathbf R_{\mathbf nij}} +\frac{4\pi}{V_\text{uc}}\sum_{\mathbf
-    !! m}^{0<|\mathbf k_\mathbf m|<k_\text c}\mathbf{\hat k}_\mathbf
+    !! m}^{0\lt|\mathbf k_\mathbf m|\lt k_\text c}\mathbf{\hat k}_\mathbf
     !! m\otimes\mathbf{\hat k}_\mathbf m\,\mathrm e^{-\frac{k_\mathbf
     !! m^2}{4\gamma^2}-\mathrm i\mathbf G_\mathbf m\cdot\mathbf R_{ij}}
     !! \\ -\frac{4\gamma^3}{3\sqrt\pi}\delta_{ij}\mathbf I +\delta(\mathbf q)\frac{4
@@ -62,6 +62,19 @@ interface dipole_matrix
     !! \end{gathered}
     !! $$
     !!
+    !! In the real-space image sums (for every damping, and likewise in the TS
+    !! energy), \(\mathbf s_{ij}\) (`pair_shift`) centers each pair's image
+    !! search before looping over the relative index \(\mathbf n\).
+    !! $$
+    !! \begin{gathered}
+    !! \mathbf R_{\mathbf nij} = \mathbf R_j + \mathbf R_\mathbf{n}
+    !! +\boldsymbol{\mathcal A} \mathbf s_{ij}-\mathbf R_i
+    !! \\ \mathbf s_{ij}=\operatorname{nint}[\boldsymbol{\mathcal A}^{-1}
+    !! (\mathbf R_i-\mathbf R_j)]
+    !! \\ \partial(\mathbf R_\mathbf n+\boldsymbol{\mathcal A}\mathbf s_{ij})
+    !! =(\partial\boldsymbol{\mathcal A})(\mathbf n+\mathbf s_{ij})
+    !! \end{gathered}
+    !! $$
     !!
     !! $$
     !! \partial\left(\frac{4\pi}{V_\text{uc}}\right)=-\frac{4\pi}{V_\text{uc}}\frac{\partial
@@ -106,10 +119,12 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     real(dp), intent(in) :: q(3)
 #endif
 
-    real(dp) :: Rn(3), Rnij(3), Rnij_norm, T(3, 3), f_damp, &
+    real(dp) :: Rij(3), latt_inv(3, 3), Rnij(3), Rnij_norm, T(3, 3), f_damp, &
         sigma_ij, T0(3, 3), beta_R_vdw
     integer :: i_atom, j_atom, i_cell, n(3), range_n(3), i, j, &
-        n_atoms, my_i_atom, my_j_atom, i_latt, my_nr, my_nc
+        n_atoms, my_i_atom, my_j_atom, i_latt, my_nr, my_nc, pair_shift(3), image_idx(3), n_cells
+    integer, allocatable :: cell_indices(:, :)
+    real(dp), allocatable :: cell_vectors(:, :)
     logical :: do_ewald, is_periodic
     type(grad_matrix_re_t) :: dT, dT0, dTew
     type(grad_scalar_t) :: df
@@ -137,6 +152,7 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
     if (is_periodic) then
         do_ewald = geom%gamm > 0d0
         range_n = supercell_circum(geom%lattice, geom%real_space_cutoff)
+        latt_inv = inverse(geom%lattice)
     else
         range_n(:) = 0
     end if
@@ -165,22 +181,37 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
 #endif
     end if
     call geom%clock(11)
+    ! Cache relative images once per call; only the search center depends on the pair.
+    n_cells = product(1 + 2 * range_n)
+    allocate (cell_indices(3, n_cells), cell_vectors(3, n_cells))
     n = [0, 0, -1]
-    each_cell: do i_cell = 1, product(1 + 2 * range_n)
+    do i_cell = 1, n_cells
         call shift_idx(n, -range_n, range_n)
+        cell_indices(:, i_cell) = n
         if (is_periodic) then
-            Rn = matmul(geom%lattice, n)
+            cell_vectors(:, i_cell) = matmul(geom%lattice, n)
         else
-            Rn(:) = 0d0
+            cell_vectors(:, i_cell) = 0d0
         end if
-        each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
-            i_atom = dipmat%idx%i_atom(my_i_atom)
-            each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
-                j_atom = dipmat%idx%j_atom(my_j_atom)
+    end do
+    each_atom: do my_i_atom = 1, size(dipmat%idx%i_atom)
+        i_atom = dipmat%idx%i_atom(my_i_atom)
+        each_atom_pair: do my_j_atom = 1, size(dipmat%idx%j_atom)
+            j_atom = dipmat%idx%j_atom(my_j_atom)
+            Rij = geom%coords(:, i_atom) - geom%coords(:, j_atom)
+            pair_shift = 0
+            ! Center the image search on the pair, including unwrapped coordinates.
+            ! The centered fractional difference is in [-1/2, 1/2], as assumed
+            ! by supercell_circum; all images within the cutoff are still summed.
+            if (is_periodic) then
+                pair_shift = nint(matmul(latt_inv, Rij))
+                Rij = Rij - matmul(geom%lattice, pair_shift)
+            end if
+            each_cell: do i_cell = 1, n_cells
                 if (i_cell == 1) then
                     if (i_atom == j_atom) cycle
                 end if
-                Rnij = geom%coords(:, i_atom) - geom%coords(:, j_atom) - Rn
+                Rnij = Rij - cell_vectors(:, i_cell)
                 Rnij_norm = sqrt(sum(Rnij**2))
                 if (is_periodic .and. Rnij_norm > geom%real_space_cutoff) cycle
                 if (allocated(damp%R_vdw)) then
@@ -265,11 +296,12 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                     end associate
                 end if
                 if (grad%dlattice) then
+                    image_idx = cell_indices(:, i_cell) + pair_shift
                      do i_latt = 1, 3
                         associate ( &
                             dTda_sub => ddipmat%dlattice(i + 1:i + 3, j + 1:j + 3, i_latt, :) &
                         )
-                            dTda_sub = dTda_sub - dTij%dr * (n(i_latt))
+                            dTda_sub = dTda_sub - dTij%dr * image_idx(i_latt)
                         end associate
                     end do
                 end if
@@ -290,9 +322,9 @@ type(matrix_cplx_t) function dipole_matrix_complex( &
                     end associate
                 end if
 #endif
-            end do each_atom_pair
-        end do each_atom
-    end do each_cell
+            end do each_cell
+        end do each_atom_pair
+    end do each_atom
     call geom%clock(-11)
     if (do_ewald) then
 #ifndef DO_COMPLEX_TYPE

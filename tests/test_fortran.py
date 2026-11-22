@@ -4,7 +4,11 @@ from pytest import approx
 
 from pymbd import ang, from_volumes
 from pymbd.fortran import MBDFortranError, MBDGeom
-from pymbd.utils import numerical_gradients, numerical_latt_gradients
+from pymbd.utils import (
+    numerical_gradients,
+    numerical_latt_gradients,
+    numerical_vdw_params_gradients,
+)
 
 
 def test_argon_dimer_plain():
@@ -65,6 +69,58 @@ def test_benzene_gradients(benzene_dimer):
         )
     for i in range(len(coords)):
         assert gradients[i] == approx(num_gradients[i], rel=1e-10, abs=1e-10)
+
+
+@pytest.mark.parametrize('variant', ['plain', 'rsscs'])
+def test_benzene_vdw_params_gradients(benzene_dimer, variant):
+    coords, species, vol_ratios = benzene_dimer[0]
+    alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
+    with MBDGeom(coords) as geom:
+
+        def energy(alpha_0, C6, R_vdw):
+            return geom.mbd_energy(alpha_0, C6, R_vdw, 0.83, variant=variant)
+
+        _, dE_dalpha_0, dE_dC6, dE_dR_vdw = geom.mbd_energy(
+            alpha_0, C6, R_vdw, 0.83, variant=variant, vdw_params_grad=True
+        )
+        num_gradients = numerical_vdw_params_gradients(energy, alpha_0, C6, R_vdw)
+    for gradient, num_gradient in zip((dE_dalpha_0, dE_dC6, dE_dR_vdw), num_gradients):
+        assert gradient == approx(num_gradient, rel=1e-6, abs=1e-10)
+
+
+def test_benzene_ts_vdw_params_gradients(benzene_dimer):
+    coords, species, vol_ratios = benzene_dimer[0]
+    alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
+    with MBDGeom(coords) as geom:
+
+        def energy(alpha_0, C6, R_vdw):
+            return geom.ts_energy(alpha_0, C6, R_vdw, 0.94)
+
+        _, dE_dalpha_0, dE_dC6, dE_dR_vdw = geom.ts_energy(
+            alpha_0, C6, R_vdw, 0.94, vdw_params_grad=True
+        )
+        num_gradients = numerical_vdw_params_gradients(energy, alpha_0, C6, R_vdw)
+    for gradient, num_gradient in zip((dE_dalpha_0, dE_dC6, dE_dR_vdw), num_gradients):
+        assert gradient == approx(num_gradient, rel=1e-6, abs=1e-10)
+
+
+def test_argon_crystal_vdw_params_gradients(argon_crystal):
+    # also pins down the order in which the two kinds of gradient come back
+    coords, lattice, k_grid, species, vol_ratios = argon_crystal
+    alpha_0, C6, R_vdw = from_volumes(species, vol_ratios)
+    with MBDGeom(coords, lattice, k_grid) as geom:
+
+        def energy(alpha_0, C6, R_vdw):
+            return geom.mbd_energy(alpha_0, C6, R_vdw, 0.83)
+
+        (_, gradients, latt_gradients, dE_dalpha_0, dE_dC6, dE_dR_vdw) = (
+            geom.mbd_energy(alpha_0, C6, R_vdw, 0.83, force=True, vdw_params_grad=True)
+        )
+        num_gradients = numerical_vdw_params_gradients(energy, alpha_0, C6, R_vdw)
+    assert gradients.shape == (len(coords), 3)
+    assert latt_gradients.shape == (3, 3)
+    for gradient, num_gradient in zip((dE_dalpha_0, dE_dC6, dE_dR_vdw), num_gradients):
+        assert gradient == approx(num_gradient, rel=1e-6, abs=1e-10)
 
 
 @pytest.mark.no_scalapack
@@ -193,6 +249,40 @@ def test_argon_crystal_gradients(argon_crystal):
         )
     for i in range(3):
         assert latt_gradients[i] == approx(num_latt_gradients[i], rel=1e-10, abs=1e-10)
+
+
+def test_geom_setters(argon_crystal):
+    coords, lattice, k_grid, species, vol_ratios = argon_crystal
+    coords_2, lattice_2 = coords + 0.1, 1.05 * lattice
+    ene_2 = MBDGeom(coords_2, lattice_2, k_grid).ts_energy_species(
+        species, vol_ratios, 0.94
+    )
+    geom = MBDGeom(coords, lattice, k_grid)
+    with geom:
+        geom.coords = coords_2
+        geom.lattice = lattice_2
+        assert geom.coords == approx(coords_2)
+        assert geom.lattice == approx(lattice_2)
+        assert geom.ts_energy_species(species, vol_ratios, 0.94) == approx(ene_2)
+    # re-entering rebuilds the libMBD geometry from the stored coordinates
+    assert geom.ts_energy_species(species, vol_ratios, 0.94) == approx(ene_2)
+    geom.coords, geom.lattice = coords, lattice  # also outside of a context
+    assert geom.coords == approx(coords)
+    with pytest.raises(ValueError):
+        geom.coords = coords[:1]
+
+
+def test_numerical_gradients_restore_geometry(argon_crystal):
+    coords, lattice, k_grid, species, vol_ratios = argon_crystal
+    with MBDGeom(coords, lattice, k_grid) as geom:
+        ene = geom.ts_energy_species(species, vol_ratios, 0.94)
+        numerical_gradients(geom, 'ts_energy_species', species, vol_ratios, 0.94)
+        numerical_latt_gradients(geom, 'ts_energy_species', species, vol_ratios, 0.94)
+        assert geom.coords == approx(coords)
+        assert geom.lattice == approx(lattice)
+        assert geom.ts_energy_species(species, vol_ratios, 0.94) == approx(
+            ene, rel=1e-14
+        )
 
 
 def test_lithium(bulk_lithium):

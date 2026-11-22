@@ -5,13 +5,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-22
+
 ### Added
 
-- Optional `pymbd.pyscf` bridge turning a converged PySCF Kohn–Sham object into an MBD or TS dispersion energy via Hirshfeld volume ratios ([#145](https://github.com/libmbd/libmbd/pull/145))
+- Gradients w.r.t. vdW parameters in the Python API ([#151](https://github.com/libmbd/libmbd/pull/151))
+- PySCF interface `pymbd.pyscf` ([#145](https://github.com/libmbd/libmbd/pull/145))
+
+### Changed
+
+- **Breaking:** New arguments of `cmbd_ts_energy()`, `cmbd_mbd_energy()`, `cmbd_mbd_scs_energy()` and `cmbd_get_results()` ([#151](https://github.com/libmbd/libmbd/pull/151))
 
 ### Fixed
 
-- pyMBD failing to import its C extension (`undefined symbol: cmbd_nonint_density`) when libMBD is built with gfortran 16.2, which no longer exports the two density bindings that were missing from the C API module's public list ([#147](https://github.com/libmbd/libmbd/pull/147))
+- Wrong results for periodic systems with atoms outside the unit cell ([#153](https://github.com/libmbd/libmbd/pull/153), [#158](https://github.com/libmbd/libmbd/pull/158))
+- Installation of pyMBD with pip>=24.1 ([#150](https://github.com/libmbd/libmbd/pull/150))
+- Density functions missing from the C API with gfortran 16.2 ([#150](https://github.com/libmbd/libmbd/pull/150))
+- Version mismatch between pyMBD and libMBD built from a checkout with untracked files ([#150](https://github.com/libmbd/libmbd/pull/150))
+- `MBDGeom.coords` and `MBDGeom.lattice` setters, and numerical gradients in `pymbd.utils` ([#157](https://github.com/libmbd/libmbd/pull/157))
 
 ## [0.15.0] - 2026-07-24
 
@@ -288,7 +299,8 @@ Completely reworked.
 - Analytical gradients including lattice-vector derivatives.
 - Scalapack parallelization of all calculations.
 
-[unreleased]: https://github.com/libmbd/libmbd/compare/0.15.0...HEAD
+[unreleased]: https://github.com/libmbd/libmbd/compare/0.16.0...HEAD
+[0.16.0]: https://github.com/libmbd/libmbd/compare/0.15.0...0.16.0
 [0.15.0]: https://github.com/libmbd/libmbd/compare/0.14.1...0.15.0
 [0.14.1]: https://github.com/libmbd/libmbd/compare/0.14.0...0.14.1
 [0.14.0]: https://github.com/libmbd/libmbd/compare/0.12.8...0.14.0

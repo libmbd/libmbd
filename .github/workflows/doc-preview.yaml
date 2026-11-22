@@ -1,0 +1,146 @@
+name: Preview Docs
+# Per-PR documentation preview on Cloudflare Pages. Production docs stay on
+# GitHub Pages (doc-deploy.yaml).
+#
+# Documentation builds the docs on `pull_request`, without secrets, and uploads
+# them as the `docs` artifact. This workflow runs in the base repository, where
+# the secrets are available, and only deploys that artifact: it never checks
+# out or executes anything from the PR, treats the artifact as untrusted static
+# files, and puts nothing PR-controlled into a command line. That is what makes
+# the `pull_request_target` trigger below safe.
+#
+# Same-repo PRs get a preview after every successful docs build. Fork PRs get
+# one only while they carry the `preview` label, which only maintainers can add:
+# - workflow_run deploys after each successful docs build, if allowed;
+# - pull_request_target (labeled) deploys the PR's latest successful docs build
+#   when `preview` is added, so the label takes effect without another push.
+#
+# Both triggers always run this file as it is on the default branch, so changes
+# here take effect only once merged.
+#
+# Requires a Direct Upload Pages project named below and the repo secrets
+# CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID.
+on:
+  workflow_run:
+    workflows: [Documentation]
+    types: [completed]
+  pull_request_target:
+    types: [labeled]
+permissions: {}
+jobs:
+  resolve:
+    name: Find PR
+    runs-on: ubuntu-latest
+    if: >-
+      github.repository == 'libmbd/libmbd' && (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.event == 'pull_request' &&
+         github.event.workflow_run.conclusion == 'success') ||
+        (github.event_name == 'pull_request_target' &&
+         github.event.label.name == 'preview'))
+    permissions:
+      actions: read
+      pull-requests: read
+    outputs:
+      number: ${{ steps.pr.outputs.number }}
+      run-id: ${{ steps.pr.outputs.run-id }}
+    steps:
+      - id: pr
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            let pr, runId;
+            if (context.eventName === 'workflow_run') {
+              // workflow_run.pull_requests is empty for fork PRs, so look the
+              // PR up by its head, and accept it only if its head is still the
+              // commit these docs were built from.
+              const run = context.payload.workflow_run;
+              const prs = await github.paginate(github.rest.pulls.list, {
+                owner, repo, state: 'open',
+                head: `${run.head_repository.owner.login}:${run.head_branch}`,
+              });
+              pr = prs.find((p) => p.head.sha === run.head_sha);
+              runId = run.id;
+            } else {
+              // `preview` was just added: deploy the latest successful docs
+              // build of the PR's head. If none has finished yet, the
+              // workflow_run trigger deploys it once it does.
+              pr = context.payload.pull_request;
+              const { data } = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id: 'doc.yaml', event: 'pull_request',
+                head_sha: pr.head.sha, status: 'success', per_page: 1,
+              });
+              runId = data.workflow_runs[0]?.id;
+            }
+            if (!pr || !runId) {
+              core.info('No open PR with a successful docs build - skipping');
+              return;
+            }
+            const fork = pr.head.repo?.full_name !== `${owner}/${repo}`;
+            if (fork && !pr.labels.some((l) => l.name === 'preview')) {
+              core.info(`#${pr.number} is from a fork and has no preview label - skipping`);
+              return;
+            }
+            core.setOutput('number', String(pr.number));
+            core.setOutput('run-id', String(runId));
+  deploy:
+    name: Preview
+    needs: resolve
+    if: needs.resolve.outputs.number
+    runs-on: ubuntu-latest
+    concurrency:
+      group: doc-preview-${{ needs.resolve.outputs.number }}
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: docs
+          path: doc/build
+          run-id: ${{ needs.resolve.outputs.run-id }}
+          github-token: ${{ github.token }}
+      - name: Keep the preview static
+        # Cloudflare Pages runs a `_worker.js` (file or directory) found in the
+        # upload as a Worker. The docs never contain one, so drop anything a PR
+        # might have slipped in. There is no checkout, so no `functions/` or
+        # wrangler config can come from the PR either.
+        run: rm -rf doc/build/_worker.js doc/build/_routes.json
+      - id: deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # v3 defaults to the old wrangler 3.90.0, which fails deploying with
+          # "Cannot convert argument to a ByteString"; pin a current wrangler.
+          wranglerVersion: '4.112.0'
+          command: pages deploy doc/build --project-name=libmbd-docs --branch=pr-${{ needs.resolve.outputs.number }}
+      # Post (or update in place) a single PR comment with the preview links,
+      # identified by an HTML-comment marker. Values are passed via env, not
+      # string-interpolated into the script, to avoid any injection.
+      - uses: actions/github-script@v9
+        env:
+          PR_NUMBER: ${{ needs.resolve.outputs.number }}
+          ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+          DEPLOY_URL: ${{ steps.deploy.outputs.deployment-url }}
+        with:
+          script: |
+            const marker = '<!-- cloudflare-preview -->';
+            const body = [
+              marker,
+              `Documentation preview: ${process.env.ALIAS_URL}`,
+              '',
+              `Latest commit deploy: ${process.env.DEPLOY_URL}`,
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = Number(process.env.PR_NUMBER);
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number,
+            });
+            const existing = comments.find((c) => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }

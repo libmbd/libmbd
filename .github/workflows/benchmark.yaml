@@ -1,0 +1,178 @@
+name: S66x8 benchmark
+on:
+  workflow_dispatch:
+    inputs:
+      report_only:
+        description: 'Render the summary without failing on a regression'
+        type: boolean
+        default: false
+
+env:
+  # pinned: the committed baseline was measured on these geometries
+  VDWSETS_REF: 1da24b4fea312e2beaf9b3b9c2966be0200f3879
+  H5_SHA256: d268d10a570c8492af95bdc1c453491e1af7d1a9a67e5e8c5fc484d675624802
+  # pinned: pyscf and tables lag new CPython releases
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  benchmark:
+    name: s66x8 ${{ matrix.batch_id }}
+    runs-on: ubuntu-latest
+    # a shard measures ~13 min; short enough that a hung one dies while
+    # aggregating the rest is still worth it
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      # A static partition of the 66 systems, balanced by longest-processing-time
+      # packing on the per-system wall times a full sweep measured (run
+      # 32630365420); a basis-function proxy ranked them badly enough to leave a
+      # 1.4x spread. Re-pack from a run's s66x8-results-* artifacts if the set or
+      # the settings change. A whole curve has to stay in one shard: the runner's
+      # monomer memoization and density chaining are both curve-local, so
+      # splitting one costs SCFs and buys nothing.
+      matrix:
+        include:
+          - {batch_id: b0, systems: '11 13 25 34 66'}
+          - {batch_id: b1, systems: '19 20 22 43 55'}
+          - {batch_id: b2, systems: '4 27 41 48 50'}
+          - {batch_id: b3, systems: '16 17 30 37 52'}
+          - {batch_id: b4, systems: '18 26 32 56 62'}
+          - {batch_id: b5, systems: '29 45 54 57 58'}
+          - {batch_id: b6, systems: '7 39 42 53 59 60'}
+          - {batch_id: b7, systems: '10 23 33 35 51 63'}
+          - {batch_id: b8, systems: '1 5 15 46 47 65'}
+          - {batch_id: b9, systems: '3 12 14 24 40 61'}
+          - {batch_id: b10, systems: '6 8 36 44 49 64'}
+          - {batch_id: b11, systems: '2 9 21 28 31 38'}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # poetry-dynamic-versioning derives the version from the tags
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Set environment variables
+        run: |
+          echo VIRTUAL_ENV=$HOME/env >>$GITHUB_ENV
+          echo $HOME/env/bin >>$GITHUB_PATH
+      - name: Pin the numeric-library threads
+        # one OpenBLAS thread, the cores to PySCF's OpenMP: where both pools
+        # claim every core they contend badly
+        run: |
+          n=$(lscpu -p=Core,Socket | grep -v '^#' | sort -u | wc -l)
+          echo "Detected $n physical cores on this runner."
+          echo "OMP_NUM_THREADS=$n" >>"$GITHUB_ENV"
+          echo "OPENBLAS_NUM_THREADS=1" >>"$GITHUB_ENV"
+          echo "MKL_NUM_THREADS=1" >>"$GITHUB_ENV"
+      - name: Install libMBD dependencies
+        # no MPI: the bridge is serial
+        run: |
+          sudo apt-get install -yq --no-install-suggests --no-install-recommends \
+            gfortran libblas-dev liblapack-dev
+      - name: Create the Python virtual environment
+        run: |
+          python3 -m venv $HOME/env
+          $HOME/env/bin/pip install -U pip
+      - name: Build & install libMBD and pyMBD
+        # pandas and tables read the HDF5 store
+        run: |
+          make install PYMBD_EXTRAS=pyscf
+          pip install pandas tables
+      - uses: actions/cache@v5
+        with:
+          path: ~/s66x8-cache
+          key: s66x8-h5-${{ env.H5_SHA256 }}
+      - name: Fetch all-data.h5 from figshare
+        run: |
+          mkdir -p ~/s66x8-cache
+          if [ ! -f ~/s66x8-cache/all-data.h5 ]; then
+            curl -fL --retry 5 --retry-all-errors --retry-delay 5 \
+              -o ~/s66x8-cache/all-data.h5.part \
+              https://ndownloader.figshare.com/files/9775933
+            mv ~/s66x8-cache/all-data.h5.part ~/s66x8-cache/all-data.h5
+          fi
+          echo "$H5_SHA256  $HOME/s66x8-cache/all-data.h5" | sha256sum -c -
+      - name: Fetch the pinned vdwsets geometries
+        run: |
+          git init -q vdwsets
+          git -C vdwsets remote add origin https://github.com/azag0/vdwsets
+          git -C vdwsets fetch -q --depth 1 origin "$VDWSETS_REF"
+          git -C vdwsets checkout -q FETCH_HEAD
+      - name: Run the shard
+        # the settings are the runner's own defaults, which is what the committed
+        # baseline records -- there is nothing to pass and nothing to keep in sync
+        env:
+          BATCH: ${{ matrix.batch_id }}
+          SYSTEMS: ${{ matrix.systems }}
+        run: |
+          read -ra idx <<< "$SYSTEMS"
+          python devtools/pyscf_s66x8_figshare_check.py \
+            --vdwsets vdwsets --h5 ~/s66x8-cache/all-data.h5 \
+            --idx "${idx[@]}" --out-json "results/s66x8-${BATCH}.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s66x8-results-${{ matrix.batch_id }}
+          path: results/
+
+  aggregate:
+    needs: benchmark
+    # Still aggregate when a shard failed -- the partial results are the point.
+    if: always() && needs.benchmark.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # the publish step force-updates ci-assets; serialize so two runs cannot
+    # clobber each other
+    permissions:
+      contents: write
+    concurrency:
+      group: ci-assets-publish
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: all-results
+          pattern: s66x8-results-*
+          merge-multiple: true
+      - name: Install the aggregator's dependencies
+        # no libMBD build and no pyscf: the runner's imports of both are lazy
+        run: pip install numpy matplotlib
+      - name: Aggregate
+        run: |
+          python devtools/pyscf_s66x8_aggregate.py \
+            --results-dir all-results --vdwsets-ref "$VDWSETS_REF" \
+            ${{ inputs.report_only && '--report-only' || '' }}
+      - name: Publish the plot and show it in the run summary
+        # A job summary renders an image only from an absolute URL, so force-push
+        # the PNG as a single-commit orphan ci-assets branch and link its raw URL.
+        # Best-effort: a publish error must not turn a green benchmark red, and
+        # the figure is in the artifact either way.
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PNG: results/convergence-s66x8.png
+        run: |
+          [ -f "$PNG" ] || exit 0
+          d=$(mktemp -d) && cp "$PNG" "$d"
+          git -C "$d" init -q
+          git -C "$d" add -A
+          git -C "$d" -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -qm "s66x8 benchmark plot from run $GITHUB_RUN_ID"
+          git -C "$d" push -q --force \
+            "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY" \
+            HEAD:refs/heads/ci-assets
+          raw=https://raw.githubusercontent.com/$GITHUB_REPOSITORY/ci-assets
+          printf '\n## Deviation against separation\n\n![plot](%s?%s)\n' \
+            "$raw/$(basename "$PNG")" "$GITHUB_RUN_ID" >>"$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: s66x8-summary
+          path: results/
